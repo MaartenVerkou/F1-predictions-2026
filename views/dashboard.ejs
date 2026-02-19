@@ -3,6 +3,12 @@
 <section class="hero">
   <div class="card">
     <h1>Your groups</h1>
+    <% if (error) { %>
+      <div class="alert"><%= error %></div>
+    <% } %>
+    <% if (success) { %>
+      <div class="alert" style="background:#eef8f0;border-color:#c8e6d0;color:#2d6a3a;"><%= success %></div>
+    <% } %>
     <% if (groups.length === 0) { %>
       <p class="muted">No groups yet. Create one below.</p>
     <% } %>
@@ -28,7 +34,26 @@
         Group name
         <input type="text" name="name" required />
       </label>
+      <label>
+        Group password
+        <input type="password" name="joinPassword" required minlength="4" />
+      </label>
       <button type="submit">Create group</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Join a group</h2>
+    <form method="post" action="/groups/join">
+      <label>
+        Group code
+        <input type="text" name="code" required />
+      </label>
+      <label>
+        Group password
+        <input type="password" name="password" required />
+      </label>
+      <button type="submit">Join group</button>
     </form>
   </div>
 </section>

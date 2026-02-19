@@ -5,6 +5,7 @@
     <h1><%= group.name %></h1>
     <p class="muted">Invite friends, then head to the questions page to lock in picks.</p>
     <p class="muted">Group closes on March 5, 2026.</p>
+    <p class="muted">Group code: <strong><%= group.join_code || 'Not set yet' %></strong></p>
     <div class="inline-actions">
       <a class="link" href="/groups/<%= group.id %>/questions">Answer questions</a>
       <a class="link" href="/groups/<%= group.id %>/responses">View responses</a>
@@ -62,6 +63,19 @@
       <% }) %>
     </ul>
   </div>
+
+  <% if (role === 'owner' || role === 'admin') { %>
+    <div class="card">
+      <h2>Group password</h2>
+      <form method="post" action="/groups/<%= group.id %>/password">
+        <label>
+          Set new password
+          <input type="password" name="joinPassword" required minlength="4" />
+        </label>
+        <button type="submit">Update password</button>
+      </form>
+    </div>
+  <% } %>
 </section>
 
 <%- include('partials/footer') %>

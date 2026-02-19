@@ -76,4 +76,4 @@ Enter season results at `/admin/actuals` after the season. The leaderboard at `/
 - `DEV_AUTO_LOGIN` - set to `1` to auto-login in development (ignored in production)
 - `DEV_AUTO_LOGIN_EMAIL` - email for auto-login user (default `dev@example.com`)
 - `DEV_AUTO_LOGIN_NAME` - name for auto-login user (default `Dev Admin`)
-- `ADMIN_EMAILS` - comma-separated list of admin emails allowed to access `/admin/*`
+- `ADMIN_PASSWORD` - password required to access `/admin/*`

@@ -20,10 +20,7 @@ const DEV_AUTO_LOGIN_EMAIL =
 const DEV_AUTO_LOGIN_NAME = process.env.DEV_AUTO_LOGIN_NAME || "Dev Admin";
 const PREDICTIONS_CLOSE_AT =
   process.env.PREDICTIONS_CLOSE_AT || "2026-03-05T23:59:59";
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -90,6 +87,19 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 `);
+
+function ensureGroupColumns() {
+  const columns = db.prepare("PRAGMA table_info(groups);").all();
+  const names = new Set(columns.map((col) => col.name));
+  if (!names.has("join_code")) {
+    db.exec("ALTER TABLE groups ADD COLUMN join_code TEXT;");
+  }
+  if (!names.has("join_password_hash")) {
+    db.exec("ALTER TABLE groups ADD COLUMN join_password_hash TEXT;");
+  }
+}
+
+ensureGroupColumns();
 
 const duplicateNames = db
   .prepare(
@@ -237,15 +247,16 @@ function getCurrentUser(req) {
   return stmt.get(req.session.userId) || null;
 }
 
-function isAdmin(user) {
-  if (!user) return false;
-  return ADMIN_EMAILS.includes(String(user.email || "").toLowerCase());
+function isAdmin(req) {
+  return req.session && req.session.isAdmin === true;
 }
 
 function requireAdmin(req, res, next) {
-  const user = getCurrentUser(req);
-  if (!isAdmin(user)) {
-    return res.status(403).send("Admin access only.");
+  if (!req.session.userId) {
+    return res.redirect("/login");
+  }
+  if (!isAdmin(req)) {
+    return res.redirect("/admin/login");
   }
   next();
 }
@@ -373,26 +384,105 @@ app.get("/dashboard", requireAuth, (req, res) => {
     )
     .all(user.id);
 
-  res.render("dashboard", { user, groups });
+  res.render("dashboard", { user, groups, error: null, success: null });
 });
 
 app.post("/groups", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
-  const { name } = req.body;
-  if (!name) {
-    return res.redirect("/dashboard");
+  const { name, joinPassword } = req.body;
+  if (!name || !joinPassword) {
+    const groups = db
+      .prepare(
+        `
+        SELECT g.id, g.name, g.owner_id, gm.role
+        FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id
+        WHERE gm.user_id = ?
+        ORDER BY g.created_at DESC
+        `
+      )
+      .all(user.id);
+    return res.render("dashboard", {
+      user,
+      groups,
+      error: "Group name and password are required.",
+      success: null
+    });
   }
   const now = new Date().toISOString();
+  const joinCode = crypto.randomBytes(3).toString("hex").toUpperCase();
+  const joinPasswordHash = bcrypt.hashSync(joinPassword, 10);
   const groupInfo = db
     .prepare(
-      "INSERT INTO groups (name, owner_id, created_at) VALUES (?, ?, ?)"
+      "INSERT INTO groups (name, owner_id, created_at, join_code, join_password_hash) VALUES (?, ?, ?, ?, ?)"
     )
-    .run(name.trim(), user.id, now);
+    .run(name.trim(), user.id, now, joinCode, joinPasswordHash);
   db.prepare(
     "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
   ).run(user.id, groupInfo.lastInsertRowid, "owner", now);
 
   res.redirect(`/groups/${groupInfo.lastInsertRowid}`);
+});
+
+app.post("/groups/join", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req);
+  const { code, password } = req.body;
+  const groups = db
+    .prepare(
+      `
+      SELECT g.id, g.name, g.owner_id, gm.role
+      FROM groups g
+      JOIN group_members gm ON gm.group_id = g.id
+      WHERE gm.user_id = ?
+      ORDER BY g.created_at DESC
+      `
+    )
+    .all(user.id);
+
+  if (!code || !password) {
+    return res.render("dashboard", {
+      user,
+      groups,
+      error: "Group code and password are required.",
+      success: null
+    });
+  }
+
+  const group = db
+    .prepare("SELECT * FROM groups WHERE join_code = ?")
+    .get(String(code).trim().toUpperCase());
+
+  if (!group || !group.join_password_hash) {
+    return res.render("dashboard", {
+      user,
+      groups,
+      error: "Invalid group code.",
+      success: null
+    });
+  }
+
+  const ok = await bcrypt.compare(password, group.join_password_hash);
+  if (!ok) {
+    return res.render("dashboard", {
+      user,
+      groups,
+      error: "Incorrect group password.",
+      success: null
+    });
+  }
+
+  if (!isMember(user.id, group.id)) {
+    db.prepare(
+      "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
+    ).run(user.id, group.id, "member", new Date().toISOString());
+  }
+
+  res.render("dashboard", {
+    user,
+    groups,
+    error: null,
+    success: `Joined group ${group.name}.`
+  });
 });
 
 app.get("/groups/:id", requireAuth, (req, res) => {
@@ -422,7 +512,7 @@ app.get("/groups/:id", requireAuth, (req, res) => {
     .all(groupId);
 
   const role = getMemberRole(user.id, groupId);
-  res.render("group", { user, group, members, invites, role });
+  res.render("group", { user, group, members, invites, role, error: null, success: null });
 });
 
 app.post("/groups/:id/invites", requireAuth, (req, res) => {
@@ -458,6 +548,24 @@ app.get("/join/:code", requireAuth, (req, res) => {
   ).run(user.id, invite.group_id, "member", now);
 
   res.redirect(`/groups/${invite.group_id}`);
+});
+
+app.post("/groups/:id/password", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  if (!isGroupAdmin(user.id, groupId)) {
+    return res.status(403).send("Admin access only.");
+  }
+  const { joinPassword } = req.body;
+  if (!joinPassword) {
+    return res.redirect(`/groups/${groupId}`);
+  }
+  const joinPasswordHash = await bcrypt.hash(joinPassword, 10);
+  db.prepare("UPDATE groups SET join_password_hash = ? WHERE id = ?").run(
+    joinPasswordHash,
+    groupId
+  );
+  res.redirect(`/groups/${groupId}`);
 });
 
 app.post("/groups/:id/members/:userId/kick", requireAuth, (req, res) => {
@@ -931,11 +1039,32 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
   });
 });
 
-app.get("/admin/actuals", requireAuth, (req, res) => {
-  const user = getCurrentUser(req);
-  if (!isAdmin(user)) {
-    return res.status(403).send("Admin access only.");
+app.get("/admin/login", (req, res) => {
+  res.render("admin_login", { user: getCurrentUser(req), error: null });
+});
+
+app.post("/admin/login", (req, res) => {
+  const { password } = req.body;
+  if (!ADMIN_PASSWORD) {
+    return res.status(500).send("Admin password not configured.");
   }
+  if (password !== ADMIN_PASSWORD) {
+    return res.render("admin_login", {
+      user: getCurrentUser(req),
+      error: "Invalid admin password."
+    });
+  }
+  req.session.isAdmin = true;
+  res.redirect("/admin/overview");
+});
+
+app.post("/admin/logout", (req, res) => {
+  req.session.isAdmin = false;
+  res.redirect("/dashboard");
+});
+
+app.get("/admin/actuals", requireAdmin, (req, res) => {
+  const user = getCurrentUser(req);
   const questions = getQuestions();
   const roster = getRoster();
   const races = getRaces();
@@ -948,11 +1077,7 @@ app.get("/admin/actuals", requireAuth, (req, res) => {
   res.render("admin_actuals", { user, questions, roster, races, actuals });
 });
 
-app.post("/admin/actuals", requireAuth, (req, res) => {
-  const user = getCurrentUser(req);
-  if (!isAdmin(user)) {
-    return res.status(403).send("Admin access only.");
-  }
+app.post("/admin/actuals", requireAdmin, (req, res) => {
   const questions = getQuestions();
   const races = getRaces();
   const now = new Date().toISOString();
@@ -1043,7 +1168,7 @@ app.post("/admin/actuals", requireAuth, (req, res) => {
   res.redirect("/admin/actuals");
 });
 
-app.get("/admin/overview", requireAuth, requireAdmin, (req, res) => {
+app.get("/admin/overview", requireAdmin, (req, res) => {
   const user = getCurrentUser(req);
   const users = db
     .prepare("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
@@ -1088,6 +1213,31 @@ app.get("/admin/overview", requireAuth, requireAdmin, (req, res) => {
     memberships,
     responses
   });
+});
+
+app.post("/admin/users/:userId/delete", requireAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!userId) return res.redirect("/admin/overview");
+  db.prepare("DELETE FROM responses WHERE user_id = ?").run(userId);
+  db.prepare("DELETE FROM group_members WHERE user_id = ?").run(userId);
+  db.prepare("DELETE FROM groups WHERE owner_id = ?").run(userId);
+  db.prepare("DELETE FROM invites WHERE created_by = ?").run(userId);
+  db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+  res.redirect("/admin/overview");
+});
+
+app.post("/admin/groups/:groupId/delete", requireAdmin, (req, res) => {
+  const groupId = Number(req.params.groupId);
+  if (!groupId) return res.redirect("/admin/overview");
+  db.prepare("DELETE FROM responses WHERE group_id = ?").run(groupId);
+  db.prepare("DELETE FROM group_members WHERE group_id = ?").run(groupId);
+  db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
+  db.prepare("DELETE FROM groups WHERE id = ?").run(groupId);
+  res.redirect("/admin/overview");
+});
+
+app.get("/admin", (req, res) => {
+  res.redirect("/admin/overview");
 });
 
 app.use((req, res) => {

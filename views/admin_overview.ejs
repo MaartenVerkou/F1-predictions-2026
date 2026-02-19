@@ -11,6 +11,7 @@
         <th>Name</th>
         <th>Email</th>
         <th>Created</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -19,6 +20,11 @@
           <td><%= row.name %></td>
           <td><%= row.email %></td>
           <td><%= new Date(row.created_at).toLocaleString() %></td>
+          <td>
+            <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+              <button class="secondary" type="submit">Delete user</button>
+            </form>
+          </td>
         </tr>
       <% }) %>
     </tbody>
@@ -31,6 +37,7 @@
         <th>Group</th>
         <th>Owner</th>
         <th>Created</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -39,6 +46,11 @@
           <td><%= row.name %></td>
           <td><%= row.owner_name %></td>
           <td><%= new Date(row.created_at).toLocaleString() %></td>
+          <td>
+            <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+              <button class="secondary" type="submit">Delete group</button>
+            </form>
+          </td>
         </tr>
       <% }) %>
     </tbody>

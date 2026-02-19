@@ -5,10 +5,15 @@
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - DEV_AUTO_LOGIN=1
-      - DEV_AUTO_LOGIN_EMAIL=maartenverkou@hotmail.com
-      - DEV_AUTO_LOGIN_NAME=Dries
-      - ADMIN_EMAILS=maartenverkou@hotmail.com
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - PORT=3000
     volumes:
       - ./data:/app/data
+    restart: unless-stopped
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    depends_on:
+      - app
+    command: tunnel --no-autoupdate --url http://app:3000
+    restart: unless-stopped

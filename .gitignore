@@ -4,3 +4,4 @@
 /data/sessions.db
 /data/sessions.db-shm
 /data/sessions.db-wal
+.env
