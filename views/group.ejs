@@ -1,0 +1,48 @@
+﻿<%- include('partials/header', { title: group.name, user }) %>
+
+<section class="hero">
+  <div class="card">
+    <h1><%= group.name %></h1>
+    <p class="muted">Invite friends, then head to the questions page to lock in picks.</p>
+    <div class="inline-actions">
+      <a class="link" href="/groups/<%= group.id %>/questions">Answer questions</a>
+      <a class="link" href="/groups/<%= group.id %>/responses">View responses</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Create invite</h2>
+    <form method="post" action="/groups/<%= group.id %>/invites">
+      <button type="submit">Generate invite link</button>
+    </form>
+    <% if (invites.length > 0) { %>
+      <ul class="list" style="margin-top:16px;">
+        <% invites.forEach(invite => { %>
+          <li class="card" style="padding:12px;">
+            <div class="muted">Invite link:</div>
+            <div>
+              <span class="link">/join/<%= invite.code %></span>
+            </div>
+            <div class="muted">Created <%= new Date(invite.created_at).toLocaleString() %></div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } else { %>
+      <p class="muted" style="margin-top:12px;">No invite links yet.</p>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <h2>Members</h2>
+    <ul class="list">
+      <% members.forEach(member => { %>
+        <li>
+          <strong><%= member.name %></strong>
+          <span class="muted">(<%= member.role %>)</span>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

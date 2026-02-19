@@ -1,0 +1,33 @@
+﻿<%- include('partials/header', { title: 'Responses', user }) %>
+
+<div class="card">
+  <h1><%= group.name %>: Responses</h1>
+  <p class="muted">All predictions submitted so far.</p>
+
+  <% if (responses.length === 0) { %>
+    <div class="alert">No responses yet.</div>
+  <% } else { %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Question</th>
+          <th>Answer</th>
+          <th>Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% responses.forEach(row => { %>
+          <tr>
+            <td><%= row.user_name %></td>
+            <td><%= row.question_id %></td>
+            <td><%= row.answer %></td>
+            <td><%= new Date(row.updated_at).toLocaleString() %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

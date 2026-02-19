@@ -1,0 +1,28 @@
+﻿<%- include('partials/header', { title: 'F1 2026 Predictions', user }) %>
+
+<section class="hero">
+  <div class="card">
+    <span class="badge">How it works</span>
+    <h1>Make bold F1 2026 predictions with friends.</h1>
+    <p class="muted">Create a group, invite friends, and lock in your season picks. We'll score it later once the real season results are in.</p>
+    <div class="inline-actions">
+      <% if (!user) { %>
+        <a class="link" href="/signup">Create an account</a>
+        <a class="link" href="/login">Log in</a>
+      <% } else { %>
+        <a class="link" href="/dashboard">Go to your dashboard</a>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Flow in three steps</h2>
+    <ol>
+      <li>Create a group and share an invite link.</li>
+      <li>Everyone joins and fills out their predictions.</li>
+      <li>View group responses in one place.</li>
+    </ol>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

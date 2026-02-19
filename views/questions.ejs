@@ -1,0 +1,30 @@
+﻿<%- include('partials/header', { title: 'Predictions', user }) %>
+
+<div class="card">
+  <h1><%= group.name %>: Predictions</h1>
+  <p class="muted">Fill in every question. You can return and update until the season starts.</p>
+
+  <form method="post" action="/groups/<%= group.id %>/questions">
+    <% if (questions.length === 0) { %>
+      <div class="alert">No questions loaded yet. Add them to data/questions.json.</div>
+    <% } %>
+
+    <% questions.forEach(question => { %>
+      <label>
+        <%= question.prompt %>
+        <% if (question.helper) { %>
+          <span class="muted"><%= question.helper %></span>
+        <% } %>
+        <% if (question.type === 'textarea') { %>
+          <textarea name="<%= question.id %>" rows="3"><%= answers[question.id] || '' %></textarea>
+        <% } else { %>
+          <input type="text" name="<%= question.id %>" value="<%= answers[question.id] || '' %>" />
+        <% } %>
+      </label>
+    <% }) %>
+
+    <button type="submit">Save predictions</button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

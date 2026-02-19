@@ -1,0 +1,21 @@
+﻿{
+  "questions": [
+    {
+      "id": "championship_top_3",
+      "prompt": "Pick your Top 3 for the Drivers' Championship",
+      "type": "text",
+      "helper": "Example: Verstappen, Norris, Leclerc"
+    },
+    {
+      "id": "constructors_top_3",
+      "prompt": "Pick your Top 3 for the Constructors' Championship",
+      "type": "text",
+      "helper": "Example: Red Bull, McLaren, Ferrari"
+    },
+    {
+      "id": "head_to_head_ferrari_mercedes",
+      "prompt": "Team head-to-head: Ferrari vs Mercedes - who scores more points?",
+      "type": "text"
+    }
+  ]
+}

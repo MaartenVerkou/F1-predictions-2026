@@ -1,0 +1,36 @@
+﻿<%- include('partials/header', { title: 'Dashboard', user }) %>
+
+<section class="hero">
+  <div class="card">
+    <h1>Your groups</h1>
+    <% if (groups.length === 0) { %>
+      <p class="muted">No groups yet. Create one below.</p>
+    <% } %>
+    <ul class="list">
+      <% groups.forEach(group => { %>
+        <li class="card" style="padding:16px;">
+          <div class="inline-actions" style="justify-content: space-between;">
+            <div>
+              <strong><%= group.name %></strong>
+              <span class="muted">(role: <%= group.role %>)</span>
+            </div>
+            <a class="link" href="/groups/<%= group.id %>">Open</a>
+          </div>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Create a new group</h2>
+    <form method="post" action="/groups">
+      <label>
+        Group name
+        <input type="text" name="name" required />
+      </label>
+      <button type="submit">Create group</button>
+    </form>
+  </div>
+</section>
+
+<%- include('partials/footer') %>
