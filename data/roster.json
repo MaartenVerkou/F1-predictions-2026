@@ -1,0 +1,40 @@
+﻿{
+  "drivers": [
+    "Alexander Albon",
+    "Arvid Lindblad",
+    "Carlos Sainz Jr.",
+    "Charles Leclerc",
+    "Esteban Ocon",
+    "Fernando Alonso",
+    "Franco Colapinto",
+    "Gabriel Bortoleto",
+    "George Russell",
+    "Isack Hadjar",
+    "Kimi Antonelli",
+    "Lance Stroll",
+    "Lando Norris",
+    "Lewis Hamilton",
+    "Liam Lawson",
+    "Max Verstappen",
+    "Nico Hulkenberg",
+    "Oliver Bearman",
+    "Oscar Piastri",
+    "Pierre Gasly",
+    "Sergio Perez",
+    "Valtteri Bottas"
+  ],
+  "teams": [
+    "Alpine",
+    "Aston Martin",
+    "Audi",
+    "Cadillac",
+    "Ferrari",
+    "Haas F1 Team",
+    "McLaren",
+    "Mercedes",
+    "Racing Bulls",
+    "Red Bull Racing",
+    "Williams"
+  ]
+}
+

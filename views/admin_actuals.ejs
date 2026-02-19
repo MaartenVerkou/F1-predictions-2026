@@ -1,0 +1,147 @@
+﻿<%- include('partials/header', { title: 'Set actuals', user }) %>
+
+<div class="card">
+  <h1>Season actuals</h1>
+  <p class="muted">Enter the real outcomes once the season is complete. These power the leaderboard.</p>
+
+  <form method="post" action="/admin/actuals">
+    <% const sourceOptionsFor = (question) => {
+      if (question.options_source === 'drivers') return roster.drivers;
+      if (question.options_source === 'teams') return roster.teams;
+      if (question.options_source === 'races') return races;
+      return [];
+    }; %>
+
+    <% questions.forEach(question => { 
+      const sourceOptions = sourceOptionsFor(question);
+      const options = (question.options || []).concat(sourceOptions || []);
+      const type = question.type || 'text';
+      let saved = actuals[question.id];
+      if (saved) {
+        try {
+          saved = JSON.parse(saved);
+        } catch (err) {}
+      }
+    %>
+      <div class="question">
+        <div style="font-weight:600;"><%= question.prompt %></div>
+        <% if (question.helper) { %>
+          <div class="muted"><%= question.helper %></div>
+        <% } %>
+
+        <% if (type === 'ranking') { 
+          const count = Number(question.count) || 3;
+          const selections = Array.isArray(saved) ? saved : [];
+        %>
+          <div class="ranking-group" data-count="<%= count %>">
+            <% for (let i = 1; i <= count; i += 1) { %>
+              <select class="ranking-select" name="<%= question.id %>_<%= i %>">
+                <option value="">Select position <%= i %></option>
+                <% options.forEach(option => { %>
+                  <option value="<%= option %>" <%= selections[i - 1] === option ? 'selected' : '' %>><%= option %></option>
+                <% }) %>
+              </select>
+            <% } %>
+          </div>
+        <% } else if (type === 'single_choice') { %>
+          <select name="<%= question.id %>">
+            <option value="">Select one</option>
+            <% options.forEach(option => { %>
+              <option value="<%= option %>" <%= saved === option ? 'selected' : '' %>><%= option %></option>
+            <% }) %>
+          </select>
+        <% } else if (type === 'multi_select') { 
+          const selections = Array.isArray(saved) ? saved : [];
+        %>
+          <div class="checkbox-grid">
+            <% options.forEach(option => { %>
+              <label class="muted">
+                <input type="checkbox" name="<%= question.id %>" value="<%= option %>" <%= selections.includes(option) ? 'checked' : '' %> />
+                <%= option %>
+              </label>
+            <% }) %>
+          </div>
+        <% } else if (type === 'multi_select_limited') { 
+          const dnfByRace = saved?.dnf_by_race || {};
+        %>
+          <div class="card" style="padding:12px;">
+            <div class="muted">Enter total DNFs per race.</div>
+            <div class="checkbox-grid">
+              <% races.forEach((race, idx) => { %>
+                <label class="muted">
+                  <span><%= race %></span>
+                  <input type="number" min="0" max="999" name="<%= question.id %>_dnf_<%= idx %>" value="<%= dnfByRace[race] ?? '' %>" />
+                </label>
+              <% }) %>
+            </div>
+          </div>
+        <% } else if (type === 'teammate_battle') { 
+          const savedObj = saved || {};
+        %>
+          <div class="inline-actions">
+            <select name="<%= question.id %>_winner">
+              <option value="">Select winner</option>
+              <% (question.options || []).forEach(option => { %>
+                <option value="<%= option %>" <%= savedObj.winner === option ? 'selected' : '' %>><%= option %></option>
+              <% }) %>
+              <option value="tie" <%= savedObj.winner === 'tie' ? 'selected' : '' %>>Tie</option>
+            </select>
+            <input type="number" name="<%= question.id %>_diff" placeholder="Points diff" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
+          </div>
+        <% } else if (type === 'boolean_with_optional_driver') { 
+          const savedObj = saved || {};
+        %>
+          <div class="inline-actions">
+            <label class="muted">
+              <input type="radio" name="<%= question.id %>" value="yes" <%= savedObj.choice === 'yes' ? 'checked' : '' %> />
+              Yes
+            </label>
+            <label class="muted">
+              <input type="radio" name="<%= question.id %>" value="no" <%= savedObj.choice === 'no' ? 'checked' : '' %> />
+              No
+            </label>
+            <select name="<%= question.id %>_driver" data-toggle-driver="<%= question.id %>">
+              <option value="">Select driver (if yes)</option>
+              <% roster.drivers.forEach(option => { %>
+                <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
+              <% }) %>
+            </select>
+          </div>
+        <% } else if (type === 'numeric_with_driver') { 
+          const savedObj = saved || {};
+        %>
+          <div class="inline-actions">
+            <input type="number" name="<%= question.id %>_value" placeholder="Number" min="0" max="999" value="<%= savedObj.value ?? '' %>" />
+            <select name="<%= question.id %>_driver">
+              <option value="">Select driver</option>
+              <% roster.drivers.forEach(option => { %>
+                <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
+              <% }) %>
+            </select>
+          </div>
+        <% } else if (type === 'boolean') { %>
+          <div class="inline-actions">
+            <label class="muted">
+              <input type="radio" name="<%= question.id %>" value="yes" <%= saved === 'yes' ? 'checked' : '' %> />
+              Yes
+            </label>
+            <label class="muted">
+              <input type="radio" name="<%= question.id %>" value="no" <%= saved === 'no' ? 'checked' : '' %> />
+              No
+            </label>
+          </div>
+        <% } else if (type === 'numeric') { %>
+          <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= saved ?? '' %>" />
+        <% } else if (type === 'textarea') { %>
+          <textarea name="<%= question.id %>" rows="3"><%= saved || '' %></textarea>
+        <% } else { %>
+          <input type="text" name="<%= question.id %>" value="<%= saved || '' %>" />
+        <% } %>
+      </div>
+    <% }) %>
+
+    <button type="submit">Save actuals</button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

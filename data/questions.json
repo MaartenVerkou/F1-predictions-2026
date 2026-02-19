@@ -1,21 +1,205 @@
 ﻿{
   "questions": [
     {
-      "id": "championship_top_3",
-      "prompt": "Pick your Top 3 for the Drivers' Championship",
-      "type": "text",
-      "helper": "Example: Verstappen, Norris, Leclerc"
+      "id": "drivers_championship_top_3",
+      "prompt": "Drivers' Championship: pick your Top 3",
+      "type": "ranking",
+      "count": 3,
+      "options_source": "drivers",
+      "points": {
+        "1st": 50,
+        "2nd": 25,
+        "3rd": 15
+      },
+      "points_display": "1st 50, 2nd 25, 3rd 15"
     },
     {
-      "id": "constructors_top_3",
-      "prompt": "Pick your Top 3 for the Constructors' Championship",
-      "type": "text",
-      "helper": "Example: Red Bull, McLaren, Ferrari"
+      "id": "drivers_championship_last",
+      "prompt": "Last driver in the championship (from the initial season lineup)",
+      "type": "single_choice",
+      "options_source": "drivers",
+      "points": 10,
+      "points_display": "10 points"
     },
     {
-      "id": "head_to_head_ferrari_mercedes",
-      "prompt": "Team head-to-head: Ferrari vs Mercedes - who scores more points?",
-      "type": "text"
+      "id": "constructors_championship_top_3",
+      "prompt": "Constructors' Championship: pick your Top 3",
+      "type": "ranking",
+      "count": 3,
+      "options_source": "teams",
+      "points": {
+        "1st": 50,
+        "2nd": 25,
+        "3rd": 15
+      },
+      "points_display": "1st 50, 2nd 25, 3rd 15"
+    },
+    {
+      "id": "constructors_championship_last",
+      "prompt": "Last team in the Constructors' Championship",
+      "type": "single_choice",
+      "options_source": "teams",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "all_teams_score_points",
+      "prompt": "Does every team score points?",
+      "type": "boolean",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "most_driver_of_the_day",
+      "prompt": "Which driver wins the most Driver of the Day awards?",
+      "type": "single_choice",
+      "options_source": "drivers",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "most_dnfs_driver",
+      "prompt": "Which driver has the most DNFs?",
+      "type": "single_choice",
+      "options_source": "drivers",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "destructors_team",
+      "prompt": "Destructors championship: most damage for which team?",
+      "type": "single_choice",
+      "options_source": "teams",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "destructors_driver",
+      "prompt": "Destructors championship: most damage for which driver?",
+      "type": "single_choice",
+      "options_source": "drivers",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "all_podium_finishers",
+      "prompt": "Select all race podium finishers (no sprints)",
+      "type": "multi_select",
+      "options_source": "drivers",
+      "points": 5,
+      "penalty": 5,
+      "minimum": 0,
+      "points_display": "5 points per correct driver, -5 for each missing or incorrect driver (min 0)"
+    },
+    {
+      "id": "teammate_battle_antonelli_russell",
+      "prompt": "Team mate battle: Antonelli vs Russell - predict points difference and who scores more",
+      "type": "teammate_battle",
+      "options": ["Kimi Antonelli", "George Russell"],
+      "points": 25,
+      "tie_bonus": 150,
+      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 150 points"
+    },
+    {
+      "id": "teammate_battle_lawson_lindblad",
+      "prompt": "Team mate battle: Lawson vs Lindblad - predict points difference and who scores more",
+      "type": "teammate_battle",
+      "options": ["Liam Lawson", "Arvid Lindblad"],
+      "points": 25,
+      "tie_bonus": 150,
+      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 150 points"
+    },
+    {
+      "id": "alpine_vs_cadillac_audi",
+      "prompt": "Alpine scores more or fewer points than Cadillac and Audi combined",
+      "type": "single_choice",
+      "options": ["More", "Less"],
+      "points": 15,
+      "points_display": "15 points"
+    },
+    {
+      "id": "most_points_no_podium",
+      "prompt": "Which team scores the most points without a podium finish?",
+      "type": "single_choice",
+      "options": ["All teams scored a podium"],
+      "options_source": "teams",
+      "points": 15,
+      "special_case": "all_podiums_bonus",
+      "bonus_value": "All teams scored a podium",
+      "bonus_points": 150,
+      "points_display": "15 points, or 150 if all teams score a podium and you predict that"
+    },
+    {
+      "id": "race_ban",
+      "prompt": "Will any driver receive a race ban?",
+      "type": "boolean_with_optional_driver",
+      "options_source": "drivers",
+      "points": 10,
+      "bonus_points": 30,
+      "points_display": "10 points for correct Y/N +30 if the driver is correct"
+    },
+    {
+      "id": "lowest_grid_win_position",
+      "prompt": "Lowest starting position from which a race is won (and who wins)",
+      "type": "numeric_with_driver",
+      "options_source": "drivers",
+      "points": {
+        "position": 10,
+        "driver": 20
+      },
+      "points_display": "10 points for position +20 for driver"
+    },
+    {
+      "id": "select_three_races_dnfs",
+      "prompt": "Select 3 races. Earn 3 points per DNF in those races.",
+      "type": "multi_select_limited",
+      "count": 3,
+      "options_source": "races",
+      "points": 3,
+      "points_display": "3 points per DNF in your selected races"
+    },
+    {
+      "id": "closest_qualifying_teammates",
+      "prompt": "Which team has the closest qualifying head-to-head?",
+      "type": "single_choice",
+      "options_source": "teams",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "races_before_title_decided",
+      "prompt": "How many races before the end is the Drivers' title decided? (last race = 0)",
+      "type": "numeric",
+      "points": 10,
+      "points_display": "10 points"
+    },
+    {
+      "id": "mini_q1_first_race_winner_champion",
+      "prompt": "Winner of race 1 wins the Drivers' Championship",
+      "type": "boolean",
+      "points": 5,
+      "points_display": "5 points"
+    },
+    {
+      "id": "mini_q2_mercedes_engines_top5",
+      "prompt": "In the Constructors' Championship, 4 of the top 5 are teams with Mercedes engines",
+      "type": "boolean",
+      "points": 5,
+      "points_display": "5 points"
+    },
+    {
+      "id": "mini_q3_ferrari_podium",
+      "prompt": "Ferrari gets at least one race podium",
+      "type": "boolean",
+      "points": 5,
+      "points_display": "5 points"
+    },
+    {
+      "id": "mini_q4_sprint_champion_same",
+      "prompt": "If we only count sprints, the same driver is champion",
+      "type": "boolean",
+      "points": 5,
+      "points_display": "5 points"
     }
   ]
 }

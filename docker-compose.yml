@@ -4,7 +4,11 @@
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
+      - DEV_AUTO_LOGIN=1
+      - DEV_AUTO_LOGIN_EMAIL=maartenverkou@hotmail.com
+      - DEV_AUTO_LOGIN_NAME=Dries
+      - ADMIN_EMAILS=maartenverkou@hotmail.com
       - PORT=3000
     volumes:
       - ./data:/app/data

@@ -4,9 +4,11 @@
   <div class="card">
     <h1><%= group.name %></h1>
     <p class="muted">Invite friends, then head to the questions page to lock in picks.</p>
+    <p class="muted">Group closes on March 5, 2026.</p>
     <div class="inline-actions">
       <a class="link" href="/groups/<%= group.id %>/questions">Answer questions</a>
       <a class="link" href="/groups/<%= group.id %>/responses">View responses</a>
+      <a class="link" href="/groups/<%= group.id %>/leaderboard">Leaderboard</a>
     </div>
   </div>
 
@@ -39,6 +41,23 @@
         <li>
           <strong><%= member.name %></strong>
           <span class="muted">(<%= member.role %>)</span>
+          <% if (role === 'owner' || role === 'admin') { %>
+            <% if (member.role !== 'owner') { %>
+              <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick" style="display:inline;">
+                <button class="secondary" type="submit">Kick</button>
+              </form>
+            <% } %>
+            <% if (member.role === 'member') { %>
+              <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote" style="display:inline;">
+                <button class="secondary" type="submit">Make admin</button>
+              </form>
+            <% } %>
+            <% if (member.role === 'admin') { %>
+              <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote" style="display:inline;">
+                <button class="secondary" type="submit">Remove admin</button>
+              </form>
+            <% } %>
+          <% } %>
         </li>
       <% }) %>
     </ul>

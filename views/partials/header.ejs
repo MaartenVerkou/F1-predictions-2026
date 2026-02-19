@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/app.js" defer></script>
   </head>
   <body>
     <header>
@@ -16,6 +17,8 @@
         <% if (user) { %>
           <span class="muted">Signed in as <strong><%= user.name %></strong></span>
           <a class="link" href="/dashboard">Dashboard</a>
+          <a class="link" href="/admin/actuals">Set actuals</a>
+          <a class="link" href="/admin/overview">Admin overview</a>
           <form action="/logout" method="post" style="margin:0;">
             <button class="secondary" type="submit">Log out</button>
           </form>

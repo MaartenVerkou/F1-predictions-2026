@@ -1,0 +1,48 @@
+﻿<%- include('partials/header', { title: 'Leaderboard', user }) %>
+
+<div class="card">
+  <h1><%= group.name %>: Leaderboard</h1>
+  <p class="muted">Scores are calculated from the season actuals.</p>
+
+  <% if (Object.keys(actuals || {}).length === 0) { %>
+    <div class="alert">No actuals have been entered yet. Set them on the “Set actuals” page to compute scores.</div>
+  <% } %>
+
+  <% if (leaderboard.length === 0) { %>
+    <div class="alert">No scored responses yet. Make sure actuals are entered and predictions have been saved.</div>
+  <% } else { %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Total points</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% leaderboard.forEach(row => { %>
+          <tr>
+            <td><%= row.name %></td>
+            <td><strong><%= row.total %></strong></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <h2 style="margin-top:24px;">Details</h2>
+    <% leaderboard.forEach(row => { %>
+      <div class="card" style="padding:16px; margin-top:12px;">
+        <strong><%= row.name %></strong>
+        <ul class="list" style="margin-top:8px;">
+          <% questions.forEach(q => { %>
+            <li>
+              <span><%= q.prompt %></span>
+              <span class="muted"> - <%= row.byQuestion[q.id] ?? 0 %> pts</span>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    <% }) %>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

@@ -11,7 +11,19 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questions.json");
+const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json");
+const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
+const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "1";
+const DEV_AUTO_LOGIN_EMAIL =
+  process.env.DEV_AUTO_LOGIN_EMAIL || "dev@example.com";
+const DEV_AUTO_LOGIN_NAME = process.env.DEV_AUTO_LOGIN_NAME || "Dev Admin";
+const PREDICTIONS_CLOSE_AT =
+  process.env.PREDICTIONS_CLOSE_AT || "2026-03-05T23:59:59";
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -71,7 +83,33 @@ db.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(group_id) REFERENCES groups(id)
   );
+
+  CREATE TABLE IF NOT EXISTS actuals (
+    question_id TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `);
+
+const duplicateNames = db
+  .prepare(
+    `
+    SELECT name, COUNT(*) as count
+    FROM users
+    GROUP BY name
+    HAVING COUNT(*) > 1
+    `
+  )
+  .all();
+
+if (duplicateNames.length === 0) {
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_name_unique ON users(name);`);
+} else {
+  console.warn(
+    "Cannot enforce unique usernames until duplicates are resolved:",
+    duplicateNames.map((row) => row.name).join(", ")
+  );
+}
 
 const app = express();
 app.set("view engine", "ejs");
@@ -93,6 +131,43 @@ app.use(
   })
 );
 
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === "production" || !DEV_AUTO_LOGIN) {
+    return next();
+  }
+  if (req.session.userId) {
+    return next();
+  }
+  const email = DEV_AUTO_LOGIN_EMAIL.trim().toLowerCase();
+  let user = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  if (!user) {
+    const passwordHash = bcrypt.hashSync(
+      crypto.randomBytes(12).toString("hex"),
+      10
+    );
+    const info = db
+      .prepare(
+        "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)"
+      )
+      .run(DEV_AUTO_LOGIN_NAME.trim(), email, passwordHash, new Date().toISOString());
+    user = { id: info.lastInsertRowid };
+  }
+  req.session.userId = user.id;
+  next();
+});
+
+function readJsonFile(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const raw = fs.readFileSync(filePath, "utf8");
+    const clean = raw.replace(/^\uFEFF/, "");
+    return JSON.parse(clean);
+  } catch (err) {
+    console.error(`Failed to read JSON: ${filePath}`, err);
+    return null;
+  }
+}
+
 function getQuestions() {
   if (!fs.existsSync(QUESTIONS_PATH)) {
     return [
@@ -111,19 +186,41 @@ function getQuestions() {
     ];
   }
 
-  try {
-    const raw = fs.readFileSync(QUESTIONS_PATH, "utf8");
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
-    if (parsed && Array.isArray(parsed.questions)) {
-      return parsed.questions;
-    }
-  } catch (err) {
-    console.error("Failed to read questions:", err);
+  const parsed = readJsonFile(QUESTIONS_PATH);
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+  if (parsed && Array.isArray(parsed.questions)) {
+    return parsed.questions;
   }
 
+  return [];
+}
+
+function getRoster() {
+  if (!fs.existsSync(ROSTER_PATH)) {
+    return { drivers: [], teams: [] };
+  }
+  const parsed = readJsonFile(ROSTER_PATH);
+  if (!parsed) return { drivers: [], teams: [] };
+  return {
+    drivers: Array.isArray(parsed.drivers) ? parsed.drivers : [],
+    teams: Array.isArray(parsed.teams) ? parsed.teams : []
+  };
+  return { drivers: [], teams: [] };
+}
+
+function getRaces() {
+  if (!fs.existsSync(RACES_PATH)) {
+    return [];
+  }
+  const parsed = readJsonFile(RACES_PATH);
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+  if (parsed && Array.isArray(parsed.races)) {
+    return parsed.races;
+  }
   return [];
 }
 
@@ -140,11 +237,50 @@ function getCurrentUser(req) {
   return stmt.get(req.session.userId) || null;
 }
 
+function isAdmin(user) {
+  if (!user) return false;
+  return ADMIN_EMAILS.includes(String(user.email || "").toLowerCase());
+}
+
+function requireAdmin(req, res, next) {
+  const user = getCurrentUser(req);
+  if (!isAdmin(user)) {
+    return res.status(403).send("Admin access only.");
+  }
+  next();
+}
+
 function isMember(userId, groupId) {
   const stmt = db.prepare(
     "SELECT 1 FROM group_members WHERE user_id = ? AND group_id = ?"
   );
   return !!stmt.get(userId, groupId);
+}
+
+function getMemberRole(userId, groupId) {
+  const stmt = db.prepare(
+    "SELECT role FROM group_members WHERE user_id = ? AND group_id = ?"
+  );
+  const row = stmt.get(userId, groupId);
+  return row ? row.role : null;
+}
+
+function isGroupAdmin(userId, groupId) {
+  const role = getMemberRole(userId, groupId);
+  return role === "owner" || role === "admin";
+}
+
+function predictionsClosed() {
+  const closeDate = new Date(PREDICTIONS_CLOSE_AT);
+  if (Number.isNaN(closeDate.getTime())) return false;
+  return new Date() > closeDate;
+}
+
+function clampNumber(value, min, max) {
+  if (value == null) return null;
+  const num = Number(value);
+  if (!Number.isFinite(num)) return null;
+  return Math.min(max, Math.max(min, num));
 }
 
 app.get("/", (req, res) => {
@@ -157,9 +293,20 @@ app.get(["/signup", "/register"], (req, res) => {
 });
 
 app.post("/signup", async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) {
+  const { name, email, password, passwordConfirm } = req.body;
+  if (!name || !email || !password || !passwordConfirm) {
     return res.render("signup", { error: "All fields are required." });
+  }
+  if (password !== passwordConfirm) {
+    return res.render("signup", { error: "Passwords do not match." });
+  }
+
+  const normalizedName = name.trim();
+  const nameTaken = db
+    .prepare("SELECT id FROM users WHERE name = ?")
+    .get(normalizedName);
+  if (nameTaken) {
+    return res.render("signup", { error: "Name already in use." });
   }
 
   const existing = db
@@ -174,7 +321,7 @@ app.post("/signup", async (req, res) => {
     "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)"
   );
   const info = stmt.run(
-    name.trim(),
+    normalizedName,
     email.trim().toLowerCase(),
     passwordHash,
     new Date().toISOString()
@@ -274,13 +421,14 @@ app.get("/groups/:id", requireAuth, (req, res) => {
     )
     .all(groupId);
 
-  res.render("group", { user, group, members, invites });
+  const role = getMemberRole(user.id, groupId);
+  res.render("group", { user, group, members, invites, role });
 });
 
 app.post("/groups/:id/invites", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
-  if (!isMember(user.id, groupId)) {
+  if (!isGroupAdmin(user.id, groupId)) {
     return res.status(403).send("Not a group member.");
   }
 
@@ -312,6 +460,63 @@ app.get("/join/:code", requireAuth, (req, res) => {
   res.redirect(`/groups/${invite.group_id}`);
 });
 
+app.post("/groups/:id/members/:userId/kick", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const targetUserId = Number(req.params.userId);
+  if (!isGroupAdmin(user.id, groupId)) {
+    return res.status(403).send("Admin access only.");
+  }
+  const targetRole = getMemberRole(targetUserId, groupId);
+  if (!targetRole) {
+    return res.redirect(`/groups/${groupId}`);
+  }
+  if (targetRole === "owner") {
+    return res.status(403).send("Owner cannot be removed.");
+  }
+  db.prepare(
+    "DELETE FROM group_members WHERE user_id = ? AND group_id = ?"
+  ).run(targetUserId, groupId);
+  res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/members/:userId/promote", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const targetUserId = Number(req.params.userId);
+  if (!isGroupAdmin(user.id, groupId)) {
+    return res.status(403).send("Admin access only.");
+  }
+  const targetRole = getMemberRole(targetUserId, groupId);
+  if (!targetRole) {
+    return res.redirect(`/groups/${groupId}`);
+  }
+  if (targetRole === "owner") {
+    return res.redirect(`/groups/${groupId}`);
+  }
+  db.prepare(
+    "UPDATE group_members SET role = ? WHERE user_id = ? AND group_id = ?"
+  ).run("admin", targetUserId, groupId);
+  res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/members/:userId/demote", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const targetUserId = Number(req.params.userId);
+  if (!isGroupAdmin(user.id, groupId)) {
+    return res.status(403).send("Admin access only.");
+  }
+  const targetRole = getMemberRole(targetUserId, groupId);
+  if (!targetRole || targetRole === "owner") {
+    return res.redirect(`/groups/${groupId}`);
+  }
+  db.prepare(
+    "UPDATE group_members SET role = ? WHERE user_id = ? AND group_id = ?"
+  ).run("member", targetUserId, groupId);
+  res.redirect(`/groups/${groupId}`);
+});
+
 app.get("/groups/:id/questions", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
@@ -321,6 +526,8 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
 
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   const questions = getQuestions();
+  const roster = getRoster();
+  const races = getRaces();
   const answers = db
     .prepare(
       "SELECT question_id, answer FROM responses WHERE user_id = ? AND group_id = ?"
@@ -331,7 +538,17 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
       return acc;
     }, {});
 
-  res.render("questions", { user, group, questions, answers });
+  const closed = predictionsClosed();
+  res.render("questions", {
+    user,
+    group,
+    questions,
+    answers,
+    roster,
+    races,
+    closed,
+    closeAt: PREDICTIONS_CLOSE_AT
+  });
 });
 
 app.post("/groups/:id/questions", requireAuth, (req, res) => {
@@ -339,6 +556,10 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
     return res.status(403).send("Not a group member.");
+  }
+
+  if (predictionsClosed()) {
+    return res.status(403).send("Predictions are closed.");
   }
 
   const questions = getQuestions();
@@ -354,8 +575,99 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
 
   const tx = db.transaction(() => {
     for (const question of questions) {
+      const type = question.type || "text";
+      if (type === "ranking") {
+        const count = Number(question.count) || 3;
+        const selections = [];
+        for (let i = 1; i <= count; i += 1) {
+          const value = req.body[`${question.id}_${i}`];
+          if (!value) continue;
+          if (!selections.includes(value)) {
+            selections.push(value);
+          }
+        }
+        if (selections.length === 0) continue;
+        insert.run(
+          user.id,
+          groupId,
+          question.id,
+          JSON.stringify(selections),
+          now,
+          now
+        );
+        continue;
+      }
+      if (type === "multi_select" || type === "multi_select_limited") {
+        const selected = req.body[question.id];
+        if (!selected) continue;
+        const selections = Array.isArray(selected) ? selected : [selected];
+        insert.run(
+          user.id,
+          groupId,
+          question.id,
+          JSON.stringify(selections),
+          now,
+          now
+        );
+        continue;
+      }
+      if (type === "teammate_battle") {
+        const winner = req.body[`${question.id}_winner`];
+        const diffRaw = req.body[`${question.id}_diff`];
+        if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
+          continue;
+        }
+        const diff = clampNumber(diffRaw, 0, 999);
+        insert.run(
+          user.id,
+          groupId,
+          question.id,
+          JSON.stringify({ winner, diff }),
+          now,
+          now
+        );
+        continue;
+      }
+      if (type === "boolean_with_optional_driver") {
+        const choice = req.body[question.id];
+        const driver = req.body[`${question.id}_driver`];
+        if (!choice) continue;
+        insert.run(
+          user.id,
+          groupId,
+          question.id,
+          JSON.stringify({ choice, driver }),
+          now,
+          now
+        );
+        continue;
+      }
+      if (type === "numeric_with_driver") {
+        const valueRaw = req.body[`${question.id}_value`];
+        const driver = req.body[`${question.id}_driver`];
+        if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
+          continue;
+        }
+        const value = clampNumber(valueRaw, 0, 999);
+        insert.run(
+          user.id,
+          groupId,
+          question.id,
+          JSON.stringify({ value, driver }),
+          now,
+          now
+        );
+        continue;
+      }
+
       const answer = req.body[question.id];
-      if (!answer) continue;
+      if (answer === undefined || answer === "") continue;
+      if (type === "numeric") {
+        const value = clampNumber(answer, 0, 999);
+        if (value == null) continue;
+        insert.run(user.id, groupId, question.id, String(value), now, now);
+        continue;
+      }
       insert.run(user.id, groupId, question.id, String(answer).trim(), now, now);
     }
   });
@@ -385,6 +697,397 @@ app.get("/groups/:id/responses", requireAuth, (req, res) => {
     .all(groupId);
 
   res.render("responses", { user, group, questions, responses });
+});
+
+app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  if (!isMember(user.id, groupId)) {
+    return res.status(403).send("Not a group member.");
+  }
+
+  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  const questions = getQuestions();
+  const actualRows = db.prepare("SELECT * FROM actuals").all();
+  const actuals = actualRows.reduce((acc, row) => {
+    acc[row.question_id] = row.value;
+    return acc;
+  }, {});
+
+  const responses = db
+    .prepare(
+      `
+      SELECT u.id as user_id, u.name as user_name, r.question_id, r.answer
+      FROM responses r
+      JOIN users u ON u.id = r.user_id
+      WHERE r.group_id = ?
+      `
+    )
+    .all(groupId);
+
+  const questionMap = questions.reduce((acc, q) => {
+    acc[q.id] = q;
+    return acc;
+  }, {});
+
+  const scoreByUser = {};
+  const members = db
+    .prepare(
+      `
+      SELECT u.id as user_id, u.name as user_name
+      FROM group_members gm
+      JOIN users u ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+      `
+    )
+    .all(groupId);
+
+  members.forEach((member) => {
+    scoreByUser[member.user_id] = {
+      userId: member.user_id,
+      name: member.user_name,
+      total: 0,
+      byQuestion: {}
+    };
+  });
+
+  function parseStoredValue(question, raw) {
+    if (!raw) return null;
+    const type = question.type || "text";
+    if (
+      type === "ranking" ||
+      type === "multi_select" ||
+      type === "multi_select_limited" ||
+      type === "teammate_battle" ||
+      type === "boolean_with_optional_driver" ||
+      type === "numeric_with_driver"
+    ) {
+      try {
+        return JSON.parse(raw);
+      } catch (err) {
+        return null;
+      }
+    }
+    return raw;
+  }
+
+  function getActual(question) {
+    const raw = actuals[question.id];
+    return parseStoredValue(question, raw);
+  }
+
+  function isMatch(actualValue, predictedValue) {
+    if (actualValue == null || predictedValue == null) return false;
+    if (Array.isArray(actualValue)) {
+      return actualValue.includes(predictedValue);
+    }
+    return String(actualValue) === String(predictedValue);
+  }
+
+  function scoreQuestion(question, predictedRaw, actualRaw) {
+    if (actualRaw == null || predictedRaw == null) return 0;
+    const type = question.type || "text";
+    if (type === "ranking") {
+      const points = question.points || {};
+      let score = 0;
+      const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
+      const count = Number(question.count) || 3;
+      for (let i = 0; i < count; i += 1) {
+        const actual = actualRaw[i];
+        const predicted = predictedRaw[i];
+        const key = positionLabels[i] || String(i + 1);
+        const value = points[key] || 0;
+        if (actual == null || predicted == null) continue;
+        if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
+          score += value;
+        }
+      }
+      return score;
+    }
+    if (type === "single_choice" || type === "text") {
+      if (question.special_case === "all_podiums_bonus") {
+        if (String(actualRaw) === String(question.bonus_value)) {
+          return String(predictedRaw) === String(question.bonus_value)
+            ? Number(question.bonus_points || 0)
+            : 0;
+        }
+      }
+      return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
+    }
+    if (type === "boolean") {
+      return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
+    }
+    if (type === "multi_select") {
+      const points = Number(question.points || 0);
+      const penalty = Number(question.penalty ?? points);
+      const minimum = Number(question.minimum ?? 0);
+      const actualSet = new Set(actualRaw || []);
+      const predictedSet = new Set(predictedRaw || []);
+      let correct = 0;
+      let wrong = 0;
+      let missing = 0;
+      predictedSet.forEach((item) => {
+        if (actualSet.has(item)) {
+          correct += 1;
+        } else {
+          wrong += 1;
+        }
+      });
+      actualSet.forEach((item) => {
+        if (!predictedSet.has(item)) {
+          missing += 1;
+        }
+      });
+      const score = correct * points - (wrong + missing) * penalty;
+      return Math.max(minimum, score);
+    }
+    if (type === "teammate_battle") {
+      const base = Number(question.points || 0);
+      const tieBonus = Number(question.tie_bonus || 0);
+      const actualWinner = actualRaw?.winner;
+      const actualDiff = Number(actualRaw?.diff);
+      const predictedWinner = predictedRaw?.winner;
+      const predictedDiff = Number(predictedRaw?.diff);
+      if (!actualWinner) return 0;
+      if (actualWinner === "tie") {
+        return predictedWinner === "tie" ? tieBonus : 0;
+      }
+      if (predictedWinner !== actualWinner) return 0;
+      if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
+      const score = base - Math.abs(predictedDiff - actualDiff);
+      return Math.max(0, score);
+    }
+    if (type === "boolean_with_optional_driver") {
+      const base = Number(question.points || 0);
+      const bonus = Number(question.bonus_points || 0);
+      const actualChoice = actualRaw?.choice;
+      const actualDriver = actualRaw?.driver;
+      const predictedChoice = predictedRaw?.choice;
+      const predictedDriver = predictedRaw?.driver;
+      if (actualChoice == null || predictedChoice == null) return 0;
+      let score = 0;
+      if (String(actualChoice) === String(predictedChoice)) {
+        score += base;
+        if (
+          String(actualChoice) === "yes" &&
+          actualDriver &&
+          String(actualDriver) === String(predictedDriver)
+        ) {
+          score += bonus;
+        }
+      }
+      return score;
+    }
+    if (type === "numeric_with_driver") {
+      const points = question.points || {};
+      const actualValue = Number(actualRaw?.value);
+      const predictedValue = Number(predictedRaw?.value);
+      const actualDriver = actualRaw?.driver;
+      const predictedDriver = predictedRaw?.driver;
+      let score = 0;
+      if (Number.isFinite(actualValue) && Number.isFinite(predictedValue)) {
+        if (actualValue === predictedValue) {
+          score += Number(points.position || 0);
+        }
+      }
+      if (actualDriver && predictedDriver && actualDriver === predictedDriver) {
+        score += Number(points.driver || 0);
+      }
+      return score;
+    }
+    if (type === "multi_select_limited") {
+      const points = Number(question.points || 0);
+      const dnfByRace = actualRaw?.dnf_by_race || {};
+      let total = 0;
+      (predictedRaw || []).forEach((race) => {
+        const count = Number(dnfByRace[race] || 0);
+        total += count * points;
+      });
+      return total;
+    }
+    if (type === "numeric") {
+      return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
+    }
+    return 0;
+  }
+
+  responses.forEach((row) => {
+    const question = questionMap[row.question_id];
+    if (!question) return;
+    const actual = getActual(question);
+    const predicted = parseStoredValue(question, row.answer);
+    const points = scoreQuestion(question, predicted, actual);
+    scoreByUser[row.user_id].total += points;
+    scoreByUser[row.user_id].byQuestion[row.question_id] = points;
+  });
+
+  const leaderboard = Object.values(scoreByUser).sort((a, b) => b.total - a.total);
+  res.render("leaderboard", {
+    user,
+    group,
+    questions,
+    leaderboard,
+    actuals
+  });
+});
+
+app.get("/admin/actuals", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  if (!isAdmin(user)) {
+    return res.status(403).send("Admin access only.");
+  }
+  const questions = getQuestions();
+  const roster = getRoster();
+  const races = getRaces();
+  const actualRows = db.prepare("SELECT * FROM actuals").all();
+  const actuals = actualRows.reduce((acc, row) => {
+    acc[row.question_id] = row.value;
+    return acc;
+  }, {});
+
+  res.render("admin_actuals", { user, questions, roster, races, actuals });
+});
+
+app.post("/admin/actuals", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  if (!isAdmin(user)) {
+    return res.status(403).send("Admin access only.");
+  }
+  const questions = getQuestions();
+  const races = getRaces();
+  const now = new Date().toISOString();
+  const upsert = db.prepare(
+    `
+    INSERT INTO actuals (question_id, value, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(question_id)
+    DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `
+  );
+
+  const tx = db.transaction(() => {
+    for (const question of questions) {
+      const type = question.type || "text";
+      if (type === "ranking") {
+        const count = Number(question.count) || 3;
+        const selections = [];
+        for (let i = 1; i <= count; i += 1) {
+          const value = req.body[`${question.id}_${i}`];
+          if (!value) continue;
+          selections.push(value);
+        }
+        if (selections.length === 0) continue;
+        upsert.run(question.id, JSON.stringify(selections), now);
+        continue;
+      }
+      if (type === "multi_select") {
+        const selected = req.body[question.id];
+        if (!selected) continue;
+        const selections = Array.isArray(selected) ? selected : [selected];
+        upsert.run(question.id, JSON.stringify(selections), now);
+        continue;
+      }
+      if (type === "multi_select_limited") {
+        const dnfByRace = {};
+        races.forEach((race, index) => {
+          const value = req.body[`${question.id}_dnf_${index}`];
+          const countValue = clampNumber(value, 0, 999);
+          if (countValue != null) {
+            dnfByRace[race] = countValue;
+          }
+        });
+        upsert.run(question.id, JSON.stringify({ dnf_by_race: dnfByRace }), now);
+        continue;
+      }
+      if (type === "teammate_battle") {
+        const winner = req.body[`${question.id}_winner`];
+        const diffRaw = req.body[`${question.id}_diff`];
+        if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
+          continue;
+        }
+        const diff = clampNumber(diffRaw, 0, 999);
+        upsert.run(question.id, JSON.stringify({ winner, diff }), now);
+        continue;
+      }
+      if (type === "boolean_with_optional_driver") {
+        const choice = req.body[question.id];
+        const driver = req.body[`${question.id}_driver`];
+        if (!choice) continue;
+        upsert.run(question.id, JSON.stringify({ choice, driver }), now);
+        continue;
+      }
+      if (type === "numeric_with_driver") {
+        const valueRaw = req.body[`${question.id}_value`];
+        const driver = req.body[`${question.id}_driver`];
+        if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
+          continue;
+        }
+        const value = clampNumber(valueRaw, 0, 999);
+        upsert.run(question.id, JSON.stringify({ value, driver }), now);
+        continue;
+      }
+
+      const answer = req.body[question.id];
+      if (answer === undefined || answer === "") continue;
+      if (type === "numeric") {
+        const value = clampNumber(answer, 0, 999);
+        if (value == null) continue;
+        upsert.run(question.id, String(value), now);
+        continue;
+      }
+      upsert.run(question.id, String(answer).trim(), now);
+    }
+  });
+  tx();
+
+  res.redirect("/admin/actuals");
+});
+
+app.get("/admin/overview", requireAuth, requireAdmin, (req, res) => {
+  const user = getCurrentUser(req);
+  const users = db
+    .prepare("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
+    .all();
+  const groups = db
+    .prepare(
+      `
+      SELECT g.id, g.name, g.owner_id, u.name as owner_name, g.created_at
+      FROM groups g
+      JOIN users u ON u.id = g.owner_id
+      ORDER BY g.created_at DESC
+      `
+    )
+    .all();
+  const memberships = db
+    .prepare(
+      `
+      SELECT gm.user_id, gm.group_id, gm.role, gm.joined_at, u.name as user_name, g.name as group_name
+      FROM group_members gm
+      JOIN users u ON u.id = gm.user_id
+      JOIN groups g ON g.id = gm.group_id
+      ORDER BY gm.joined_at DESC
+      `
+    )
+    .all();
+  const responses = db
+    .prepare(
+      `
+      SELECT r.user_id, u.name as user_name, r.group_id, g.name as group_name, r.question_id, r.answer, r.updated_at
+      FROM responses r
+      JOIN users u ON u.id = r.user_id
+      JOIN groups g ON g.id = r.group_id
+      ORDER BY r.updated_at DESC
+      `
+    )
+    .all();
+
+  res.render("admin_overview", {
+    user,
+    users,
+    groups,
+    memberships,
+    responses
+  });
 });
 
 app.use((req, res) => {

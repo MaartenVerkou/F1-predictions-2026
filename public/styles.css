@@ -67,11 +67,25 @@ label {
   gap: 6px;
 }
 
-input, textarea {
+input,
+select,
+textarea {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
   font-size: 16px;
+}
+
+.ranking-group {
+  display: grid;
+  gap: 10px;
+}
+
+.checkbox-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 8px;
 }
 
 button {
@@ -118,6 +132,12 @@ button.secondary {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.question {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 .link {
