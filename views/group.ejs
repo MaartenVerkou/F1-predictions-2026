@@ -7,31 +7,38 @@
     <p class="muted">Group closes on March 5, 2026.</p>
     <p class="muted">Group code: <strong><%= group.join_code || 'Not set yet' %></strong></p>
     <div class="inline-actions">
-      <a class="link" href="/groups/<%= group.id %>/questions">Answer questions</a>
+      <a class="button-link" href="/groups/<%= group.id %>/questions">Answer questions</a>
       <a class="link" href="/groups/<%= group.id %>/responses">View responses</a>
       <a class="link" href="/groups/<%= group.id %>/leaderboard">Leaderboard</a>
+      <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('Leave this group?');" style="margin:0;">
+        <button class="secondary" type="submit">Leave group</button>
+      </form>
     </div>
   </div>
 
   <div class="card">
-    <h2>Create invite</h2>
-    <form method="post" action="/groups/<%= group.id %>/invites">
-      <button type="submit">Generate invite link</button>
-    </form>
-    <% if (invites.length > 0) { %>
-      <ul class="list" style="margin-top:16px;">
-        <% invites.forEach(invite => { %>
-          <li class="card" style="padding:12px;">
-            <div class="muted">Invite link:</div>
-            <div>
-              <span class="link">/join/<%= invite.code %></span>
-            </div>
-            <div class="muted">Created <%= new Date(invite.created_at).toLocaleString() %></div>
-          </li>
-        <% }) %>
-      </ul>
+    <h2>Invite link</h2>
+    <% if (invite) { %>
+      <div class="card" style="padding:12px;">
+        <div class="inline-actions" style="justify-content: space-between;">
+          <span class="link" id="invite-link">/join/<%= invite.code %></span>
+          <button type="button" class="secondary" data-copy-target="invite-link">Copy</button>
+        </div>
+        <div class="muted">Created <%= new Date(invite.created_at).toLocaleString() %></div>
+      </div>
     <% } else { %>
-      <p class="muted" style="margin-top:12px;">No invite links yet.</p>
+      <p class="muted">No invite link yet.</p>
+    <% } %>
+
+    <% if (role === 'owner' || role === 'admin') { %>
+      <div class="inline-actions" style="margin-top:12px;">
+        <form method="post" action="/groups/<%= group.id %>/invites">
+          <button type="submit">Generate new link</button>
+        </form>
+        <form method="post" action="/groups/<%= group.id %>/invites/remove">
+          <button class="secondary" type="submit">Remove link</button>
+        </form>
+      </div>
     <% } %>
   </div>
 

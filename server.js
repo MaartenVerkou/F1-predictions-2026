@@ -6,6 +6,7 @@ const session = require("express-session");
 const SQLiteStore = require("connect-sqlite3")(session);
 const bcrypt = require("bcrypt");
 const Database = require("better-sqlite3");
+const nodemailer = require("nodemailer");
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
@@ -14,6 +15,10 @@ const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questi
 const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json");
 const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const AUTO_VERIFY = process.env.AUTO_VERIFY === "1";
 const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "1";
 const DEV_AUTO_LOGIN_EMAIL =
   process.env.DEV_AUTO_LOGIN_EMAIL || "dev@example.com";
@@ -86,6 +91,15 @@ db.exec(`
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS email_verifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
 `);
 
 function ensureGroupColumns() {
@@ -100,6 +114,43 @@ function ensureGroupColumns() {
 }
 
 ensureGroupColumns();
+
+function ensureUserColumns() {
+  const columns = db.prepare("PRAGMA table_info(users);").all();
+  const names = new Set(columns.map((col) => col.name));
+  if (!names.has("is_verified")) {
+    db.exec("ALTER TABLE users ADD COLUMN is_verified INTEGER DEFAULT 0;");
+  }
+  if (!names.has("verified_at")) {
+    db.exec("ALTER TABLE users ADD COLUMN verified_at TEXT;");
+  }
+}
+
+ensureUserColumns();
+
+if (AUTO_VERIFY) {
+  db.prepare("UPDATE users SET is_verified = 1 WHERE is_verified = 0").run();
+}
+
+const duplicateGroups = db
+  .prepare(
+    `
+    SELECT name, COUNT(*) as count
+    FROM groups
+    GROUP BY name
+    HAVING COUNT(*) > 1
+    `
+  )
+  .all();
+
+if (duplicateGroups.length === 0) {
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_name_unique ON groups(name);`);
+} else {
+  console.warn(
+    "Cannot enforce unique group names until duplicates are resolved:",
+    duplicateGroups.map((row) => row.name).join(", ")
+  );
+}
 
 const duplicateNames = db
   .prepare(
@@ -268,6 +319,25 @@ function isMember(userId, groupId) {
   return !!stmt.get(userId, groupId);
 }
 
+function getMailer() {
+  if (!SMTP_USER || !SMTP_PASS) return null;
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS
+    }
+  });
+}
+
+function generateToken() {
+  return crypto.randomBytes(24).toString("hex");
+}
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 function getMemberRole(userId, groupId) {
   const stmt = db.prepare(
     "SELECT role FROM group_members WHERE user_id = ? AND group_id = ?"
@@ -279,6 +349,20 @@ function getMemberRole(userId, groupId) {
 function isGroupAdmin(userId, groupId) {
   const role = getMemberRole(userId, groupId);
   return role === "owner" || role === "admin";
+}
+
+function getNextOwner(groupId, currentOwnerId) {
+  return db
+    .prepare(
+      `
+      SELECT gm.user_id, gm.role
+      FROM group_members gm
+      WHERE gm.group_id = ? AND gm.user_id <> ?
+      ORDER BY CASE gm.role WHEN 'admin' THEN 1 WHEN 'member' THEN 2 ELSE 3 END, gm.joined_at ASC
+      LIMIT 1
+      `
+    )
+    .get(groupId, currentOwnerId);
 }
 
 function predictionsClosed() {
@@ -320,25 +404,78 @@ app.post("/signup", async (req, res) => {
     return res.render("signup", { error: "Name already in use." });
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
   const existing = db
-    .prepare("SELECT id FROM users WHERE email = ?")
-    .get(email.trim().toLowerCase());
-  if (existing) {
+    .prepare("SELECT id, is_verified FROM users WHERE email = ?")
+    .get(normalizedEmail);
+  if (existing && existing.is_verified) {
     return res.render("signup", { error: "Email already registered." });
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const stmt = db.prepare(
-    "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)"
-  );
-  const info = stmt.run(
-    normalizedName,
-    email.trim().toLowerCase(),
-    passwordHash,
-    new Date().toISOString()
-  );
-  req.session.userId = info.lastInsertRowid;
-  res.redirect("/dashboard");
+  const now = new Date().toISOString();
+  let userId = existing ? existing.id : null;
+  if (userId) {
+    db.prepare(
+      "UPDATE users SET name = ?, password_hash = ?, created_at = ?, is_verified = 0, verified_at = NULL WHERE id = ?"
+    ).run(normalizedName, passwordHash, now, userId);
+  } else {
+    const stmt = db.prepare(
+      "INSERT INTO users (name, email, password_hash, created_at, is_verified) VALUES (?, ?, ?, ?, 0)"
+    );
+    const info = stmt.run(normalizedName, normalizedEmail, passwordHash, now);
+    userId = info.lastInsertRowid;
+  }
+
+  if (AUTO_VERIFY) {
+    db.prepare("UPDATE users SET is_verified = 1, verified_at = ? WHERE id = ?").run(
+      now,
+      userId
+    );
+    req.session.userId = userId;
+    return res.redirect("/dashboard");
+  }
+
+  const token = generateToken();
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+  db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(userId);
+  db.prepare(
+    "INSERT INTO email_verifications (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)"
+  ).run(userId, tokenHash, expiresAt, now);
+
+  const verifyUrl = `${BASE_URL}/verify?token=${token}`;
+  const mailer = getMailer();
+  if (!mailer) {
+    return res.render("verify_notice", {
+      email: normalizedEmail,
+      message: "SMTP is not configured. Use the link below to verify.",
+      verifyUrl
+    });
+  }
+
+  try {
+    await mailer.sendMail({
+      from: SMTP_USER,
+      to: normalizedEmail,
+      subject: "Verify your F1 Predictions account",
+      text: `Verify your account: ${verifyUrl}`,
+      html: `<p>Verify your account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`
+    });
+  } catch (err) {
+    console.error("Failed to send verification email:", err);
+    return res.render("verify_notice", {
+      email: normalizedEmail,
+      message: "Email failed to send. Use the link below to verify.",
+      verifyUrl
+    });
+  }
+
+  res.render("verify_notice", {
+    email: normalizedEmail,
+    message: "Verification email sent. Please check your inbox.",
+    verifyUrl: null
+  });
 });
 
 app.get("/login", (req, res) => {
@@ -356,6 +493,9 @@ app.post("/login", async (req, res) => {
   if (!user) {
     return res.render("login", { error: "Invalid credentials." });
   }
+  if (!AUTO_VERIFY && !user.is_verified) {
+    return res.render("login", { error: "Please verify your email first." });
+  }
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) {
     return res.render("login", { error: "Invalid credentials." });
@@ -368,6 +508,31 @@ app.post("/logout", (req, res) => {
   req.session.destroy(() => {
     res.redirect("/");
   });
+});
+
+app.get("/verify", (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res.status(400).send("Missing token.");
+  }
+  const tokenHash = hashToken(String(token));
+  const verification = db
+    .prepare(
+      "SELECT * FROM email_verifications WHERE token_hash = ? AND expires_at > ?"
+    )
+    .get(tokenHash, new Date().toISOString());
+  if (!verification) {
+    return res.status(400).send("Invalid or expired token.");
+  }
+  const now = new Date().toISOString();
+  db.prepare("UPDATE users SET is_verified = 1, verified_at = ? WHERE id = ?").run(
+    now,
+    verification.user_id
+  );
+  db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(
+    verification.user_id
+  );
+  res.render("verify_success");
 });
 
 app.get("/dashboard", requireAuth, (req, res) => {
@@ -409,6 +574,29 @@ app.post("/groups", requireAuth, (req, res) => {
       success: null
     });
   }
+  const normalizedName = name.trim();
+  const groupExists = db
+    .prepare("SELECT id FROM groups WHERE name = ?")
+    .get(normalizedName);
+  if (groupExists) {
+    const groups = db
+      .prepare(
+        `
+        SELECT g.id, g.name, g.owner_id, gm.role
+        FROM groups g
+        JOIN group_members gm ON gm.group_id = g.id
+        WHERE gm.user_id = ?
+        ORDER BY g.created_at DESC
+        `
+      )
+      .all(user.id);
+    return res.render("dashboard", {
+      user,
+      groups,
+      error: "Group name already exists.",
+      success: null
+    });
+  }
   const now = new Date().toISOString();
   const joinCode = crypto.randomBytes(3).toString("hex").toUpperCase();
   const joinPasswordHash = bcrypt.hashSync(joinPassword, 10);
@@ -416,7 +604,7 @@ app.post("/groups", requireAuth, (req, res) => {
     .prepare(
       "INSERT INTO groups (name, owner_id, created_at, join_code, join_password_hash) VALUES (?, ?, ?, ?, ?)"
     )
-    .run(name.trim(), user.id, now, joinCode, joinPasswordHash);
+    .run(normalizedName, user.id, now, joinCode, joinPasswordHash);
   db.prepare(
     "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
   ).run(user.id, groupInfo.lastInsertRowid, "owner", now);
@@ -505,23 +693,24 @@ app.get("/groups/:id", requireAuth, (req, res) => {
       `
     )
     .all(groupId);
-  const invites = db
+  const invite = db
     .prepare(
-      "SELECT * FROM invites WHERE group_id = ? ORDER BY created_at DESC"
+      "SELECT * FROM invites WHERE group_id = ? ORDER BY created_at DESC LIMIT 1"
     )
-    .all(groupId);
+    .get(groupId);
 
   const role = getMemberRole(user.id, groupId);
-  res.render("group", { user, group, members, invites, role, error: null, success: null });
+  res.render("group", { user, group, members, invite, role, error: null, success: null });
 });
 
 app.post("/groups/:id/invites", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isGroupAdmin(user.id, groupId)) {
-    return res.status(403).send("Not a group member.");
+    return res.status(403).send("Admin access only.");
   }
 
+  db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
   const code = crypto.randomBytes(4).toString("hex");
   db.prepare(
     "INSERT INTO invites (group_id, code, created_at, created_by) VALUES (?, ?, ?, ?)"
@@ -530,7 +719,46 @@ app.post("/groups/:id/invites", requireAuth, (req, res) => {
   res.redirect(`/groups/${groupId}`);
 });
 
+app.post("/groups/:id/invites/remove", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  if (!isGroupAdmin(user.id, groupId)) {
+    return res.status(403).send("Admin access only.");
+  }
+  db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
+  res.redirect(`/groups/${groupId}`);
+});
+
 app.get("/join/:code", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const code = req.params.code.trim();
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return res.status(404).send("Invite not found.");
+  }
+  if (isMember(user.id, invite.group_id)) {
+    return res.redirect(`/groups/${invite.group_id}`);
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  const members = db
+    .prepare(
+      `
+      SELECT u.id, u.name, gm.role
+      FROM group_members gm
+      JOIN users u ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+      ORDER BY gm.joined_at ASC
+      `
+    )
+    .all(invite.group_id);
+  res.render("join_confirm", { user, group, members, code });
+});
+
+app.post("/join/:code", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const code = req.params.code.trim();
   const invite = db
@@ -623,6 +851,43 @@ app.post("/groups/:id/members/:userId/demote", requireAuth, (req, res) => {
     "UPDATE group_members SET role = ? WHERE user_id = ? AND group_id = ?"
   ).run("member", targetUserId, groupId);
   res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/leave", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  if (!isMember(user.id, groupId)) {
+    return res.status(403).send("Not a group member.");
+  }
+
+  const role = getMemberRole(user.id, groupId);
+  const tx = db.transaction(() => {
+    if (role === "owner") {
+      const nextOwner = getNextOwner(groupId, user.id);
+      if (!nextOwner) {
+        throw new Error("Owner cannot leave as the last member.");
+      }
+      db.prepare("UPDATE groups SET owner_id = ? WHERE id = ?").run(
+        nextOwner.user_id,
+        groupId
+      );
+      db.prepare(
+        "UPDATE group_members SET role = 'owner' WHERE user_id = ? AND group_id = ?"
+      ).run(nextOwner.user_id, groupId);
+    }
+    db.prepare("DELETE FROM group_members WHERE user_id = ? AND group_id = ?").run(
+      user.id,
+      groupId
+    );
+  });
+
+  try {
+    tx();
+  } catch (err) {
+    return res.status(400).send(err.message);
+  }
+
+  res.redirect("/dashboard");
 });
 
 app.get("/groups/:id/questions", requireAuth, (req, res) => {
@@ -767,6 +1032,22 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
         );
         continue;
       }
+      if (type === "single_choice_with_driver") {
+        const value = req.body[`${question.id}_value`];
+        const driver = req.body[`${question.id}_driver`];
+        if ((!value || value === "") && (!driver || driver === "")) {
+          continue;
+        }
+        insert.run(
+          user.id,
+          groupId,
+          question.id,
+          JSON.stringify({ value, driver }),
+          now,
+          now
+        );
+        continue;
+      }
 
       const answer = req.body[question.id];
       if (answer === undefined || answer === "") continue;
@@ -868,7 +1149,8 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
       type === "multi_select_limited" ||
       type === "teammate_battle" ||
       type === "boolean_with_optional_driver" ||
-      type === "numeric_with_driver"
+      type === "numeric_with_driver" ||
+      type === "single_choice_with_driver"
     ) {
       try {
         return JSON.parse(raw);
@@ -986,15 +1268,15 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
       }
       return score;
     }
-    if (type === "numeric_with_driver") {
+    if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
       const points = question.points || {};
-      const actualValue = Number(actualRaw?.value);
-      const predictedValue = Number(predictedRaw?.value);
+      const actualValue = actualRaw?.value;
+      const predictedValue = predictedRaw?.value;
       const actualDriver = actualRaw?.driver;
       const predictedDriver = predictedRaw?.driver;
       let score = 0;
-      if (Number.isFinite(actualValue) && Number.isFinite(predictedValue)) {
-        if (actualValue === predictedValue) {
+      if (actualValue != null && predictedValue != null) {
+        if (String(actualValue) === String(predictedValue)) {
           score += Number(points.position || 0);
         }
       }
@@ -1148,6 +1430,15 @@ app.post("/admin/actuals", requireAdmin, (req, res) => {
           continue;
         }
         const value = clampNumber(valueRaw, 0, 999);
+        upsert.run(question.id, JSON.stringify({ value, driver }), now);
+        continue;
+      }
+      if (type === "single_choice_with_driver") {
+        const value = req.body[`${question.id}_value`];
+        const driver = req.body[`${question.id}_driver`];
+        if ((!value || value === "") && (!driver || driver === "")) {
+          continue;
+        }
         upsert.run(question.id, JSON.stringify({ value, driver }), now);
         continue;
       }

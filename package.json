@@ -13,6 +13,7 @@
     "connect-sqlite3": "^0.9.15",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
-    "express-session": "^1.17.3"
+    "express-session": "^1.17.3",
+    "nodemailer": "^6.9.14"
   }
 }

@@ -1,14 +1,21 @@
 ﻿<%- include('partials/header', { title: 'Dashboard', user }) %>
 
 <section class="hero">
+  <% if (error) { %>
+    <div class="alert"><%= error %></div>
+  <% } %>
+  <% if (success) { %>
+    <div class="alert" style="background:#eef8f0;border-color:#c8e6d0;color:#2d6a3a;"><%= success %></div>
+  <% } %>
+
   <div class="card">
-    <h1>Your groups</h1>
-    <% if (error) { %>
-      <div class="alert"><%= error %></div>
-    <% } %>
-    <% if (success) { %>
-      <div class="alert" style="background:#eef8f0;border-color:#c8e6d0;color:#2d6a3a;"><%= success %></div>
-    <% } %>
+    <div class="inline-actions" style="justify-content: space-between;">
+      <h1 style="margin:0 0 12px 0;">My groups</h1>
+      <div class="inline-actions">
+        <a class="button-link" href="#create-group">Create group</a>
+        <a class="link" href="#join-group">Join group</a>
+      </div>
+    </div>
     <% if (groups.length === 0) { %>
       <p class="muted">No groups yet. Create one below.</p>
     <% } %>
@@ -18,16 +25,16 @@
           <div class="inline-actions" style="justify-content: space-between;">
             <div>
               <strong><%= group.name %></strong>
-              <span class="muted">(role: <%= group.role %>)</span>
+              <span class="muted">(<%= group.role %>)</span>
             </div>
-            <a class="link" href="/groups/<%= group.id %>">Open</a>
+            <a class="link" href="/groups/<%= group.id %>">View group</a>
           </div>
         </li>
       <% }) %>
     </ul>
   </div>
 
-  <div class="card">
+  <div class="card" id="create-group">
     <h2>Create a new group</h2>
     <form method="post" action="/groups">
       <label>
@@ -42,7 +49,7 @@
     </form>
   </div>
 
-  <div class="card">
+  <div class="card" id="join-group">
     <h2>Join a group</h2>
     <form method="post" action="/groups/join">
       <label>

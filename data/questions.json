@@ -141,7 +141,8 @@
     {
       "id": "lowest_grid_win_position",
       "prompt": "Lowest starting position from which a race is won (and who wins)",
-      "type": "numeric_with_driver",
+      "type": "single_choice_with_driver",
+      "options": ["Pitlane", "22", "21", "20", "19", "18", "17", "16", "15", "14", "13", "12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"],
       "options_source": "drivers",
       "points": {
         "position": 10,

@@ -1,0 +1,12 @@
+﻿<%- include('partials/header', { title: 'Verify email', user: null }) %>
+
+<div class="card" style="max-width:520px; margin: 0 auto;">
+  <h1>Verify your email</h1>
+  <p class="muted"><%= message %></p>
+  <% if (verifyUrl) { %>
+    <div class="alert">Verification link (dev mode): <a class="link" href="<%= verifyUrl %>"><%= verifyUrl %></a></div>
+  <% } %>
+  <p class="muted">Email: <strong><%= email %></strong></p>
+</div>
+
+<%- include('partials/footer') %>

@@ -73,7 +73,8 @@ Enter season results at `/admin/actuals` after the season. The leaderboard at `/
 - `ROSTER_PATH` - roster file path (default `DATA_DIR/roster.json`)
 - `RACES_PATH` - races file path (default `DATA_DIR/races.json`)
 - `SESSION_SECRET` - session cookie secret
-- `DEV_AUTO_LOGIN` - set to `1` to auto-login in development (ignored in production)
-- `DEV_AUTO_LOGIN_EMAIL` - email for auto-login user (default `dev@example.com`)
-- `DEV_AUTO_LOGIN_NAME` - name for auto-login user (default `Dev Admin`)
 - `ADMIN_PASSWORD` - password required to access `/admin/*`
+- `SMTP_USER` - Gmail address for verification emails
+- `SMTP_PASS` - Gmail app password
+- `BASE_URL` - public base URL for verification links (e.g. `https://example.com`)
+- `AUTO_VERIFY` - set to `1` to auto-verify users (skip email verification)

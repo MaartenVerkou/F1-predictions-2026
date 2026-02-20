@@ -5,58 +5,73 @@
   <p class="muted">All predictions submitted so far.</p>
 
   <% const questionMap = questions.reduce((acc, q) => { acc[q.id] = q; return acc; }, {}); %>
+  <% const responsesByQuestion = responses.reduce((acc, row) => {
+      if (!acc[row.question_id]) acc[row.question_id] = [];
+      acc[row.question_id].push(row);
+      return acc;
+    }, {}); %>
+  <% const formatAnswer = (row) => {
+      const q = questionMap[row.question_id];
+      let answerText = row.answer;
+      if (q && (q.type === 'ranking' || q.type === 'multi_select' || q.type === 'multi_select_limited')) {
+        try {
+          const items = JSON.parse(row.answer);
+          if (Array.isArray(items)) {
+            answerText = q.type === 'ranking' ? items.join(' > ') : items.join(', ');
+          }
+        } catch (err) {}
+      }
+      if (q && q.type === 'boolean') {
+        answerText = row.answer === 'yes' ? 'Yes' : row.answer === 'no' ? 'No' : row.answer;
+      }
+      if (q && (q.type === 'teammate_battle' || q.type === 'boolean_with_optional_driver' || q.type === 'numeric_with_driver' || q.type === 'single_choice_with_driver')) {
+        try {
+          const obj = JSON.parse(row.answer);
+          if (q.type === 'teammate_battle') {
+            answerText = `${obj.winner || 'n/a'} (diff: ${obj.diff ?? 'n/a'})`;
+          }
+          if (q.type === 'boolean_with_optional_driver') {
+            answerText = `${obj.choice || 'n/a'}${obj.driver ? ` - ${obj.driver}` : ''}`;
+          }
+          if (q.type === 'numeric_with_driver' || q.type === 'single_choice_with_driver') {
+            answerText = `${obj.value ?? 'n/a'}${obj.driver ? ` - ${obj.driver}` : ''}`;
+          }
+        } catch (err) {}
+      }
+      return answerText;
+    }; %>
 
   <% if (responses.length === 0) { %>
     <div class="alert">No responses yet.</div>
   <% } else { %>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Member</th>
-          <th>Question</th>
-          <th>Answer</th>
-          <th>Updated</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% responses.forEach(row => { 
-          const q = questionMap[row.question_id];
-          let answerText = row.answer;
-          if (q && (q.type === 'ranking' || q.type === 'multi_select' || q.type === 'multi_select_limited')) {
-            try {
-              const items = JSON.parse(row.answer);
-              if (Array.isArray(items)) {
-                answerText = q.type === 'ranking' ? items.join(' > ') : items.join(', ');
-              }
-            } catch (err) {}
-          }
-          if (q && q.type === 'boolean') {
-            answerText = row.answer === 'yes' ? 'Yes' : row.answer === 'no' ? 'No' : row.answer;
-          }
-          if (q && (q.type === 'teammate_battle' || q.type === 'boolean_with_optional_driver' || q.type === 'numeric_with_driver')) {
-            try {
-              const obj = JSON.parse(row.answer);
-              if (q.type === 'teammate_battle') {
-                answerText = `${obj.winner || 'n/a'} (diff: ${obj.diff ?? 'n/a'})`;
-              }
-              if (q.type === 'boolean_with_optional_driver') {
-                answerText = `${obj.choice || 'n/a'}${obj.driver ? ` - ${obj.driver}` : ''}`;
-              }
-              if (q.type === 'numeric_with_driver') {
-                answerText = `${obj.value ?? 'n/a'}${obj.driver ? ` - ${obj.driver}` : ''}`;
-              }
-            } catch (err) {}
-          }
-        %>
-          <tr>
-            <td><%= row.user_name %></td>
-            <td><%= q ? q.prompt : row.question_id %></td>
-            <td><%= answerText %></td>
-            <td><%= new Date(row.updated_at).toLocaleString() %></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
+    <% questions.forEach(q => { %>
+      <div class="card" style="margin-top:12px;">
+        <h2><%= q.prompt %></h2>
+        <% const rows = responsesByQuestion[q.id] || []; %>
+        <% if (rows.length === 0) { %>
+          <p class="muted">No responses yet.</p>
+        <% } else { %>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Answer</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.forEach(row => { %>
+                <tr>
+                  <td><%= row.user_name %></td>
+                  <td><%= formatAnswer(row) %></td>
+                  <td><%= new Date(row.updated_at).toLocaleString() %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        <% } %>
+      </div>
+    <% }) %>
   <% } %>
 </div>
 

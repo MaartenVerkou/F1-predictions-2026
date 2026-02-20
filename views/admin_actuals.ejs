@@ -119,6 +119,23 @@
               <% }) %>
             </select>
           </div>
+        <% } else if (type === 'single_choice_with_driver') { 
+          const savedObj = saved || {};
+        %>
+          <div class="inline-actions">
+            <select name="<%= question.id %>_value">
+              <option value="">Select position</option>
+              <% options.forEach(option => { %>
+                <option value="<%= option %>" <%= savedObj.value === option ? 'selected' : '' %>><%= option %></option>
+              <% }) %>
+            </select>
+            <select name="<%= question.id %>_driver">
+              <option value="">Select driver</option>
+              <% roster.drivers.forEach(option => { %>
+                <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
+              <% }) %>
+            </select>
+          </div>
         <% } else if (type === 'boolean') { %>
           <div class="inline-actions">
             <label class="muted">

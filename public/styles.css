@@ -27,6 +27,21 @@ header {
   border-bottom: 1px solid var(--border);
 }
 
+.countdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #fff4f1;
+  border: 1px solid #f3c1b9;
+  font-size: 14px;
+}
+
+.countdown-value {
+  color: #a73729;
+}
+
 header a {
   text-decoration: none;
   color: var(--text);
@@ -88,6 +103,16 @@ textarea {
   margin-top: 8px;
 }
 
+.checkbox-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-grid input[type="checkbox"] {
+  margin: 0;
+}
+
 button {
   background: var(--accent);
   color: white;
@@ -98,10 +123,21 @@ button {
   cursor: pointer;
 }
 
+button.primary {
+  box-shadow: 0 10px 20px rgba(214, 63, 47, 0.25);
+}
+
 button.secondary {
   background: transparent;
   color: var(--accent);
   border: 1px solid var(--accent);
+}
+
+button:disabled {
+  background: #d9d4c8;
+  color: #8a867d;
+  cursor: not-allowed;
+  border: 1px solid #d9d4c8;
 }
 
 .inline-actions {
@@ -144,6 +180,18 @@ button.secondary {
   color: var(--accent);
   text-decoration: none;
   font-weight: 600;
+}
+
+.button-link {
+  background: var(--accent);
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .table {

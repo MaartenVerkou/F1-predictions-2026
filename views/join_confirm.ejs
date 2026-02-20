@@ -1,0 +1,25 @@
+﻿<%- include('partials/header', { title: 'Join group', user }) %>
+
+<div class="card" style="max-width:640px; margin: 0 auto;">
+  <h1>Join <%= group.name %>?</h1>
+  <p class="muted">You were invited to this group. Confirm to join.</p>
+
+  <h2>Members</h2>
+  <ul class="list">
+    <% members.forEach(member => { %>
+      <li>
+        <strong><%= member.name %></strong>
+        <span class="muted">(<%= member.role %>)</span>
+      </li>
+    <% }) %>
+  </ul>
+
+  <form method="post" action="/join/<%= code %>" style="margin-top:16px;">
+    <div class="inline-actions">
+      <button type="submit">Join group</button>
+      <a class="link" href="/dashboard">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<%- include('partials/footer') %>
