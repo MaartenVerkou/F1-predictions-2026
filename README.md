@@ -18,6 +18,19 @@ docker build -t f1-predictions-2026 .
 docker run --rm -p 3000:3000 -v ${PWD}/data:/app/data f1-predictions-2026
 ```
 
+## Cloudflare tunnel (TryCloudflare)
+
+This repo includes a `cloudflared` service in `docker-compose.yml` that creates a random TryCloudflare URL (no token required).
+
+Start:
+
+```powershell
+docker compose up -d --build
+docker compose logs -f tunnel
+```
+
+The tunnel URL changes on restarts. To avoid rotating links, use a named tunnel with a token.
+
 ## Questions file
 
 Replace `data/questions.json` with your question list. Supported shape:
