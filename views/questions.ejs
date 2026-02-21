@@ -91,14 +91,14 @@
           try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
         %>
           <div class="inline-actions">
-            <select name="<%= question.id %>_winner">
+            <select name="<%= question.id %>_winner" data-toggle-diff="<%= question.id %>">
               <option value="">Select winner</option>
               <% (question.options || []).forEach(option => { %>
                 <option value="<%= option %>" <%= saved.winner === option ? 'selected' : '' %>><%= option %></option>
               <% }) %>
               <option value="tie" <%= saved.winner === 'tie' ? 'selected' : '' %>>Tie</option>
             </select>
-            <input type="number" name="<%= question.id %>_diff" placeholder="Points diff" min="0" max="999" value="<%= saved.diff ?? '' %>" />
+            <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="Points diff" min="0" max="999" value="<%= saved.diff ?? '' %>" />
           </div>
         <% } else if (type === 'boolean_with_optional_driver') { 
           let saved = {};
@@ -137,11 +137,12 @@
           let saved = {};
           try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
           const driverOptions = roster.drivers;
+          const positionOptions = question.options || [];
         %>
           <div class="inline-actions">
             <select name="<%= question.id %>_value">
               <option value="">Select position</option>
-              <% options.forEach(option => { %>
+              <% positionOptions.forEach(option => { %>
                 <option value="<%= option %>" <%= saved.value === option ? 'selected' : '' %>><%= option %></option>
               <% }) %>
             </select>

@@ -2,7 +2,7 @@
 
 <div class="card">
   <h1>Season actuals</h1>
-  <p class="muted">Enter the real outcomes once the season is complete. These power the leaderboard.</p>
+  <p class="muted">Enter the real outcomes once the season is complete. These will power the leaderboard when it is enabled.</p>
 
   <form method="post" action="/admin/actuals">
     <% const sourceOptionsFor = (question) => {
@@ -79,14 +79,14 @@
           const savedObj = saved || {};
         %>
           <div class="inline-actions">
-            <select name="<%= question.id %>_winner">
+            <select name="<%= question.id %>_winner" data-toggle-diff="<%= question.id %>">
               <option value="">Select winner</option>
               <% (question.options || []).forEach(option => { %>
                 <option value="<%= option %>" <%= savedObj.winner === option ? 'selected' : '' %>><%= option %></option>
               <% }) %>
               <option value="tie" <%= savedObj.winner === 'tie' ? 'selected' : '' %>>Tie</option>
             </select>
-            <input type="number" name="<%= question.id %>_diff" placeholder="Points diff" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
+            <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="Points diff" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
           </div>
         <% } else if (type === 'boolean_with_optional_driver') { 
           const savedObj = saved || {};
@@ -121,11 +121,12 @@
           </div>
         <% } else if (type === 'single_choice_with_driver') { 
           const savedObj = saved || {};
+          const positionOptions = question.options || [];
         %>
           <div class="inline-actions">
             <select name="<%= question.id %>_value">
               <option value="">Select position</option>
-              <% options.forEach(option => { %>
+              <% positionOptions.forEach(option => { %>
                 <option value="<%= option %>" <%= savedObj.value === option ? 'selected' : '' %>><%= option %></option>
               <% }) %>
             </select>

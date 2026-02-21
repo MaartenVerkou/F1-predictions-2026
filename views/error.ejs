@@ -1,0 +1,16 @@
+<%- include('partials/header', { title, user }) %>
+
+<div class="card" style="max-width:640px; margin: 0 auto;">
+  <h1><%= statusCode %></h1>
+  <p class="muted"><%= message %></p>
+  <div class="inline-actions">
+    <a class="link" href="/">Home</a>
+    <% if (user) { %>
+      <a class="link" href="/dashboard">Dashboard</a>
+    <% } else { %>
+      <a class="link" href="/login">Log in</a>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

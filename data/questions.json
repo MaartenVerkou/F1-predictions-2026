@@ -111,7 +111,7 @@
     },
     {
       "id": "alpine_vs_cadillac_audi",
-      "prompt": "Alpine scores more or fewer points than Cadillac and Audi combined",
+      "prompt": "Alpine scores more or less points than Cadillac and Audi combined",
       "type": "single_choice",
       "options": ["More", "Less"],
       "points": 15,

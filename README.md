@@ -75,7 +75,7 @@ Race options are loaded from `data/races.json`:
 
 ## Scoring / actuals
 
-Enter season results at `/admin/actuals` after the season. The leaderboard at `/groups/:id/leaderboard` computes totals automatically from those actuals and the saved predictions.
+Enter season results at `/admin/actuals` after the season. Leaderboard scoring is currently disabled until season results are finalized.
 
 ## Environment variables
 
@@ -86,7 +86,7 @@ Enter season results at `/admin/actuals` after the season. The leaderboard at `/
 - `ROSTER_PATH` - roster file path (default `DATA_DIR/roster.json`)
 - `RACES_PATH` - races file path (default `DATA_DIR/races.json`)
 - `SESSION_SECRET` - session cookie secret
-- `ADMIN_PASSWORD` - password required to access `/admin/*`
+- `ADMIN_PASSWORD` - password required to access `/admin/*` (default `change-me`)
 - `SMTP_USER` - Gmail address for verification emails
 - `SMTP_PASS` - Gmail app password
 - `BASE_URL` - public base URL for verification links (e.g. `https://example.com`)

@@ -25,7 +25,9 @@ const DEV_AUTO_LOGIN_EMAIL =
 const DEV_AUTO_LOGIN_NAME = process.env.DEV_AUTO_LOGIN_NAME || "Dev Admin";
 const PREDICTIONS_CLOSE_AT =
   process.env.PREDICTIONS_CLOSE_AT || "2026-03-05T23:59:59";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const ADMIN_PASSWORD =
+  (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.trim()) || "change-me";
+const LEADERBOARD_ENABLED = process.env.LEADERBOARD_ENABLED === "1";
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -144,7 +146,13 @@ function getGlobalGroup() {
 
 function ensureGlobalGroup(ownerId) {
   let global = getGlobalGroup();
-  if (global) return global;
+  if (global) {
+    // Global league should stay public and free to join.
+    db.prepare(
+      "UPDATE groups SET is_public = 1, join_password_hash = NULL WHERE id = ?"
+    ).run(global.id);
+    return db.prepare("SELECT * FROM groups WHERE id = ?").get(global.id);
+  }
   if (!ownerId) {
     const firstUser = db
       .prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
@@ -155,7 +163,7 @@ function ensureGlobalGroup(ownerId) {
   const now = new Date().toISOString();
   const info = db
     .prepare(
-      "INSERT INTO groups (name, owner_id, created_at, is_global, is_public) VALUES (?, ?, ?, 1, 0)"
+      "INSERT INTO groups (name, owner_id, created_at, is_global, is_public, join_password_hash) VALUES (?, ?, ?, 1, 1, NULL)"
     )
     .run("Global", ownerId, now);
   global = db.prepare("SELECT * FROM groups WHERE id = ?").get(info.lastInsertRowid);
@@ -169,14 +177,6 @@ function ensureGlobalMemberships() {
   db.prepare(
     "UPDATE group_members SET role = 'owner' WHERE group_id = ? AND user_id = ?"
   ).run(global.id, global.owner_id);
-  db.prepare(
-    `
-    INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at)
-    SELECT u.id, ?, 'member', ?
-    FROM users u
-    WHERE u.id <> ?
-    `
-  ).run(global.id, now, global.owner_id);
   db.prepare(
     "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'owner', ?)"
   ).run(global.owner_id, global.id, now);
@@ -350,6 +350,19 @@ function getCurrentUser(req) {
   return stmt.get(req.session.userId) || null;
 }
 
+function sendError(req, res, statusCode, message) {
+  const preferredType = req.accepts(["html", "json", "text"]);
+  if (preferredType === "html") {
+    return res.status(statusCode).render("error", {
+      title: `${statusCode} Error`,
+      user: getCurrentUser(req),
+      statusCode,
+      message
+    });
+  }
+  return res.status(statusCode).send(message);
+}
+
 function isAdmin(req) {
   return req.session && req.session.isAdmin === true;
 }
@@ -478,18 +491,13 @@ app.post("/signup", async (req, res) => {
     const info = stmt.run(normalizedName, normalizedEmail, passwordHash, now);
     userId = info.lastInsertRowid;
   }
+  ensureGlobalGroup(userId);
 
   if (AUTO_VERIFY) {
     db.prepare("UPDATE users SET is_verified = 1, verified_at = ? WHERE id = ?").run(
       now,
       userId
     );
-    const global = ensureGlobalGroup(userId);
-    if (global) {
-      db.prepare(
-        "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-      ).run(userId, global.id, global.owner_id === userId ? "owner" : "member", now);
-    }
     req.session.userId = userId;
     return res.redirect("/dashboard");
   }
@@ -571,7 +579,7 @@ app.post("/logout", (req, res) => {
 app.get("/verify", (req, res) => {
   const { token } = req.query;
   if (!token) {
-    return res.status(400).send("Missing token.");
+    return sendError(req, res, 400, "Missing token.");
   }
   const tokenHash = hashToken(String(token));
   const verification = db
@@ -580,7 +588,7 @@ app.get("/verify", (req, res) => {
     )
     .get(tokenHash, new Date().toISOString());
   if (!verification) {
-    return res.status(400).send("Invalid or expired token.");
+    return sendError(req, res, 400, "Invalid or expired token.");
   }
   const now = new Date().toISOString();
   db.prepare("UPDATE users SET is_verified = 1, verified_at = ? WHERE id = ?").run(
@@ -610,10 +618,10 @@ app.get("/dashboard", requireAuth, (req, res) => {
   const publicGroups = db
     .prepare(
       `
-      SELECT g.id, g.name, u.name as owner_name, g.created_at
+      SELECT g.id, g.name, u.name as owner_name, g.created_at, g.is_global
       FROM groups g
       JOIN users u ON u.id = g.owner_id
-      WHERE g.is_public = 1 AND g.is_global = 0
+      WHERE g.is_public = 1
       AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
       ORDER BY g.created_at DESC
       `
@@ -648,10 +656,10 @@ app.post("/groups", requireAuth, (req, res) => {
     const publicGroups = db
       .prepare(
         `
-        SELECT g.id, g.name, u.name as owner_name, g.created_at
+        SELECT g.id, g.name, u.name as owner_name, g.created_at, g.is_global
         FROM groups g
         JOIN users u ON u.id = g.owner_id
-        WHERE g.is_public = 1 AND g.is_global = 0
+        WHERE g.is_public = 1
         AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
         ORDER BY g.created_at DESC
         `
@@ -684,10 +692,10 @@ app.post("/groups", requireAuth, (req, res) => {
     const publicGroups = db
       .prepare(
         `
-        SELECT g.id, g.name, u.name as owner_name, g.created_at
+        SELECT g.id, g.name, u.name as owner_name, g.created_at, g.is_global
         FROM groups g
         JOIN users u ON u.id = g.owner_id
-        WHERE g.is_public = 1 AND g.is_global = 0
+        WHERE g.is_public = 1
         AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
         ORDER BY g.created_at DESC
         `
@@ -721,7 +729,7 @@ app.post("/groups/:id/join-public", requireAuth, (req, res) => {
   const groupId = Number(req.params.id);
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   if (!group || !group.is_public) {
-    return res.status(404).send("Group not found.");
+    return sendError(req, res, 404, "Group not found.");
   }
   if (!isMember(user.id, groupId)) {
     db.prepare(
@@ -748,10 +756,10 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   const publicGroups = db
     .prepare(
       `
-      SELECT g.id, g.name, u.name as owner_name, g.created_at
+      SELECT g.id, g.name, u.name as owner_name, g.created_at, g.is_global
       FROM groups g
       JOIN users u ON u.id = g.owner_id
-      WHERE g.is_public = 1 AND g.is_global = 0
+      WHERE g.is_public = 1
       AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
       ORDER BY g.created_at DESC
       `
@@ -812,7 +820,7 @@ app.get("/groups/:id", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
-    return res.status(403).send("Not a group member.");
+    return sendError(req, res, 403, "Not a group member.");
   }
   const group = db
     .prepare("SELECT * FROM groups WHERE id = ?")
@@ -842,7 +850,7 @@ app.post("/groups/:id/invites", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isGroupAdmin(user.id, groupId)) {
-    return res.status(403).send("Admin access only.");
+    return sendError(req, res, 403, "Admin access only.");
   }
 
   db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
@@ -858,7 +866,7 @@ app.post("/groups/:id/invites/remove", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isGroupAdmin(user.id, groupId)) {
-    return res.status(403).send("Admin access only.");
+    return sendError(req, res, 403, "Admin access only.");
   }
   db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
   res.redirect(`/groups/${groupId}`);
@@ -871,7 +879,7 @@ app.get("/join/:code", requireAuth, (req, res) => {
     .prepare("SELECT * FROM invites WHERE code = ?")
     .get(code);
   if (!invite) {
-    return res.status(404).send("Invite not found.");
+    return sendError(req, res, 404, "Invite not found.");
   }
   if (isMember(user.id, invite.group_id)) {
     return res.redirect(`/groups/${invite.group_id}`);
@@ -900,7 +908,7 @@ app.post("/join/:code", requireAuth, async (req, res) => {
     .prepare("SELECT * FROM invites WHERE code = ?")
     .get(code);
   if (!invite) {
-    return res.status(404).send("Invite not found.");
+    return sendError(req, res, 404, "Invite not found.");
   }
   if (isMember(user.id, invite.group_id)) {
     return res.redirect(`/groups/${invite.group_id}`);
@@ -909,7 +917,7 @@ app.post("/join/:code", requireAuth, async (req, res) => {
     .prepare("SELECT * FROM groups WHERE id = ?")
     .get(invite.group_id);
   if (!group) {
-    return res.status(404).send("Group not found.");
+    return sendError(req, res, 404, "Group not found.");
   }
   if (!group.is_public && group.join_password_hash) {
     const { password } = req.body;
@@ -967,11 +975,11 @@ app.post("/groups/:id/password", requireAuth, async (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isGroupAdmin(user.id, groupId)) {
-    return res.status(403).send("Admin access only.");
+    return sendError(req, res, 403, "Admin access only.");
   }
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   if (group && group.is_public) {
-    return res.status(400).send("Public groups do not use a password.");
+    return sendError(req, res, 400, "Public groups do not use a password.");
   }
   const { joinPassword } = req.body;
   if (!joinPassword) {
@@ -990,14 +998,14 @@ app.post("/groups/:id/members/:userId/kick", requireAuth, (req, res) => {
   const groupId = Number(req.params.id);
   const targetUserId = Number(req.params.userId);
   if (!isGroupAdmin(user.id, groupId)) {
-    return res.status(403).send("Admin access only.");
+    return sendError(req, res, 403, "Admin access only.");
   }
   const targetRole = getMemberRole(targetUserId, groupId);
   if (!targetRole) {
     return res.redirect(`/groups/${groupId}`);
   }
   if (targetRole === "owner") {
-    return res.status(403).send("Owner cannot be removed.");
+    return sendError(req, res, 403, "Owner cannot be removed.");
   }
   db.prepare(
     "DELETE FROM group_members WHERE user_id = ? AND group_id = ?"
@@ -1010,7 +1018,7 @@ app.post("/groups/:id/members/:userId/promote", requireAuth, (req, res) => {
   const groupId = Number(req.params.id);
   const targetUserId = Number(req.params.userId);
   if (!isGroupAdmin(user.id, groupId)) {
-    return res.status(403).send("Admin access only.");
+    return sendError(req, res, 403, "Admin access only.");
   }
   const targetRole = getMemberRole(targetUserId, groupId);
   if (!targetRole) {
@@ -1030,7 +1038,7 @@ app.post("/groups/:id/members/:userId/demote", requireAuth, (req, res) => {
   const groupId = Number(req.params.id);
   const targetUserId = Number(req.params.userId);
   if (!isGroupAdmin(user.id, groupId)) {
-    return res.status(403).send("Admin access only.");
+    return sendError(req, res, 403, "Admin access only.");
   }
   const targetRole = getMemberRole(targetUserId, groupId);
   if (!targetRole || targetRole === "owner") {
@@ -1046,12 +1054,12 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
-    return res.status(403).send("Not a group member.");
+    return sendError(req, res, 403, "Not a group member.");
   }
 
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   if (group && group.is_global) {
-    return res.status(400).send("You cannot leave the Global group.");
+    return sendError(req, res, 400, "You cannot leave the Global group.");
   }
 
   const role = getMemberRole(user.id, groupId);
@@ -1078,7 +1086,7 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
   try {
     tx();
   } catch (err) {
-    return res.status(400).send(err.message);
+    return sendError(req, res, 400, err.message);
   }
 
   res.redirect("/dashboard");
@@ -1088,7 +1096,7 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
-    return res.status(403).send("Not a group member.");
+    return sendError(req, res, 403, "Not a group member.");
   }
 
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
@@ -1122,11 +1130,11 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
-    return res.status(403).send("Not a group member.");
+    return sendError(req, res, 403, "Not a group member.");
   }
 
   if (predictionsClosed()) {
-    return res.status(403).send("Predictions are closed.");
+    return sendError(req, res, 403, "Predictions are closed.");
   }
 
   const questions = getQuestions();
@@ -1184,7 +1192,7 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
         if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
           continue;
         }
-        const diff = clampNumber(diffRaw, 0, 999);
+        const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
         insert.run(
           user.id,
           groupId,
@@ -1263,7 +1271,7 @@ app.get("/groups/:id/responses", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
-    return res.status(403).send("Not a group member.");
+    return sendError(req, res, 403, "Not a group member.");
   }
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   const questions = getQuestions();
@@ -1284,9 +1292,18 @@ app.get("/groups/:id/responses", requireAuth, (req, res) => {
 
 app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
+  const adminAccess = isAdmin(req);
+  if (!LEADERBOARD_ENABLED && !adminAccess) {
+    return sendError(
+      req,
+      res,
+      404,
+      "Leaderboard is not available yet. It will be enabled after season results are finalized."
+    );
+  }
   const groupId = Number(req.params.id);
-  if (!isMember(user.id, groupId)) {
-    return res.status(403).send("Not a group member.");
+  if (!adminAccess && !isMember(user.id, groupId)) {
+    return sendError(req, res, 403, "Not a group member.");
   }
 
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
@@ -1521,9 +1538,6 @@ app.get("/admin/login", (req, res) => {
 
 app.post("/admin/login", (req, res) => {
   const { password } = req.body;
-  if (!ADMIN_PASSWORD) {
-    return res.status(500).send("Admin password not configured.");
-  }
   if (password !== ADMIN_PASSWORD) {
     return res.render("admin_login", {
       user: getCurrentUser(req),
@@ -1606,7 +1620,7 @@ app.post("/admin/actuals", requireAdmin, (req, res) => {
         if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
           continue;
         }
-        const diff = clampNumber(diffRaw, 0, 999);
+        const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
         upsert.run(question.id, JSON.stringify({ winner, diff }), now);
         continue;
       }
@@ -1726,7 +1740,15 @@ app.get("/admin", (req, res) => {
 });
 
 app.use((req, res) => {
-  res.status(404).render("404");
+  res.status(404).render("404", { user: getCurrentUser(req) });
+});
+
+app.use((err, req, res, next) => {
+  console.error("Unhandled server error:", err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  return sendError(req, res, 500, "Something went wrong. Please try again.");
 });
 
 app.listen(PORT, () => {

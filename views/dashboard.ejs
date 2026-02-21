@@ -68,9 +68,12 @@
               <div>
                 <strong><%= group.name %></strong>
                 <span class="muted">(owner: <%= group.owner_name %>)</span>
+                <% if (group.is_global) { %>
+                  <span class="muted"> - Global league (free)</span>
+                <% } %>
               </div>
               <form method="post" action="/groups/<%= group.id %>/join-public" style="margin:0;">
-                <button type="submit">Join</button>
+                <button type="submit"><%= group.is_global ? 'Join free' : 'Join' %></button>
               </form>
             </div>
           </li>

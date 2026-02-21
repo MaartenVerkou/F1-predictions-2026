@@ -47,9 +47,12 @@
           <td><%= row.owner_name %></td>
           <td><%= new Date(row.created_at).toLocaleString() %></td>
           <td>
-            <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
-              <button class="secondary" type="submit">Delete group</button>
-            </form>
+            <div class="inline-actions">
+              <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
+              <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+                <button class="secondary" type="submit">Delete group</button>
+              </form>
+            </div>
           </td>
         </tr>
       <% }) %>

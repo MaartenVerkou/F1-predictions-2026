@@ -46,6 +46,21 @@ const initDriverToggles = () => {
   });
 };
 
+const initTeammateDiffToggles = () => {
+  document.querySelectorAll('select[data-toggle-diff]').forEach(select => {
+    const id = select.dataset.toggleDiff;
+    const diffInput = document.querySelector(`input[data-diff-for="${id}"]`);
+    if (!diffInput) return;
+    const update = () => {
+      const tieSelected = select.value === 'tie';
+      diffInput.disabled = tieSelected;
+      if (tieSelected) diffInput.value = '';
+    };
+    select.addEventListener('change', update);
+    update();
+  });
+};
+
 const initNumberClamps = () => {
   document.querySelectorAll('input[type="number"]').forEach(input => {
     input.addEventListener('input', () => {
@@ -130,6 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initRankingGroups();
   initCheckboxLimits();
   initDriverToggles();
+  initTeammateDiffToggles();
   initNumberClamps();
   initCountdown();
   initCopyButtons();

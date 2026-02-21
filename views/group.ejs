@@ -11,10 +11,11 @@
     <div class="inline-actions">
       <a class="button-link" href="/groups/<%= group.id %>/questions">Answer questions</a>
       <a class="link" href="/groups/<%= group.id %>/responses">View responses</a>
-      <a class="link" href="/groups/<%= group.id %>/leaderboard">Leaderboard</a>
-      <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('Leave this group?');" style="margin:0;">
-        <button class="secondary" type="submit">Leave group</button>
-      </form>
+      <% if (!group.is_global) { %>
+        <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('Leave this group?');" style="margin:0;">
+          <button class="secondary" type="submit">Leave group</button>
+        </form>
+      <% } %>
     </div>
   </div>
 
