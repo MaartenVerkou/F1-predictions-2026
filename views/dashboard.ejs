@@ -42,15 +42,46 @@
         <input type="text" name="name" required />
       </label>
       <label>
-        Group password
-        <input type="password" name="joinPassword" required minlength="4" />
+        Visibility
+        <select name="visibility" required>
+          <option value="private">Private (invite code + password)</option>
+          <option value="public">Public (anyone can join)</option>
+        </select>
+      </label>
+      <label>
+        Group password (required for private groups)
+        <input type="password" name="joinPassword" minlength="4" />
       </label>
       <button type="submit">Create group</button>
     </form>
   </div>
 
+  <div class="card" id="public-groups">
+    <h2>Public groups</h2>
+    <% if (!publicGroups || publicGroups.length === 0) { %>
+      <p class="muted">No public groups available.</p>
+    <% } else { %>
+      <ul class="list">
+        <% publicGroups.forEach(group => { %>
+          <li class="card" style="padding:12px;">
+            <div class="inline-actions" style="justify-content: space-between;">
+              <div>
+                <strong><%= group.name %></strong>
+                <span class="muted">(owner: <%= group.owner_name %>)</span>
+              </div>
+              <form method="post" action="/groups/<%= group.id %>/join-public" style="margin:0;">
+                <button type="submit">Join</button>
+              </form>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
+
   <div class="card" id="join-group">
-    <h2>Join a group</h2>
+    <h2>Private groups</h2>
+    <p class="muted">Join with code + password. Private groups are not listed publicly.</p>
     <form method="post" action="/groups/join">
       <label>
         Group code

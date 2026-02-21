@@ -111,6 +111,12 @@ function ensureGroupColumns() {
   if (!names.has("join_password_hash")) {
     db.exec("ALTER TABLE groups ADD COLUMN join_password_hash TEXT;");
   }
+  if (!names.has("is_public")) {
+    db.exec("ALTER TABLE groups ADD COLUMN is_public INTEGER DEFAULT 0;");
+  }
+  if (!names.has("is_global")) {
+    db.exec("ALTER TABLE groups ADD COLUMN is_global INTEGER DEFAULT 0;");
+  }
 }
 
 ensureGroupColumns();
@@ -131,6 +137,52 @@ ensureUserColumns();
 if (AUTO_VERIFY) {
   db.prepare("UPDATE users SET is_verified = 1 WHERE is_verified = 0").run();
 }
+
+function getGlobalGroup() {
+  return db.prepare("SELECT * FROM groups WHERE is_global = 1 LIMIT 1").get();
+}
+
+function ensureGlobalGroup(ownerId) {
+  let global = getGlobalGroup();
+  if (global) return global;
+  if (!ownerId) {
+    const firstUser = db
+      .prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+      .get();
+    if (!firstUser) return null;
+    ownerId = firstUser.id;
+  }
+  const now = new Date().toISOString();
+  const info = db
+    .prepare(
+      "INSERT INTO groups (name, owner_id, created_at, is_global, is_public) VALUES (?, ?, ?, 1, 0)"
+    )
+    .run("Global", ownerId, now);
+  global = db.prepare("SELECT * FROM groups WHERE id = ?").get(info.lastInsertRowid);
+  return global;
+}
+
+function ensureGlobalMemberships() {
+  const global = ensureGlobalGroup();
+  if (!global) return;
+  const now = new Date().toISOString();
+  db.prepare(
+    "UPDATE group_members SET role = 'owner' WHERE group_id = ? AND user_id = ?"
+  ).run(global.id, global.owner_id);
+  db.prepare(
+    `
+    INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at)
+    SELECT u.id, ?, 'member', ?
+    FROM users u
+    WHERE u.id <> ?
+    `
+  ).run(global.id, now, global.owner_id);
+  db.prepare(
+    "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'owner', ?)"
+  ).run(global.owner_id, global.id, now);
+}
+
+ensureGlobalMemberships();
 
 const duplicateGroups = db
   .prepare(
@@ -432,6 +484,12 @@ app.post("/signup", async (req, res) => {
       now,
       userId
     );
+    const global = ensureGlobalGroup(userId);
+    if (global) {
+      db.prepare(
+        "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
+      ).run(userId, global.id, global.owner_id === userId ? "owner" : "member", now);
+    }
     req.session.userId = userId;
     return res.redirect("/dashboard");
   }
@@ -549,13 +607,33 @@ app.get("/dashboard", requireAuth, (req, res) => {
     )
     .all(user.id);
 
-  res.render("dashboard", { user, groups, error: null, success: null });
+  const publicGroups = db
+    .prepare(
+      `
+      SELECT g.id, g.name, u.name as owner_name, g.created_at
+      FROM groups g
+      JOIN users u ON u.id = g.owner_id
+      WHERE g.is_public = 1 AND g.is_global = 0
+      AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
+      ORDER BY g.created_at DESC
+      `
+    )
+    .all(user.id);
+
+  res.render("dashboard", {
+    user,
+    groups,
+    publicGroups,
+    error: null,
+    success: null
+  });
 });
 
 app.post("/groups", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
-  const { name, joinPassword } = req.body;
-  if (!name || !joinPassword) {
+  const { name, joinPassword, visibility } = req.body;
+  const isPublic = visibility === "public";
+  if (!name || (!isPublic && !joinPassword)) {
     const groups = db
       .prepare(
         `
@@ -564,12 +642,25 @@ app.post("/groups", requireAuth, (req, res) => {
         JOIN group_members gm ON gm.group_id = g.id
         WHERE gm.user_id = ?
         ORDER BY g.created_at DESC
+      `
+    )
+    .all(user.id);
+    const publicGroups = db
+      .prepare(
+        `
+        SELECT g.id, g.name, u.name as owner_name, g.created_at
+        FROM groups g
+        JOIN users u ON u.id = g.owner_id
+        WHERE g.is_public = 1 AND g.is_global = 0
+        AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
+        ORDER BY g.created_at DESC
         `
       )
       .all(user.id);
     return res.render("dashboard", {
       user,
       groups,
+      publicGroups,
       error: "Group name and password are required.",
       success: null
     });
@@ -587,29 +678,57 @@ app.post("/groups", requireAuth, (req, res) => {
         JOIN group_members gm ON gm.group_id = g.id
         WHERE gm.user_id = ?
         ORDER BY g.created_at DESC
+      `
+    )
+    .all(user.id);
+    const publicGroups = db
+      .prepare(
+        `
+        SELECT g.id, g.name, u.name as owner_name, g.created_at
+        FROM groups g
+        JOIN users u ON u.id = g.owner_id
+        WHERE g.is_public = 1 AND g.is_global = 0
+        AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
+        ORDER BY g.created_at DESC
         `
       )
       .all(user.id);
     return res.render("dashboard", {
       user,
       groups,
+      publicGroups,
       error: "Group name already exists.",
       success: null
     });
   }
   const now = new Date().toISOString();
-  const joinCode = crypto.randomBytes(3).toString("hex").toUpperCase();
-  const joinPasswordHash = bcrypt.hashSync(joinPassword, 10);
+  const joinCode = isPublic ? null : crypto.randomBytes(3).toString("hex").toUpperCase();
+  const joinPasswordHash = isPublic ? null : bcrypt.hashSync(joinPassword, 10);
   const groupInfo = db
     .prepare(
-      "INSERT INTO groups (name, owner_id, created_at, join_code, join_password_hash) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO groups (name, owner_id, created_at, join_code, join_password_hash, is_public, is_global) VALUES (?, ?, ?, ?, ?, ?, 0)"
     )
-    .run(normalizedName, user.id, now, joinCode, joinPasswordHash);
+    .run(normalizedName, user.id, now, joinCode, joinPasswordHash, isPublic ? 1 : 0);
   db.prepare(
     "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
   ).run(user.id, groupInfo.lastInsertRowid, "owner", now);
 
   res.redirect(`/groups/${groupInfo.lastInsertRowid}`);
+});
+
+app.post("/groups/:id/join-public", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  if (!group || !group.is_public) {
+    return res.status(404).send("Group not found.");
+  }
+  if (!isMember(user.id, groupId)) {
+    db.prepare(
+      "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
+    ).run(user.id, groupId, "member", new Date().toISOString());
+  }
+  res.redirect(`/groups/${groupId}`);
 });
 
 app.post("/groups/join", requireAuth, async (req, res) => {
@@ -626,11 +745,24 @@ app.post("/groups/join", requireAuth, async (req, res) => {
       `
     )
     .all(user.id);
+  const publicGroups = db
+    .prepare(
+      `
+      SELECT g.id, g.name, u.name as owner_name, g.created_at
+      FROM groups g
+      JOIN users u ON u.id = g.owner_id
+      WHERE g.is_public = 1 AND g.is_global = 0
+      AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
+      ORDER BY g.created_at DESC
+      `
+    )
+    .all(user.id);
 
   if (!code || !password) {
     return res.render("dashboard", {
       user,
       groups,
+      publicGroups,
       error: "Group code and password are required.",
       success: null
     });
@@ -640,10 +772,11 @@ app.post("/groups/join", requireAuth, async (req, res) => {
     .prepare("SELECT * FROM groups WHERE join_code = ?")
     .get(String(code).trim().toUpperCase());
 
-  if (!group || !group.join_password_hash) {
+  if (!group || !group.join_password_hash || group.is_public) {
     return res.render("dashboard", {
       user,
       groups,
+      publicGroups,
       error: "Invalid group code.",
       success: null
     });
@@ -654,6 +787,7 @@ app.post("/groups/join", requireAuth, async (req, res) => {
     return res.render("dashboard", {
       user,
       groups,
+      publicGroups,
       error: "Incorrect group password.",
       success: null
     });
@@ -668,6 +802,7 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   res.render("dashboard", {
     user,
     groups,
+    publicGroups,
     error: null,
     success: `Joined group ${group.name}.`
   });
@@ -755,10 +890,10 @@ app.get("/join/:code", requireAuth, (req, res) => {
       `
     )
     .all(invite.group_id);
-  res.render("join_confirm", { user, group, members, code });
+  res.render("join_confirm", { user, group, members, code, error: null });
 });
 
-app.post("/join/:code", requireAuth, (req, res) => {
+app.post("/join/:code", requireAuth, async (req, res) => {
   const user = getCurrentUser(req);
   const code = req.params.code.trim();
   const invite = db
@@ -769,6 +904,56 @@ app.post("/join/:code", requireAuth, (req, res) => {
   }
   if (isMember(user.id, invite.group_id)) {
     return res.redirect(`/groups/${invite.group_id}`);
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return res.status(404).send("Group not found.");
+  }
+  if (!group.is_public && group.join_password_hash) {
+    const { password } = req.body;
+    if (!password) {
+      const members = db
+        .prepare(
+          `
+          SELECT u.id, u.name, gm.role
+          FROM group_members gm
+          JOIN users u ON u.id = gm.user_id
+          WHERE gm.group_id = ?
+          ORDER BY gm.joined_at ASC
+          `
+        )
+        .all(invite.group_id);
+      return res.render("join_confirm", {
+        user,
+        group,
+        members,
+        code,
+        error: "Group password required."
+      });
+    }
+    const ok = await bcrypt.compare(password, group.join_password_hash);
+    if (!ok) {
+      const members = db
+        .prepare(
+          `
+          SELECT u.id, u.name, gm.role
+          FROM group_members gm
+          JOIN users u ON u.id = gm.user_id
+          WHERE gm.group_id = ?
+          ORDER BY gm.joined_at ASC
+          `
+        )
+        .all(invite.group_id);
+      return res.render("join_confirm", {
+        user,
+        group,
+        members,
+        code,
+        error: "Incorrect password."
+      });
+    }
   }
   const now = new Date().toISOString();
   db.prepare(
@@ -783,6 +968,10 @@ app.post("/groups/:id/password", requireAuth, async (req, res) => {
   const groupId = Number(req.params.id);
   if (!isGroupAdmin(user.id, groupId)) {
     return res.status(403).send("Admin access only.");
+  }
+  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  if (group && group.is_public) {
+    return res.status(400).send("Public groups do not use a password.");
   }
   const { joinPassword } = req.body;
   if (!joinPassword) {
@@ -858,6 +1047,11 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
     return res.status(403).send("Not a group member.");
+  }
+
+  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  if (group && group.is_global) {
+    return res.status(400).send("You cannot leave the Global group.");
   }
 
   const role = getMemberRole(user.id, groupId);

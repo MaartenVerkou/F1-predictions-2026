@@ -15,6 +15,15 @@
   </ul>
 
   <form method="post" action="/join/<%= code %>" style="margin-top:16px;">
+    <% if (!group.is_public) { %>
+      <label>
+        Group password
+        <input type="password" name="password" required />
+      </label>
+      <% if (error) { %>
+        <div class="alert"><%= error %></div>
+      <% } %>
+    <% } %>
     <div class="inline-actions">
       <button type="submit">Join group</button>
       <a class="link" href="/dashboard">Cancel</a>

@@ -112,6 +112,20 @@ const initCopyButtons = () => {
   });
 };
 
+const initVisibilityToggle = () => {
+  const visibility = document.querySelector('select[name="visibility"]');
+  const passwordInput = document.querySelector('input[name="joinPassword"]');
+  if (!visibility || !passwordInput) return;
+  const update = () => {
+    const isPublic = visibility.value === 'public';
+    passwordInput.required = !isPublic;
+    passwordInput.disabled = isPublic;
+    if (isPublic) passwordInput.value = '';
+  };
+  visibility.addEventListener('change', update);
+  update();
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initRankingGroups();
   initCheckboxLimits();
@@ -119,4 +133,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initNumberClamps();
   initCountdown();
   initCopyButtons();
+  initVisibilityToggle();
 });
