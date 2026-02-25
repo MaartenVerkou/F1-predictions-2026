@@ -2,6 +2,9 @@
 
 <div class="card" style="max-width:480px; margin: 0 auto;">
   <h1>Welcome back</h1>
+  <% if (notice) { %>
+    <p class="muted"><%= notice %></p>
+  <% } %>
   <% if (error) { %>
     <div class="alert"><%= error %></div>
   <% } %>
@@ -14,6 +17,7 @@
       Password
       <input type="password" name="password" required />
     </label>
+    <a class="link underlined-link" href="/forgot-password">Forgot password?</a>
     <button type="submit">Log in</button>
   </form>
 </div>

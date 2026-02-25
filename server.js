@@ -17,6 +17,12 @@ const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
+const SMTP_SECURE = process.env.SMTP_SECURE
+  ? process.env.SMTP_SECURE === "1" || process.env.SMTP_SECURE.toLowerCase() === "true"
+  : SMTP_PORT === 465;
+const DEBUG_EMAIL_LINKS = process.env.DEBUG_EMAIL_LINKS === "1";
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const AUTO_VERIFY = process.env.AUTO_VERIFY === "1";
 const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "1";
@@ -98,6 +104,15 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
     token_hash TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS password_resets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
     expires_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
@@ -385,9 +400,11 @@ function isMember(userId, groupId) {
 }
 
 function getMailer() {
-  if (!SMTP_USER || !SMTP_PASS) return null;
+  if (!SMTP_USER || !SMTP_PASS || !SMTP_HOST) return null;
   return nodemailer.createTransport({
-    service: "gmail",
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS
@@ -401,6 +418,13 @@ function generateToken() {
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function maskEmail(email) {
+  const [local, domain] = String(email || "").split("@");
+  if (!local || !domain) return "unknown";
+  if (local.length <= 2) return `**@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
 }
 
 function getMemberRole(userId, groupId) {
@@ -545,29 +569,189 @@ app.post("/signup", async (req, res) => {
 });
 
 app.get("/login", (req, res) => {
-  res.render("login", { error: null });
+  const notice =
+    req.query.reset === "1" ? "Password updated. You can log in now." : null;
+  res.render("login", { error: null, notice });
 });
 
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
-    return res.render("login", { error: "Email and password required." });
+    return res.render("login", {
+      error: "Email and password required.",
+      notice: null
+    });
   }
   const user = db
     .prepare("SELECT * FROM users WHERE email = ?")
     .get(email.trim().toLowerCase());
   if (!user) {
-    return res.render("login", { error: "Invalid credentials." });
+    return res.render("login", {
+      error: "No account found for that email.",
+      notice: null
+    });
   }
   if (!AUTO_VERIFY && !user.is_verified) {
-    return res.render("login", { error: "Please verify your email first." });
+    return res.render("login", {
+      error: "Please verify your email first.",
+      notice: null
+    });
   }
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) {
-    return res.render("login", { error: "Invalid credentials." });
+    return res.render("login", {
+      error: "Password is incorrect.",
+      notice: null
+    });
   }
   req.session.userId = user.id;
   res.redirect("/dashboard");
+});
+
+app.get("/forgot-password", (req, res) => {
+  res.render("forgot_password", {
+    error: null,
+    message: null,
+    debugResetUrl: null
+  });
+});
+
+app.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.render("forgot_password", {
+      error: "Email is required.",
+      message: null,
+      debugResetUrl: null
+    });
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+  console.log("[auth:forgot] request", {
+    email: maskEmail(normalizedEmail)
+  });
+  const user = db
+    .prepare("SELECT id FROM users WHERE email = ?")
+    .get(normalizedEmail);
+  console.log("[auth:forgot] lookup", {
+    email: maskEmail(normalizedEmail),
+    userFound: !!user
+  });
+
+  if (user) {
+    const token = generateToken();
+    const tokenHash = hashToken(token);
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+    const resetUrl = `${BASE_URL}/reset-password?token=${token}`;
+    db.prepare("DELETE FROM password_resets WHERE user_id = ?").run(user.id);
+    db.prepare(
+      "INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)"
+    ).run(user.id, tokenHash, expiresAt, now);
+    console.log("[auth:forgot] token-created", {
+      userId: user.id,
+      expiresAt
+    });
+
+    const mailer = getMailer();
+    console.log("[auth:forgot] mailer", {
+      configured: !!mailer,
+      smtpHost: SMTP_HOST || "",
+      smtpPort: SMTP_PORT,
+      smtpSecure: SMTP_SECURE
+    });
+    if (mailer) {
+      try {
+        const info = await mailer.sendMail({
+          from: SMTP_USER,
+          to: normalizedEmail,
+          subject: "Reset your F1 Predictions password",
+          text: `Reset your password: ${resetUrl}`,
+          html: `<p>Reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`
+        });
+        console.log("[auth:forgot] email-sent", {
+          to: maskEmail(normalizedEmail),
+          accepted: info.accepted,
+          rejected: info.rejected,
+          response: info.response,
+          messageId: info.messageId
+        });
+      } catch (err) {
+        console.error("Failed to send password reset email:", err);
+      }
+    }
+
+    return res.render("forgot_password", {
+      error: null,
+      message: "If that email exists, a reset link has been sent.",
+      debugResetUrl: DEBUG_EMAIL_LINKS ? resetUrl : null
+    });
+  }
+
+  return res.render("forgot_password", {
+    error: null,
+    message: "If that email exists, a reset link has been sent.",
+    debugResetUrl: null
+  });
+});
+
+app.get("/reset-password", (req, res) => {
+  const token = String(req.query.token || "");
+  if (!token) {
+    return res.render("reset_password", {
+      token: "",
+      error: "Reset link is invalid or expired."
+    });
+  }
+
+  const tokenHash = hashToken(token);
+  const reset = db
+    .prepare("SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > ?")
+    .get(tokenHash, new Date().toISOString());
+  if (!reset) {
+    return res.render("reset_password", {
+      token: "",
+      error: "Reset link is invalid or expired."
+    });
+  }
+
+  return res.render("reset_password", { token, error: null });
+});
+
+app.post("/reset-password", async (req, res) => {
+  const token = String(req.body.token || "");
+  const { password, passwordConfirm } = req.body;
+  if (!token || !password || !passwordConfirm) {
+    return res.render("reset_password", {
+      token,
+      error: "All fields are required."
+    });
+  }
+  if (password !== passwordConfirm) {
+    return res.render("reset_password", {
+      token,
+      error: "Passwords do not match."
+    });
+  }
+
+  const tokenHash = hashToken(token);
+  const reset = db
+    .prepare("SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > ?")
+    .get(tokenHash, new Date().toISOString());
+  if (!reset) {
+    return res.render("reset_password", {
+      token: "",
+      error: "Reset link is invalid or expired."
+    });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
+    passwordHash,
+    reset.user_id
+  );
+  db.prepare("DELETE FROM password_resets WHERE user_id = ?").run(reset.user_id);
+  return res.redirect("/login?reset=1");
 });
 
 app.post("/logout", (req, res) => {

@@ -5,6 +5,7 @@ Simple group-based prediction game for the 2026 F1 season.
 ## Local dev
 
 ```powershell
+copy .env.example .env
 npm install
 npm start
 ```
@@ -87,7 +88,11 @@ Enter season results at `/admin/actuals` after the season. Leaderboard scoring i
 - `RACES_PATH` - races file path (default `DATA_DIR/races.json`)
 - `SESSION_SECRET` - session cookie secret
 - `ADMIN_PASSWORD` - password required to access `/admin/*` (default `change-me`)
-- `SMTP_USER` - Gmail address for verification emails
-- `SMTP_PASS` - Gmail app password
+- `SMTP_USER` - sender mailbox username/login (e.g. `no-reply@example.com`)
+- `SMTP_PASS` - sender mailbox password
+- `SMTP_HOST` - SMTP host (e.g. `mail.example.com`)
+- `SMTP_PORT` - optional SMTP port (default `465`)
+- `SMTP_SECURE` - optional; `1`/`true` for SSL/TLS, `0`/`false` otherwise (default auto: true on port 465)
+- `DEBUG_EMAIL_LINKS` - set to `1` in local/dev to show password reset links on the forgot-password page
 - `BASE_URL` - public base URL for verification links (e.g. `https://example.com`)
 - `AUTO_VERIFY` - set to `1` to auto-verify users (skip email verification)
