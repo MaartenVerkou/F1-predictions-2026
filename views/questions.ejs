@@ -2,14 +2,43 @@
 
 <div class="card">
   <h1><%= group.name %>: Predictions</h1>
-  <p class="muted">Fill in every question. You can return and update until the season starts.</p>
-  <p class="muted">Predictions close on March 5, 2026.</p>
+  <div class="group-rules-box">
+    <div class="group-rules-label">Group rules</div>
+    <p class="muted group-rules-text"><%= groupRules %></p>
+  </div>
 
   <% if (closed) { %>
     <div class="alert">Predictions are closed. The deadline was March 5, 2026.</div>
   <% } %>
 
-  <form method="post" action="/groups/<%= group.id %>/questions">
+  <div class="questions-top-actions">
+    <% if (copyGroups && copyGroups.length > 0) { %>
+      <form method="get" action="/groups/<%= group.id %>/questions" class="inline-actions">
+        <label class="muted" style="display:flex; align-items:center; gap:8px; font-weight:600;">
+          Copy predictions from
+          <select name="copyFrom" onchange="this.form.submit()">
+            <option value="">Select group</option>
+            <% copyGroups.forEach(copyGroup => { %>
+              <option value="<%= copyGroup.id %>" <%= selectedCopyGroupId === copyGroup.id ? 'selected' : '' %>>
+                <%= copyGroup.name %><%= copyGroup.is_global ? ' (Global)' : '' %>
+              </option>
+            <% }) %>
+          </select>
+        </label>
+        <% if (selectedCopyGroupId) { %>
+          <a class="link underlined-link" href="/groups/<%= group.id %>/questions">Reset</a>
+          <button type="submit" form="predictions-form" class="link underlined-link link-button" <%= closed ? 'disabled' : '' %>>Save</button>
+        <% } %>
+      </form>
+    <% } %>
+  </div>
+
+  <% if (prefillNotice) { %>
+    <p class="muted" style="margin:0 0 14px;"><%= prefillNotice %></p>
+  <% } %>
+
+  <form id="predictions-form" method="post" action="/groups/<%= group.id %>/questions">
+
     <% if (questions.length === 0) { %>
       <div class="alert">No questions loaded yet. Add them to data/questions.json.</div>
     <% } %>

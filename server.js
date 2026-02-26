@@ -36,6 +36,21 @@ const ADMIN_EMAILS = new Set(
     .filter(Boolean)
 );
 const LEADERBOARD_ENABLED = process.env.LEADERBOARD_ENABLED === "1";
+const MAX_PRIVILEGED_GROUPS = 3;
+
+function formatCloseDateForRules() {
+  const closeDate = new Date(PREDICTIONS_CLOSE_AT);
+  if (Number.isNaN(closeDate.getTime())) return "the season start";
+  return closeDate.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+const DEFAULT_GROUP_RULES =
+  "Fill in every question. You can return and update until the season starts.\n" +
+  `Predictions close on ${formatCloseDateForRules()}.`;
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -135,6 +150,9 @@ function ensureGroupColumns() {
   }
   if (!names.has("is_global")) {
     db.exec("ALTER TABLE groups ADD COLUMN is_global INTEGER DEFAULT 0;");
+  }
+  if (!names.has("rules_text")) {
+    db.exec("ALTER TABLE groups ADD COLUMN rules_text TEXT;");
   }
 }
 
@@ -424,6 +442,58 @@ function isMember(userId, groupId) {
   return !!stmt.get(userId, groupId);
 }
 
+function getPrivilegedGroupCount(userId) {
+  const row = db
+    .prepare(
+      "SELECT COUNT(*) as count FROM group_members WHERE user_id = ? AND role IN ('owner', 'admin')"
+    )
+    .get(userId);
+  return Number(row?.count || 0);
+}
+
+function isGlobalAdminUser(userId) {
+  const row = db.prepare("SELECT is_admin FROM users WHERE id = ?").get(userId);
+  return !!(row && row.is_admin === 1);
+}
+
+function canTakePrivilegedRole(userId, currentRole) {
+  if (isGlobalAdminUser(userId)) return true;
+  // Existing owner/admin in this same group can switch between privileged roles.
+  if (currentRole === "owner" || currentRole === "admin") return true;
+  return getPrivilegedGroupCount(userId) < MAX_PRIVILEGED_GROUPS;
+}
+
+function getResponsesByGroup(userId, groupId) {
+  return db
+    .prepare(
+      "SELECT question_id, answer FROM responses WHERE user_id = ? AND group_id = ?"
+    )
+    .all(userId, groupId)
+    .reduce((acc, row) => {
+      acc[row.question_id] = row.answer;
+      return acc;
+    }, {});
+}
+
+function getCopySourceGroups(userId, currentGroupId) {
+  return db
+    .prepare(
+      `
+      SELECT g.id, g.name, g.is_global
+      FROM groups g
+      JOIN group_members gm ON gm.group_id = g.id
+      WHERE gm.user_id = ? AND g.id <> ?
+      ORDER BY g.is_global DESC, g.name ASC
+      `
+    )
+    .all(userId, currentGroupId);
+}
+
+function getGroupRulesText(group) {
+  const customRules = String(group?.rules_text || "").trim();
+  return customRules || DEFAULT_GROUP_RULES;
+}
+
 function getMailer() {
   if (!SMTP_USER || !SMTP_PASS || !SMTP_HOST) return null;
   const smtpName =
@@ -462,17 +532,23 @@ function isGroupAdmin(userId, groupId) {
 }
 
 function getNextOwner(groupId, currentOwnerId) {
-  return db
+  const candidates = db
     .prepare(
       `
       SELECT gm.user_id, gm.role
       FROM group_members gm
       WHERE gm.group_id = ? AND gm.user_id <> ?
       ORDER BY CASE gm.role WHEN 'admin' THEN 1 WHEN 'member' THEN 2 ELSE 3 END, gm.joined_at ASC
-      LIMIT 1
       `
     )
-    .get(groupId, currentOwnerId);
+    .all(groupId, currentOwnerId);
+
+  for (const candidate of candidates) {
+    if (canTakePrivilegedRole(candidate.user_id, candidate.role)) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 function predictionsClosed() {
@@ -541,6 +617,42 @@ app.post("/groups", requireAuth, (req, res) => {
       success: null
     });
   }
+  if (!(user && user.is_admin === 1)) {
+    const privilegedCount = getPrivilegedGroupCount(user.id);
+    if (privilegedCount >= MAX_PRIVILEGED_GROUPS) {
+      const groups = db
+        .prepare(
+          `
+          SELECT g.id, g.name, g.owner_id, gm.role
+          FROM groups g
+          JOIN group_members gm ON gm.group_id = g.id
+          WHERE gm.user_id = ?
+          ORDER BY g.created_at DESC
+        `
+        )
+        .all(user.id);
+      const publicGroups = db
+        .prepare(
+          `
+          SELECT g.id, g.name, u.name as owner_name, g.created_at, g.is_global
+          FROM groups g
+          JOIN users u ON u.id = g.owner_id
+          WHERE g.is_public = 1
+          AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
+          ORDER BY g.created_at DESC
+          `
+        )
+        .all(user.id);
+      return res.render("dashboard", {
+        user,
+        groups,
+        publicGroups,
+        error: `You can be owner/admin in at most ${MAX_PRIVILEGED_GROUPS} groups.`,
+        success: null
+      });
+    }
+  }
+
   const normalizedName = name.trim();
   const groupExists = db
     .prepare("SELECT id FROM groups WHERE name = ?")
@@ -711,7 +823,19 @@ app.get("/groups/:id", requireAuth, (req, res) => {
     .get(groupId);
 
   const role = getMemberRole(user.id, groupId);
-  res.render("group", { user, group, members, invite, role, error: null, success: null });
+  const canEditRules = role === "owner" || role === "admin";
+  const groupRules = getGroupRulesText(group);
+  res.render("group", {
+    user,
+    group,
+    members,
+    invite,
+    role,
+    canEditRules,
+    groupRules,
+    error: null,
+    success: null
+  });
 });
 
 app.post("/groups/:id/invites", requireAuth, (req, res) => {
@@ -861,6 +985,24 @@ app.post("/groups/:id/password", requireAuth, async (req, res) => {
   res.redirect(`/groups/${groupId}`);
 });
 
+app.post("/groups/:id/rules", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  if (!isGroupAdmin(user.id, groupId)) {
+    return sendError(req, res, 403, "Admin access only.");
+  }
+  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  const rulesText = String(req.body.rulesText || "").trim();
+  db.prepare("UPDATE groups SET rules_text = ? WHERE id = ?").run(
+    rulesText || null,
+    groupId
+  );
+  return res.redirect(`/groups/${groupId}`);
+});
+
 app.post("/groups/:id/members/:userId/kick", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const groupId = Number(req.params.id);
@@ -894,6 +1036,17 @@ app.post("/groups/:id/members/:userId/promote", requireAuth, (req, res) => {
   }
   if (targetRole === "owner") {
     return res.redirect(`/groups/${groupId}`);
+  }
+  if (targetRole === "admin") {
+    return res.redirect(`/groups/${groupId}`);
+  }
+  if (!canTakePrivilegedRole(targetUserId, targetRole)) {
+    return sendError(
+      req,
+      res,
+      400,
+      `User already has the maximum of ${MAX_PRIVILEGED_GROUPS} owner/admin groups.`
+    );
   }
   db.prepare(
     "UPDATE group_members SET role = ? WHERE user_id = ? AND group_id = ?"
@@ -935,7 +1088,9 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
     if (role === "owner") {
       const nextOwner = getNextOwner(groupId, user.id);
       if (!nextOwner) {
-        throw new Error("Owner cannot leave as the last member.");
+        throw new Error(
+          `No eligible new owner found. A non-global-admin user can be owner/admin in at most ${MAX_PRIVILEGED_GROUPS} groups.`
+        );
       }
       db.prepare("UPDATE groups SET owner_id = ? WHERE id = ?").run(
         nextOwner.user_id,
@@ -968,25 +1123,53 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
   }
 
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
   const questions = getQuestions();
   const roster = getRoster();
   const races = getRaces();
-  const answers = db
-    .prepare(
-      "SELECT question_id, answer FROM responses WHERE user_id = ? AND group_id = ?"
-    )
-    .all(user.id, groupId)
-    .reduce((acc, row) => {
-      acc[row.question_id] = row.answer;
-      return acc;
-    }, {});
+  const currentAnswers = getResponsesByGroup(user.id, groupId);
+  const copyGroups = getCopySourceGroups(user.id, groupId);
+  const requestedCopyGroupId = Number(req.query.copyFrom || 0);
+  let selectedCopyGroupId = null;
+  let prefillNotice = null;
+  let answers = currentAnswers;
+
+  if (requestedCopyGroupId > 0) {
+    const sourceGroup = copyGroups.find((row) => row.id === requestedCopyGroupId);
+    if (sourceGroup) {
+      selectedCopyGroupId = sourceGroup.id;
+      const sourceAnswers = getResponsesByGroup(user.id, sourceGroup.id);
+      if (Object.keys(sourceAnswers).length > 0) {
+        answers = sourceAnswers;
+        prefillNotice = `Prefilled from ${sourceGroup.name}. Save predictions to apply them to this group.`;
+      } else {
+        prefillNotice = `${sourceGroup.name} has no saved predictions yet.`;
+      }
+    }
+  } else if (Object.keys(currentAnswers).length === 0) {
+    const globalGroup = copyGroups.find((row) => row.is_global === 1);
+    if (globalGroup) {
+      const globalAnswers = getResponsesByGroup(user.id, globalGroup.id);
+      if (Object.keys(globalAnswers).length > 0) {
+        answers = globalAnswers;
+        prefillNotice = `Prefilled from ${globalGroup.name}. Save predictions to apply them to this group.`;
+      }
+    }
+  }
 
   const closed = predictionsClosed();
+  const groupRules = getGroupRulesText(group);
   res.render("questions", {
     user,
     group,
+    groupRules,
     questions,
     answers,
+    copyGroups,
+    selectedCopyGroupId,
+    prefillNotice,
     roster,
     races,
     closed,
@@ -999,6 +1182,10 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
+  }
+  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
   }
 
   if (predictionsClosed()) {
@@ -1131,6 +1318,48 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
     }
   });
   tx();
+
+  // First group submission can seed the Global league as a baseline.
+  if (!group.is_global) {
+    const globalGroup = getGlobalGroup();
+    if (globalGroup && globalGroup.id !== groupId) {
+      const existingGlobalResponses = db
+        .prepare("SELECT COUNT(*) as count FROM responses WHERE user_id = ? AND group_id = ?")
+        .get(user.id, globalGroup.id);
+      if (Number(existingGlobalResponses?.count || 0) === 0) {
+        const sourceRows = db
+          .prepare("SELECT question_id, answer FROM responses WHERE user_id = ? AND group_id = ?")
+          .all(user.id, groupId);
+        if (sourceRows.length > 0) {
+          const seedNow = new Date().toISOString();
+          const seedTx = db.transaction(() => {
+            db.prepare(
+              "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'member', ?)"
+            ).run(user.id, globalGroup.id, seedNow);
+            const upsertGlobal = db.prepare(
+              `
+              INSERT INTO responses (user_id, group_id, question_id, answer, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT(user_id, group_id, question_id)
+              DO UPDATE SET answer = excluded.answer, updated_at = excluded.updated_at
+              `
+            );
+            for (const row of sourceRows) {
+              upsertGlobal.run(
+                user.id,
+                globalGroup.id,
+                row.question_id,
+                row.answer,
+                seedNow,
+                seedNow
+              );
+            }
+          });
+          seedTx();
+        }
+      }
+    }
+  }
 
   res.redirect(`/groups/${groupId}/questions`);
 });

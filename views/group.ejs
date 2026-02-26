@@ -4,7 +4,10 @@
   <div class="card">
     <h1><%= group.name %></h1>
     <p class="muted">Invite friends, then head to the questions page to lock in picks.</p>
-    <p class="muted">Group closes on March 5, 2026.</p>
+    <div class="group-rules-box">
+      <div class="group-rules-label">Group rules</div>
+      <p class="muted group-rules-text"><%= groupRules %></p>
+    </div>
     <% if (!group.is_public) { %>
       <p class="muted">Group code: <strong><%= group.join_code || 'Not set yet' %></strong></p>
     <% } %>
@@ -18,6 +21,20 @@
       <% } %>
     </div>
   </div>
+
+  <% if (canEditRules) { %>
+    <div class="card">
+      <h2>Edit group rules</h2>
+      <p class="muted">Leave empty to use default rules.</p>
+      <form method="post" action="/groups/<%= group.id %>/rules">
+        <label>
+          Rules text
+          <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
+        </label>
+        <button type="submit">Save rules</button>
+      </form>
+    </div>
+  <% } %>
 
   <% if (!group.is_global) { %>
     <div class="card">

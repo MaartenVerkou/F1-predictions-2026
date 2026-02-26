@@ -19,7 +19,10 @@
       </div>
       <div class="inline-actions">
         <% if (user) { %>
-          <span class="muted">Signed in as <strong><%= user.name %></strong></span>
+          <span class="muted">
+            Signed in as
+            <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
+          </span>
           <a class="link" href="/dashboard">Dashboard</a>
           <% if (user.is_admin) { %>
             <a class="link" href="/admin/overview">Admin</a>

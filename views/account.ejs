@@ -1,0 +1,49 @@
+<%- include('partials/header', { title: 'My account', user }) %>
+
+<section class="hero">
+  <% if (error) { %>
+    <div class="alert"><%= error %></div>
+  <% } %>
+  <% if (success) { %>
+    <div class="alert" style="background:#eef8f0;border-color:#c8e6d0;color:#2d6a3a;"><%= success %></div>
+  <% } %>
+
+  <div class="card">
+    <h1>My account</h1>
+    <p class="muted">Signed in as <strong><%= user.name %></strong></p>
+    <p class="muted">Email: <strong><%= user.email %></strong></p>
+  </div>
+
+  <div class="card">
+    <h2>Change password</h2>
+    <form method="post" action="/account/password">
+      <label>
+        Current password
+        <input type="password" name="currentPassword" required />
+      </label>
+      <label>
+        New password
+        <input type="password" name="newPassword" minlength="6" required />
+      </label>
+      <label>
+        Confirm new password
+        <input type="password" name="newPasswordConfirm" minlength="6" required />
+      </label>
+      <button type="submit">Update password</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Delete account</h2>
+    <p class="muted">This removes your user account and your personal predictions. This cannot be undone.</p>
+    <form method="post" action="/account/delete" onsubmit="return confirm('Delete your account permanently?');">
+      <label>
+        Current password
+        <input type="password" name="currentPassword" required />
+      </label>
+      <button class="secondary" type="submit">Delete account</button>
+    </form>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

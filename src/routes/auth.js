@@ -326,6 +326,113 @@ function registerAuthRoutes(app, deps) {
     return res.redirect("/dashboard");
   });
 
+  app.get("/account", requireAuth, (req, res) => {
+    const user = getCurrentUser(req);
+    const error = req.query.error ? String(req.query.error) : null;
+    const success = req.query.success ? String(req.query.success) : null;
+    return res.render("account", { user, error, success });
+  });
+
+  app.post("/account/password", requireAuth, async (req, res) => {
+    const user = getCurrentUser(req);
+    const { currentPassword, newPassword, newPasswordConfirm } = req.body;
+    if (!currentPassword || !newPassword || !newPasswordConfirm) {
+      return res.redirect(
+        `/account?error=${encodeURIComponent("All password fields are required.")}`
+      );
+    }
+    if (String(newPassword).length < MIN_PASSWORD_LENGTH) {
+      return res.redirect(
+        `/account?error=${encodeURIComponent(
+          `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+        )}`
+      );
+    }
+    if (newPassword !== newPasswordConfirm) {
+      return res.redirect(
+        `/account?error=${encodeURIComponent("New passwords do not match.")}`
+      );
+    }
+
+    const fullUser = db
+      .prepare("SELECT id, password_hash FROM users WHERE id = ?")
+      .get(user.id);
+    if (!fullUser) {
+      return res.redirect("/login");
+    }
+    const currentOk = await bcrypt.compare(currentPassword, fullUser.password_hash);
+    if (!currentOk) {
+      return res.redirect(
+        `/account?error=${encodeURIComponent("Current password is incorrect.")}`
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
+      passwordHash,
+      user.id
+    );
+    return res.redirect(
+      `/account?success=${encodeURIComponent("Password updated.")}`
+    );
+  });
+
+  app.post("/account/delete", requireAuth, async (req, res) => {
+    const user = getCurrentUser(req);
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.redirect(
+        `/account?error=${encodeURIComponent("Current password is required to delete your account.")}`
+      );
+    }
+
+    const fullUser = db
+      .prepare("SELECT id, password_hash FROM users WHERE id = ?")
+      .get(user.id);
+    if (!fullUser) {
+      return res.redirect("/login");
+    }
+    const currentOk = await bcrypt.compare(currentPassword, fullUser.password_hash);
+    if (!currentOk) {
+      return res.redirect(
+        `/account?error=${encodeURIComponent("Current password is incorrect.")}`
+      );
+    }
+
+    const ownedGroups = db
+      .prepare(
+        `
+        SELECT g.id, g.name
+        FROM groups g
+        WHERE g.owner_id = ?
+        ORDER BY g.created_at ASC
+        `
+      )
+      .all(user.id);
+    if (ownedGroups.length > 0) {
+      const firstOwned = ownedGroups[0].name;
+      return res.redirect(
+        `/account?error=${encodeURIComponent(
+          `You still own ${ownedGroups.length} group(s), starting with "${firstOwned}". Transfer ownership or leave those groups first.`
+        )}`
+      );
+    }
+
+    const tx = db.transaction(() => {
+      db.prepare("DELETE FROM responses WHERE user_id = ?").run(user.id);
+      db.prepare("DELETE FROM group_members WHERE user_id = ?").run(user.id);
+      db.prepare("DELETE FROM invites WHERE created_by = ?").run(user.id);
+      db.prepare("DELETE FROM password_resets WHERE user_id = ?").run(user.id);
+      db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(user.id);
+      db.prepare("DELETE FROM users WHERE id = ?").run(user.id);
+    });
+    tx();
+
+    req.session.destroy(() => {
+      res.redirect("/");
+    });
+  });
+
   app.get("/dashboard", requireAuth, (req, res) => {
     const user = getCurrentUser(req);
     const groups = db
