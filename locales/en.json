@@ -1,0 +1,103 @@
+﻿{
+    "header":  {
+                   "site_title":  "F1 2026 Predictions",
+                   "countdown_prefix":  "Predictions close in",
+                   "language":  "Language",
+                   "signed_in_as":  "Signed in as",
+                   "dashboard":  "Dashboard",
+                   "admin":  "Admin",
+                   "logout":  "Log out",
+                   "login":  "Log in",
+                   "signup":  "Sign up"
+               },
+    "theme":  {
+                  "toggle":  "Toggle theme",
+                  "dark_mode":  "Dark mode",
+                  "light_mode":  "Light mode"
+              },
+    "common":  {
+                   "name":  "Name",
+                   "email":  "Email",
+                   "password":  "Password"
+               },
+    "login":  {
+                  "page_title":  "Log in",
+                  "heading":  "Welcome back",
+                  "forgot_password":  "Forgot password?",
+                  "no_account":  "Don\u0027t have an account? Sign up"
+              },
+    "signup":  {
+                   "page_title":  "Sign up",
+                   "heading":  "Create your account",
+                   "verify_required":  "Account verification required before login.",
+                   "confirm_password":  "Confirm password",
+                   "create_account":  "Create account",
+                   "has_account":  "Already have an account? Log in"
+               },
+    "dashboard":  {
+                      "page_title":  "Dashboard",
+                      "my_groups":  "My groups",
+                      "create_group":  "Create group",
+                      "join_group":  "Join group",
+                      "no_groups":  "No groups yet. Create one below.",
+                      "view_group":  "View group",
+                      "public_groups":  "Public groups",
+                      "no_public_groups":  "No public groups available.",
+                      "owner":  "owner",
+                      "global_group_free":  "Global league (free)",
+                      "join_free":  "Join free",
+                      "join":  "Join",
+                      "create_new_group":  "Create a new group",
+                      "group_name":  "Group name",
+                      "visibility":  "Visibility",
+                      "private_option":  "Private (invite code + password)",
+                      "public_option":  "Public (anyone can join)",
+                      "group_password_private":  "Group password (required for private groups)",
+                      "private_groups":  "Private groups",
+                      "private_groups_help":  "Join with code + password. Private groups are not listed publicly.",
+                      "group_code":  "Group code",
+                      "group_password":  "Group password"
+                  },
+    "group":  {
+                  "default_rules":  "Fill in every question. You can return and update until the season starts.\nPredictions close on {close_date}.",
+                  "invite_friends":  "Invite friends, then head to the questions page to lock in picks.",
+                  "rules_label":  "Group rules",
+                  "group_code":  "Group code",
+                  "code_not_set":  "Not set yet",
+                  "answer_questions":  "Answer questions",
+                  "view_responses":  "View responses",
+                  "leave_group":  "Leave group",
+                  "leave_confirm":  "Leave this group?",
+                  "edit_rules":  "Edit group rules",
+                  "leave_empty_uses_default":  "Leave empty to use default rules.",
+                  "rules_text":  "Rules text",
+                  "save_rules":  "Save rules",
+                  "invite_link":  "Invite link",
+                  "copy":  "Copy",
+                  "created_at":  "Created",
+                  "no_invite_link":  "No invite link yet.",
+                  "generate_new_link":  "Generate new link",
+                  "remove_link":  "Remove link",
+                  "members":  "Members",
+                  "kick":  "Kick",
+                  "make_admin":  "Make admin",
+                  "remove_admin":  "Remove admin",
+                  "group_password":  "Group password",
+                  "set_new_password":  "Set new password",
+                  "update_password":  "Update password"
+              },
+    "questions":  {
+                      "page_title":  "Predictions",
+                      "closed_message":  "Predictions are closed.",
+                      "copy_from":  "Copy predictions from",
+                      "select_group":  "Select group",
+                      "global_tag":  "Global",
+                      "reset":  "Reset",
+                      "save":  "Save",
+                      "save_predictions":  "Save predictions",
+                      "no_questions":  "No questions loaded yet. Add them to data/questions.json.",
+                      "prefilled_from_group":  "Prefilled from {group_name}. Save predictions to apply them to this group.",
+                      "no_saved_predictions":  "{group_name} has no saved predictions yet."
+                  }
+}
+

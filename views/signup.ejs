@@ -1,32 +1,32 @@
-﻿<%- include('partials/header', { title: 'Sign up', user: null }) %>
+<%- include('partials/header', { title: t('signup.page_title'), user: null }) %>
 
 <div class="card" style="max-width:480px; margin: 0 auto;">
-  <h1>Create your account</h1>
+  <h1><%= t('signup.heading') %></h1>
   <% if (error) { %>
     <div class="alert"><%= error %></div>
   <% } %>
   <form method="post" action="/signup">
     <label>
-      Name
+      <%= t('common.name') %>
       <input type="text" name="name" placeholder="The Hulk" required />
     </label>
     <label>
-      Email
+      <%= t('common.email') %>
       <input type="email" name="email" placeholder="nico@audi.com" required />
     </label>
-    <p class="muted" style="margin:-8px 0 0;">Account verification required before login.</p>
+    <p class="muted" style="margin:-8px 0 0;"><%= t('signup.verify_required') %></p>
     <label>
-      Password
+      <%= t('common.password') %>
       <input type="password" name="password" required minlength="6" />
     </label>
     <label>
-      Confirm password
+      <%= t('signup.confirm_password') %>
       <input type="password" name="passwordConfirm" required minlength="6" />
     </label>
-    <button type="submit">Create account</button>
+    <button type="submit"><%= t('signup.create_account') %></button>
   </form>
   <div class="auth-links">
-    <a class="link underlined-link" href="/login">Already have an account? Log in</a>
+    <a class="link underlined-link" href="/login"><%= t('signup.has_account') %></a>
   </div>
 </div>
 

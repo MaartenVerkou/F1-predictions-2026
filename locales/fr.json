@@ -1,0 +1,103 @@
+﻿{
+    "header":  {
+                   "site_title":  "Pronostics F1 2026",
+                   "countdown_prefix":  "ClÃ´ture des pronostics dans",
+                   "language":  "Langue",
+                   "signed_in_as":  "ConnectÃ© en tant que",
+                   "dashboard":  "Tableau de bord",
+                   "admin":  "Admin",
+                   "logout":  "Se dÃ©connecter",
+                   "login":  "Se connecter",
+                   "signup":  "S\u0027inscrire"
+               },
+    "theme":  {
+                  "toggle":  "Changer le thÃ¨me",
+                  "dark_mode":  "Mode sombre",
+                  "light_mode":  "Mode clair"
+              },
+    "common":  {
+                   "name":  "Nom",
+                   "email":  "E-mail",
+                   "password":  "Mot de passe"
+               },
+    "login":  {
+                  "page_title":  "Connexion",
+                  "heading":  "Bon retour",
+                  "forgot_password":  "Mot de passe oubliÃ© ?",
+                  "no_account":  "Pas encore de compte ? Inscrivez-vous"
+              },
+    "signup":  {
+                   "page_title":  "Inscription",
+                   "heading":  "CrÃ©er votre compte",
+                   "verify_required":  "La vÃ©rification du compte est requise avant la connexion.",
+                   "confirm_password":  "Confirmer le mot de passe",
+                   "create_account":  "CrÃ©er le compte",
+                   "has_account":  "Vous avez dÃ©jÃ  un compte ? Connectez-vous"
+               },
+    "dashboard":  {
+                      "page_title":  "Tableau de bord",
+                      "my_groups":  "Mes groupes",
+                      "create_group":  "CrÃ©er un groupe",
+                      "join_group":  "Rejoindre un groupe",
+                      "no_groups":  "Aucun groupe pour le moment. CrÃ©ez-en un ci-dessous.",
+                      "view_group":  "Voir le groupe",
+                      "public_groups":  "Groupes publics",
+                      "no_public_groups":  "Aucun groupe public disponible.",
+                      "owner":  "propriÃ©taire",
+                      "global_group_free":  "Ligue globale (gratuite)",
+                      "join_free":  "Rejoindre gratuitement",
+                      "join":  "Rejoindre",
+                      "create_new_group":  "CrÃ©er un nouveau groupe",
+                      "group_name":  "Nom du groupe",
+                      "visibility":  "VisibilitÃ©",
+                      "private_option":  "PrivÃ© (code d\u0027invitation + mot de passe)",
+                      "public_option":  "Public (tout le monde peut rejoindre)",
+                      "group_password_private":  "Mot de passe du groupe (requis pour les groupes privÃ©s)",
+                      "private_groups":  "Groupes privÃ©s",
+                      "private_groups_help":  "Rejoignez avec code + mot de passe. Les groupes privÃ©s ne sont pas listÃ©s publiquement.",
+                      "group_code":  "Code du groupe",
+                      "group_password":  "Mot de passe du groupe"
+                  },
+    "group":  {
+                  "default_rules":  "Fill in every question. You can return and update until the season starts.\nPredictions close on {close_date}.",
+                  "invite_friends":  "Invite friends, then head to the questions page to lock in picks.",
+                  "rules_label":  "Group rules",
+                  "group_code":  "Group code",
+                  "code_not_set":  "Not set yet",
+                  "answer_questions":  "Answer questions",
+                  "view_responses":  "View responses",
+                  "leave_group":  "Leave group",
+                  "leave_confirm":  "Leave this group?",
+                  "edit_rules":  "Edit group rules",
+                  "leave_empty_uses_default":  "Leave empty to use default rules.",
+                  "rules_text":  "Rules text",
+                  "save_rules":  "Save rules",
+                  "invite_link":  "Invite link",
+                  "copy":  "Copy",
+                  "created_at":  "Created",
+                  "no_invite_link":  "No invite link yet.",
+                  "generate_new_link":  "Generate new link",
+                  "remove_link":  "Remove link",
+                  "members":  "Members",
+                  "kick":  "Kick",
+                  "make_admin":  "Make admin",
+                  "remove_admin":  "Remove admin",
+                  "group_password":  "Group password",
+                  "set_new_password":  "Set new password",
+                  "update_password":  "Update password"
+              },
+    "questions":  {
+                      "page_title":  "Predictions",
+                      "closed_message":  "Predictions are closed.",
+                      "copy_from":  "Copy predictions from",
+                      "select_group":  "Select group",
+                      "global_tag":  "Global",
+                      "reset":  "Reset",
+                      "save":  "Save",
+                      "save_predictions":  "Save predictions",
+                      "no_questions":  "No questions loaded yet. Add them to data/questions.json.",
+                      "prefilled_from_group":  "Prefilled from {group_name}. Save predictions to apply them to this group.",
+                      "no_saved_predictions":  "{group_name} has no saved predictions yet."
+                  }
+}
+

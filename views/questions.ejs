@@ -1,33 +1,33 @@
-﻿<%- include('partials/header', { title: 'Predictions', user }) %>
+﻿<%- include('partials/header', { title: t('questions.page_title'), user }) %>
 
 <div class="card">
-  <h1><%= group.name %>: Predictions</h1>
+  <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
   <div class="group-rules-box">
-    <div class="group-rules-label">Group rules</div>
+    <div class="group-rules-label"><%= t('group.rules_label') %></div>
     <p class="muted group-rules-text"><%= groupRules %></p>
   </div>
 
   <% if (closed) { %>
-    <div class="alert">Predictions are closed. The deadline was March 5, 2026.</div>
+    <div class="alert"><%= t('questions.closed_message') %></div>
   <% } %>
 
   <div class="questions-top-actions">
     <% if (copyGroups && copyGroups.length > 0) { %>
       <form method="get" action="/groups/<%= group.id %>/questions" class="inline-actions">
         <label class="muted" style="display:flex; align-items:center; gap:8px; font-weight:600;">
-          Copy predictions from
+          <%= t('questions.copy_from') %>
           <select name="copyFrom" onchange="this.form.submit()">
-            <option value="">Select group</option>
+            <option value=""><%= t('questions.select_group') %></option>
             <% copyGroups.forEach(copyGroup => { %>
               <option value="<%= copyGroup.id %>" <%= selectedCopyGroupId === copyGroup.id ? 'selected' : '' %>>
-                <%= copyGroup.name %><%= copyGroup.is_global ? ' (Global)' : '' %>
+                <%= copyGroup.name %><%= copyGroup.is_global ? ` (${t('questions.global_tag')})` : '' %>
               </option>
             <% }) %>
           </select>
         </label>
         <% if (selectedCopyGroupId) { %>
-          <a class="link underlined-link" href="/groups/<%= group.id %>/questions">Reset</a>
-          <button type="submit" form="predictions-form" class="link underlined-link link-button" <%= closed ? 'disabled' : '' %>>Save</button>
+          <a class="link underlined-link" href="/groups/<%= group.id %>/questions"><%= t('questions.reset') %></a>
+          <button type="submit" form="predictions-form" class="link underlined-link link-button" <%= closed ? 'disabled' : '' %>><%= t('questions.save') %></button>
         <% } %>
       </form>
     <% } %>
@@ -40,7 +40,7 @@
   <form id="predictions-form" method="post" action="/groups/<%= group.id %>/questions">
 
     <% if (questions.length === 0) { %>
-      <div class="alert">No questions loaded yet. Add them to data/questions.json.</div>
+      <div class="alert"><%= t('questions.no_questions') %></div>
     <% } %>
 
     <% const formatPoints = (q) => {
@@ -203,8 +203,9 @@
       </div>
     <% }) %>
 
-    <button type="submit" <%= closed ? 'disabled' : '' %>>Save predictions</button>
+    <button type="submit" <%= closed ? 'disabled' : '' %>><%= t('questions.save_predictions') %></button>
   </form>
 </div>
 
 <%- include('partials/footer') %>
+

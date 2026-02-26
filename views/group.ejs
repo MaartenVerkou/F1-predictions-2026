@@ -3,20 +3,20 @@
 <section class="hero">
   <div class="card">
     <h1><%= group.name %></h1>
-    <p class="muted">Invite friends, then head to the questions page to lock in picks.</p>
+    <p class="muted"><%= t('group.invite_friends') %></p>
     <div class="group-rules-box">
-      <div class="group-rules-label">Group rules</div>
+      <div class="group-rules-label"><%= t('group.rules_label') %></div>
       <p class="muted group-rules-text"><%= groupRules %></p>
     </div>
     <% if (!group.is_public) { %>
-      <p class="muted">Group code: <strong><%= group.join_code || 'Not set yet' %></strong></p>
+      <p class="muted"><%= t('group.group_code') %>: <strong><%= group.join_code || t('group.code_not_set') %></strong></p>
     <% } %>
     <div class="inline-actions">
-      <a class="button-link" href="/groups/<%= group.id %>/questions">Answer questions</a>
-      <a class="link" href="/groups/<%= group.id %>/responses">View responses</a>
+      <a class="button-link" href="/groups/<%= group.id %>/questions"><%= t('group.answer_questions') %></a>
+      <a class="link" href="/groups/<%= group.id %>/responses"><%= t('group.view_responses') %></a>
       <% if (!group.is_global) { %>
-        <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('Leave this group?');" style="margin:0;">
-          <button class="secondary" type="submit">Leave group</button>
+        <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('<%= t('group.leave_confirm') %>');" style="margin:0;">
+          <button class="secondary" type="submit"><%= t('group.leave_group') %></button>
         </form>
       <% } %>
     </div>
@@ -24,40 +24,40 @@
 
   <% if (canEditRules) { %>
     <div class="card">
-      <h2>Edit group rules</h2>
-      <p class="muted">Leave empty to use default rules.</p>
+      <h2><%= t('group.edit_rules') %></h2>
+      <p class="muted"><%= t('group.leave_empty_uses_default') %></p>
       <form method="post" action="/groups/<%= group.id %>/rules">
         <label>
-          Rules text
+          <%= t('group.rules_text') %>
           <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
         </label>
-        <button type="submit">Save rules</button>
+        <button type="submit"><%= t('group.save_rules') %></button>
       </form>
     </div>
   <% } %>
 
   <% if (!group.is_global) { %>
     <div class="card">
-      <h2>Invite link</h2>
+      <h2><%= t('group.invite_link') %></h2>
       <% if (invite) { %>
         <div class="card" style="padding:12px;">
           <div class="inline-actions" style="justify-content: space-between;">
             <span class="link" id="invite-link">/join/<%= invite.code %></span>
-            <button type="button" class="secondary" data-copy-target="invite-link">Copy</button>
+            <button type="button" class="secondary" data-copy-target="invite-link"><%= t('group.copy') %></button>
           </div>
-          <div class="muted">Created <%= new Date(invite.created_at).toLocaleString() %></div>
+          <div class="muted"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
         </div>
       <% } else { %>
-        <p class="muted">No invite link yet.</p>
+        <p class="muted"><%= t('group.no_invite_link') %></p>
       <% } %>
 
       <% if (role === 'owner' || role === 'admin') { %>
         <div class="inline-actions" style="margin-top:12px;">
           <form method="post" action="/groups/<%= group.id %>/invites">
-            <button type="submit">Generate new link</button>
+            <button type="submit"><%= t('group.generate_new_link') %></button>
           </form>
           <form method="post" action="/groups/<%= group.id %>/invites/remove">
-            <button class="secondary" type="submit">Remove link</button>
+            <button class="secondary" type="submit"><%= t('group.remove_link') %></button>
           </form>
         </div>
       <% } %>
@@ -65,7 +65,7 @@
   <% } %>
 
   <div class="card">
-    <h2>Members</h2>
+    <h2><%= t('group.members') %></h2>
     <ul class="list">
       <% members.forEach(member => { %>
         <li>
@@ -74,17 +74,17 @@
           <% if (role === 'owner' || role === 'admin') { %>
             <% if (member.role !== 'owner') { %>
               <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick" style="display:inline;">
-                <button class="secondary" type="submit">Kick</button>
+                <button class="secondary" type="submit"><%= t('group.kick') %></button>
               </form>
             <% } %>
             <% if (member.role === 'member') { %>
               <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote" style="display:inline;">
-                <button class="secondary" type="submit">Make admin</button>
+                <button class="secondary" type="submit"><%= t('group.make_admin') %></button>
               </form>
             <% } %>
             <% if (member.role === 'admin') { %>
               <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote" style="display:inline;">
-                <button class="secondary" type="submit">Remove admin</button>
+                <button class="secondary" type="submit"><%= t('group.remove_admin') %></button>
               </form>
             <% } %>
           <% } %>
@@ -95,13 +95,13 @@
 
   <% if (!group.is_public && (role === 'owner' || role === 'admin')) { %>
     <div class="card">
-      <h2>Group password</h2>
+      <h2><%= t('group.group_password') %></h2>
       <form method="post" action="/groups/<%= group.id %>/password">
         <label>
-          Set new password
+          <%= t('group.set_new_password') %>
           <input type="password" name="joinPassword" required minlength="4" />
         </label>
-        <button type="submit">Update password</button>
+        <button type="submit"><%= t('group.update_password') %></button>
       </form>
     </div>
   <% } %>

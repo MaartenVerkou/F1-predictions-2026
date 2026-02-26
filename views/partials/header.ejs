@@ -3,6 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("theme");
+          var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var theme = saved || (prefersDark ? "dark" : "light");
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {}
+      })();
+    </script>
     <title><%= title %></title>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,28 +22,78 @@
   </head>
   <body>
     <header>
-      <a href="/">F1 2026 Predictions</a>
-      <div class="countdown" data-close-date="2026-03-05T23:59:59Z">
-        <span class="muted">Predictions close in</span>
-        <strong class="countdown-value">--</strong>
+      <div class="header-left">
+        <a href="/"><%= t('header.site_title') %></a>
+        <div class="countdown" data-close-date="2026-03-05T23:59:59Z">
+          <span class="muted"><%= t('header.countdown_prefix') %></span>
+          <strong class="countdown-value">--</strong>
+        </div>
       </div>
-      <div class="inline-actions">
-        <% if (user) { %>
-          <span class="muted">
-            Signed in as
-            <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
-          </span>
-          <a class="link" href="/dashboard">Dashboard</a>
-          <% if (user.is_admin) { %>
-            <a class="link" href="/admin/overview">Admin</a>
+      <div class="header-actions">
+        <div class="header-main-links">
+          <% if (user) { %>
+            <span class="muted">
+              <%= t('header.signed_in_as') %>
+              <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
+            </span>
+            <a class="link" href="/dashboard"><%= t('header.dashboard') %></a>
+            <% if (user.is_admin) { %>
+              <a class="link" href="/admin/overview"><%= t('header.admin') %></a>
+            <% } %>
+            <form action="/logout" method="post" style="margin:0;">
+              <button class="secondary" type="submit"><%= t('header.logout') %></button>
+            </form>
+          <% } else { %>
+            <a class="link" href="/login"><%= t('header.login') %></a>
+            <a class="link" href="/signup"><%= t('header.signup') %></a>
           <% } %>
-          <form action="/logout" method="post" style="margin:0;">
-            <button class="secondary" type="submit">Log out</button>
-          </form>
-        <% } else { %>
-          <a class="link" href="/login">Log in</a>
-          <a class="link" href="/signup">Sign up</a>
-        <% } %>
+        </div>
+        <div class="header-icon-actions">
+          <details class="lang-menu">
+          <summary class="icon-btn" aria-label="<%= t('header.language') %>" title="<%= t('header.language') %>">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
+              <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+            </svg>
+          </summary>
+          <div class="lang-popover">
+            <form method="post" action="/language" class="lang-list-form">
+              <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+              <% supportedLocales.forEach(({ code, label }) => { %>
+                <button
+                  type="submit"
+                  name="locale"
+                  value="<%= code %>"
+                  class="<%= locale === code ? 'lang-option is-active' : 'lang-option' %>"
+                >
+                  <%= label %>
+                </button>
+              <% }) %>
+            </form>
+          </div>
+          </details>
+          <button
+            type="button"
+            class="secondary theme-toggle icon-btn"
+            data-theme-toggle
+            data-label-dark="<%= t('theme.dark_mode') %>"
+            data-label-light="<%= t('theme.light_mode') %>"
+            aria-label="<%= t('theme.dark_mode') %>"
+            title="<%= t('theme.dark_mode') %>"
+          >
+            <span class="theme-icon theme-icon-moon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path d="M15.5 3.5a8.5 8.5 0 1 0 5 15 8 8 0 1 1-5-15z" fill="none" stroke="currentColor" stroke-width="1.7"></path>
+              </svg>
+            </span>
+            <span class="theme-icon theme-icon-sun" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
+                <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
       </div>
     </header>
     <main>

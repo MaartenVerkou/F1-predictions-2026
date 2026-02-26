@@ -37,20 +37,67 @@ const ADMIN_EMAILS = new Set(
 );
 const LEADERBOARD_ENABLED = process.env.LEADERBOARD_ENABLED === "1";
 const MAX_PRIVILEGED_GROUPS = 3;
+const LOCALES_DIR = path.join(__dirname, "locales");
+const SUPPORTED_LOCALES = ["en", "de", "fr", "nl", "es"];
+const DEFAULT_LOCALE = "en";
+const LOCALE_LABELS = {
+  en: "English",
+  de: "Deutsch",
+  fr: "Français",
+  nl: "Nederlands",
+  es: "Español"
+};
+const localeCache = new Map();
 
-function formatCloseDateForRules() {
+function formatCloseDateForRules(locale = DEFAULT_LOCALE) {
   const closeDate = new Date(PREDICTIONS_CLOSE_AT);
-  if (Number.isNaN(closeDate.getTime())) return "the season start";
-  return closeDate.toLocaleDateString("en-US", {
+  if (Number.isNaN(closeDate.getTime())) return "";
+  return closeDate.toLocaleDateString(locale, {
     month: "long",
     day: "numeric",
     year: "numeric"
   });
 }
 
-const DEFAULT_GROUP_RULES =
-  "Fill in every question. You can return and update until the season starts.\n" +
-  `Predictions close on ${formatCloseDateForRules()}.`;
+function loadLocale(locale) {
+  if (!SUPPORTED_LOCALES.includes(locale)) return {};
+  if (localeCache.has(locale)) return localeCache.get(locale);
+  const filePath = path.join(LOCALES_DIR, `${locale}.json`);
+  if (!fs.existsSync(filePath)) {
+    localeCache.set(locale, {});
+    return {};
+  }
+  try {
+    const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+    const parsed = JSON.parse(raw);
+    localeCache.set(locale, parsed);
+    return parsed;
+  } catch (err) {
+    console.error(`Failed to load locale file: ${filePath}`, err);
+    localeCache.set(locale, {});
+    return {};
+  }
+}
+
+function translate(locale, key, params = {}) {
+  const dict = loadLocale(locale);
+  const value = key.split(".").reduce((acc, part) => {
+    if (!acc || typeof acc !== "object") return undefined;
+    return acc[part];
+  }, dict);
+  const template = typeof value === "string" ? value : key;
+  return template.replace(/\{(\w+)\}/g, (_, token) => {
+    if (params[token] == null) return `{${token}}`;
+    return String(params[token]);
+  });
+}
+
+function getDefaultGroupRules(locale = DEFAULT_LOCALE) {
+  const closeDate = formatCloseDateForRules(locale);
+  return translate(locale, "group.default_rules", {
+    close_date: closeDate
+  });
+}
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -294,6 +341,41 @@ app.use(
 );
 
 app.use((req, res, next) => {
+  const savedLocale = req.session?.locale;
+  const locale = SUPPORTED_LOCALES.includes(savedLocale)
+    ? savedLocale
+    : DEFAULT_LOCALE;
+  res.locals.locale = locale;
+  res.locals.currentPath = req.originalUrl || "/";
+  res.locals.supportedLocales = SUPPORTED_LOCALES.map((code) => ({
+    code,
+    label: LOCALE_LABELS[code] || code
+  }));
+  res.locals.t = (key, params = {}) => translate(locale, key, params);
+  next();
+});
+
+app.post("/language", (req, res) => {
+  const locale = String(req.body.locale || "").trim().toLowerCase();
+  if (SUPPORTED_LOCALES.includes(locale)) {
+    req.session.locale = locale;
+  }
+  const redirectToRaw = String(req.body.redirectTo || req.get("referer") || "/").trim();
+  let redirectTo = "/";
+  if (redirectToRaw.startsWith("/")) {
+    redirectTo = redirectToRaw;
+  } else {
+    try {
+      const parsed = new URL(redirectToRaw);
+      redirectTo = `${parsed.pathname || "/"}${parsed.search || ""}`;
+    } catch (err) {
+      redirectTo = "/";
+    }
+  }
+  return res.redirect(redirectTo);
+});
+
+app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production" || !DEV_AUTO_LOGIN) {
     return next();
   }
@@ -489,9 +571,9 @@ function getCopySourceGroups(userId, currentGroupId) {
     .all(userId, currentGroupId);
 }
 
-function getGroupRulesText(group) {
+function getGroupRulesText(group, locale = DEFAULT_LOCALE) {
   const customRules = String(group?.rules_text || "").trim();
-  return customRules || DEFAULT_GROUP_RULES;
+  return customRules || getDefaultGroupRules(locale);
 }
 
 function getMailer() {
@@ -798,6 +880,7 @@ app.post("/groups/join", requireAuth, async (req, res) => {
 
 app.get("/groups/:id", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
+  const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
@@ -824,7 +907,7 @@ app.get("/groups/:id", requireAuth, (req, res) => {
 
   const role = getMemberRole(user.id, groupId);
   const canEditRules = role === "owner" || role === "admin";
-  const groupRules = getGroupRulesText(group);
+  const groupRules = getGroupRulesText(group, locale);
   res.render("group", {
     user,
     group,
@@ -1117,6 +1200,7 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
 
 app.get("/groups/:id/questions", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
+  const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
@@ -1143,9 +1227,13 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
       const sourceAnswers = getResponsesByGroup(user.id, sourceGroup.id);
       if (Object.keys(sourceAnswers).length > 0) {
         answers = sourceAnswers;
-        prefillNotice = `Prefilled from ${sourceGroup.name}. Save predictions to apply them to this group.`;
+        prefillNotice = translate(locale, "questions.prefilled_from_group", {
+          group_name: sourceGroup.name
+        });
       } else {
-        prefillNotice = `${sourceGroup.name} has no saved predictions yet.`;
+        prefillNotice = translate(locale, "questions.no_saved_predictions", {
+          group_name: sourceGroup.name
+        });
       }
     }
   } else if (Object.keys(currentAnswers).length === 0) {
@@ -1154,13 +1242,15 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
       const globalAnswers = getResponsesByGroup(user.id, globalGroup.id);
       if (Object.keys(globalAnswers).length > 0) {
         answers = globalAnswers;
-        prefillNotice = `Prefilled from ${globalGroup.name}. Save predictions to apply them to this group.`;
+        prefillNotice = translate(locale, "questions.prefilled_from_group", {
+          group_name: globalGroup.name
+        });
       }
     }
   }
 
   const closed = predictionsClosed();
-  const groupRules = getGroupRulesText(group);
+  const groupRules = getGroupRulesText(group, locale);
   res.render("questions", {
     user,
     group,

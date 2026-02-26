@@ -1,4 +1,4 @@
-﻿<%- include('partials/header', { title: 'Dashboard', user }) %>
+<%- include('partials/header', { title: t('dashboard.page_title'), user }) %>
 
 <section class="hero">
   <% if (error) { %>
@@ -10,14 +10,14 @@
 
   <div class="card">
     <div class="inline-actions" style="justify-content: space-between;">
-      <h1 style="margin:0 0 12px 0;">My groups</h1>
+      <h1 style="margin:0 0 12px 0;"><%= t('dashboard.my_groups') %></h1>
       <div class="inline-actions">
-        <a class="button-link" href="#create-group">Create group</a>
-        <a class="link" href="#join-group">Join group</a>
+        <a class="button-link" href="#create-group"><%= t('dashboard.create_group') %></a>
+        <a class="link" href="#join-group"><%= t('dashboard.join_group') %></a>
       </div>
     </div>
     <% if (groups.length === 0) { %>
-      <p class="muted">No groups yet. Create one below.</p>
+      <p class="muted"><%= t('dashboard.no_groups') %></p>
     <% } %>
     <ul class="list">
       <% groups.forEach(group => { %>
@@ -27,7 +27,7 @@
               <strong><%= group.name %></strong>
               <span class="muted">(<%= group.role %>)</span>
             </div>
-            <a class="link" href="/groups/<%= group.id %>">View group</a>
+            <a class="link" href="/groups/<%= group.id %>"><%= t('dashboard.view_group') %></a>
           </div>
         </li>
       <% }) %>
@@ -35,9 +35,9 @@
   </div>
 
   <div class="card" id="public-groups">
-    <h2>Public groups</h2>
+    <h2><%= t('dashboard.public_groups') %></h2>
     <% if (!publicGroups || publicGroups.length === 0) { %>
-      <p class="muted">No public groups available.</p>
+      <p class="muted"><%= t('dashboard.no_public_groups') %></p>
     <% } else { %>
       <ul class="list">
         <% publicGroups.forEach(group => { %>
@@ -45,13 +45,13 @@
             <div class="inline-actions" style="justify-content: space-between;">
               <div>
                 <strong><%= group.name %></strong>
-                <span class="muted">(owner: <%= group.owner_name %>)</span>
+                <span class="muted">(<%= t('dashboard.owner') %>: <%= group.owner_name %>)</span>
                 <% if (group.is_global) { %>
-                  <span class="muted"> - Global league (free)</span>
+                  <span class="muted"> - <%= t('dashboard.global_group_free') %></span>
                 <% } %>
               </div>
               <form method="post" action="/groups/<%= group.id %>/join-public" style="margin:0;">
-                <button type="submit"><%= group.is_global ? 'Join free' : 'Join' %></button>
+                <button type="submit"><%= group.is_global ? t('dashboard.join_free') : t('dashboard.join') %></button>
               </form>
             </div>
           </li>
@@ -61,40 +61,40 @@
   </div>
 
   <div class="card" id="create-group">
-    <h2>Create a new group</h2>
+    <h2><%= t('dashboard.create_new_group') %></h2>
     <form method="post" action="/groups">
       <label>
-        Group name
+        <%= t('dashboard.group_name') %>
         <input type="text" name="name" required />
       </label>
       <label>
-        Visibility
+        <%= t('dashboard.visibility') %>
         <select name="visibility" required>
-          <option value="private">Private (invite code + password)</option>
-          <option value="public">Public (anyone can join)</option>
+          <option value="private"><%= t('dashboard.private_option') %></option>
+          <option value="public"><%= t('dashboard.public_option') %></option>
         </select>
       </label>
       <label>
-        Group password (required for private groups)
+        <%= t('dashboard.group_password_private') %>
         <input type="password" name="joinPassword" minlength="4" />
       </label>
-      <button type="submit">Create group</button>
+      <button type="submit"><%= t('dashboard.create_group') %></button>
     </form>
   </div>
 
   <div class="card" id="join-group">
-    <h2>Private groups</h2>
-    <p class="muted">Join with code + password. Private groups are not listed publicly.</p>
+    <h2><%= t('dashboard.private_groups') %></h2>
+    <p class="muted"><%= t('dashboard.private_groups_help') %></p>
     <form method="post" action="/groups/join">
       <label>
-        Group code
+        <%= t('dashboard.group_code') %>
         <input type="text" name="code" required />
       </label>
       <label>
-        Group password
+        <%= t('dashboard.group_password') %>
         <input type="password" name="password" required />
       </label>
-      <button type="submit">Join group</button>
+      <button type="submit"><%= t('dashboard.join_group') %></button>
     </form>
   </div>
 </section>

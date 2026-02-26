@@ -1,0 +1,103 @@
+﻿{
+    "header":  {
+                   "site_title":  "F1 2026 Voorspellingen",
+                   "countdown_prefix":  "Voorspellingen sluiten over",
+                   "language":  "Taal",
+                   "signed_in_as":  "Ingelogd als",
+                   "dashboard":  "Dashboard",
+                   "admin":  "Admin",
+                   "logout":  "Uitloggen",
+                   "login":  "Inloggen",
+                   "signup":  "Registreren"
+               },
+    "theme":  {
+                  "toggle":  "Thema wisselen",
+                  "dark_mode":  "Donkere modus",
+                  "light_mode":  "Lichte modus"
+              },
+    "common":  {
+                   "name":  "Naam",
+                   "email":  "E-mail",
+                   "password":  "Wachtwoord"
+               },
+    "login":  {
+                  "page_title":  "Inloggen",
+                  "heading":  "Welkom terug",
+                  "forgot_password":  "Wachtwoord vergeten?",
+                  "no_account":  "Nog geen account? Registreer"
+              },
+    "signup":  {
+                   "page_title":  "Registreren",
+                   "heading":  "Maak je account aan",
+                   "verify_required":  "Accountverificatie is vereist voor inloggen.",
+                   "confirm_password":  "Bevestig wachtwoord",
+                   "create_account":  "Account aanmaken",
+                   "has_account":  "Al een account? Log in"
+               },
+    "dashboard":  {
+                      "page_title":  "Dashboard",
+                      "my_groups":  "Mijn groepen",
+                      "create_group":  "Groep maken",
+                      "join_group":  "Groep joinen",
+                      "no_groups":  "Nog geen groepen. Maak er hieronder een aan.",
+                      "view_group":  "Bekijk groep",
+                      "public_groups":  "Openbare groepen",
+                      "no_public_groups":  "Geen openbare groepen beschikbaar.",
+                      "owner":  "eigenaar",
+                      "global_group_free":  "Global league (gratis)",
+                      "join_free":  "Gratis joinen",
+                      "join":  "Joinen",
+                      "create_new_group":  "Nieuwe groep maken",
+                      "group_name":  "Groepsnaam",
+                      "visibility":  "Zichtbaarheid",
+                      "private_option":  "PrivÃ© (invite-code + wachtwoord)",
+                      "public_option":  "Openbaar (iedereen kan joinen)",
+                      "group_password_private":  "Groepswachtwoord (verplicht voor privÃ© groepen)",
+                      "private_groups":  "PrivÃ© groepen",
+                      "private_groups_help":  "Join met code + wachtwoord. PrivÃ© groepen zijn niet openbaar zichtbaar.",
+                      "group_code":  "Groepscode",
+                      "group_password":  "Groepswachtwoord"
+                  },
+    "group":  {
+                  "default_rules":  "Vul alle vragen in. Je kunt terugkomen en aanpassen tot het seizoen start.\nVoorspellingen sluiten op {close_date}.",
+                  "invite_friends":  "Nodig vrienden uit en ga daarna naar de vragen om je voorspellingen vast te leggen.",
+                  "rules_label":  "Groepsregels",
+                  "group_code":  "Groepscode",
+                  "code_not_set":  "Nog niet ingesteld",
+                  "answer_questions":  "Vragen beantwoorden",
+                  "view_responses":  "Antwoorden bekijken",
+                  "leave_group":  "Groep verlaten",
+                  "leave_confirm":  "Deze groep verlaten?",
+                  "edit_rules":  "Groepsregels bewerken",
+                  "leave_empty_uses_default":  "Leeg laten gebruikt de standaardregels.",
+                  "rules_text":  "Regeltekst",
+                  "save_rules":  "Regels opslaan",
+                  "invite_link":  "Invite-link",
+                  "copy":  "Kopieer",
+                  "created_at":  "Aangemaakt",
+                  "no_invite_link":  "Nog geen invite-link.",
+                  "generate_new_link":  "Nieuwe link genereren",
+                  "remove_link":  "Link verwijderen",
+                  "members":  "Leden",
+                  "kick":  "Verwijderen",
+                  "make_admin":  "Admin maken",
+                  "remove_admin":  "Admin weghalen",
+                  "group_password":  "Groepswachtwoord",
+                  "set_new_password":  "Nieuw wachtwoord instellen",
+                  "update_password":  "Wachtwoord bijwerken"
+              },
+    "questions":  {
+                      "page_title":  "Voorspellingen",
+                      "closed_message":  "Voorspellingen zijn gesloten.",
+                      "copy_from":  "Kopieer voorspellingen van",
+                      "select_group":  "Selecteer groep",
+                      "global_tag":  "Global",
+                      "reset":  "Reset",
+                      "save":  "Opslaan",
+                      "save_predictions":  "Voorspellingen opslaan",
+                      "no_questions":  "Nog geen vragen geladen. Voeg ze toe in data/questions.json.",
+                      "prefilled_from_group":  "Vooraf ingevuld vanuit {group_name}. Sla op om dit voor deze groep toe te passen.",
+                      "no_saved_predictions":  "{group_name} heeft nog geen opgeslagen voorspellingen."
+                  }
+}
+

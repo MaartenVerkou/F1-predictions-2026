@@ -141,7 +141,36 @@ const initVisibilityToggle = () => {
   update();
 };
 
+const initThemeToggle = () => {
+  const toggle = document.querySelector('[data-theme-toggle]');
+  if (!toggle) return;
+
+  const root = document.documentElement;
+  const labelDark = toggle.dataset.labelDark || 'Dark mode';
+  const labelLight = toggle.dataset.labelLight || 'Light mode';
+  const getTheme = () => root.getAttribute('data-theme') || 'light';
+  const setTheme = (theme) => {
+    root.setAttribute('data-theme', theme);
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (err) {
+      // ignore storage errors
+    }
+    const nextLabel = theme === 'dark' ? labelLight : labelDark;
+    toggle.setAttribute('aria-label', nextLabel);
+    toggle.setAttribute('title', nextLabel);
+  };
+
+  setTheme(getTheme());
+
+  toggle.addEventListener('click', () => {
+    const next = getTheme() === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+  initThemeToggle();
   initRankingGroups();
   initCheckboxLimits();
   initDriverToggles();
