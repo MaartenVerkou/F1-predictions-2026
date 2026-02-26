@@ -4,7 +4,7 @@ function registerAuthRoutes(app, deps) {
     db,
     bcrypt,
     ADMIN_EMAILS,
-    ensureGlobalGroup,
+    ensureUserInGlobalGroup,
     generateToken,
     hashToken,
     BASE_URL,
@@ -156,7 +156,7 @@ function registerAuthRoutes(app, deps) {
       );
       userId = info.lastInsertRowid;
     }
-    ensureGlobalGroup(userId);
+    ensureUserInGlobalGroup(userId);
 
     const result = await issueAndSendVerificationEmail(
       userId,
@@ -460,7 +460,7 @@ function registerAuthRoutes(app, deps) {
       verification.user_id
     );
     req.session.userId = verification.user_id;
-    return res.redirect("/dashboard");
+    return res.redirect("/");
   });
 
   app.get("/account", requireAuth, (req, res) => {
@@ -604,6 +604,17 @@ function registerAuthRoutes(app, deps) {
       error: null,
       success: null
     });
+  });
+
+  app.get("/start-predicting", requireAuth, (req, res) => {
+    const user = getCurrentUser(req);
+    if (!user) return res.redirect("/login");
+
+    const globalGroup = ensureUserInGlobalGroup(user.id);
+    if (!globalGroup || !globalGroup.id) {
+      return sendError(req, res, 500, "Global group is not available.");
+    }
+    return res.redirect(`/groups/${globalGroup.id}/questions`);
   });
 }
 

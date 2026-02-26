@@ -53,7 +53,7 @@
                       "private_option":  "Private (invite code + password)",
                       "public_option":  "Public (anyone can join)",
                       "group_password_private":  "Group password (required for private groups)",
-                      "private_groups":  "Private groups",
+                      "private_groups":  "Join a private group",
                       "private_groups_help":  "Join with code + password. Private groups are not listed publicly.",
                       "group_code":  "Group code",
                       "group_password":  "Group password"

@@ -10,46 +10,6 @@
   <% if (adminSuccess) { %>
     <p class="muted"><%= adminSuccess %></p>
   <% } %>
-  <h2 style="margin-top:24px;">Question Data Cleanup</h2>
-  <p class="muted">Removes orphan records in <code>responses</code> and <code>actuals</code> where <code>question_id</code> no longer exists in <code>data/questions.json</code>.</p>
-  <% if (!questionCleanupReport || questionCleanupReport.validQuestionCount === 0) { %>
-    <div class="alert">Cleanup blocked: no valid question IDs loaded from data/questions.json.</div>
-  <% } else { %>
-    <p class="muted">
-      Current question IDs: <strong><%= questionCleanupReport.validQuestionCount %></strong>.
-      Orphan responses: <strong><%= questionCleanupReport.orphanResponses %></strong>.
-      Orphan actuals: <strong><%= questionCleanupReport.orphanActuals %></strong>.
-    </p>
-    <% if (questionCleanupReport.orphanQuestionIds && questionCleanupReport.orphanQuestionIds.length > 0) { %>
-      <div class="inline-actions" style="margin: 0 0 10px;">
-        <form method="post" action="/admin/questions/cleanup" onsubmit="return confirm('Cleanup orphan question data now? This deletes old responses and actuals that no longer match current question IDs.');">
-          <button type="submit">Run cleanup</button>
-        </form>
-      </div>
-      <table class="table compact">
-        <thead>
-          <tr>
-            <th>Orphan question_id</th>
-            <th>Responses</th>
-            <th>Actuals</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% const orphanResponseById = {}; (questionCleanupReport.orphanResponseRows || []).forEach(row => { orphanResponseById[row.question_id] = row.count; }); %>
-          <% const orphanActualById = {}; (questionCleanupReport.orphanActualRows || []).forEach(row => { orphanActualById[row.question_id] = row.count; }); %>
-          <% questionCleanupReport.orphanQuestionIds.forEach(id => { %>
-            <tr>
-              <td><%= id %></td>
-              <td><%= orphanResponseById[id] || 0 %></td>
-              <td><%= orphanActualById[id] || 0 %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    <% } else { %>
-      <p class="muted">No orphan question data found. Cleanup is not needed right now.</p>
-    <% } %>
-  <% } %>
 
   <h2>Users</h2>
   <table class="table compact">

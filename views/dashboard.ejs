@@ -9,11 +9,10 @@
   <% } %>
 
   <div class="card">
-    <div class="inline-actions" style="justify-content: space-between;">
+    <div class="inline-actions" style="justify-content: space-between; align-items: flex-start;">
       <h1 style="margin:0 0 12px 0;"><%= t('dashboard.my_groups') %></h1>
       <div class="inline-actions">
         <a class="button-link" href="#create-group"><%= t('dashboard.create_group') %></a>
-        <a class="link" href="#join-group"><%= t('dashboard.join_group') %></a>
       </div>
     </div>
     <% if (groups.length === 0) { %>
@@ -21,14 +20,16 @@
     <% } %>
     <ul class="list">
       <% groups.forEach(group => { %>
-        <li class="card dashboard-group-item" style="padding:16px;">
-          <div class="inline-actions" style="justify-content: space-between;">
-            <div>
-              <strong><%= group.name %></strong>
-              <span class="muted">(<%= group.role %>)</span>
+        <li class="card dashboard-group-item">
+          <a class="dashboard-group-link" href="/groups/<%= group.id %>" aria-label="<%= `${t('dashboard.view_group')}: ${group.name}` %>">
+            <div class="inline-actions" style="justify-content: space-between;">
+              <div>
+                <strong><%= group.name %></strong>
+                <span class="muted">(<%= group.role %>)</span>
+              </div>
+              <span class="dashboard-group-view-label"><%= t('dashboard.view_group') %></span>
             </div>
-            <a class="link" href="/groups/<%= group.id %>"><%= t('dashboard.view_group') %></a>
-          </div>
+          </a>
         </li>
       <% }) %>
     </ul>
@@ -58,6 +59,22 @@
         <% }) %>
       </ul>
     <% } %>
+  </div>
+
+  <div class="card" id="join-group">
+    <h2><%= t('dashboard.private_groups') %></h2>
+    <p class="muted"><%= t('dashboard.private_groups_help') %></p>
+    <form method="post" action="/groups/join">
+      <label>
+        <%= t('dashboard.group_code') %>
+        <input type="text" name="code" required />
+      </label>
+      <label>
+        <%= t('dashboard.group_password') %>
+        <input type="password" name="password" required />
+      </label>
+      <button type="submit"><%= t('dashboard.join_group') %></button>
+    </form>
   </div>
 
   <div class="card" id="create-group">
@@ -91,22 +108,6 @@
         <input type="password" name="joinPassword" minlength="4" />
       </label>
       <button type="submit"><%= t('dashboard.create_group') %></button>
-    </form>
-  </div>
-
-  <div class="card" id="join-group">
-    <h2><%= t('dashboard.private_groups') %></h2>
-    <p class="muted"><%= t('dashboard.private_groups_help') %></p>
-    <form method="post" action="/groups/join">
-      <label>
-        <%= t('dashboard.group_code') %>
-        <input type="text" name="code" required />
-      </label>
-      <label>
-        <%= t('dashboard.group_password') %>
-        <input type="password" name="password" required />
-      </label>
-      <button type="submit"><%= t('dashboard.join_group') %></button>
     </form>
   </div>
 </section>

@@ -23,20 +23,50 @@ copy .env.example .env
 docker compose up -d --build
 ```
 
+Enable built-in Caddy edge proxy (profile `edge`):
+
+```powershell
+docker compose --profile edge up -d --build
+```
+
 Useful commands:
 
 ```powershell
 docker compose ps
 docker compose logs -f app
+docker compose logs -f caddy
 docker compose down
 docker compose down -v
+```
+
+On server behind an already running shared Caddy, run with server override:
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.server.yml up -d --build
+```
+
+Or run built-in Caddy in this repo (single-host edge):
+
+```powershell
+docker network create proxy
+docker compose -f docker-compose.yml -f docker-compose.server.yml --profile edge up -d --build
 ```
 
 Notes:
 
 - App URL: `http://localhost:3000`
-- Data persists in `./data` via bind mount (`./data:/app/data`).
-- `down -v` does not remove `./data`; it only removes Compose-managed volumes.
+- Login/user/session data persists in Docker volume `f1predictions_f1_state` (`/app/state` in container).
+- Question config stays in repo `./data` and is mounted read-only at `/app/config`.
+- `docker compose down -v` removes the Docker volume (database + sessions).
+
+If you previously used `./data:/app/data` and want to keep that old database, run this once before first start with the new setup (Linux/macOS shell):
+
+```bash
+docker compose down
+docker volume create f1predictions_f1_state
+docker run --rm -v f1predictions_f1_state:/state -v "$(pwd)/data:/legacy" alpine sh -c "cp -f /legacy/app.db /state/app.db 2>/dev/null || true; cp -f /legacy/sessions.db /state/sessions.db 2>/dev/null || true"
+docker compose up -d --build
+```
 
 ## Cloudflare tunnel (TryCloudflare)
 
@@ -50,6 +80,30 @@ docker compose logs -f tunnel
 ```
 
 The tunnel URL changes on restarts. To avoid rotating links, use a named tunnel with a token.
+
+## Caddy Workflow
+
+Default Caddy config file for this repo is in project root:
+
+- `./Caddyfile`
+
+Single app / single repo:
+
+1. Run `docker compose --profile edge up -d --build`.
+2. Caddy uses `./Caddyfile` and auto-manages TLS certs.
+
+Multiple apps on one server:
+
+1. Run Caddy only once (from one repo/stack) with `--profile edge`.
+2. Start other apps without `--profile edge`.
+3. Add additional site blocks to the running Caddy instance config.
+4. Reload Caddy after edits:
+
+```bash
+docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+Important: never run two Caddy instances binding host ports `80/443` on the same server.
 
 ## Questions file
 
@@ -125,7 +179,7 @@ Enter season results at `/admin/actuals` after the season. Leaderboard scoring i
 - `SMTP_HOST` - SMTP host (e.g. `mail.example.com`)
 - `SMTP_PORT` - optional SMTP port (default `465`); SSL/TLS is chosen automatically (`465` secure, others STARTTLS/plain)
 - `SMTP_CLIENT_NAME` - optional SMTP client/EHLO name; defaults to the domain part of `SMTP_USER`
-- `BASE_URL` - public base URL for verification links (e.g. `https://example.com`)
+- `APP_DOMAIN` - app domain/host (default `localhost`); used by built-in Caddy edge profile and for email verification/reset links. For localhost, the app uses `http://localhost:PORT`; otherwise it uses `https://APP_DOMAIN`.
 - `DEV_AUTO_LOGIN` - set to `1` to auto-login a dev user on each request (disabled when `NODE_ENV=production`)
 - `DEV_AUTO_LOGIN_EMAIL` - email used for dev auto-login (default `dev@example.com`)
 - `DEV_AUTO_LOGIN_NAME` - display name used for dev auto-login (default `Dev Admin`)

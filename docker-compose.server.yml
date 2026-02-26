@@ -1,0 +1,17 @@
+services:
+  app:
+    ports: !reset []
+    networks:
+      default: {}
+      proxy:
+        aliases:
+          - f1-app
+  caddy:
+    networks:
+      default: {}
+      proxy: {}
+
+networks:
+  proxy:
+    external: true
+    name: proxy

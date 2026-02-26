@@ -12,7 +12,12 @@ services:
       - DEV_AUTO_LOGIN_EMAIL=${DEV_AUTO_LOGIN_EMAIL:-dev@example.com}
       - DEV_AUTO_LOGIN_NAME=${DEV_AUTO_LOGIN_NAME:-Dev Admin}
       - PORT=3000
-      - BASE_URL=${BASE_URL:-http://localhost:3000}
+      - APP_DOMAIN=${APP_DOMAIN:-localhost}
+      - DATA_DIR=/app/state
+      - DB_PATH=/app/state/app.db
+      - QUESTIONS_PATH=/app/config/questions.json
+      - ROSTER_PATH=/app/config/roster.json
+      - RACES_PATH=/app/config/races.json
       - SESSION_SECRET=${SESSION_SECRET:-change-me}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
@@ -20,7 +25,8 @@ services:
       - SMTP_PORT=${SMTP_PORT:-465}
       - SMTP_CLIENT_NAME=${SMTP_CLIENT_NAME:-}
     volumes:
-      - ./data:/app/data
+      - f1_state:/app/state
+      - ./data:/app/config:ro
     restart: unless-stopped
 
   tunnel:
@@ -31,3 +37,25 @@ services:
       - app
     command: tunnel --no-autoupdate --url http://app:3000
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    profiles:
+      - edge
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - APP_DOMAIN=${APP_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  f1_state:
+  caddy_data:
+  caddy_config:

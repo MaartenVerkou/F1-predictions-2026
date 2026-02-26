@@ -24,7 +24,22 @@ const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_HOST = process.env.SMTP_HOST || "";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_CLIENT_NAME = process.env.SMTP_CLIENT_NAME || "";
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+function deriveBaseUrl() {
+  const rawDomain = String(process.env.APP_DOMAIN || "localhost")
+    .trim()
+    .replace(/\/+$/, "");
+  const host = rawDomain.replace(/^https?:\/\//i, "");
+  const localhostHostPattern = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i;
+
+  if (localhostHostPattern.test(host)) {
+    if (host.includes(":")) return `http://${host}`;
+    return `http://${host}:${PORT}`;
+  }
+
+  if (/^https?:\/\//i.test(rawDomain)) return rawDomain;
+  return `https://${host}`;
+}
+const BASE_URL = deriveBaseUrl();
 const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "1";
 const DEV_AUTO_LOGIN_EMAIL =
   process.env.DEV_AUTO_LOGIN_EMAIL || "dev@example.com";
@@ -268,16 +283,48 @@ function ensureGlobalGroup(ownerId) {
   return global;
 }
 
+function ensureUserInGlobalGroup(userId) {
+  const normalizedUserId = Number(userId || 0);
+  if (!normalizedUserId) return null;
+  const global = ensureGlobalGroup(normalizedUserId);
+  if (!global) return null;
+  const now = new Date().toISOString();
+  if (normalizedUserId === global.owner_id) {
+    db.prepare(
+      "UPDATE group_members SET role = 'owner' WHERE group_id = ? AND user_id = ?"
+    ).run(global.id, normalizedUserId);
+    db.prepare(
+      "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'owner', ?)"
+    ).run(normalizedUserId, global.id, now);
+    return global;
+  }
+  db.prepare(
+    "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'member', ?)"
+  ).run(normalizedUserId, global.id, now);
+  return global;
+}
+
 function ensureGlobalMemberships() {
   const global = ensureGlobalGroup();
   if (!global) return;
   const now = new Date().toISOString();
-  db.prepare(
-    "UPDATE group_members SET role = 'owner' WHERE group_id = ? AND user_id = ?"
-  ).run(global.id, global.owner_id);
-  db.prepare(
-    "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'owner', ?)"
-  ).run(global.owner_id, global.id, now);
+  const users = db.prepare("SELECT id FROM users").all();
+  const addMember = db.prepare(
+    "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'member', ?)"
+  );
+  const tx = db.transaction(() => {
+    db.prepare(
+      "UPDATE group_members SET role = 'owner' WHERE group_id = ? AND user_id = ?"
+    ).run(global.id, global.owner_id);
+    db.prepare(
+      "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'owner', ?)"
+    ).run(global.owner_id, global.id, now);
+    for (const row of users) {
+      if (row.id === global.owner_id) continue;
+      addMember.run(row.id, global.id, now);
+    }
+  });
+  tx();
 }
 
 ensureGlobalMemberships();
@@ -407,6 +454,7 @@ app.use((req, res, next) => {
       .run(DEV_AUTO_LOGIN_NAME.trim(), email, passwordHash, new Date().toISOString());
     user = { id: info.lastInsertRowid };
   }
+  ensureUserInGlobalGroup(user.id);
   req.session.userId = user.id;
   next();
 });
@@ -652,7 +700,7 @@ registerAuthRoutes(app, {
   db,
   bcrypt,
   ADMIN_EMAILS,
-  ensureGlobalGroup,
+  ensureUserInGlobalGroup,
   generateToken,
   hashToken,
   BASE_URL,
@@ -1107,6 +1155,13 @@ app.post("/groups/:id/members/:userId/kick", requireAuth, (req, res) => {
   const targetUserId = Number(req.params.userId);
   if (!isGroupAdmin(user.id, groupId)) {
     return sendError(req, res, 403, "Admin access only.");
+  }
+  const group = db.prepare("SELECT id, is_global FROM groups WHERE id = ?").get(groupId);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (group.is_global) {
+    return sendError(req, res, 400, "Members cannot be removed from the Global group.");
   }
   const targetRole = getMemberRole(targetUserId, groupId);
   if (!targetRole) {

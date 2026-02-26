@@ -4,12 +4,13 @@
   <div class="card">
     <span class="badge">How it works</span>
     <h1>Make bold F1 2026 predictions with friends.</h1>
-    <p class="muted">Create a group, invite friends, and lock in your season picks. We'll score it later once the real season results are in.</p>
+    <p class="muted">Fill in your predictions, create a group, and invite friends. We'll score it later once the real season results are in.</p>
     <div class="inline-actions">
       <% if (!user) { %>
         <a class="link" href="/signup">Create an account</a>
         <a class="link" href="/login">Log in</a>
       <% } else { %>
+        <a class="button-link hero-start-predicting" href="/start-predicting">Start predicting</a>
         <a class="link" href="/dashboard">Go to your dashboard</a>
       <% } %>
     </div>
