@@ -8,12 +8,13 @@
   <form method="post" action="/signup">
     <label>
       Name
-      <input type="text" name="name" required />
+      <input type="text" name="name" placeholder="The Hulk" required />
     </label>
     <label>
       Email
-      <input type="email" name="email" required />
+      <input type="email" name="email" placeholder="nico@audi.com" required />
     </label>
+    <p class="muted" style="margin:-8px 0 0;">Account verification required before login.</p>
     <label>
       Password
       <input type="password" name="password" required minlength="6" />
@@ -24,7 +25,9 @@
     </label>
     <button type="submit">Create account</button>
   </form>
-  <p class="muted" style="margin-top:12px;">You will receive a verification email before you can log in.</p>
+  <div class="auth-links">
+    <a class="link underlined-link" href="/login">Already have an account? Log in</a>
+  </div>
 </div>
 
 <%- include('partials/footer') %>

@@ -21,7 +21,9 @@
         <% if (user) { %>
           <span class="muted">Signed in as <strong><%= user.name %></strong></span>
           <a class="link" href="/dashboard">Dashboard</a>
-          <a class="link" href="/admin/overview">Admin</a>
+          <% if (user.is_admin) { %>
+            <a class="link" href="/admin/overview">Admin</a>
+          <% } %>
           <form action="/logout" method="post" style="margin:0;">
             <button class="secondary" type="submit">Log out</button>
           </form>

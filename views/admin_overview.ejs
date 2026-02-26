@@ -1,15 +1,23 @@
-﻿<%- include('partials/header', { title: 'Admin overview', user }) %>
+<%- include('partials/header', { title: 'Admin overview', user }) %>
+<%- include('partials/admin_nav', { active: 'overview' }) %>
 
 <div class="card">
   <h1>Admin overview</h1>
   <p class="muted">Accounts, groups, memberships, and responses.</p>
+  <% if (adminError) { %>
+    <div class="alert"><%= adminError %></div>
+  <% } %>
+  <% if (adminSuccess) { %>
+    <p class="muted"><%= adminSuccess %></p>
+  <% } %>
 
   <h2>Users</h2>
-  <table class="table">
+  <table class="table compact">
     <thead>
       <tr>
         <th>Name</th>
         <th>Email</th>
+        <th>Admin</th>
         <th>Created</th>
         <th>Actions</th>
       </tr>
@@ -19,11 +27,23 @@
         <tr>
           <td><%= row.name %></td>
           <td><%= row.email %></td>
+          <td><%= row.is_admin ? 'Yes' : 'No' %></td>
           <td><%= new Date(row.created_at).toLocaleString() %></td>
           <td>
-            <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
-              <button class="secondary" type="submit">Delete user</button>
-            </form>
+            <div class="table-actions">
+              <% if (row.is_admin) { %>
+                <form method="post" action="/admin/users/<%= row.id %>/remove-admin">
+                  <button class="secondary admin-toggle-btn" type="submit">Remove admin</button>
+                </form>
+              <% } else { %>
+                <form method="post" action="/admin/users/<%= row.id %>/make-admin">
+                  <button class="secondary admin-toggle-btn" type="submit">Make admin</button>
+                </form>
+              <% } %>
+              <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+                <button class="secondary" type="submit">Delete user</button>
+              </form>
+            </div>
           </td>
         </tr>
       <% }) %>
@@ -31,7 +51,7 @@
   </table>
 
   <h2 style="margin-top:24px;">Groups</h2>
-  <table class="table">
+  <table class="table compact">
     <thead>
       <tr>
         <th>Group</th>
@@ -47,7 +67,7 @@
           <td><%= row.owner_name %></td>
           <td><%= new Date(row.created_at).toLocaleString() %></td>
           <td>
-            <div class="inline-actions">
+            <div class="table-actions">
               <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
               <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
                 <button class="secondary" type="submit">Delete group</button>
@@ -60,7 +80,7 @@
   </table>
 
   <h2 style="margin-top:24px;">Memberships</h2>
-  <table class="table">
+  <table class="table compact">
     <thead>
       <tr>
         <th>User</th>
@@ -82,7 +102,7 @@
   </table>
 
   <h2 style="margin-top:24px;">Responses</h2>
-  <table class="table">
+  <table class="table compact">
     <thead>
       <tr>
         <th>User</th>
@@ -104,6 +124,16 @@
       <% }) %>
     </tbody>
   </table>
+  <div class="inline-actions" style="margin-top: 10px;">
+    <% if (currentResponsePage > 1) { %>
+      <a class="link" href="/admin/overview?page=<%= currentResponsePage - 1 %>">Previous 50</a>
+    <% } %>
+    <span class="muted">Page <%= currentResponsePage %> of <%= totalResponsePages %></span>
+    <% if (currentResponsePage < totalResponsePages) { %>
+      <a class="link" href="/admin/overview?page=<%= currentResponsePage + 1 %>">Next 50</a>
+    <% } %>
+  </div>
 </div>
 
 <%- include('partials/footer') %>
+

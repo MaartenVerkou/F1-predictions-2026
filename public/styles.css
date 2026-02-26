@@ -188,6 +188,12 @@ button:disabled {
   width: fit-content;
 }
 
+.auth-links {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
 .button-link {
   background: var(--accent);
   color: white;
@@ -211,6 +217,58 @@ button:disabled {
   padding: 10px;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
+}
+
+.table.compact th,
+.table.compact td {
+  padding: 6px 8px;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.table-actions form {
+  display: block;
+  margin: 0;
+}
+
+.table-actions button {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.admin-toggle-btn {
+  width: 132px;
+  text-align: center;
+}
+
+.admin-nav {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.admin-nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+  background: #fff;
+}
+
+.admin-nav-link.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #fff4f1;
 }
 
 .alert {

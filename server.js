@@ -7,6 +7,8 @@ const SQLiteStore = require("connect-sqlite3")(session);
 const bcrypt = require("bcrypt");
 const Database = require("better-sqlite3");
 const nodemailer = require("nodemailer");
+const { registerAuthRoutes } = require("./src/routes/auth");
+const { registerAdminRoutes } = require("./src/routes/admin");
 
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
@@ -19,20 +21,20 @@ const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_HOST = process.env.SMTP_HOST || "";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
-const SMTP_SECURE = process.env.SMTP_SECURE
-  ? process.env.SMTP_SECURE === "1" || process.env.SMTP_SECURE.toLowerCase() === "true"
-  : SMTP_PORT === 465;
-const DEBUG_EMAIL_LINKS = process.env.DEBUG_EMAIL_LINKS === "1";
+const SMTP_CLIENT_NAME = process.env.SMTP_CLIENT_NAME || "";
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
-const AUTO_VERIFY = process.env.AUTO_VERIFY === "1";
 const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "1";
 const DEV_AUTO_LOGIN_EMAIL =
   process.env.DEV_AUTO_LOGIN_EMAIL || "dev@example.com";
 const DEV_AUTO_LOGIN_NAME = process.env.DEV_AUTO_LOGIN_NAME || "Dev Admin";
 const PREDICTIONS_CLOSE_AT =
   process.env.PREDICTIONS_CLOSE_AT || "2026-03-05T23:59:59";
-const ADMIN_PASSWORD =
-  (process.env.ADMIN_PASSWORD && process.env.ADMIN_PASSWORD.trim()) || "change-me";
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean)
+);
 const LEADERBOARD_ENABLED = process.env.LEADERBOARD_ENABLED === "1";
 
 if (!fs.existsSync(DATA_DIR)) {
@@ -147,13 +149,27 @@ function ensureUserColumns() {
   if (!names.has("verified_at")) {
     db.exec("ALTER TABLE users ADD COLUMN verified_at TEXT;");
   }
+  if (!names.has("is_admin")) {
+    db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0;");
+  }
 }
 
 ensureUserColumns();
 
-if (AUTO_VERIFY) {
-  db.prepare("UPDATE users SET is_verified = 1 WHERE is_verified = 0").run();
+function syncAdminWhitelist() {
+  if (!ADMIN_EMAILS.size) return;
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    for (const email of ADMIN_EMAILS) {
+      db.prepare(
+        "UPDATE users SET is_admin = 1, is_verified = 1, verified_at = COALESCE(verified_at, ?) WHERE email = ?"
+      ).run(now, email);
+    }
+  });
+  tx();
 }
+
+syncAdminWhitelist();
 
 function getGlobalGroup() {
   return db.prepare("SELECT * FROM groups WHERE is_global = 1 LIMIT 1").get();
@@ -263,6 +279,15 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV === "production" || !DEV_AUTO_LOGIN) {
     return next();
   }
+  if (req.session.devAutoLoginDisabled) {
+    // Backward-compat: old sessions used a persistent disable flag.
+    req.session.devAutoLoginDisabled = false;
+    req.session.devAutoLoginSkipOnce = true;
+  }
+  if (req.session.devAutoLoginSkipOnce) {
+    req.session.devAutoLoginSkipOnce = false;
+    return req.session.save(() => next());
+  }
   if (req.session.userId) {
     return next();
   }
@@ -335,7 +360,6 @@ function getRoster() {
     drivers: Array.isArray(parsed.drivers) ? parsed.drivers : [],
     teams: Array.isArray(parsed.teams) ? parsed.teams : []
   };
-  return { drivers: [], teams: [] };
 }
 
 function getRaces() {
@@ -361,7 +385,7 @@ function requireAuth(req, res, next) {
 
 function getCurrentUser(req) {
   if (!req.session.userId) return null;
-  const stmt = db.prepare("SELECT id, name, email FROM users WHERE id = ?");
+  const stmt = db.prepare("SELECT id, name, email, is_admin FROM users WHERE id = ?");
   return stmt.get(req.session.userId) || null;
 }
 
@@ -379,7 +403,8 @@ function sendError(req, res, statusCode, message) {
 }
 
 function isAdmin(req) {
-  return req.session && req.session.isAdmin === true;
+  const user = getCurrentUser(req);
+  return !!(user && user.is_admin === 1);
 }
 
 function requireAdmin(req, res, next) {
@@ -387,7 +412,7 @@ function requireAdmin(req, res, next) {
     return res.redirect("/login");
   }
   if (!isAdmin(req)) {
-    return res.redirect("/admin/login");
+    return sendError(req, res, 403, "Admin access only.");
   }
   next();
 }
@@ -401,10 +426,13 @@ function isMember(userId, groupId) {
 
 function getMailer() {
   if (!SMTP_USER || !SMTP_PASS || !SMTP_HOST) return null;
+  const smtpName =
+    SMTP_CLIENT_NAME || (SMTP_USER.includes("@") ? SMTP_USER.split("@")[1] : "");
   return nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
-    secure: SMTP_SECURE,
+    secure: SMTP_PORT === 465,
+    name: smtpName || undefined,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS
@@ -418,13 +446,6 @@ function generateToken() {
 
 function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-function maskEmail(email) {
-  const [local, domain] = String(email || "").split("@");
-  if (!local || !domain) return "unknown";
-  if (local.length <= 2) return `**@${domain}`;
-  return `${local.slice(0, 2)}***@${domain}`;
 }
 
 function getMemberRole(userId, groupId) {
@@ -467,358 +488,21 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, num));
 }
 
-app.get("/", (req, res) => {
-  const user = getCurrentUser(req);
-  res.render("home", { user });
-});
-
-app.get(["/signup", "/register"], (req, res) => {
-  res.render("signup", { error: null });
-});
-
-app.post("/signup", async (req, res) => {
-  const { name, email, password, passwordConfirm } = req.body;
-  if (!name || !email || !password || !passwordConfirm) {
-    return res.render("signup", { error: "All fields are required." });
-  }
-  if (password !== passwordConfirm) {
-    return res.render("signup", { error: "Passwords do not match." });
-  }
-
-  const normalizedName = name.trim();
-  const nameTaken = db
-    .prepare("SELECT id FROM users WHERE name = ?")
-    .get(normalizedName);
-  if (nameTaken) {
-    return res.render("signup", { error: "Name already in use." });
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const existing = db
-    .prepare("SELECT id, is_verified FROM users WHERE email = ?")
-    .get(normalizedEmail);
-  if (existing && existing.is_verified) {
-    return res.render("signup", { error: "Email already registered." });
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-  const now = new Date().toISOString();
-  let userId = existing ? existing.id : null;
-  if (userId) {
-    db.prepare(
-      "UPDATE users SET name = ?, password_hash = ?, created_at = ?, is_verified = 0, verified_at = NULL WHERE id = ?"
-    ).run(normalizedName, passwordHash, now, userId);
-  } else {
-    const stmt = db.prepare(
-      "INSERT INTO users (name, email, password_hash, created_at, is_verified) VALUES (?, ?, ?, ?, 0)"
-    );
-    const info = stmt.run(normalizedName, normalizedEmail, passwordHash, now);
-    userId = info.lastInsertRowid;
-  }
-  ensureGlobalGroup(userId);
-
-  if (AUTO_VERIFY) {
-    db.prepare("UPDATE users SET is_verified = 1, verified_at = ? WHERE id = ?").run(
-      now,
-      userId
-    );
-    req.session.userId = userId;
-    return res.redirect("/dashboard");
-  }
-
-  const token = generateToken();
-  const tokenHash = hashToken(token);
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
-  db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(userId);
-  db.prepare(
-    "INSERT INTO email_verifications (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)"
-  ).run(userId, tokenHash, expiresAt, now);
-
-  const verifyUrl = `${BASE_URL}/verify?token=${token}`;
-  const mailer = getMailer();
-  if (!mailer) {
-    return res.render("verify_notice", {
-      email: normalizedEmail,
-      message: "SMTP is not configured. Use the link below to verify.",
-      verifyUrl
-    });
-  }
-
-  try {
-    await mailer.sendMail({
-      from: SMTP_USER,
-      to: normalizedEmail,
-      subject: "Verify your F1 Predictions account",
-      text: `Verify your account: ${verifyUrl}`,
-      html: `<p>Verify your account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`
-    });
-  } catch (err) {
-    console.error("Failed to send verification email:", err);
-    return res.render("verify_notice", {
-      email: normalizedEmail,
-      message: "Email failed to send. Use the link below to verify.",
-      verifyUrl
-    });
-  }
-
-  res.render("verify_notice", {
-    email: normalizedEmail,
-    message: "Verification email sent. Please check your inbox.",
-    verifyUrl: null
-  });
-});
-
-app.get("/login", (req, res) => {
-  const notice =
-    req.query.reset === "1" ? "Password updated. You can log in now." : null;
-  res.render("login", { error: null, notice });
-});
-
-app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.render("login", {
-      error: "Email and password required.",
-      notice: null
-    });
-  }
-  const user = db
-    .prepare("SELECT * FROM users WHERE email = ?")
-    .get(email.trim().toLowerCase());
-  if (!user) {
-    return res.render("login", {
-      error: "No account found for that email.",
-      notice: null
-    });
-  }
-  if (!AUTO_VERIFY && !user.is_verified) {
-    return res.render("login", {
-      error: "Please verify your email first.",
-      notice: null
-    });
-  }
-  const ok = await bcrypt.compare(password, user.password_hash);
-  if (!ok) {
-    return res.render("login", {
-      error: "Password is incorrect.",
-      notice: null
-    });
-  }
-  req.session.userId = user.id;
-  res.redirect("/dashboard");
-});
-
-app.get("/forgot-password", (req, res) => {
-  res.render("forgot_password", {
-    error: null,
-    message: null,
-    debugResetUrl: null
-  });
-});
-
-app.post("/forgot-password", async (req, res) => {
-  const { email } = req.body;
-  if (!email) {
-    return res.render("forgot_password", {
-      error: "Email is required.",
-      message: null,
-      debugResetUrl: null
-    });
-  }
-
-  const normalizedEmail = String(email).trim().toLowerCase();
-  console.log("[auth:forgot] request", {
-    email: maskEmail(normalizedEmail)
-  });
-  const user = db
-    .prepare("SELECT id FROM users WHERE email = ?")
-    .get(normalizedEmail);
-  console.log("[auth:forgot] lookup", {
-    email: maskEmail(normalizedEmail),
-    userFound: !!user
-  });
-
-  if (user) {
-    const token = generateToken();
-    const tokenHash = hashToken(token);
-    const now = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60).toISOString();
-    const resetUrl = `${BASE_URL}/reset-password?token=${token}`;
-    db.prepare("DELETE FROM password_resets WHERE user_id = ?").run(user.id);
-    db.prepare(
-      "INSERT INTO password_resets (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)"
-    ).run(user.id, tokenHash, expiresAt, now);
-    console.log("[auth:forgot] token-created", {
-      userId: user.id,
-      expiresAt
-    });
-
-    const mailer = getMailer();
-    console.log("[auth:forgot] mailer", {
-      configured: !!mailer,
-      smtpHost: SMTP_HOST || "",
-      smtpPort: SMTP_PORT,
-      smtpSecure: SMTP_SECURE
-    });
-    if (mailer) {
-      try {
-        const info = await mailer.sendMail({
-          from: SMTP_USER,
-          to: normalizedEmail,
-          subject: "Reset your F1 Predictions password",
-          text: `Reset your password: ${resetUrl}`,
-          html: `<p>Reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p>`
-        });
-        console.log("[auth:forgot] email-sent", {
-          to: maskEmail(normalizedEmail),
-          accepted: info.accepted,
-          rejected: info.rejected,
-          response: info.response,
-          messageId: info.messageId
-        });
-      } catch (err) {
-        console.error("Failed to send password reset email:", err);
-      }
-    }
-
-    return res.render("forgot_password", {
-      error: null,
-      message: "If that email exists, a reset link has been sent.",
-      debugResetUrl: DEBUG_EMAIL_LINKS ? resetUrl : null
-    });
-  }
-
-  return res.render("forgot_password", {
-    error: null,
-    message: "If that email exists, a reset link has been sent.",
-    debugResetUrl: null
-  });
-});
-
-app.get("/reset-password", (req, res) => {
-  const token = String(req.query.token || "");
-  if (!token) {
-    return res.render("reset_password", {
-      token: "",
-      error: "Reset link is invalid or expired."
-    });
-  }
-
-  const tokenHash = hashToken(token);
-  const reset = db
-    .prepare("SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > ?")
-    .get(tokenHash, new Date().toISOString());
-  if (!reset) {
-    return res.render("reset_password", {
-      token: "",
-      error: "Reset link is invalid or expired."
-    });
-  }
-
-  return res.render("reset_password", { token, error: null });
-});
-
-app.post("/reset-password", async (req, res) => {
-  const token = String(req.body.token || "");
-  const { password, passwordConfirm } = req.body;
-  if (!token || !password || !passwordConfirm) {
-    return res.render("reset_password", {
-      token,
-      error: "All fields are required."
-    });
-  }
-  if (password !== passwordConfirm) {
-    return res.render("reset_password", {
-      token,
-      error: "Passwords do not match."
-    });
-  }
-
-  const tokenHash = hashToken(token);
-  const reset = db
-    .prepare("SELECT * FROM password_resets WHERE token_hash = ? AND expires_at > ?")
-    .get(tokenHash, new Date().toISOString());
-  if (!reset) {
-    return res.render("reset_password", {
-      token: "",
-      error: "Reset link is invalid or expired."
-    });
-  }
-
-  const passwordHash = await bcrypt.hash(password, 12);
-  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(
-    passwordHash,
-    reset.user_id
-  );
-  db.prepare("DELETE FROM password_resets WHERE user_id = ?").run(reset.user_id);
-  return res.redirect("/login?reset=1");
-});
-
-app.post("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.redirect("/");
-  });
-});
-
-app.get("/verify", (req, res) => {
-  const { token } = req.query;
-  if (!token) {
-    return sendError(req, res, 400, "Missing token.");
-  }
-  const tokenHash = hashToken(String(token));
-  const verification = db
-    .prepare(
-      "SELECT * FROM email_verifications WHERE token_hash = ? AND expires_at > ?"
-    )
-    .get(tokenHash, new Date().toISOString());
-  if (!verification) {
-    return sendError(req, res, 400, "Invalid or expired token.");
-  }
-  const now = new Date().toISOString();
-  db.prepare("UPDATE users SET is_verified = 1, verified_at = ? WHERE id = ?").run(
-    now,
-    verification.user_id
-  );
-  db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(
-    verification.user_id
-  );
-  res.render("verify_success");
-});
-
-app.get("/dashboard", requireAuth, (req, res) => {
-  const user = getCurrentUser(req);
-  const groups = db
-    .prepare(
-      `
-      SELECT g.id, g.name, g.owner_id, gm.role
-      FROM groups g
-      JOIN group_members gm ON gm.group_id = g.id
-      WHERE gm.user_id = ?
-      ORDER BY g.created_at DESC
-      `
-    )
-    .all(user.id);
-
-  const publicGroups = db
-    .prepare(
-      `
-      SELECT g.id, g.name, u.name as owner_name, g.created_at, g.is_global
-      FROM groups g
-      JOIN users u ON u.id = g.owner_id
-      WHERE g.is_public = 1
-      AND g.id NOT IN (SELECT group_id FROM group_members WHERE user_id = ?)
-      ORDER BY g.created_at DESC
-      `
-    )
-    .all(user.id);
-
-  res.render("dashboard", {
-    user,
-    groups,
-    publicGroups,
-    error: null,
-    success: null
-  });
+registerAuthRoutes(app, {
+  db,
+  bcrypt,
+  ADMIN_EMAILS,
+  ensureGlobalGroup,
+  generateToken,
+  hashToken,
+  BASE_URL,
+  getMailer,
+  SMTP_USER,
+  getCurrentUser,
+  sendError,
+  requireAuth,
+  DEV_AUTO_LOGIN,
+  NODE_ENV: process.env.NODE_ENV || "development"
 });
 
 app.post("/groups", requireAuth, (req, res) => {
@@ -1716,211 +1400,14 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
   });
 });
 
-app.get("/admin/login", (req, res) => {
-  res.render("admin_login", { user: getCurrentUser(req), error: null });
-});
-
-app.post("/admin/login", (req, res) => {
-  const { password } = req.body;
-  if (password !== ADMIN_PASSWORD) {
-    return res.render("admin_login", {
-      user: getCurrentUser(req),
-      error: "Invalid admin password."
-    });
-  }
-  req.session.isAdmin = true;
-  res.redirect("/admin/overview");
-});
-
-app.post("/admin/logout", (req, res) => {
-  req.session.isAdmin = false;
-  res.redirect("/dashboard");
-});
-
-app.get("/admin/actuals", requireAdmin, (req, res) => {
-  const user = getCurrentUser(req);
-  const questions = getQuestions();
-  const roster = getRoster();
-  const races = getRaces();
-  const actualRows = db.prepare("SELECT * FROM actuals").all();
-  const actuals = actualRows.reduce((acc, row) => {
-    acc[row.question_id] = row.value;
-    return acc;
-  }, {});
-
-  res.render("admin_actuals", { user, questions, roster, races, actuals });
-});
-
-app.post("/admin/actuals", requireAdmin, (req, res) => {
-  const questions = getQuestions();
-  const races = getRaces();
-  const now = new Date().toISOString();
-  const upsert = db.prepare(
-    `
-    INSERT INTO actuals (question_id, value, updated_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(question_id)
-    DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-    `
-  );
-
-  const tx = db.transaction(() => {
-    for (const question of questions) {
-      const type = question.type || "text";
-      if (type === "ranking") {
-        const count = Number(question.count) || 3;
-        const selections = [];
-        for (let i = 1; i <= count; i += 1) {
-          const value = req.body[`${question.id}_${i}`];
-          if (!value) continue;
-          selections.push(value);
-        }
-        if (selections.length === 0) continue;
-        upsert.run(question.id, JSON.stringify(selections), now);
-        continue;
-      }
-      if (type === "multi_select") {
-        const selected = req.body[question.id];
-        if (!selected) continue;
-        const selections = Array.isArray(selected) ? selected : [selected];
-        upsert.run(question.id, JSON.stringify(selections), now);
-        continue;
-      }
-      if (type === "multi_select_limited") {
-        const dnfByRace = {};
-        races.forEach((race, index) => {
-          const value = req.body[`${question.id}_dnf_${index}`];
-          const countValue = clampNumber(value, 0, 999);
-          if (countValue != null) {
-            dnfByRace[race] = countValue;
-          }
-        });
-        upsert.run(question.id, JSON.stringify({ dnf_by_race: dnfByRace }), now);
-        continue;
-      }
-      if (type === "teammate_battle") {
-        const winner = req.body[`${question.id}_winner`];
-        const diffRaw = req.body[`${question.id}_diff`];
-        if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
-          continue;
-        }
-        const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
-        upsert.run(question.id, JSON.stringify({ winner, diff }), now);
-        continue;
-      }
-      if (type === "boolean_with_optional_driver") {
-        const choice = req.body[question.id];
-        const driver = req.body[`${question.id}_driver`];
-        if (!choice) continue;
-        upsert.run(question.id, JSON.stringify({ choice, driver }), now);
-        continue;
-      }
-      if (type === "numeric_with_driver") {
-        const valueRaw = req.body[`${question.id}_value`];
-        const driver = req.body[`${question.id}_driver`];
-        if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
-          continue;
-        }
-        const value = clampNumber(valueRaw, 0, 999);
-        upsert.run(question.id, JSON.stringify({ value, driver }), now);
-        continue;
-      }
-      if (type === "single_choice_with_driver") {
-        const value = req.body[`${question.id}_value`];
-        const driver = req.body[`${question.id}_driver`];
-        if ((!value || value === "") && (!driver || driver === "")) {
-          continue;
-        }
-        upsert.run(question.id, JSON.stringify({ value, driver }), now);
-        continue;
-      }
-
-      const answer = req.body[question.id];
-      if (answer === undefined || answer === "") continue;
-      if (type === "numeric") {
-        const value = clampNumber(answer, 0, 999);
-        if (value == null) continue;
-        upsert.run(question.id, String(value), now);
-        continue;
-      }
-      upsert.run(question.id, String(answer).trim(), now);
-    }
-  });
-  tx();
-
-  res.redirect("/admin/actuals");
-});
-
-app.get("/admin/overview", requireAdmin, (req, res) => {
-  const user = getCurrentUser(req);
-  const users = db
-    .prepare("SELECT id, name, email, created_at FROM users ORDER BY created_at DESC")
-    .all();
-  const groups = db
-    .prepare(
-      `
-      SELECT g.id, g.name, g.owner_id, u.name as owner_name, g.created_at
-      FROM groups g
-      JOIN users u ON u.id = g.owner_id
-      ORDER BY g.created_at DESC
-      `
-    )
-    .all();
-  const memberships = db
-    .prepare(
-      `
-      SELECT gm.user_id, gm.group_id, gm.role, gm.joined_at, u.name as user_name, g.name as group_name
-      FROM group_members gm
-      JOIN users u ON u.id = gm.user_id
-      JOIN groups g ON g.id = gm.group_id
-      ORDER BY gm.joined_at DESC
-      `
-    )
-    .all();
-  const responses = db
-    .prepare(
-      `
-      SELECT r.user_id, u.name as user_name, r.group_id, g.name as group_name, r.question_id, r.answer, r.updated_at
-      FROM responses r
-      JOIN users u ON u.id = r.user_id
-      JOIN groups g ON g.id = r.group_id
-      ORDER BY r.updated_at DESC
-      `
-    )
-    .all();
-
-  res.render("admin_overview", {
-    user,
-    users,
-    groups,
-    memberships,
-    responses
-  });
-});
-
-app.post("/admin/users/:userId/delete", requireAdmin, (req, res) => {
-  const userId = Number(req.params.userId);
-  if (!userId) return res.redirect("/admin/overview");
-  db.prepare("DELETE FROM responses WHERE user_id = ?").run(userId);
-  db.prepare("DELETE FROM group_members WHERE user_id = ?").run(userId);
-  db.prepare("DELETE FROM groups WHERE owner_id = ?").run(userId);
-  db.prepare("DELETE FROM invites WHERE created_by = ?").run(userId);
-  db.prepare("DELETE FROM users WHERE id = ?").run(userId);
-  res.redirect("/admin/overview");
-});
-
-app.post("/admin/groups/:groupId/delete", requireAdmin, (req, res) => {
-  const groupId = Number(req.params.groupId);
-  if (!groupId) return res.redirect("/admin/overview");
-  db.prepare("DELETE FROM responses WHERE group_id = ?").run(groupId);
-  db.prepare("DELETE FROM group_members WHERE group_id = ?").run(groupId);
-  db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
-  db.prepare("DELETE FROM groups WHERE id = ?").run(groupId);
-  res.redirect("/admin/overview");
-});
-
-app.get("/admin", (req, res) => {
-  res.redirect("/admin/overview");
+registerAdminRoutes(app, {
+  db,
+  requireAdmin,
+  getCurrentUser,
+  getQuestions,
+  getRoster,
+  getRaces,
+  clampNumber
 });
 
 app.use((req, res) => {

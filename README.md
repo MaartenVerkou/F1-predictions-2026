@@ -78,6 +78,19 @@ Race options are loaded from `data/races.json`:
 
 Enter season results at `/admin/actuals` after the season. Leaderboard scoring is currently disabled until season results are finalized.
 
+## Auth behavior
+
+- Signup requires account verification before login.
+- Forgot password flow is available at `/forgot-password`.
+- In development, `DEV_AUTO_LOGIN=1` can auto-login a dev user.
+- In development with auto-login enabled, logout skips auto-login once, then auto-login resumes on later visits.
+
+## Code layout
+
+- `server.js` keeps app bootstrap, middleware, data setup, and shared helpers.
+- `src/routes/auth.js` contains auth-related routes.
+- `src/routes/admin.js` contains admin routes.
+
 ## Environment variables
 
 - `PORT` - server port (default `3000`)
@@ -87,12 +100,17 @@ Enter season results at `/admin/actuals` after the season. Leaderboard scoring i
 - `ROSTER_PATH` - roster file path (default `DATA_DIR/roster.json`)
 - `RACES_PATH` - races file path (default `DATA_DIR/races.json`)
 - `SESSION_SECRET` - session cookie secret
-- `ADMIN_PASSWORD` - password required to access `/admin/*` (default `change-me`)
+- `ADMIN_EMAILS` - comma-separated admin whitelist emails (e.g. `admin@example.com,owner@example.com`)
 - `SMTP_USER` - sender mailbox username/login (e.g. `no-reply@example.com`)
 - `SMTP_PASS` - sender mailbox password
 - `SMTP_HOST` - SMTP host (e.g. `mail.example.com`)
-- `SMTP_PORT` - optional SMTP port (default `465`)
-- `SMTP_SECURE` - optional; `1`/`true` for SSL/TLS, `0`/`false` otherwise (default auto: true on port 465)
-- `DEBUG_EMAIL_LINKS` - set to `1` in local/dev to show password reset links on the forgot-password page
+- `SMTP_PORT` - optional SMTP port (default `465`); SSL/TLS is chosen automatically (`465` secure, others STARTTLS/plain)
+- `SMTP_CLIENT_NAME` - optional SMTP client/EHLO name; defaults to the domain part of `SMTP_USER`
 - `BASE_URL` - public base URL for verification links (e.g. `https://example.com`)
-- `AUTO_VERIFY` - set to `1` to auto-verify users (skip email verification)
+- `DEV_AUTO_LOGIN` - set to `1` to auto-login a dev user on each request (disabled when `NODE_ENV=production`)
+- `DEV_AUTO_LOGIN_EMAIL` - email used for dev auto-login (default `dev@example.com`)
+- `DEV_AUTO_LOGIN_NAME` - display name used for dev auto-login (default `Dev Admin`)
+- `PREDICTIONS_CLOSE_AT` - ISO datetime after which predictions are locked
+- `LEADERBOARD_ENABLED` - set to `1` to enable leaderboard for non-admin users
+
+Note: for Docker, variables from `.env` must be referenced in `docker-compose.yml` (`environment:` or `env_file:`) to be available inside the app container.
