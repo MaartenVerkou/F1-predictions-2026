@@ -1,103 +1,232 @@
-﻿{
-    "header":  {
-                   "site_title":  "F1 2026 Voorspellingen",
-                   "countdown_prefix":  "Voorspellingen sluiten over",
-                   "language":  "Taal",
-                   "signed_in_as":  "Ingelogd als",
-                   "dashboard":  "Dashboard",
-                   "admin":  "Admin",
-                   "logout":  "Uitloggen",
-                   "login":  "Inloggen",
-                   "signup":  "Registreren"
-               },
-    "theme":  {
-                  "toggle":  "Thema wisselen",
-                  "dark_mode":  "Donkere modus",
-                  "light_mode":  "Lichte modus"
-              },
-    "common":  {
-                   "name":  "Naam",
-                   "email":  "E-mail",
-                   "password":  "Wachtwoord"
-               },
-    "login":  {
-                  "page_title":  "Inloggen",
-                  "heading":  "Welkom terug",
-                  "forgot_password":  "Wachtwoord vergeten?",
-                  "no_account":  "Nog geen account? Registreer"
-              },
-    "signup":  {
-                   "page_title":  "Registreren",
-                   "heading":  "Maak je account aan",
-                   "verify_required":  "Accountverificatie is vereist voor inloggen.",
-                   "confirm_password":  "Bevestig wachtwoord",
-                   "create_account":  "Account aanmaken",
-                   "has_account":  "Al een account? Log in"
-               },
-    "dashboard":  {
-                      "page_title":  "Dashboard",
-                      "my_groups":  "Mijn groepen",
-                      "create_group":  "Groep maken",
-                      "join_group":  "Groep joinen",
-                      "no_groups":  "Nog geen groepen. Maak er hieronder een aan.",
-                      "view_group":  "Bekijk groep",
-                      "public_groups":  "Openbare groepen",
-                      "no_public_groups":  "Geen openbare groepen beschikbaar.",
-                      "owner":  "eigenaar",
-                      "global_group_free":  "Global league (gratis)",
-                      "join_free":  "Gratis joinen",
-                      "join":  "Joinen",
-                      "create_new_group":  "Nieuwe groep maken",
-                      "group_name":  "Groepsnaam",
-                      "visibility":  "Zichtbaarheid",
-                      "private_option":  "PrivÃ© (invite-code + wachtwoord)",
-                      "public_option":  "Openbaar (iedereen kan joinen)",
-                      "group_password_private":  "Groepswachtwoord (verplicht voor privÃ© groepen)",
-                      "private_groups":  "PrivÃ© groepen",
-                      "private_groups_help":  "Join met code + wachtwoord. PrivÃ© groepen zijn niet openbaar zichtbaar.",
-                      "group_code":  "Groepscode",
-                      "group_password":  "Groepswachtwoord"
-                  },
-    "group":  {
-                  "default_rules":  "Vul alle vragen in. Je kunt terugkomen en aanpassen tot het seizoen start.\nVoorspellingen sluiten op {close_date}.",
-                  "invite_friends":  "Nodig vrienden uit en ga daarna naar de vragen om je voorspellingen vast te leggen.",
-                  "rules_label":  "Groepsregels",
-                  "group_code":  "Groepscode",
-                  "code_not_set":  "Nog niet ingesteld",
-                  "answer_questions":  "Vragen beantwoorden",
-                  "view_responses":  "Antwoorden bekijken",
-                  "leave_group":  "Groep verlaten",
-                  "leave_confirm":  "Deze groep verlaten?",
-                  "edit_rules":  "Groepsregels bewerken",
-                  "leave_empty_uses_default":  "Leeg laten gebruikt de standaardregels.",
-                  "rules_text":  "Regeltekst",
-                  "save_rules":  "Regels opslaan",
-                  "invite_link":  "Invite-link",
-                  "copy":  "Kopieer",
-                  "created_at":  "Aangemaakt",
-                  "no_invite_link":  "Nog geen invite-link.",
-                  "generate_new_link":  "Nieuwe link genereren",
-                  "remove_link":  "Link verwijderen",
-                  "members":  "Leden",
-                  "kick":  "Verwijderen",
-                  "make_admin":  "Admin maken",
-                  "remove_admin":  "Admin weghalen",
-                  "group_password":  "Groepswachtwoord",
-                  "set_new_password":  "Nieuw wachtwoord instellen",
-                  "update_password":  "Wachtwoord bijwerken"
-              },
-    "questions":  {
-                      "page_title":  "Voorspellingen",
-                      "closed_message":  "Voorspellingen zijn gesloten.",
-                      "copy_from":  "Kopieer voorspellingen van",
-                      "select_group":  "Selecteer groep",
-                      "global_tag":  "Global",
-                      "reset":  "Reset",
-                      "save":  "Opslaan",
-                      "save_predictions":  "Voorspellingen opslaan",
-                      "no_questions":  "Nog geen vragen geladen. Voeg ze toe in data/questions.json.",
-                      "prefilled_from_group":  "Vooraf ingevuld vanuit {group_name}. Sla op om dit voor deze groep toe te passen.",
-                      "no_saved_predictions":  "{group_name} heeft nog geen opgeslagen voorspellingen."
-                  }
+{
+  "header": {
+    "site_title": "F1 Predictions 2026",
+    "countdown_prefix": "Voorspellingen sluiten over",
+    "language": "Taal",
+    "signed_in_as": "Ingelogd als",
+    "dashboard": "Dashboard",
+    "admin": "Admin",
+    "logout": "Uitloggen",
+    "login": "Inloggen",
+    "signup": "Registreren",
+    "about": "Over"
+  },
+  "theme": {
+    "toggle": "Thema wisselen",
+    "dark_mode": "Donkere modus",
+    "light_mode": "Lichte modus"
+  },
+  "common": {
+    "name": "Naam",
+    "email": "E-mail",
+    "password": "Wachtwoord"
+  },
+  "login": {
+    "page_title": "Inloggen",
+    "heading": "Welkom terug",
+    "forgot_password": "Wachtwoord vergeten?",
+    "no_account": "Nog geen account? Registreer"
+  },
+  "signup": {
+    "page_title": "Registreren",
+    "heading": "Maak je account aan",
+    "verify_required": "Accountverificatie is vereist voor inloggen.",
+    "confirm_password": "Bevestig wachtwoord",
+    "create_account": "Account aanmaken",
+    "has_account": "Al een account? Log in"
+  },
+  "dashboard": {
+    "page_title": "Dashboard",
+    "my_groups": "Mijn groepen",
+    "create_group": "Groep maken",
+    "join_group": "Groep joinen",
+    "no_groups": "Nog geen groepen. Maak er hieronder een aan.",
+    "view_group": "Bekijk groep",
+    "public_groups": "Openbare groepen",
+    "no_public_groups": "Geen openbare groepen beschikbaar.",
+    "owner": "eigenaar",
+    "global_group_free": "Global league (gratis)",
+    "join_free": "Gratis joinen",
+    "join": "Joinen",
+    "create_new_group": "Nieuwe groep maken",
+    "group_name": "Groepsnaam",
+    "visibility": "Zichtbaarheid",
+    "private_option": "Privé (invite-code + wachtwoord)",
+    "public_option": "Openbaar (iedereen kan joinen)",
+    "group_password_private": "Groepswachtwoord (verplicht voor privé groepen)",
+    "private_groups": "Privé groepen",
+    "private_groups_help": "Join met code + wachtwoord. Privé groepen zijn niet openbaar zichtbaar.",
+    "group_code": "Groepscode",
+    "group_password": "Groepswachtwoord"
+  },
+  "group": {
+    "default_rules": "Vul alle vragen in. Je kunt terugkomen en aanpassen tot het seizoen start.\nVoorspellingen sluiten op {close_date}.",
+    "invite_friends": "Nodig vrienden uit en ga daarna naar de vragen om je voorspellingen vast te leggen.",
+    "rules_label": "Groepsregels",
+    "group_code": "Groepscode",
+    "code_not_set": "Nog niet ingesteld",
+    "answer_questions": "Vragen beantwoorden",
+    "view_responses": "Antwoorden bekijken",
+    "leave_group": "Groep verlaten",
+    "leave_confirm": "Deze groep verlaten?",
+    "edit_rules": "Groepsregels bewerken",
+    "leave_empty_uses_default": "Leeg laten gebruikt de standaardregels.",
+    "rules_text": "Regeltekst",
+    "save_rules": "Regels opslaan",
+    "invite_link": "Invite-link",
+    "copy": "Kopieer",
+    "created_at": "Aangemaakt",
+    "no_invite_link": "Nog geen invite-link.",
+    "generate_new_link": "Nieuwe link genereren",
+    "remove_link": "Link verwijderen",
+    "members": "Leden",
+    "kick": "Verwijderen",
+    "make_admin": "Admin maken",
+    "remove_admin": "Admin weghalen",
+    "group_password": "Groepswachtwoord",
+    "set_new_password": "Nieuw wachtwoord instellen",
+    "update_password": "Wachtwoord bijwerken"
+  },
+  "questions": {
+    "page_title": "Voorspellingen",
+    "closed_message": "Voorspellingen zijn gesloten.",
+    "copy_from": "Kopieer voorspellingen van",
+    "select_group": "Selecteer groep",
+    "global_tag": "Global",
+    "reset": "Reset",
+    "save": "Opslaan",
+    "save_predictions": "Voorspellingen opslaan",
+    "no_questions": "Nog geen vragen geladen. Voeg ze toe in data/questions.json.",
+    "prefilled_from_group": "Vooraf ingevuld vanuit {group_name}. Sla op om dit voor deze groep toe te passen.",
+    "no_saved_predictions": "{group_name} heeft nog geen opgeslagen voorspellingen.",
+    "no_options_loaded": "Geen opties geladen voor deze vraag. Controleer roster/races JSON.",
+    "select_position": "Kies positie",
+    "select_one": "Kies een optie",
+    "select_exactly": "Selecteer precies",
+    "select_winner": "Kies winnaar",
+    "tie": "Gelijk",
+    "points_diff": "Puntenverschil",
+    "yes": "Ja",
+    "no": "Nee",
+    "select_driver_if_yes": "Kies coureur (bij ja)",
+    "number": "Nummer",
+    "select_driver": "Kies coureur"
+  },
+  "home": {
+    "badge_how_it_works": "Hoe het werkt",
+    "headline": "Doe gewaagde F1 2026 voorspellingen met vrienden.",
+    "subtitle": "Vul je voorspellingen in, maak een groep en nodig vrienden uit. We berekenen later de score op basis van de officiele seizoensuitslagen.",
+    "create_account": "Maak een account",
+    "start_predicting": "Start met voorspellen",
+    "go_dashboard": "Ga naar je dashboard",
+    "about_link": "Over F1 Predictions",
+    "flow_title": "In drie stappen",
+    "flow_step_1": "Maak een groep en deel een invite-link.",
+    "flow_step_2": "Iedereen joint en vult voorspellingen in.",
+    "flow_step_3": "Bekijk alle groepsantwoorden op een plek."
+  },
+  "about_page": {
+    "title": "Over F1 Predictions",
+    "last_updated": "Laatst bijgewerkt",
+    "nav_about": "Over",
+    "nav_terms": "Voorwaarden",
+    "nav_privacy": "Privacy",
+    "nav_contact": "Contact",
+    "section_about": "Ons doel",
+    "section_terms": "Gebruiksvoorwaarden",
+    "section_privacy": "Privacyoverzicht",
+    "section_contact": "Contact",
+    "intended_audience": "Doelgroep",
+    "how_it_works": "Hoe het werkt",
+    "definitions": "Definities",
+    "results": "Resultaten en databronnen",
+    "private_arrangements": "Afspraken in privegroepen",
+    "fair_use": "Fair use en platformintegriteit",
+    "governing_law": "Toepasselijk recht en jurisdictie",
+    "liability": "Aansprakelijkheid",
+    "cookies": "Cookies en sessies",
+    "retention": "Dataretentie",
+    "export": "Data-inzage en export"
+  },
+  "question_prompts": {
+    "drivers_championship_top_3": {
+      "prompt": "WK coureurs: kies je top 3"
+    },
+    "drivers_championship_last": {
+      "prompt": "Laatste coureur in het kampioenschap (uit de startopstelling bij seizoensstart)"
+    },
+    "constructors_championship_top_3": {
+      "prompt": "WK constructeurs: kies je top 3"
+    },
+    "constructors_championship_last": {
+      "prompt": "Laatste team in het constructeurskampioenschap"
+    },
+    "all_teams_score_points": {
+      "prompt": "Scoort elk team punten?"
+    },
+    "most_driver_of_the_day": {
+      "prompt": "Welke coureur wint de meeste Driver of the Day-awards?"
+    },
+    "most_dnfs_driver": {
+      "prompt": "Welke coureur heeft de meeste DNF's?"
+    },
+    "destructors_team": {
+      "prompt": "Destructors-kampioenschap: welk team heeft de meeste schade?"
+    },
+    "destructors_driver": {
+      "prompt": "Destructors-kampioenschap: welke coureur heeft de meeste schade?"
+    },
+    "all_podium_finishers": {
+      "prompt": "Selecteer alle podiumfinishers van races (geen sprints)"
+    },
+    "teammate_battle_antonelli_russell": {
+      "prompt": "Teamgenootduel: Antonelli vs Russell - voorspel puntenverschil en wie meer scoort"
+    },
+    "teammate_battle_lawson_lindblad": {
+      "prompt": "Teamgenootduel: Norris vs Piastri - voorspel puntenverschil en wie meer scoort"
+    },
+    "alpine_vs_cadillac_audi": {
+      "prompt": "Scoort Alpine meer of minder punten dan Cadillac, Audi en Aston Martin samen?",
+      "option_labels": {
+        "More": "Meer",
+        "Less": "Minder"
+      }
+    },
+    "most_points_no_podium": {
+      "prompt": "Welk team scoort de meeste punten zonder podiumfinish?",
+      "option_labels": {
+        "All teams scored a podium": "Alle teams scoorden een podium"
+      }
+    },
+    "race_ban": {
+      "prompt": "Krijgt een coureur een raceban?"
+    },
+    "lowest_grid_win_position": {
+      "prompt": "Laagste startpositie van waaruit een race wordt gewonnen (en wie wint)"
+    },
+    "select_three_races_dnfs": {
+      "prompt": "Kies 3 races. Verdien 3 punten per DNF in die races."
+    },
+    "closest_qualifying_teammates": {
+      "prompt": "Welk team heeft de kleinste kwalificatie-onderlinge stand?"
+    },
+    "races_before_title_decided": {
+      "prompt": "Hoeveel races voor het einde wordt de rijderstitel beslist? (laatste race = 0)"
+    },
+    "mini_q1_first_race_winner_champion": {
+      "prompt": "Winnaar van race 1 wint ook het coureurskampioenschap"
+    },
+    "mini_q2_mercedes_engines_top5": {
+      "prompt": "In het constructeurskampioenschap zijn 4 van de top 5 teams met Mercedes-motoren"
+    },
+    "mini_q3_ferrari_podium": {
+      "prompt": "Beide Ferrari-coureurs pakken minstens een Grand Prix-podium"
+    },
+    "mini_q4_sprint_champion_same": {
+      "prompt": "Als we alleen sprints tellen, is dezelfde coureur kampioen"
+    },
+    "mini_q5_team_engine_switch_2027_2028": {
+      "prompt": "Voor het einde van 2026 kondigen een of meer teams aan dat ze vanaf 2027 of 2028 van motorleverancier wisselen"
+    }
+  }
 }
-

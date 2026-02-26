@@ -1,27 +1,27 @@
-﻿<%- include('partials/header', { title: 'F1 2026 Predictions', user }) %>
+<%- include('partials/header', { title: t('header.site_title'), user }) %>
 
 <section class="hero">
   <div class="card">
-    <span class="badge">How it works</span>
-    <h1>Make bold F1 2026 predictions with friends.</h1>
-    <p class="muted">Fill in your predictions, create a group, and invite friends. We'll score it later once the real season results are in.</p>
+    <span class="badge"><%= t('home.badge_how_it_works') %></span>
+    <h1><%= t('home.headline') %></h1>
+    <p class="muted"><%= t('home.subtitle') %></p>
     <div class="inline-actions">
       <% if (!user) { %>
-        <a class="link" href="/signup">Create an account</a>
-        <a class="link" href="/login">Log in</a>
+        <a class="link" href="/signup"><%= t('home.create_account') %></a>
       <% } else { %>
-        <a class="button-link hero-start-predicting" href="/start-predicting">Start predicting</a>
-        <a class="link" href="/dashboard">Go to your dashboard</a>
+        <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
+        <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
       <% } %>
+      <a class="link" href="/about"><%= t('home.about_link') %></a>
     </div>
   </div>
 
   <div class="card">
-    <h2>Flow in three steps</h2>
+    <h2><%= t('home.flow_title') %></h2>
     <ol>
-      <li>Create a group and share an invite link.</li>
-      <li>Everyone joins and fills out their predictions.</li>
-      <li>View group responses in one place.</li>
+      <li><%= t('home.flow_step_1') %></li>
+      <li><%= t('home.flow_step_2') %></li>
+      <li><%= t('home.flow_step_3') %></li>
     </ol>
   </div>
 </section>

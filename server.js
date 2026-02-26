@@ -471,9 +471,9 @@ function readJsonFile(filePath) {
   }
 }
 
-function getQuestions() {
+function getQuestions(locale = DEFAULT_LOCALE) {
   if (!fs.existsSync(QUESTIONS_PATH)) {
-    return [
+    const fallback = [
       {
         id: "championship_top_3",
         prompt: "Pick your Top 3 for the Drivers' Championship",
@@ -487,17 +487,42 @@ function getQuestions() {
         helper: "Example: Ferrari"
       }
     ];
+    return localizeQuestions(fallback, locale);
   }
 
   const parsed = readJsonFile(QUESTIONS_PATH);
+  let questions = [];
   if (Array.isArray(parsed)) {
-    return parsed;
+    questions = parsed;
+  } else if (parsed && Array.isArray(parsed.questions)) {
+    questions = parsed.questions;
   }
-  if (parsed && Array.isArray(parsed.questions)) {
-    return parsed.questions;
-  }
+  return localizeQuestions(questions, locale);
+}
 
-  return [];
+function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
+  const dict = loadLocale(locale);
+  const promptMap = dict?.question_prompts || {};
+  return (questions || []).map((question) => {
+    const localized = { ...question };
+    const translation = promptMap[question.id] || {};
+    if (typeof translation.prompt === "string" && translation.prompt.trim()) {
+      localized.prompt = translation.prompt;
+    }
+    if (typeof translation.helper === "string") {
+      localized.helper = translation.helper;
+    }
+    if (
+      typeof translation.points_display === "string" &&
+      translation.points_display.trim()
+    ) {
+      localized.points_display = translation.points_display;
+    }
+    if (translation.option_labels && typeof translation.option_labels === "object") {
+      localized.option_labels = translation.option_labels;
+    }
+    return localized;
+  });
 }
 
 function getRoster() {
@@ -1280,7 +1305,7 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
   if (!group) {
     return sendError(req, res, 404, "Group not found.");
   }
-  const questions = getQuestions();
+  const questions = getQuestions(locale);
   const roster = getRoster();
   const races = getRaces();
   const currentAnswers = getResponsesByGroup(user.id, groupId);
@@ -1526,12 +1551,13 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
 
 app.get("/groups/:id/responses", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
+  const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(req.params.id);
   if (!isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
-  const questions = getQuestions();
+  const questions = getQuestions(locale);
   const responses = db
     .prepare(
       `
@@ -1549,6 +1575,7 @@ app.get("/groups/:id/responses", requireAuth, (req, res) => {
 
 app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
+  const locale = res.locals.locale || DEFAULT_LOCALE;
   const adminAccess = isAdmin(req);
   if (!LEADERBOARD_ENABLED && !adminAccess) {
     return sendError(
@@ -1564,7 +1591,7 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
   }
 
   const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
-  const questions = getQuestions();
+  const questions = getQuestions(locale);
   const actualRows = db.prepare("SELECT * FROM actuals").all();
   const actuals = actualRows.reduce((acc, row) => {
     acc[row.question_id] = row.value;

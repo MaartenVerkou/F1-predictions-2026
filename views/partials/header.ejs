@@ -32,11 +32,11 @@
       <div class="header-actions">
         <div class="header-main-links">
           <% if (user) { %>
+            <a class="link" href="/dashboard"><%= t('header.dashboard') %></a>
             <span class="muted">
               <%= t('header.signed_in_as') %>
               <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
             </span>
-            <a class="link" href="/dashboard"><%= t('header.dashboard') %></a>
             <% if (user.is_admin) { %>
               <a class="link" href="/admin/overview"><%= t('header.admin') %></a>
             <% } %>
@@ -45,7 +45,6 @@
             </form>
           <% } else { %>
             <a class="link" href="/login"><%= t('header.login') %></a>
-            <a class="link" href="/signup"><%= t('header.signup') %></a>
           <% } %>
         </div>
         <div class="header-icon-actions">

@@ -92,6 +92,11 @@ function registerAuthRoutes(app, deps) {
     res.render("home", { user });
   });
 
+  app.get("/about", (req, res) => {
+    const user = getCurrentUser(req);
+    res.render("about", { user });
+  });
+
   app.get(["/signup", "/register"], (req, res) => {
     res.render("signup", { error: null });
   });

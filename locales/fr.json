@@ -1,103 +1,232 @@
-﻿{
-    "header":  {
-                   "site_title":  "Pronostics F1 2026",
-                   "countdown_prefix":  "ClÃ´ture des pronostics dans",
-                   "language":  "Langue",
-                   "signed_in_as":  "ConnectÃ© en tant que",
-                   "dashboard":  "Tableau de bord",
-                   "admin":  "Admin",
-                   "logout":  "Se dÃ©connecter",
-                   "login":  "Se connecter",
-                   "signup":  "S\u0027inscrire"
-               },
-    "theme":  {
-                  "toggle":  "Changer le thÃ¨me",
-                  "dark_mode":  "Mode sombre",
-                  "light_mode":  "Mode clair"
-              },
-    "common":  {
-                   "name":  "Nom",
-                   "email":  "E-mail",
-                   "password":  "Mot de passe"
-               },
-    "login":  {
-                  "page_title":  "Connexion",
-                  "heading":  "Bon retour",
-                  "forgot_password":  "Mot de passe oubliÃ© ?",
-                  "no_account":  "Pas encore de compte ? Inscrivez-vous"
-              },
-    "signup":  {
-                   "page_title":  "Inscription",
-                   "heading":  "CrÃ©er votre compte",
-                   "verify_required":  "La vÃ©rification du compte est requise avant la connexion.",
-                   "confirm_password":  "Confirmer le mot de passe",
-                   "create_account":  "CrÃ©er le compte",
-                   "has_account":  "Vous avez dÃ©jÃ  un compte ? Connectez-vous"
-               },
-    "dashboard":  {
-                      "page_title":  "Tableau de bord",
-                      "my_groups":  "Mes groupes",
-                      "create_group":  "CrÃ©er un groupe",
-                      "join_group":  "Rejoindre un groupe",
-                      "no_groups":  "Aucun groupe pour le moment. CrÃ©ez-en un ci-dessous.",
-                      "view_group":  "Voir le groupe",
-                      "public_groups":  "Groupes publics",
-                      "no_public_groups":  "Aucun groupe public disponible.",
-                      "owner":  "propriÃ©taire",
-                      "global_group_free":  "Ligue globale (gratuite)",
-                      "join_free":  "Rejoindre gratuitement",
-                      "join":  "Rejoindre",
-                      "create_new_group":  "CrÃ©er un nouveau groupe",
-                      "group_name":  "Nom du groupe",
-                      "visibility":  "VisibilitÃ©",
-                      "private_option":  "PrivÃ© (code d\u0027invitation + mot de passe)",
-                      "public_option":  "Public (tout le monde peut rejoindre)",
-                      "group_password_private":  "Mot de passe du groupe (requis pour les groupes privÃ©s)",
-                      "private_groups":  "Groupes privÃ©s",
-                      "private_groups_help":  "Rejoignez avec code + mot de passe. Les groupes privÃ©s ne sont pas listÃ©s publiquement.",
-                      "group_code":  "Code du groupe",
-                      "group_password":  "Mot de passe du groupe"
-                  },
-    "group":  {
-                  "default_rules":  "Fill in every question. You can return and update until the season starts.\nPredictions close on {close_date}.",
-                  "invite_friends":  "Invite friends, then head to the questions page to lock in picks.",
-                  "rules_label":  "Group rules",
-                  "group_code":  "Group code",
-                  "code_not_set":  "Not set yet",
-                  "answer_questions":  "Answer questions",
-                  "view_responses":  "View responses",
-                  "leave_group":  "Leave group",
-                  "leave_confirm":  "Leave this group?",
-                  "edit_rules":  "Edit group rules",
-                  "leave_empty_uses_default":  "Leave empty to use default rules.",
-                  "rules_text":  "Rules text",
-                  "save_rules":  "Save rules",
-                  "invite_link":  "Invite link",
-                  "copy":  "Copy",
-                  "created_at":  "Created",
-                  "no_invite_link":  "No invite link yet.",
-                  "generate_new_link":  "Generate new link",
-                  "remove_link":  "Remove link",
-                  "members":  "Members",
-                  "kick":  "Kick",
-                  "make_admin":  "Make admin",
-                  "remove_admin":  "Remove admin",
-                  "group_password":  "Group password",
-                  "set_new_password":  "Set new password",
-                  "update_password":  "Update password"
-              },
-    "questions":  {
-                      "page_title":  "Predictions",
-                      "closed_message":  "Predictions are closed.",
-                      "copy_from":  "Copy predictions from",
-                      "select_group":  "Select group",
-                      "global_tag":  "Global",
-                      "reset":  "Reset",
-                      "save":  "Save",
-                      "save_predictions":  "Save predictions",
-                      "no_questions":  "No questions loaded yet. Add them to data/questions.json.",
-                      "prefilled_from_group":  "Prefilled from {group_name}. Save predictions to apply them to this group.",
-                      "no_saved_predictions":  "{group_name} has no saved predictions yet."
-                  }
+{
+  "header": {
+    "site_title": "F1 Predictions 2026",
+    "countdown_prefix": "Cloture des pronostics dans",
+    "language": "Langue",
+    "signed_in_as": "Compte",
+    "dashboard": "Tableau de bord",
+    "admin": "Admin",
+    "logout": "Quitter",
+    "login": "Se connecter",
+    "signup": "S'inscrire",
+    "about": "A propos"
+  },
+  "theme": {
+    "toggle": "Changer le thÃ¨me",
+    "dark_mode": "Mode sombre",
+    "light_mode": "Mode clair"
+  },
+  "common": {
+    "name": "Nom",
+    "email": "E-mail",
+    "password": "Mot de passe"
+  },
+  "login": {
+    "page_title": "Connexion",
+    "heading": "Bon retour",
+    "forgot_password": "Mot de passe oubliÃ© ?",
+    "no_account": "Pas encore de compte ? Inscrivez-vous"
+  },
+  "signup": {
+    "page_title": "Inscription",
+    "heading": "CrÃ©er votre compte",
+    "verify_required": "La vÃ©rification du compte est requise avant la connexion.",
+    "confirm_password": "Confirmer le mot de passe",
+    "create_account": "CrÃ©er le compte",
+    "has_account": "Vous avez dÃ©jÃ  un compte ? Connectez-vous"
+  },
+  "dashboard": {
+    "page_title": "Tableau de bord",
+    "my_groups": "Mes groupes",
+    "create_group": "CrÃ©er un groupe",
+    "join_group": "Rejoindre un groupe",
+    "no_groups": "Aucun groupe pour le moment. CrÃ©ez-en un ci-dessous.",
+    "view_group": "Voir le groupe",
+    "public_groups": "Groupes publics",
+    "no_public_groups": "Aucun groupe public disponible.",
+    "owner": "propriÃ©taire",
+    "global_group_free": "Ligue globale (gratuite)",
+    "join_free": "Rejoindre gratuitement",
+    "join": "Rejoindre",
+    "create_new_group": "CrÃ©er un nouveau groupe",
+    "group_name": "Nom du groupe",
+    "visibility": "VisibilitÃ©",
+    "private_option": "PrivÃ© (code d'invitation + mot de passe)",
+    "public_option": "Public (tout le monde peut rejoindre)",
+    "group_password_private": "Mot de passe du groupe (requis pour les groupes privÃ©s)",
+    "private_groups": "Groupes privÃ©s",
+    "private_groups_help": "Rejoignez avec code + mot de passe. Les groupes privÃ©s ne sont pas listÃ©s publiquement.",
+    "group_code": "Code du groupe",
+    "group_password": "Mot de passe du groupe"
+  },
+  "group": {
+    "default_rules": "Fill in every question. You can return and update until the season starts.\nPredictions close on {close_date}.",
+    "invite_friends": "Invite friends, then head to the questions page to lock in picks.",
+    "rules_label": "Group rules",
+    "group_code": "Group code",
+    "code_not_set": "Not set yet",
+    "answer_questions": "Answer questions",
+    "view_responses": "View responses",
+    "leave_group": "Leave group",
+    "leave_confirm": "Leave this group?",
+    "edit_rules": "Edit group rules",
+    "leave_empty_uses_default": "Leave empty to use default rules.",
+    "rules_text": "Rules text",
+    "save_rules": "Save rules",
+    "invite_link": "Invite link",
+    "copy": "Copy",
+    "created_at": "Created",
+    "no_invite_link": "No invite link yet.",
+    "generate_new_link": "Generate new link",
+    "remove_link": "Remove link",
+    "members": "Members",
+    "kick": "Kick",
+    "make_admin": "Make admin",
+    "remove_admin": "Remove admin",
+    "group_password": "Group password",
+    "set_new_password": "Set new password",
+    "update_password": "Update password"
+  },
+  "questions": {
+    "page_title": "Predictions",
+    "closed_message": "Predictions are closed.",
+    "copy_from": "Copy predictions from",
+    "select_group": "Select group",
+    "global_tag": "Global",
+    "reset": "Reset",
+    "save": "Save",
+    "save_predictions": "Save predictions",
+    "no_questions": "No questions loaded yet. Add them to data/questions.json.",
+    "prefilled_from_group": "Prefilled from {group_name}. Save predictions to apply them to this group.",
+    "no_saved_predictions": "{group_name} has no saved predictions yet.",
+    "no_options_loaded": "Aucune option chargee pour cette question. Verifiez roster/races JSON.",
+    "select_position": "Choisir position",
+    "select_one": "Choisir une option",
+    "select_exactly": "Selectionnez exactement",
+    "select_winner": "Choisir gagnant",
+    "tie": "Egalite",
+    "points_diff": "Ecart de points",
+    "yes": "Oui",
+    "no": "Non",
+    "select_driver_if_yes": "Choisir pilote (si oui)",
+    "number": "Nombre",
+    "select_driver": "Choisir pilote"
+  },
+  "home": {
+    "badge_how_it_works": "Comment ca marche",
+    "headline": "Faites des pronostics F1 2026 audacieux avec vos amis.",
+    "subtitle": "Remplissez vos pronostics, creez un groupe et invitez vos amis. Le classement est calcule plus tard selon les resultats officiels de la saison.",
+    "create_account": "Creer un compte",
+    "start_predicting": "Commencer les pronostics",
+    "go_dashboard": "Aller au tableau de bord",
+    "about_link": "A propos de F1 Predictions",
+    "flow_title": "Fonctionnement en trois etapes",
+    "flow_step_1": "Creez un groupe et partagez un lien dinvitation.",
+    "flow_step_2": "Tout le monde rejoint et complete ses pronostics.",
+    "flow_step_3": "Consultez les reponses du groupe au meme endroit."
+  },
+  "about_page": {
+    "title": "A propos de F1 Predictions",
+    "last_updated": "Derniere mise a jour",
+    "nav_about": "A propos",
+    "nav_terms": "Conditions",
+    "nav_privacy": "Confidentialite",
+    "nav_contact": "Contact",
+    "section_about": "Notre objectif",
+    "section_terms": "Conditions dutilisation",
+    "section_privacy": "Apercu de la confidentialite",
+    "section_contact": "Contact",
+    "intended_audience": "Public vise",
+    "how_it_works": "Fonctionnement",
+    "definitions": "Definitions",
+    "results": "Resultats et sources de donnees",
+    "private_arrangements": "Accords entre groupes prives",
+    "fair_use": "Utilisation equitable et integrite de la plateforme",
+    "governing_law": "Droit applicable et juridiction",
+    "liability": "Responsabilite",
+    "cookies": "Cookies et sessions",
+    "retention": "Conservation des donnees",
+    "export": "Acces et export des donnees"
+  },
+  "question_prompts": {
+    "drivers_championship_top_3": {
+      "prompt": "Championnat pilotes: choisissez votre top 3"
+    },
+    "drivers_championship_last": {
+      "prompt": "Dernier pilote du championnat (parmi la grille initiale de saison)"
+    },
+    "constructors_championship_top_3": {
+      "prompt": "Championnat constructeurs: choisissez votre top 3"
+    },
+    "constructors_championship_last": {
+      "prompt": "Derniere equipe du championnat constructeurs"
+    },
+    "all_teams_score_points": {
+      "prompt": "Est-ce que chaque equipe marque des points ?"
+    },
+    "most_driver_of_the_day": {
+      "prompt": "Quel pilote gagne le plus de distinctions Driver of the Day ?"
+    },
+    "most_dnfs_driver": {
+      "prompt": "Quel pilote a le plus de DNF ?"
+    },
+    "destructors_team": {
+      "prompt": "Championnat destructors: quelle equipe a le plus de degats ?"
+    },
+    "destructors_driver": {
+      "prompt": "Championnat destructors: quel pilote a le plus de degats ?"
+    },
+    "all_podium_finishers": {
+      "prompt": "Selectionnez tous les pilotes de podium en course (sans sprints)"
+    },
+    "teammate_battle_antonelli_russell": {
+      "prompt": "Duel coequipiers: Antonelli vs Russell - predisez ecart de points et qui marque plus"
+    },
+    "teammate_battle_lawson_lindblad": {
+      "prompt": "Duel coequipiers: Norris vs Piastri - predisez ecart de points et qui marque plus"
+    },
+    "alpine_vs_cadillac_audi": {
+      "prompt": "Alpine marque plus ou moins de points que Cadillac, Audi et Aston Martin reunis ?",
+      "option_labels": {
+        "More": "Plus",
+        "Less": "Moins"
+      }
+    },
+    "most_points_no_podium": {
+      "prompt": "Quelle equipe marque le plus de points sans podium ?",
+      "option_labels": {
+        "All teams scored a podium": "Toutes les equipes ont fait un podium"
+      }
+    },
+    "race_ban": {
+      "prompt": "Un pilote recevra-t-il une suspension de course ?"
+    },
+    "lowest_grid_win_position": {
+      "prompt": "Position de depart la plus basse depuis laquelle une course est gagnee (et par qui)"
+    },
+    "select_three_races_dnfs": {
+      "prompt": "Choisissez 3 courses. Gagnez 3 points par DNF dans ces courses."
+    },
+    "closest_qualifying_teammates": {
+      "prompt": "Quelle equipe a le duel qualifications le plus serre ?"
+    },
+    "races_before_title_decided": {
+      "prompt": "Combien de courses avant la fin le titre pilotes est-il decide ? (derniere course = 0)"
+    },
+    "mini_q1_first_race_winner_champion": {
+      "prompt": "Le vainqueur de la course 1 gagne le championnat pilotes"
+    },
+    "mini_q2_mercedes_engines_top5": {
+      "prompt": "Au championnat constructeurs, 4 des 5 premiers sont des equipes a moteur Mercedes"
+    },
+    "mini_q3_ferrari_podium": {
+      "prompt": "Les deux pilotes Ferrari obtiennent au moins un podium en Grand Prix"
+    },
+    "mini_q4_sprint_champion_same": {
+      "prompt": "Si on compte seulement les sprints, le meme pilote est champion"
+    },
+    "mini_q5_team_engine_switch_2027_2028": {
+      "prompt": "Avant la fin de 2026, une ou plusieurs equipes annoncent un changement de motoriste pour 2027 ou 2028"
+    }
+  }
 }
-

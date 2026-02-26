@@ -264,6 +264,29 @@ const initThemeToggle = () => {
   });
 };
 
+const initScrollToEndButton = () => {
+  const button = document.querySelector('[data-scroll-to-end]');
+  if (!button) return;
+
+  const targetSelector = button.dataset.scrollToEndTarget || '';
+  const target = targetSelector ? document.querySelector(targetSelector) : null;
+  if (!target) return;
+
+  const updateVisibility = () => {
+    const nearBottom =
+      window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 120;
+    button.classList.toggle('is-hidden', nearBottom);
+  };
+
+  button.addEventListener('click', () => {
+    target.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  });
+
+  window.addEventListener('scroll', updateVisibility, { passive: true });
+  window.addEventListener('resize', updateVisibility);
+  updateVisibility();
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initRankingGroups();
@@ -275,4 +298,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initCopyButtons();
   initNameAvailabilityChecks();
   initVisibilityToggle();
+  initScrollToEndButton();
 });

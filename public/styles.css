@@ -62,24 +62,42 @@ header {
 }
 
 .header-left {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
-  justify-items: center;
-  text-align: center;
+  text-align: left;
+}
+
+.header-left > a {
+  white-space: nowrap;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 8px;
+  margin-left: auto;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .header-main-links {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 14px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.header-main-links .muted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .header-icon-actions {
@@ -97,6 +115,7 @@ header {
   background: var(--countdown-bg);
   border: 1px solid var(--countdown-border);
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .countdown-value {
@@ -589,6 +608,33 @@ button:disabled {
   margin-left: auto;
 }
 
+.scroll-to-end-btn {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  box-shadow: 0 12px 24px rgba(214, 63, 47, 0.3);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.scroll-to-end-btn svg {
+  width: 32px;
+  height: 32px;
+}
+
+.scroll-to-end-btn.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+}
+
 .dashboard-group-item {
   transition: border-color 0.2s ease, background-color 0.2s ease;
   padding: 0;
@@ -667,20 +713,65 @@ button.theme-toggle:focus-visible {
   background: #2a1e1b;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 1200px) {
   header {
     padding: 20px 24px;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
   }
 
   .header-left {
+    display: grid;
+    gap: 8px;
     width: 100%;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .header-left > a {
+    white-space: normal;
+  }
+
+  .header-actions {
+    width: min(100%, 920px);
+    justify-content: center;
+    gap: 10px;
+    margin-left: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+  }
+
+  .header-main-links {
+    justify-content: center;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 720px) {
+  header {
+    padding: 16px;
+  }
+
+  .header-actions {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .header-main-links {
+    gap: 8px;
+    font-size: 14px;
   }
 
   main {
     padding: 24px;
+  }
+
+  .countdown {
+    font-size: 13px;
+    padding: 5px 10px;
   }
 
   .questions-top-actions {
@@ -691,5 +782,10 @@ button.theme-toggle:focus-visible {
 
   .questions-top-actions .inline-actions {
     margin-left: 0;
+  }
+
+  .scroll-to-end-btn {
+    right: 16px;
+    bottom: 16px;
   }
 }
