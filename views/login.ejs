@@ -7,11 +7,17 @@
   <% } %>
   <% if (error) { %>
     <div class="alert"><%= error %></div>
+    <% if (unverifiedEmail) { %>
+      <form method="post" action="/resend-verification" class="auth-links" style="margin: 6px 0 14px;">
+        <input type="hidden" name="email" value="<%= unverifiedEmail %>" />
+        <button type="submit" class="link underlined-link link-button">Resend verification email</button>
+      </form>
+    <% } %>
   <% } %>
   <form method="post" action="/login">
     <label>
       <%= t('common.email') %>
-      <input type="email" name="email" placeholder="you@team.com" required />
+      <input type="email" name="email" value="<%= email || '' %>" placeholder="you@team.com" required />
     </label>
     <label>
       <%= t('common.password') %>

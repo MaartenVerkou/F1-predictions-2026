@@ -17,6 +17,45 @@ function registerAuthRoutes(app, deps) {
     NODE_ENV
   } = deps;
 
+  async function issueAndSendVerificationEmail(userId, email) {
+    const token = generateToken();
+    const tokenHash = hashToken(token);
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+    db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(userId);
+    db.prepare(
+      "INSERT INTO email_verifications (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)"
+    ).run(userId, tokenHash, expiresAt, now);
+
+    const verifyUrl = `${BASE_URL}/verify?token=${token}`;
+    const mailer = getMailer();
+    if (!mailer) {
+      return {
+        ok: false,
+        reason: "smtp_missing",
+        verifyUrl
+      };
+    }
+
+    try {
+      await mailer.sendMail({
+        from: SMTP_USER,
+        to: email,
+        subject: "Verify your F1 Predictions account",
+        text: `Verify your account: ${verifyUrl}`,
+        html: `<p>Verify your account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`
+      });
+      return { ok: true };
+    } catch (err) {
+      console.error("Failed to send verification email:", err);
+      return {
+        ok: false,
+        reason: "send_failed",
+        verifyUrl
+      };
+    }
+  }
+
   app.get("/", (req, res) => {
     const user = getCurrentUser(req);
     res.render("home", { user });
@@ -79,38 +118,19 @@ function registerAuthRoutes(app, deps) {
     }
     ensureGlobalGroup(userId);
 
-    const token = generateToken();
-    const tokenHash = hashToken(token);
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
-    db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(userId);
-    db.prepare(
-      "INSERT INTO email_verifications (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)"
-    ).run(userId, tokenHash, expiresAt, now);
-
-    const verifyUrl = `${BASE_URL}/verify?token=${token}`;
-    const mailer = getMailer();
-    if (!mailer) {
+    const result = await issueAndSendVerificationEmail(userId, normalizedEmail);
+    if (!result.ok && result.reason === "smtp_missing") {
       return res.render("verify_notice", {
         email: normalizedEmail,
         message: "SMTP is not configured. Use the link below to verify.",
-        verifyUrl
+        verifyUrl: result.verifyUrl
       });
     }
-
-    try {
-      await mailer.sendMail({
-        from: SMTP_USER,
-        to: normalizedEmail,
-        subject: "Verify your F1 Predictions account",
-        text: `Verify your account: ${verifyUrl}`,
-        html: `<p>Verify your account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`
-      });
-    } catch (err) {
-      console.error("Failed to send verification email:", err);
+    if (!result.ok && result.reason === "send_failed") {
       return res.render("verify_notice", {
         email: normalizedEmail,
         message: "Email failed to send. Use the link below to verify.",
-        verifyUrl
+        verifyUrl: result.verifyUrl
       });
     }
 
@@ -124,41 +144,99 @@ function registerAuthRoutes(app, deps) {
   app.get("/login", (req, res) => {
     const notice =
       req.query.reset === "1" ? "Password updated. You can log in now." : null;
-    res.render("login", { error: null, notice });
+    res.render("login", {
+      error: null,
+      notice,
+      unverifiedEmail: null,
+      email: ""
+    });
   });
 
   app.post("/login", async (req, res) => {
     const { email, password } = req.body;
+    const normalizedEmail = String(email || "").trim().toLowerCase();
     if (!email || !password) {
       return res.render("login", {
         error: "Email and password required.",
-        notice: null
+        notice: null,
+        unverifiedEmail: null,
+        email: normalizedEmail
       });
     }
     const user = db
       .prepare("SELECT * FROM users WHERE email = ?")
-      .get(email.trim().toLowerCase());
+      .get(normalizedEmail);
     if (!user) {
       return res.render("login", {
         error: "No account found for that email.",
-        notice: null
+        notice: null,
+        unverifiedEmail: null,
+        email: normalizedEmail
       });
     }
     if (!user.is_verified) {
       return res.render("login", {
         error: "Please verify your email first.",
-        notice: null
+        notice: null,
+        unverifiedEmail: normalizedEmail,
+        email: normalizedEmail
       });
     }
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) {
       return res.render("login", {
         error: "Password is incorrect.",
-        notice: null
+        notice: null,
+        unverifiedEmail: null,
+        email: normalizedEmail
       });
     }
     req.session.userId = user.id;
     return res.redirect("/dashboard");
+  });
+
+  app.post("/resend-verification", async (req, res) => {
+    const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    if (!normalizedEmail) {
+      return res.render("login", {
+        error: "Email is required.",
+        notice: null,
+        unverifiedEmail: null,
+        email: ""
+      });
+    }
+
+    const user = db
+      .prepare("SELECT id, is_verified FROM users WHERE email = ?")
+      .get(normalizedEmail);
+
+    if (!user || user.is_verified) {
+      return res.render("login", {
+        error: null,
+        notice: "If your account exists and is unverified, a new verification email was sent.",
+        unverifiedEmail: null,
+        email: normalizedEmail
+      });
+    }
+
+    const result = await issueAndSendVerificationEmail(user.id, normalizedEmail);
+    if (!result.ok && result.verifyUrl) {
+      return res.render("verify_notice", {
+        email: normalizedEmail,
+        message:
+          result.reason === "smtp_missing"
+            ? "SMTP is not configured. Use the link below to verify."
+            : "Email failed to send. Use the link below to verify.",
+        verifyUrl: result.verifyUrl
+      });
+    }
+
+    return res.render("login", {
+      error: null,
+      notice: "Verification email re-sent. Please check your inbox.",
+      unverifiedEmail: null,
+      email: normalizedEmail
+    });
   });
 
   app.get("/forgot-password", (req, res) => {
