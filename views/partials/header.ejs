@@ -83,7 +83,13 @@
           >
             <span class="theme-icon theme-icon-moon" aria-hidden="true">
               <svg viewBox="0 0 24 24">
-                <path d="M15.5 3.5a8.5 8.5 0 1 0 5 15 8 8 0 1 1-5-15z" fill="none" stroke="currentColor" stroke-width="1.7"></path>
+                <defs>
+                  <mask id="theme-moon-cutout">
+                    <rect width="24" height="24" fill="white"></rect>
+                    <circle cx="16" cy="12" r="7.1" fill="black"></circle>
+                  </mask>
+                </defs>
+                <circle cx="12" cy="12" r="9" fill="currentColor" mask="url(#theme-moon-cutout)"></circle>
               </svg>
             </span>
             <span class="theme-icon theme-icon-sun" aria-hidden="true">

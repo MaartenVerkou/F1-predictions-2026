@@ -110,7 +110,7 @@ const initCopyButtons = () => {
       const targetId = button.dataset.copyTarget;
       const target = document.getElementById(targetId);
       if (!target) return;
-      const text = target.textContent.trim();
+      const text = (target.dataset.copyValue || target.textContent || '').trim();
       try {
         await navigator.clipboard.writeText(text);
         button.textContent = 'Copied';
@@ -123,6 +123,101 @@ const initCopyButtons = () => {
           button.textContent = 'Copy';
         }, 1500);
       }
+    });
+  });
+};
+
+const initNameAvailabilityChecks = () => {
+  document.querySelectorAll('input[data-name-check-url]').forEach(input => {
+    const feedback = input.parentElement?.querySelector('[data-name-check-feedback]');
+    const url = input.dataset.nameCheckUrl;
+    if (!feedback || !url) return;
+
+    const minLength = Number(input.dataset.nameCheckMinLength || 2);
+    const delay = Number(input.dataset.nameCheckDelay || 1200);
+    const msgChecking = input.dataset.nameCheckMsgChecking || 'Checking...';
+    const msgAvailable = input.dataset.nameCheckMsgAvailable || 'Name is available.';
+    const msgTaken = input.dataset.nameCheckMsgTaken || 'Name already in use.';
+    const msgError = input.dataset.nameCheckMsgError || 'Could not check name right now.';
+    let timeoutId = null;
+    let requestCounter = 0;
+    let lastCheckedValue = '';
+
+    const setStatus = (status, message) => {
+      feedback.dataset.status = status || '';
+      feedback.textContent = message || '';
+    };
+
+    const clearStatus = () => {
+      setStatus('', '');
+      input.setCustomValidity('');
+    };
+
+    const checkNow = async () => {
+      const value = input.value.trim();
+      if (value.length < minLength) {
+        lastCheckedValue = '';
+        clearStatus();
+        return;
+      }
+      lastCheckedValue = value;
+      const requestId = ++requestCounter;
+      setStatus('checking', msgChecking);
+
+      try {
+        const separator = url.includes('?') ? '&' : '?';
+        const response = await fetch(
+          `${url}${separator}name=${encodeURIComponent(value)}`,
+          { headers: { Accept: 'application/json' } }
+        );
+        if (requestId !== requestCounter) return;
+        if (!response.ok) throw new Error(`Unexpected status: ${response.status}`);
+        const payload = await response.json();
+        if (requestId !== requestCounter) return;
+
+        if (payload && payload.available) {
+          input.setCustomValidity('');
+          setStatus('available', msgAvailable);
+        } else {
+          input.setCustomValidity(msgTaken);
+          setStatus('taken', msgTaken);
+        }
+      } catch (err) {
+        if (requestId !== requestCounter) return;
+        input.setCustomValidity('');
+        setStatus('error', msgError);
+      }
+    };
+
+    const queueCheck = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      const value = input.value.trim();
+      if (value.length < minLength) {
+        requestCounter += 1;
+        lastCheckedValue = '';
+        clearStatus();
+        return;
+      }
+      input.setCustomValidity('');
+      setStatus('', '');
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        checkNow();
+      }, delay);
+    };
+
+    input.addEventListener('input', queueCheck);
+    input.addEventListener('blur', () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      const value = input.value.trim();
+      if (value.length < minLength || value === lastCheckedValue) return;
+      checkNow();
     });
   });
 };
@@ -178,5 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initNumberClamps();
   initCountdown();
   initCopyButtons();
+  initNameAvailabilityChecks();
   initVisibilityToggle();
 });

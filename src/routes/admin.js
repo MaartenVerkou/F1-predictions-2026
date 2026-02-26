@@ -9,6 +9,71 @@ function registerAdminRoutes(app, deps) {
     clampNumber
   } = deps;
 
+  function collectQuestionDataCleanupReport() {
+    const questions = getQuestions();
+    const validQuestionIds = new Set(
+      questions
+        .map((question) => String(question?.id || "").trim())
+        .filter(Boolean)
+    );
+
+    const responseCounts = db
+      .prepare(
+        `
+        SELECT question_id, COUNT(*) as count
+        FROM responses
+        GROUP BY question_id
+        `
+      )
+      .all();
+    const actualCounts = db
+      .prepare(
+        `
+        SELECT question_id, COUNT(*) as count
+        FROM actuals
+        GROUP BY question_id
+        `
+      )
+      .all();
+
+    const orphanResponseRows = responseCounts
+      .filter((row) => !validQuestionIds.has(String(row.question_id || "").trim()))
+      .map((row) => ({
+        question_id: row.question_id,
+        count: Number(row.count || 0)
+      }))
+      .sort(
+        (a, b) => b.count - a.count || String(a.question_id).localeCompare(String(b.question_id))
+      );
+    const orphanActualRows = actualCounts
+      .filter((row) => !validQuestionIds.has(String(row.question_id || "").trim()))
+      .map((row) => ({
+        question_id: row.question_id,
+        count: Number(row.count || 0)
+      }))
+      .sort(
+        (a, b) => b.count - a.count || String(a.question_id).localeCompare(String(b.question_id))
+      );
+
+    const orphanResponses = orphanResponseRows.reduce((sum, row) => sum + row.count, 0);
+    const orphanActuals = orphanActualRows.reduce((sum, row) => sum + row.count, 0);
+    const orphanQuestionIds = Array.from(
+      new Set([
+        ...orphanResponseRows.map((row) => String(row.question_id)),
+        ...orphanActualRows.map((row) => String(row.question_id))
+      ])
+    ).sort((a, b) => a.localeCompare(b));
+
+    return {
+      validQuestionCount: validQuestionIds.size,
+      orphanResponseRows,
+      orphanActualRows,
+      orphanResponses,
+      orphanActuals,
+      orphanQuestionIds
+    };
+  }
+
   app.get("/admin/login", (req, res) => {
     if (!req.session.userId) return res.redirect("/login");
     return res.redirect("/admin/overview");
@@ -183,11 +248,13 @@ function registerAdminRoutes(app, deps) {
         `
       )
       .all(responsesPerPage, responseOffset);
+    const questionCleanupReport = collectQuestionDataCleanupReport();
 
     res.render("admin_overview", {
       user,
       adminError,
       adminSuccess,
+      questionCleanupReport,
       users,
       groups,
       memberships,
@@ -195,6 +262,47 @@ function registerAdminRoutes(app, deps) {
       currentResponsePage: safePage,
       totalResponsePages
     });
+  });
+
+  app.post("/admin/questions/cleanup", requireAdmin, (req, res) => {
+    const report = collectQuestionDataCleanupReport();
+    if (report.validQuestionCount === 0) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent(
+          "Cleanup aborted: no question IDs were loaded from data/questions.json."
+        )}`
+      );
+    }
+    if (report.orphanResponses === 0 && report.orphanActuals === 0) {
+      return res.redirect(
+        `/admin/overview?success=${encodeURIComponent(
+          "Cleanup complete: no orphan question data found."
+        )}`
+      );
+    }
+
+    const deleteResponsesByQuestionId = db.prepare(
+      "DELETE FROM responses WHERE question_id = ?"
+    );
+    const deleteActualsByQuestionId = db.prepare(
+      "DELETE FROM actuals WHERE question_id = ?"
+    );
+
+    const tx = db.transaction(() => {
+      for (const row of report.orphanResponseRows) {
+        deleteResponsesByQuestionId.run(row.question_id);
+      }
+      for (const row of report.orphanActualRows) {
+        deleteActualsByQuestionId.run(row.question_id);
+      }
+    });
+    tx();
+
+    return res.redirect(
+      `/admin/overview?success=${encodeURIComponent(
+        `Cleanup complete: removed ${report.orphanResponses} orphan responses and ${report.orphanActuals} orphan actuals across ${report.orphanQuestionIds.length} question IDs.`
+      )}`
+    );
   });
 
   app.post("/admin/users/:userId/make-admin", requireAdmin, (req, res) => {

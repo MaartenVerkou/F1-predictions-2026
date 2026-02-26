@@ -12,21 +12,40 @@ npm start
 
 Visit `http://localhost:3000`.
 
-## Docker
+## Docker Compose (recommended)
+
+This repo has a Compose project name configured: `name: f1predictions`.
+
+Run from the repo root:
 
 ```powershell
-docker build -t f1-predictions-2026 .
-docker run --rm -p 3000:3000 -v ${PWD}/data:/app/data f1-predictions-2026
+copy .env.example .env
+docker compose up -d --build
 ```
+
+Useful commands:
+
+```powershell
+docker compose ps
+docker compose logs -f app
+docker compose down
+docker compose down -v
+```
+
+Notes:
+
+- App URL: `http://localhost:3000`
+- Data persists in `./data` via bind mount (`./data:/app/data`).
+- `down -v` does not remove `./data`; it only removes Compose-managed volumes.
 
 ## Cloudflare tunnel (TryCloudflare)
 
-This repo includes a `cloudflared` service in `docker-compose.yml` that creates a random TryCloudflare URL (no token required).
+This repo includes an optional `cloudflared` service in `docker-compose.yml` (profile: `tunnel`) that creates a random TryCloudflare URL (no token required).
 
-Start:
+Start app + tunnel only when needed:
 
 ```powershell
-docker compose up -d --build
+docker compose --profile tunnel up -d --build
 docker compose logs -f tunnel
 ```
 

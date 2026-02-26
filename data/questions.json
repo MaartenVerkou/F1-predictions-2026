@@ -102,16 +102,16 @@
     },
     {
       "id": "teammate_battle_lawson_lindblad",
-      "prompt": "Team mate battle: Lawson vs Lindblad - predict points difference and who scores more",
+      "prompt": "Team mate battle: Norris vs Piastri - predict points difference and who scores more",
       "type": "teammate_battle",
-      "options": ["Liam Lawson", "Arvid Lindblad"],
+      "options": ["Lando Norris", "Oscar Piastri"],
       "points": 25,
       "tie_bonus": 150,
       "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 150 points"
     },
     {
       "id": "alpine_vs_cadillac_audi",
-      "prompt": "Alpine scores more or less points than Cadillac and Audi combined",
+      "prompt": "Alpine scores more or less points than Cadillac, Audi and Aston Martin combined",
       "type": "single_choice",
       "options": ["More", "Less"],
       "points": 15,
@@ -190,7 +190,7 @@
     },
     {
       "id": "mini_q3_ferrari_podium",
-      "prompt": "Ferrari gets at least one race podium",
+      "prompt": "Both Ferrari drivers score at least one Grand Prix podium",
       "type": "boolean",
       "points": 5,
       "points_display": "5 points"
@@ -198,6 +198,13 @@
     {
       "id": "mini_q4_sprint_champion_same",
       "prompt": "If we only count sprints, the same driver is champion",
+      "type": "boolean",
+      "points": 5,
+      "points_display": "5 points"
+    },
+    {
+      "id": "mini_q5_team_engine_switch_2027_2028",
+      "prompt": "Before the end of the 2026 season, one or more teams announce they'll switch engine supplier from 2027 or 2028 onwards",
       "type": "boolean",
       "points": 5,
       "points_display": "5 points"

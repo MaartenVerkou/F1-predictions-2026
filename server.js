@@ -18,6 +18,8 @@ const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json"
 const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
 const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_FROM = process.env.SMTP_FROM || "";
+const COMPANY_NAME = process.env.COMPANY_NAME || "F1 Predictions";
 const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_HOST = process.env.SMTP_HOST || "";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
@@ -656,11 +658,24 @@ registerAuthRoutes(app, {
   BASE_URL,
   getMailer,
   SMTP_USER,
+  SMTP_FROM,
+  COMPANY_NAME,
   getCurrentUser,
   sendError,
   requireAuth,
   DEV_AUTO_LOGIN,
   NODE_ENV: process.env.NODE_ENV || "development"
+});
+
+app.get("/api/groups/check-name", requireAuth, (req, res) => {
+  const normalizedName = String(req.query.name || "").trim();
+  if (!normalizedName) {
+    return res.json({ available: false, reason: "empty" });
+  }
+  const exists = db
+    .prepare("SELECT id FROM groups WHERE name = ?")
+    .get(normalizedName);
+  return res.json({ available: !exists });
 });
 
 app.post("/groups", requireAuth, (req, res) => {

@@ -8,7 +8,20 @@
   <form method="post" action="/signup">
     <label>
       <%= t('common.name') %>
-      <input type="text" name="name" placeholder="The Hulk" required />
+      <input
+        type="text"
+        name="name"
+        placeholder="The Hulk"
+        required
+        data-name-check-url="/api/users/check-name"
+        data-name-check-delay="2000"
+        data-name-check-min-length="2"
+        data-name-check-msg-checking="Checking name..."
+        data-name-check-msg-available="Name is available."
+        data-name-check-msg-taken="Name already in use."
+        data-name-check-msg-error="Could not check name right now."
+      />
+      <span class="field-status muted" data-name-check-feedback aria-live="polite"></span>
     </label>
     <label>
       <%= t('common.email') %>

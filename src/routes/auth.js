@@ -10,6 +10,8 @@ function registerAuthRoutes(app, deps) {
     BASE_URL,
     getMailer,
     SMTP_USER,
+    SMTP_FROM,
+    COMPANY_NAME,
     getCurrentUser,
     sendError,
     requireAuth,
@@ -17,7 +19,25 @@ function registerAuthRoutes(app, deps) {
     NODE_ENV
   } = deps;
 
-  async function issueAndSendVerificationEmail(userId, email) {
+  const BRAND_NAME = String(COMPANY_NAME || "F1 Predictions").trim() || "F1 Predictions";
+  const TEAM_SIGNOFF = `The ${BRAND_NAME} Team`;
+  const EMAIL_SENDER = String(SMTP_FROM || "").trim()
+    || (SMTP_USER ? `${BRAND_NAME} <${SMTP_USER}>` : BRAND_NAME);
+
+  const escapeHtml = (value) =>
+    String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const getGreetingName = (name) => {
+    const normalized = String(name || "").trim();
+    return normalized || "there";
+  };
+
+  async function issueAndSendVerificationEmail(userId, email, name = "") {
     const token = generateToken();
     const tokenHash = hashToken(token);
     const now = new Date().toISOString();
@@ -38,12 +58,23 @@ function registerAuthRoutes(app, deps) {
     }
 
     try {
+      const greetingName = getGreetingName(name);
+      const safeGreetingName = escapeHtml(greetingName);
       await mailer.sendMail({
-        from: SMTP_USER,
+        from: EMAIL_SENDER,
         to: email,
-        subject: "Verify your F1 Predictions account",
-        text: `Verify your account: ${verifyUrl}`,
-        html: `<p>Verify your account:</p><p><a href="${verifyUrl}">${verifyUrl}</a></p>`
+        subject: `Verify your ${BRAND_NAME} account`,
+        text:
+          `Hey ${greetingName}!\n\n` +
+          `Please verify your ${BRAND_NAME} account:\n` +
+          `${verifyUrl}\n\n` +
+          "Thanks,\n" +
+          `${TEAM_SIGNOFF}`,
+        html:
+          `<p>Hey ${safeGreetingName}!</p>` +
+          `<p>Please verify your ${escapeHtml(BRAND_NAME)} account:</p>` +
+          `<p><a href="${verifyUrl}">${verifyUrl}</a></p>` +
+          `<p>Thanks,<br>${escapeHtml(TEAM_SIGNOFF)}</p>`
       });
       return { ok: true };
     } catch (err) {
@@ -63,6 +94,15 @@ function registerAuthRoutes(app, deps) {
 
   app.get(["/signup", "/register"], (req, res) => {
     res.render("signup", { error: null });
+  });
+
+  app.get("/api/users/check-name", (req, res) => {
+    const normalizedName = String(req.query.name || "").trim();
+    if (!normalizedName) {
+      return res.json({ available: false, reason: "empty" });
+    }
+    const exists = db.prepare("SELECT id FROM users WHERE name = ?").get(normalizedName);
+    return res.json({ available: !exists });
   });
 
   app.post("/signup", async (req, res) => {
@@ -118,7 +158,11 @@ function registerAuthRoutes(app, deps) {
     }
     ensureGlobalGroup(userId);
 
-    const result = await issueAndSendVerificationEmail(userId, normalizedEmail);
+    const result = await issueAndSendVerificationEmail(
+      userId,
+      normalizedEmail,
+      normalizedName
+    );
     if (!result.ok && result.reason === "smtp_missing") {
       return res.render("verify_notice", {
         email: normalizedEmail,
@@ -207,7 +251,7 @@ function registerAuthRoutes(app, deps) {
     }
 
     const user = db
-      .prepare("SELECT id, is_verified FROM users WHERE email = ?")
+      .prepare("SELECT id, name, is_verified FROM users WHERE email = ?")
       .get(normalizedEmail);
 
     if (!user || user.is_verified) {
@@ -219,7 +263,11 @@ function registerAuthRoutes(app, deps) {
       });
     }
 
-    const result = await issueAndSendVerificationEmail(user.id, normalizedEmail);
+    const result = await issueAndSendVerificationEmail(
+      user.id,
+      normalizedEmail,
+      user.name
+    );
     if (!result.ok && result.verifyUrl) {
       return res.render("verify_notice", {
         email: normalizedEmail,
@@ -257,7 +305,7 @@ function registerAuthRoutes(app, deps) {
 
     const normalizedEmail = String(email).trim().toLowerCase();
     const user = db
-      .prepare("SELECT id FROM users WHERE email = ?")
+      .prepare("SELECT id, name FROM users WHERE email = ?")
       .get(normalizedEmail);
 
     if (user) {
@@ -274,14 +322,25 @@ function registerAuthRoutes(app, deps) {
       const mailer = getMailer();
       if (mailer) {
         try {
+          const greetingName = getGreetingName(user.name);
+          const safeGreetingName = escapeHtml(greetingName);
           await mailer.sendMail({
-            from: `F1 Predictions <${SMTP_USER}>`,
+            from: EMAIL_SENDER,
             to: normalizedEmail,
             subject: "Password reset request",
             text:
-              `You requested a password reset for F1 Predictions.\n\n` +
+              `Hey ${greetingName}!\n\n` +
+              `You requested a password reset for ${BRAND_NAME}.\n\n` +
               `Reset link: ${resetUrl}\n\n` +
-              `If you did not request this, you can ignore this email.`
+              "If you did not request this, you can ignore this email.\n\n" +
+              "Thanks,\n" +
+              `${TEAM_SIGNOFF}`,
+            html:
+              `<p>Hey ${safeGreetingName}!</p>` +
+              `<p>You requested a password reset for ${escapeHtml(BRAND_NAME)}.</p>` +
+              `<p><a href="${resetUrl}">${resetUrl}</a></p>` +
+              "<p>If you did not request this, you can ignore this email.</p>" +
+              `<p>Thanks,<br>${escapeHtml(TEAM_SIGNOFF)}</p>`
           });
         } catch (err) {
           console.error("Failed to send password reset email:", err);

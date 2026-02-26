@@ -42,7 +42,7 @@
       <% if (invite) { %>
         <div class="card" style="padding:12px;">
           <div class="inline-actions" style="justify-content: space-between;">
-            <span class="link" id="invite-link">/join/<%= invite.code %></span>
+            <span class="link" id="invite-link" data-copy-value="https://f1predictions.crashalong.com/join/<%= invite.code %>">/join/<%= invite.code %></span>
             <button type="button" class="secondary" data-copy-target="invite-link"><%= t('group.copy') %></button>
           </div>
           <div class="muted"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>

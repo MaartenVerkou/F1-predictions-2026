@@ -1,3 +1,5 @@
+name: f1predictions
+
 services:
   app:
     build: .
@@ -23,6 +25,8 @@ services:
 
   tunnel:
     image: cloudflare/cloudflared:latest
+    profiles:
+      - tunnel
     depends_on:
       - app
     command: tunnel --no-autoupdate --url http://app:3000
