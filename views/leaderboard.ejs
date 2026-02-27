@@ -1,6 +1,52 @@
 <%- include('partials/header', { title: t('leaderboard.page_title'), user }) %>
 
 <div class="card">
+  <% const formatAnswer = (question, raw) => {
+    if (raw == null || raw === "") return "-";
+    const text = String(raw);
+    const type = question?.type || "text";
+    if (
+      type === "ranking" ||
+      type === "multi_select" ||
+      type === "multi_select_limited" ||
+      type === "teammate_battle" ||
+      type === "boolean_with_optional_driver" ||
+      type === "numeric_with_driver" ||
+      type === "single_choice_with_driver"
+    ) {
+      try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) return parsed.join(" | ");
+        if (parsed && typeof parsed === "object") {
+          if (type === "teammate_battle") {
+            if (parsed.winner === "tie") return "Tie";
+            if (parsed.winner) {
+              const diffText =
+                parsed.diff == null || parsed.diff === ""
+                  ? ""
+                  : ` (${parsed.diff})`;
+              return `${parsed.winner}${diffText}`;
+            }
+          }
+          if (type === "boolean_with_optional_driver") {
+            const choice = parsed.choice == null ? "-" : String(parsed.choice);
+            return parsed.driver ? `${choice} - ${parsed.driver}` : choice;
+          }
+          if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
+            const value = parsed.value == null ? "-" : String(parsed.value);
+            return parsed.driver ? `${value} - ${parsed.driver}` : value;
+          }
+          return Object.entries(parsed)
+            .map(([key, value]) => `${key}: ${value == null ? "-" : value}`)
+            .join("; ");
+        }
+        return parsed == null ? "-" : String(parsed);
+      } catch (err) {
+        return text;
+      }
+    }
+    return text;
+  }; %>
   <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
   <p class="muted"><%= t('leaderboard.subtitle') %></p>
 
@@ -11,9 +57,16 @@
   <% if (leaderboard.length === 0) { %>
     <div class="alert"><%= t('leaderboard.no_scored_responses') %></div>
   <% } else { %>
+    <p class="muted">
+      <% const startRank = (currentLeaderboardPage - 1) * leaderboardPerPage + 1; %>
+      <% const endRank = startRank + leaderboard.length - 1; %>
+      Showing <%= startRank %>-<%= endRank %> of <%= leaderboardTotal %>
+    </p>
+
     <table class="table">
       <thead>
         <tr>
+          <th>#</th>
           <th><%= t('leaderboard.member') %></th>
           <th><%= t('leaderboard.total_points') %></th>
         </tr>
@@ -21,14 +74,24 @@
       <tbody>
         <% leaderboard.forEach(row => { %>
           <tr>
+            <td><%= row.rank %></td>
             <td><%= row.name %></td>
             <td><strong><%= row.total %></strong></td>
           </tr>
         <% }) %>
       </tbody>
     </table>
+    <div class="inline-actions" style="margin-top: 10px;">
+      <% if (currentLeaderboardPage > 1) { %>
+        <a class="link" href="/groups/<%= group.id %>/leaderboard?page=<%= currentLeaderboardPage - 1 %>#leaderboard-details">Previous <%= leaderboardPerPage %></a>
+      <% } %>
+      <span class="muted">Page <%= currentLeaderboardPage %> of <%= totalLeaderboardPages %></span>
+      <% if (currentLeaderboardPage < totalLeaderboardPages) { %>
+        <a class="link" href="/groups/<%= group.id %>/leaderboard?page=<%= currentLeaderboardPage + 1 %>#leaderboard-details">Next <%= leaderboardPerPage %></a>
+      <% } %>
+    </div>
 
-    <h2 style="margin-top:24px;"><%= t('leaderboard.details') %></h2>
+    <h2 id="leaderboard-details" style="margin-top:24px;"><%= t('leaderboard.details') %></h2>
     <div class="leaderboard-member-switcher" data-member-switcher>
       <button
         type="button"
@@ -54,7 +117,7 @@
             data-member-tab
             data-target="<%= panelId %>"
           >
-            <span class="leaderboard-member-rank">#<%= index + 1 %></span>
+            <span class="leaderboard-member-rank">#<%= row.rank %></span>
             <span><%= row.name %></span>
           </button>
         <% }) %>
@@ -84,14 +147,24 @@
           <strong><%= row.name %></strong>
           <span class="muted"><%= row.total %> <%= t('leaderboard.points_short') %></span>
         </div>
-        <ul class="list" style="margin-top:8px;">
+        <table class="table compact" style="margin-top:8px;">
+          <thead>
+            <tr>
+              <th>Question</th>
+              <th>Answer</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody>
           <% questions.forEach(q => { %>
-            <li>
-              <span><%= q.prompt %></span>
-              <span class="muted"> - <%= row.byQuestion[q.id] ?? 0 %> <%= t('leaderboard.points_short') %></span>
-            </li>
+            <tr>
+              <td><%= q.prompt %></td>
+              <td><%= formatAnswer(q, row.answersByQuestion?.[q.id]) %></td>
+              <td><%= row.byQuestion[q.id] ?? 0 %> <%= t('leaderboard.points_short') %></td>
+            </tr>
           <% }) %>
-        </ul>
+          </tbody>
+        </table>
       </section>
     <% }) %>
   <% } %>

@@ -407,13 +407,7 @@ function registerAdminRoutes(app, deps) {
         `
         SELECT COUNT(*) as count
         FROM groups g
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM group_members gm_test
-          JOIN users u_test ON u_test.id = gm_test.user_id
-          WHERE gm_test.group_id = g.id
-            AND u_test.is_simulated = 1
-        )
+        WHERE COALESCE(g.is_simulated, 0) = 0
         `
       )
       .get();
@@ -453,13 +447,7 @@ function registerAdminRoutes(app, deps) {
         SELECT g.id, g.name, g.owner_id, u.name as owner_name, g.created_at
         FROM groups g
         JOIN users u ON u.id = g.owner_id
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM group_members gm_test
-          JOIN users u_test ON u_test.id = gm_test.user_id
-          WHERE gm_test.group_id = g.id
-            AND u_test.is_simulated = 1
-        )
+        WHERE COALESCE(g.is_simulated, 0) = 0
         ORDER BY g.created_at DESC
         LIMIT ? OFFSET ?
         `
@@ -474,13 +462,7 @@ function registerAdminRoutes(app, deps) {
         JOIN users u ON u.id = gm.user_id
         JOIN groups g ON g.id = gm.group_id
         WHERE u.is_simulated = 0
-          AND NOT EXISTS (
-            SELECT 1
-            FROM group_members gm_test
-            JOIN users u_test ON u_test.id = gm_test.user_id
-            WHERE gm_test.group_id = g.id
-              AND u_test.is_simulated = 1
-          )
+          AND COALESCE(g.is_simulated, 0) = 0
         `
       )
       .get();
@@ -500,13 +482,7 @@ function registerAdminRoutes(app, deps) {
         JOIN users u ON u.id = gm.user_id
         JOIN groups g ON g.id = gm.group_id
         WHERE u.is_simulated = 0
-          AND NOT EXISTS (
-            SELECT 1
-            FROM group_members gm_test
-            JOIN users u_test ON u_test.id = gm_test.user_id
-            WHERE gm_test.group_id = g.id
-              AND u_test.is_simulated = 1
-          )
+          AND COALESCE(g.is_simulated, 0) = 0
         ORDER BY gm.joined_at DESC
         LIMIT ? OFFSET ?
         `
@@ -521,13 +497,7 @@ function registerAdminRoutes(app, deps) {
         JOIN users u ON u.id = r.user_id
         JOIN groups g ON g.id = r.group_id
         WHERE u.is_simulated = 0
-          AND NOT EXISTS (
-            SELECT 1
-            FROM group_members gm_test
-            JOIN users u_test ON u_test.id = gm_test.user_id
-            WHERE gm_test.group_id = g.id
-              AND u_test.is_simulated = 1
-          )
+          AND COALESCE(g.is_simulated, 0) = 0
         `
       )
       .get();
@@ -546,13 +516,7 @@ function registerAdminRoutes(app, deps) {
         JOIN users u ON u.id = r.user_id
         JOIN groups g ON g.id = r.group_id
         WHERE u.is_simulated = 0
-          AND NOT EXISTS (
-            SELECT 1
-            FROM group_members gm_test
-            JOIN users u_test ON u_test.id = gm_test.user_id
-            WHERE gm_test.group_id = g.id
-              AND u_test.is_simulated = 1
-          )
+          AND COALESCE(g.is_simulated, 0) = 0
         ORDER BY r.updated_at DESC
         LIMIT ? OFFSET ?
         `
@@ -598,13 +562,8 @@ function registerAdminRoutes(app, deps) {
         `
         SELECT COUNT(*) as count
         FROM groups g
-        WHERE EXISTS (
-          SELECT 1
-          FROM group_members gm_test
-          JOIN users u_test ON u_test.id = gm_test.user_id
-          WHERE gm_test.group_id = g.id
-            AND u_test.is_simulated = 1
-        )
+        WHERE COALESCE(g.is_simulated, 0) = 1
+          AND COALESCE(g.is_global, 0) = 0
         `
       )
       .get();
@@ -632,13 +591,8 @@ function registerAdminRoutes(app, deps) {
         JOIN users owner ON owner.id = g.owner_id
         LEFT JOIN group_members gm ON gm.group_id = g.id
         LEFT JOIN users member_user ON member_user.id = gm.user_id
-        WHERE EXISTS (
-          SELECT 1
-          FROM group_members gm_test
-          JOIN users u_test ON u_test.id = gm_test.user_id
-          WHERE gm_test.group_id = g.id
-            AND u_test.is_simulated = 1
-        )
+        WHERE COALESCE(g.is_simulated, 0) = 1
+          AND COALESCE(g.is_global, 0) = 0
         GROUP BY g.id, g.name, g.created_at, owner.name
         ORDER BY g.created_at DESC
         LIMIT ? OFFSET ?
@@ -667,7 +621,7 @@ function registerAdminRoutes(app, deps) {
       requestedName || `Test Group ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
     const rawCount = Number(req.body.fakePlayerCount || 0);
     const fakePlayerCount = Number.isFinite(rawCount)
-      ? Math.max(1, Math.min(200, Math.floor(rawCount)))
+      ? Math.max(1, Math.min(5000, Math.floor(rawCount)))
       : 20;
 
     const questions = getQuestions("en");
@@ -680,8 +634,10 @@ function registerAdminRoutes(app, deps) {
 
     const insertGroup = db.prepare(
       `
-      INSERT INTO groups (name, owner_id, created_at, is_public, join_code, join_password_hash, rules_text)
-      VALUES (?, ?, ?, 0, NULL, NULL, ?)
+      INSERT INTO groups (
+        name, owner_id, created_at, is_public, join_code, join_password_hash, rules_text, is_global, is_simulated
+      )
+      VALUES (?, ?, ?, 0, NULL, NULL, ?, 0, 1)
       `
     );
     const addMembership = db.prepare(

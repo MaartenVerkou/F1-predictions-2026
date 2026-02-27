@@ -225,6 +225,9 @@ function ensureGroupColumns() {
   if (!names.has("rules_text")) {
     db.exec("ALTER TABLE groups ADD COLUMN rules_text TEXT;");
   }
+  if (!names.has("is_simulated")) {
+    db.exec("ALTER TABLE groups ADD COLUMN is_simulated INTEGER DEFAULT 0;");
+  }
 }
 
 ensureGroupColumns();
@@ -272,21 +275,30 @@ function ensureGlobalGroup(ownerId) {
   if (global) {
     // Global league should stay public and free to join.
     db.prepare(
-      "UPDATE groups SET is_public = 1, join_password_hash = NULL WHERE id = ?"
+      "UPDATE groups SET is_public = 1, join_password_hash = NULL, is_simulated = 0 WHERE id = ?"
     ).run(global.id);
     return db.prepare("SELECT * FROM groups WHERE id = ?").get(global.id);
   }
   if (!ownerId) {
     const firstUser = db
-      .prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+      .prepare(
+        "SELECT id FROM users WHERE is_simulated = 0 ORDER BY created_at ASC LIMIT 1"
+      )
       .get();
-    if (!firstUser) return null;
-    ownerId = firstUser.id;
+    if (!firstUser) {
+      const fallbackUser = db
+        .prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
+        .get();
+      if (!fallbackUser) return null;
+      ownerId = fallbackUser.id;
+    } else {
+      ownerId = firstUser.id;
+    }
   }
   const now = new Date().toISOString();
   const info = db
     .prepare(
-      "INSERT INTO groups (name, owner_id, created_at, is_global, is_public, join_password_hash) VALUES (?, ?, ?, 1, 1, NULL)"
+      "INSERT INTO groups (name, owner_id, created_at, is_global, is_public, join_password_hash, is_simulated) VALUES (?, ?, ?, 1, 1, NULL, 0)"
     )
     .run("Global", ownerId, now);
   global = db.prepare("SELECT * FROM groups WHERE id = ?").get(info.lastInsertRowid);
@@ -318,11 +330,21 @@ function ensureGlobalMemberships() {
   const global = ensureGlobalGroup();
   if (!global) return;
   const now = new Date().toISOString();
-  const users = db.prepare("SELECT id FROM users").all();
+  const users = db
+    .prepare("SELECT id FROM users WHERE is_simulated = 0")
+    .all();
   const addMember = db.prepare(
     "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'member', ?)"
   );
+  const removeSimulatedMembers = db.prepare(
+    `
+    DELETE FROM group_members
+    WHERE group_id = ?
+      AND user_id IN (SELECT id FROM users WHERE is_simulated = 1)
+    `
+  );
   const tx = db.transaction(() => {
+    removeSimulatedMembers.run(global.id);
     db.prepare(
       "UPDATE group_members SET role = 'owner' WHERE group_id = ? AND user_id = ?"
     ).run(global.id, global.owner_id);
@@ -338,6 +360,27 @@ function ensureGlobalMemberships() {
 }
 
 ensureGlobalMemberships();
+
+function backfillGroupSimulationFlags() {
+  db.exec(`
+    UPDATE groups
+    SET is_simulated = 1
+    WHERE is_global = 0
+      AND EXISTS (
+        SELECT 1
+        FROM group_members gm
+        JOIN users u ON u.id = gm.user_id
+        WHERE gm.group_id = groups.id
+          AND u.is_simulated = 1
+      );
+
+    UPDATE groups
+    SET is_simulated = 0
+    WHERE is_global = 1;
+  `);
+}
+
+backfillGroupSimulationFlags();
 
 const duplicateGroups = db
   .prepare(
@@ -1731,7 +1774,8 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
       userId: member.user_id,
       name: member.user_name,
       total: 0,
-      byQuestion: {}
+      byQuestion: {},
+      answersByQuestion: {}
     };
   });
 
@@ -1904,15 +1948,41 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
     const points = scoreQuestion(question, predicted, actual);
     scoreByUser[row.user_id].total += points;
     scoreByUser[row.user_id].byQuestion[row.question_id] = points;
+    scoreByUser[row.user_id].answersByQuestion[row.question_id] = row.answer;
   });
 
   const leaderboard = Object.values(scoreByUser).sort((a, b) => b.total - a.total);
+  const leaderboardPerPage = 25;
+  const requestedLeaderboardPage = Number(req.query.page || 1);
+  const currentLeaderboardPage =
+    Number.isFinite(requestedLeaderboardPage) && requestedLeaderboardPage > 0
+      ? Math.floor(requestedLeaderboardPage)
+      : 1;
+  const totalLeaderboardPages = Math.max(
+    1,
+    Math.ceil(leaderboard.length / leaderboardPerPage)
+  );
+  const safeLeaderboardPage = Math.min(
+    currentLeaderboardPage,
+    totalLeaderboardPages
+  );
+  const leaderboardOffset = (safeLeaderboardPage - 1) * leaderboardPerPage;
+  const pagedLeaderboard = leaderboard
+    .slice(leaderboardOffset, leaderboardOffset + leaderboardPerPage)
+    .map((row, index) => ({
+      ...row,
+      rank: leaderboardOffset + index + 1
+    }));
   res.render("leaderboard", {
     user,
     group,
     questions,
-    leaderboard,
-    actuals
+    leaderboard: pagedLeaderboard,
+    actuals,
+    leaderboardTotal: leaderboard.length,
+    leaderboardPerPage,
+    currentLeaderboardPage: safeLeaderboardPage,
+    totalLeaderboardPages
   });
 });
 

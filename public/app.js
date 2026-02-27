@@ -322,7 +322,13 @@ const initLeaderboardMemberSwitcher = () => {
         tab.classList.toggle('is-active', isActive);
         tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
         tab.setAttribute('tabindex', isActive ? '0' : '-1');
-        if (moveFocus && isActive) tab.focus();
+        if (moveFocus && isActive) {
+          try {
+            tab.focus({ preventScroll: true });
+          } catch (err) {
+            tab.focus();
+          }
+        }
         const panelId = tab.dataset.target || '';
         if (!panelId) return;
         const panel = document.getElementById(panelId);
@@ -353,13 +359,13 @@ const initLeaderboardMemberSwitcher = () => {
     prevButton.addEventListener('click', () => {
       const activeIndex = getActiveIndex();
       if (activeIndex <= 0) return;
-      activateTab(tabs[activeIndex - 1], { moveFocus: true });
+      activateTab(tabs[activeIndex - 1], { moveFocus: false });
       updateArrowState();
     });
     nextButton.addEventListener('click', () => {
       const activeIndex = getActiveIndex();
       if (activeIndex >= tabs.length - 1) return;
-      activateTab(tabs[activeIndex + 1], { moveFocus: true });
+      activateTab(tabs[activeIndex + 1], { moveFocus: false });
       updateArrowState();
     });
 
