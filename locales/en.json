@@ -256,7 +256,7 @@
       "prompt": "Lowest starting position from which a race is won (and who wins)"
     },
     "select_three_races_dnfs": {
-      "prompt": "Select 3 races. Earn 3 points per DNF in those races."
+      "prompt": "Select 3 races. Earn 2 points per DNF in those races."
     },
     "closest_qualifying_teammates": {
       "prompt": "Which team has the closest qualifying head-to-head?"

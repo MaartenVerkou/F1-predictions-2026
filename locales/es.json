@@ -256,7 +256,7 @@
       "prompt": "Posicion de salida mas baja desde la que se gana una carrera (y quien gana)"
     },
     "select_three_races_dnfs": {
-      "prompt": "Selecciona 3 carreras. Gana 3 puntos por cada DNF en esas carreras."
+      "prompt": "Selecciona 3 carreras. Gana 2 puntos por cada DNF en esas carreras."
     },
     "closest_qualifying_teammates": {
       "prompt": "Que equipo tiene el duelo de clasificacion mas ajustado?"

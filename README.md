@@ -151,6 +151,20 @@ Race options are loaded from `data/races.json`:
 
 Enter season results at `/admin/actuals` after the season. Leaderboard scoring is currently disabled until season results are finalized.
 
+## Points balance simulation
+
+You can run a local Monte Carlo style balance check with synthetic players that use "global F1 knowledge" (strong/weak teams) plus noise.
+
+```powershell
+npm run analyze:balance -- --players 1000 --seasons 200 --seed 42 --top 12
+```
+
+Optional JSON export:
+
+```powershell
+npm run analyze:balance -- --players 1000 --seasons 200 --json balance-report.json
+```
+
 ## Auth behavior
 
 - Signup requires account verification before login.

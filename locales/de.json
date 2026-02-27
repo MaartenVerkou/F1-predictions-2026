@@ -256,7 +256,7 @@
       "prompt": "Niedrigste Startposition, von der ein Rennen gewonnen wird (und wer gewinnt)"
     },
     "select_three_races_dnfs": {
-      "prompt": "Waehle 3 Rennen. Du erhaelst 3 Punkte pro DNF in diesen Rennen."
+      "prompt": "Waehle 3 Rennen. Du erhaelst 2 Punkte pro DNF in diesen Rennen."
     },
     "closest_qualifying_teammates": {
       "prompt": "Welches Team hat das engste Qualifying-Duell intern?"

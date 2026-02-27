@@ -47,6 +47,19 @@
     }
     return text;
   }; %>
+  <% const leaderboardBaseHref =
+    typeof leaderboardBasePath === "string" && leaderboardBasePath
+      ? leaderboardBasePath
+      : `/groups/${group.id}/leaderboard`; %>
+  <% const leaderboardQueryPart =
+    typeof leaderboardQuery === "string" && leaderboardQuery.trim()
+      ? leaderboardQuery.trim()
+      : ""; %>
+  <% const pageHref = (pageNumber) =>
+    leaderboardQueryPart
+      ? `${leaderboardBaseHref}?${leaderboardQueryPart}&page=${pageNumber}#leaderboard-details`
+      : `${leaderboardBaseHref}?page=${pageNumber}#leaderboard-details`; %>
+
   <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
   <p class="muted"><%= t('leaderboard.subtitle') %></p>
 
@@ -83,11 +96,11 @@
     </table>
     <div class="inline-actions" style="margin-top: 10px;">
       <% if (currentLeaderboardPage > 1) { %>
-        <a class="link" href="/groups/<%= group.id %>/leaderboard?page=<%= currentLeaderboardPage - 1 %>#leaderboard-details">Previous <%= leaderboardPerPage %></a>
+        <a class="link" href="<%= pageHref(currentLeaderboardPage - 1) %>">Previous <%= leaderboardPerPage %></a>
       <% } %>
       <span class="muted">Page <%= currentLeaderboardPage %> of <%= totalLeaderboardPages %></span>
       <% if (currentLeaderboardPage < totalLeaderboardPages) { %>
-        <a class="link" href="/groups/<%= group.id %>/leaderboard?page=<%= currentLeaderboardPage + 1 %>#leaderboard-details">Next <%= leaderboardPerPage %></a>
+        <a class="link" href="<%= pageHref(currentLeaderboardPage + 1) %>">Next <%= leaderboardPerPage %></a>
       <% } %>
     </div>
 

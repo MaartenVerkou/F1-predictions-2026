@@ -256,7 +256,7 @@
       "prompt": "Position de depart la plus basse depuis laquelle une course est gagnee (et par qui)"
     },
     "select_three_races_dnfs": {
-      "prompt": "Choisissez 3 courses. Gagnez 3 points par DNF dans ces courses."
+      "prompt": "Choisissez 3 courses. Gagnez 2 points par DNF dans ces courses."
     },
     "closest_qualifying_teammates": {
       "prompt": "Quelle equipe a le duel qualifications le plus serre ?"

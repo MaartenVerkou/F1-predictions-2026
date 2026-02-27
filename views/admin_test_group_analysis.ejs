@@ -1,0 +1,102 @@
+<%- include('partials/header', { title: 'Test group analysis', user }) %>
+<%- include('partials/admin_nav', { active: 'analysis' }) %>
+
+<div class="card">
+  <h1>Test group analysis</h1>
+  <p class="muted">
+    Group: <strong><%= group.name %></strong>
+  </p>
+  <div class="inline-actions">
+    <a class="link" href="/admin/analysis">Back to admin</a>
+    <a class="link <%= analysisMode === 'actuals' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=actuals">Analyze actuals</a>
+    <a class="link <%= analysisMode === 'sim200' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=sim200">Analyze 200 seasons</a>
+    <% if (analysisMode === 'sim200') { %>
+      <a class="link" href="/admin/analysis/<%= group.id %>/leaderboard?mode=sim200">Open leaderboard</a>
+    <% } else { %>
+      <a class="link" href="/groups/<%= group.id %>/leaderboard">Open leaderboard</a>
+    <% } %>
+  </div>
+
+  <p class="muted" style="margin-top: 12px;">
+    Simulated players: <%= analysis.memberCount %> |
+    Questions configured: <%= analysis.questionCount %> |
+    Questions with actuals set: <%= analysis.scoredQuestionCount %>
+  </p>
+  <% if (analysis.winner) { %>
+    <p class="muted">
+      Current winner: <strong><%= analysis.winner.name %></strong> (<%= analysis.winnerTotal.toFixed(2) %> pts)
+    </p>
+  <% } %>
+  <% if (analysisMode === 'sim200') { %>
+    <p class="muted">
+      Mode: Monte Carlo over <strong><%= analysis.seasons %></strong> seasons. Winner score shown is average winner score.
+      Avg total score/player: <strong><%= analysis.avgTotalScore.toFixed(2) %></strong> (+/- <%= analysis.stdTotalScore.toFixed(2) %>).
+      <% if (analysis.originalPlayerCount && analysis.originalPlayerCount !== analysis.memberCount) { %>
+        Used <strong><%= analysis.memberCount %></strong> players for speed (group has <%= analysis.originalPlayerCount %> simulated players).
+      <% } %>
+    </p>
+  <% } %>
+
+  <h2 style="margin-top: 18px;">How to read this</h2>
+  <p class="muted">
+    This table shows which questions have the biggest influence on who wins.
+    Rows are sorted by dominance (highest influence first).
+  </p>
+  <ul class="muted">
+    <li><strong>Impact</strong>: quick label of dominance. HIGH means this question has relatively large influence.</li>
+    <li>
+      <strong>Flip %</strong>:
+      <% if (analysisMode === 'sim200') { %>
+        percentage of simulated seasons where the winner changes if this question is removed.
+      <% } else { %>
+        in actuals mode this is snapshot-based, so it is 100% if removing this question changes the current winner, otherwise 0%.
+      <% } %>
+    </li>
+    <li><strong>Winner flips?</strong>: direct yes/no version of flip behavior for the current view.</li>
+    <li><strong>Winner %</strong>: share of the winner's total score that comes from this question.</li>
+    <li><strong>Winner points</strong>: average points the winner gets from this question.</li>
+    <li><strong>Avg/player</strong>: average points for all players from this question.</li>
+  </ul>
+  <p class="muted">
+    Practical guideline: keep only a few HIGH rows and keep most questions MED/LOW, so one single question is less likely to decide everything.
+  </p>
+
+  <% if (!analysis.rows.length) { %>
+    <p class="muted">
+      No analyzable rows yet. Set season actuals first in Admin -> Actuals.
+    </p>
+  <% } else { %>
+    <table class="table compact">
+      <thead>
+        <tr>
+          <th>Question ID</th>
+          <th>Impact</th>
+          <th>Flip %</th>
+          <th>Winner flips?</th>
+          <th>Winner %</th>
+          <th>Winner points</th>
+          <th>Avg/player</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% analysis.rows.forEach((row) => { %>
+          <tr>
+            <td><code><%= row.id %></code></td>
+            <td><%= row.impact %></td>
+            <td><%= row.flipPercent.toFixed(1) %>%</td>
+            <td><%= row.winnerFlips ? 'Yes' : 'No' %></td>
+            <td><%= row.winnerShare.toFixed(1) %>%</td>
+            <td><%= row.avgWinner.toFixed(2) %></td>
+            <td><%= row.avgPlayer.toFixed(2) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <p class="muted" style="margin-top: 12px;">
+      Tip: if one row consistently dominates, lower its points or add nearby/partial scoring where possible.
+    </p>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

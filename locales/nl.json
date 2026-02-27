@@ -256,7 +256,7 @@
       "prompt": "Laagste startpositie van waaruit een race wordt gewonnen (en wie wint)"
     },
     "select_three_races_dnfs": {
-      "prompt": "Kies 3 races. Verdien 3 punten per DNF in die races."
+      "prompt": "Kies 3 races. Verdien 2 punten per DNF in die races."
     },
     "closest_qualifying_teammates": {
       "prompt": "Welk team heeft de kleinste kwalificatie-onderlinge stand?"

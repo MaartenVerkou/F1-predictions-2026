@@ -1,8 +1,8 @@
-<%- include('partials/header', { title: 'Admin testing', user }) %>
-<%- include('partials/admin_nav', { active: 'testing' }) %>
+<%- include('partials/header', { title: 'Admin analysis', user }) %>
+<%- include('partials/admin_nav', { active: 'analysis' }) %>
 
 <div class="card">
-  <h1>Admin testing</h1>
+  <h1>Admin analysis</h1>
   <p class="muted">Create simulation groups and manage existing test groups.</p>
   <% if (adminError) { %>
     <div class="alert"><%= adminError %></div>
@@ -19,7 +19,7 @@
     </label>
     <label class="muted" style="display:flex; flex-direction:column; gap:6px; width:180px;">
       Fake players
-      <input type="number" name="fakePlayerCount" min="1" max="5000" value="20" required />
+      <input type="number" name="fakePlayerCount" min="1" max="5000" value="200" required />
     </label>
     <button type="submit">Create test group</button>
   </form>
@@ -28,16 +28,15 @@
   <% if (groups.length === 0) { %>
     <p class="muted">No test groups yet.</p>
   <% } else { %>
-    <table class="table compact">
+    <table class="table compact admin-analysis-groups-table">
       <thead>
         <tr>
           <th>Group</th>
           <th>Owner</th>
-          <th>Fake players</th>
           <th>Total members</th>
-          <th>Total responses</th>
           <th>Created</th>
           <th>Actions</th>
+          <th>Delete</th>
         </tr>
       </thead>
       <tbody>
@@ -45,17 +44,18 @@
           <tr>
             <td><%= row.name %></td>
             <td><%= row.owner_name %></td>
-            <td><%= Number(row.fake_players || 0) %></td>
             <td><%= Number(row.total_members || 0) %></td>
-            <td><%= Number(row.total_responses || 0) %></td>
             <td><%= new Date(row.created_at).toLocaleString() %></td>
             <td>
               <div class="table-actions">
-                <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
-                <form method="post" action="/admin/groups/<%= row.id %>/delete?from=testing" onsubmit="return confirm('Delete this test group and all related data?')">
-                  <button class="secondary" type="submit">Delete group</button>
-                </form>
+                <a class="link" href="/admin/analysis/<%= row.id %>?mode=actuals">Analyze actuals</a>
+                <a class="link" href="/admin/analysis/<%= row.id %>?mode=sim200">Analyze 200 seasons</a>
               </div>
+            </td>
+            <td>
+              <form method="post" action="/admin/groups/<%= row.id %>/delete?from=analysis" onsubmit="return confirm('Delete this test group and all related data?')">
+                <button class="secondary no-wrap-btn" type="submit">Delete group</button>
+              </form>
             </td>
           </tr>
         <% }) %>
@@ -65,11 +65,11 @@
 
   <div class="inline-actions" style="margin-top: 10px;">
     <% if (currentPage > 1) { %>
-      <a class="link" href="/admin/testing?page=<%= currentPage - 1 %>">Previous <%= groupsPerPage %></a>
+      <a class="link" href="/admin/analysis?page=<%= currentPage - 1 %>">Previous <%= groupsPerPage %></a>
     <% } %>
     <span class="muted">Page <%= currentPage %> of <%= totalPages %></span>
     <% if (currentPage < totalPages) { %>
-      <a class="link" href="/admin/testing?page=<%= currentPage + 1 %>">Next <%= groupsPerPage %></a>
+      <a class="link" href="/admin/analysis?page=<%= currentPage + 1 %>">Next <%= groupsPerPage %></a>
     <% } %>
   </div>
 </div>

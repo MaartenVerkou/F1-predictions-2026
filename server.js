@@ -1917,6 +1917,29 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
       if (actualValue != null && predictedValue != null) {
         if (String(actualValue) === String(predictedValue)) {
           score += Number(points.position || 0);
+        } else if (
+          type === "single_choice_with_driver" &&
+          question.position_nearby_points &&
+          typeof question.position_nearby_points === "object"
+        ) {
+          const toGridNumber = (value) => {
+            if (value == null) return null;
+            const raw = String(value).trim().toLowerCase();
+            if (!raw) return null;
+            if (raw === "pitlane" || raw === "pit lane") return 23;
+            const numeric = Number(raw);
+            return Number.isFinite(numeric) ? numeric : null;
+          };
+
+          const actualGrid = toGridNumber(actualValue);
+          const predictedGrid = toGridNumber(predictedValue);
+          if (actualGrid != null && predictedGrid != null) {
+            const diff = Math.abs(actualGrid - predictedGrid);
+            const nearbyPoints = Number(
+              question.position_nearby_points[String(diff)] || 0
+            );
+            if (nearbyPoints > 0) score += nearbyPoints;
+          }
         }
       }
       if (actualDriver && predictedDriver && actualDriver === predictedDriver) {

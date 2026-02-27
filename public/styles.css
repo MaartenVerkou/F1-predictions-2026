@@ -539,6 +539,16 @@ button:disabled {
   font-size: 13px;
 }
 
+.no-wrap-btn {
+  white-space: nowrap;
+}
+
+.admin-analysis-groups-table th:last-child,
+.admin-analysis-groups-table td:last-child {
+  white-space: nowrap;
+  width: 1%;
+}
+
 .admin-toggle-btn {
   width: 132px;
   text-align: center;

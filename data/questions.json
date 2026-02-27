@@ -46,8 +46,8 @@
       "id": "all_teams_score_points",
       "prompt": "Does every team score points?",
       "type": "boolean",
-      "points": 10,
-      "points_display": "10 points"
+      "points": 5,
+      "points_display": "5 points"
     },
     {
       "id": "most_driver_of_the_day",
@@ -97,8 +97,8 @@
       "type": "teammate_battle",
       "options": ["Kimi Antonelli", "George Russell"],
       "points": 25,
-      "tie_bonus": 150,
-      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 150 points"
+      "tie_bonus": 75,
+      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points"
     },
     {
       "id": "teammate_battle_lawson_lindblad",
@@ -106,8 +106,8 @@
       "type": "teammate_battle",
       "options": ["Lando Norris", "Oscar Piastri"],
       "points": 25,
-      "tie_bonus": 150,
-      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 150 points"
+      "tie_bonus": 75,
+      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points"
     },
     {
       "id": "alpine_vs_cadillac_audi",
@@ -126,8 +126,8 @@
       "points": 15,
       "special_case": "all_podiums_bonus",
       "bonus_value": "All teams scored a podium",
-      "bonus_points": 150,
-      "points_display": "15 points, or 150 if all teams score a podium and you predict that"
+      "bonus_points": 75,
+      "points_display": "15 points, or 75 if all teams score a podium and you predict that"
     },
     {
       "id": "race_ban",
@@ -148,16 +148,22 @@
         "position": 10,
         "driver": 20
       },
-      "points_display": "10 points for position +20 for driver"
+      "position_nearby_points": {
+        "1": 7,
+        "2": 5,
+        "3": 3,
+        "4": 1
+      },
+      "points_display": "10 points for exact position, 7/5/3/1 if 1/2/3/4 off, +20 for driver"
     },
     {
       "id": "select_three_races_dnfs",
-      "prompt": "Select 3 races. Earn 3 points per DNF in those races.",
+      "prompt": "Select 3 races. Earn 2 points per DNF in those races.",
       "type": "multi_select_limited",
       "count": 3,
       "options_source": "races",
-      "points": 3,
-      "points_display": "3 points per DNF in your selected races"
+      "points": 2,
+      "points_display": "2 points per DNF in your selected races"
     },
     {
       "id": "closest_qualifying_teammates",
