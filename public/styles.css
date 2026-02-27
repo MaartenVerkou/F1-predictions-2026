@@ -404,10 +404,17 @@ button:disabled {
   padding: 4px 10px;
   border-radius: 999px;
   background: #fbe9e7;
+  border: 1px solid #f3c1b9;
   color: var(--accent);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+:root[data-theme="dark"] .badge {
+  background: #2a1e1b;
+  border-color: #5c3630;
+  color: #ffb3aa;
 }
 
 .question {
@@ -539,6 +546,7 @@ button:disabled {
 
 .admin-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 0 0 14px;
 }
@@ -553,13 +561,40 @@ button:disabled {
   text-decoration: none;
   font-weight: 600;
   font-size: 13px;
-  background: #fff;
+  background: var(--card);
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.admin-nav-link:hover,
+.admin-nav-link:focus-visible {
+  border-color: #cfbea3;
+  background: #fefbf6;
+  color: var(--text);
 }
 
 .admin-nav-link.is-active {
   border-color: var(--accent);
   color: var(--accent);
   background: #fff4f1;
+}
+
+:root[data-theme="dark"] .admin-nav-link {
+  background: #242a31;
+  border-color: #3a424c;
+  color: #dce2ea;
+}
+
+:root[data-theme="dark"] .admin-nav-link:hover,
+:root[data-theme="dark"] .admin-nav-link:focus-visible {
+  background: #2f3741;
+  border-color: #566273;
+  color: #f3f6fa;
+}
+
+:root[data-theme="dark"] .admin-nav-link.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #2a1e1b;
 }
 
 .admin-question-table-wrap {
