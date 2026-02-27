@@ -46,13 +46,13 @@
     <% const formatPoints = (q) => {
       if (q.points_display) return q.points_display;
       if (q.points == null) return null;
-      if (typeof q.points === 'number') return `${q.points} points`;
+      if (typeof q.points === 'number') return `${q.points} ${t('questions.points_word')}`;
       if (typeof q.points === 'string') return q.points;
       if (q.points.position || q.points.driver) {
-        return `Points: position ${q.points.position || 0}, driver ${q.points.driver || 0}`;
+        return `${t('questions.points_label')}: ${t('questions.position_word')} ${q.points.position || 0}, ${t('questions.driver_word')} ${q.points.driver || 0}`;
       }
       const entries = Object.entries(q.points).map(([key, value]) => `${key}: ${value}`);
-      return entries.length ? `Points: ${entries.join(', ')}` : null;
+      return entries.length ? `${t('questions.points_label')}: ${entries.join(', ')}` : null;
     }; %>
 
     <% questions.forEach(question => { 
@@ -215,8 +215,8 @@
   class="scroll-to-end-btn is-hidden"
   data-scroll-to-end
   data-scroll-to-end-target="#questions-form-end"
-  aria-label="Go to end of page"
-  title="Go to end of page"
+  aria-label="<%= t('questions.scroll_to_end') %>"
+  title="<%= t('questions.scroll_to_end') %>"
 >
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>

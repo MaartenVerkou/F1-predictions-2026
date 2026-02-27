@@ -287,6 +287,88 @@ const initScrollToEndButton = () => {
   updateVisibility();
 };
 
+const initLeaderboardMemberSwitcher = () => {
+  document.querySelectorAll('[data-member-switcher]').forEach(switcher => {
+    const strip = switcher.querySelector('[data-member-strip]');
+    const prevButton = switcher.querySelector('[data-member-scroll="prev"]');
+    const nextButton = switcher.querySelector('[data-member-scroll="next"]');
+    const tabs = Array.from(switcher.querySelectorAll('[data-member-tab]'));
+    if (!strip || !prevButton || !nextButton || tabs.length === 0) return;
+
+    const getActiveIndex = () => {
+      const idx = tabs.findIndex(tab => tab.classList.contains('is-active'));
+      return idx >= 0 ? idx : 0;
+    };
+
+    const updateArrowState = () => {
+      const canScroll = strip.scrollWidth > strip.clientWidth + 1;
+      prevButton.classList.toggle('is-hidden', !canScroll);
+      nextButton.classList.toggle('is-hidden', !canScroll);
+      if (!canScroll) {
+        prevButton.disabled = true;
+        nextButton.disabled = true;
+        return;
+      }
+      const activeIndex = getActiveIndex();
+      prevButton.disabled = activeIndex <= 0;
+      nextButton.disabled = activeIndex >= tabs.length - 1;
+    };
+
+    const activateTab = (targetTab, options = {}) => {
+      const { moveFocus = false, ensureVisible = true } = options;
+      const targetId = targetTab.dataset.target || '';
+      tabs.forEach(tab => {
+        const isActive = tab === targetTab;
+        tab.classList.toggle('is-active', isActive);
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        tab.setAttribute('tabindex', isActive ? '0' : '-1');
+        if (moveFocus && isActive) tab.focus();
+        const panelId = tab.dataset.target || '';
+        if (!panelId) return;
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        panel.classList.toggle('is-active', isActive);
+        panel.hidden = !isActive;
+      });
+      if (ensureVisible) {
+        targetTab.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }
+    };
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => activateTab(tab));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        const step = event.key === 'ArrowRight' ? 1 : -1;
+        const nextIndex = (index + step + tabs.length) % tabs.length;
+        activateTab(tabs[nextIndex], { moveFocus: true });
+      });
+    });
+
+    prevButton.addEventListener('click', () => {
+      const activeIndex = getActiveIndex();
+      if (activeIndex <= 0) return;
+      activateTab(tabs[activeIndex - 1], { moveFocus: true });
+      updateArrowState();
+    });
+    nextButton.addEventListener('click', () => {
+      const activeIndex = getActiveIndex();
+      if (activeIndex >= tabs.length - 1) return;
+      activateTab(tabs[activeIndex + 1], { moveFocus: true });
+      updateArrowState();
+    });
+
+    strip.addEventListener('scroll', updateArrowState, { passive: true });
+    window.addEventListener('resize', updateArrowState);
+    updateArrowState();
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initThemeToggle();
   initRankingGroups();
@@ -299,4 +381,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initScrollToEndButton();
+  initLeaderboardMemberSwitcher();
 });

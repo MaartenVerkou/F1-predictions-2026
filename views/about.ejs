@@ -14,95 +14,81 @@
 
   <div class="card" id="about">
     <h2><%= t('about_page.section_about') %></h2>
-    <p>This website is an independent, community-driven Formula 1 season prediction game.</p>
-    <p>
-      Participants submit season-long predictions before the first race weekend begins. After the deadline, predictions are locked and
-      cannot be changed. After the final race, results are calculated based on official season outcomes.
-    </p>
-    <p>
-      The platform is a set-and-forget prediction challenge that rewards thoughtful forecasting rather than ongoing activity.
-      The website exists purely for entertainment purposes.
-    </p>
+    <p><%= t('about_page.about_intro_1') %></p>
+    <p><%= t('about_page.about_intro_2') %></p>
+    <p><%= t('about_page.about_intro_3') %></p>
   </div>
 
   <div class="card" id="terms">
     <h2><%= t('about_page.section_terms') %></h2>
 
     <h3><%= t('about_page.intended_audience') %></h3>
-    <p>This platform is intended for users aged 18 years or older. By creating an account, users confirm they meet this age requirement.</p>
+    <p><%= t('about_page.audience_body') %></p>
 
     <h3><%= t('about_page.how_it_works') %></h3>
-    <p>Users create an account with username, email address, and password.</p>
-    <p>Usernames are visible to participants. Email addresses are only accessible to global platform administrators.</p>
-    <p>Users can join public groups or private groups (invite link or password required). Group owners can assign admins, edit group rules, and remove members.</p>
-    <p>All predictions must be submitted before the deadline. After the deadline, predictions are locked and timestamps are kept for integrity.</p>
+    <p><%= t('about_page.how_body_1') %></p>
+    <p><%= t('about_page.how_body_2') %></p>
+    <p><%= t('about_page.how_body_3') %></p>
+    <p><%= t('about_page.how_body_4') %></p>
 
     <h3><%= t('about_page.definitions') %></h3>
     <ul>
-      <li>The published Formula 1 results are used where possible.</li>
-      <li>When multiple answers are correct, all correct answers earn points.</li>
-      <li>Where race, DNF, podium, etc. are mentioned, this refers to a Grand Prix and not a sprint (unless stated otherwise).</li>
-      <li>A DNS does not qualify as a DNF.</li>
-      <li>
-        The season ends directly after the final race and the availability of results, unless there is a known reason to wait for impactful controversies to be resolved
-        (such as disqualification).
-      </li>
+      <li><%= t('about_page.def_1') %></li>
+      <li><%= t('about_page.def_2') %></li>
+      <li><%= t('about_page.def_3') %></li>
+      <li><%= t('about_page.def_4') %></li>
+      <li><%= t('about_page.def_5') %></li>
     </ul>
 
     <h3><%= t('about_page.results') %></h3>
-    <p>Final standings are calculated from official Formula 1 season results.</p>
+    <p><%= t('about_page.results_body_1') %></p>
     <p>
-      For specific statistical components (such as sustained damage estimations), we may use public data from
-      <a class="link" href="https://www.racingstatisticsf1.com/" target="_blank" rel="noopener noreferrer">racingstatisticsf1.com</a>.
+      <%= t('about_page.results_body_2_prefix') %>
+      <a class="link" href="https://www.racingstatisticsf1.com/" target="_blank" rel="noopener noreferrer">racingstatisticsf1.com</a>
+      <%= t('about_page.results_body_2_suffix') %>
     </p>
-    <p>We are not responsible for errors, delays, or changes in third-party data sources.</p>
-    <p>
-      This platform is not affiliated with Formula 1, FIA, or any official motorsport entity.
-      All trademarks, team names, and driver names remain property of their respective owners.
-    </p>
+    <p><%= t('about_page.results_body_3') %></p>
+    <p><%= t('about_page.results_body_4') %></p>
 
     <h3><%= t('about_page.private_arrangements') %></h3>
-    <p>Groups may define their own informal rules in group descriptions.</p>
-    <p>
-      The platform does not collect, process, manage, or distribute money. It does not organize competitions for financial gain,
-      mediate disputes, or facilitate gambling.
-    </p>
-    <p>Any private arrangements between participants are fully outside this website and remain the users' own responsibility.</p>
+    <p><%= t('about_page.private_body_1') %></p>
+    <p><%= t('about_page.private_body_2') %></p>
+    <p><%= t('about_page.private_body_3') %></p>
 
     <h3><%= t('about_page.fair_use') %></h3>
-    <p>We reserve the right to remove accounts involved in abuse, fraud, or manipulation, and to remove content that violates law.</p>
-    <p>We may add, suspend, or discontinue platform features when needed.</p>
-    <p>For scoring disputes, the final interpretation of questions and correct answers is determined by website administrators.</p>
-    <p>The platform is provided as-is without guarantees of uninterrupted availability.</p>
+    <p><%= t('about_page.fair_body_1') %></p>
+    <p><%= t('about_page.fair_body_2') %></p>
+    <p><%= t('about_page.fair_body_3') %></p>
+    <p><%= t('about_page.fair_body_4') %></p>
 
     <h3><%= t('about_page.governing_law') %></h3>
-    <p>Unless mandatory law states otherwise, these terms are governed by Dutch law and disputes fall under the competent courts in the Netherlands.</p>
+    <p><%= t('about_page.law_body') %></p>
 
     <h3><%= t('about_page.liability') %></h3>
-    <p>The platform is not liable for direct or indirect damages, financial losses, or disputes from user interactions or private arrangements.</p>
+    <p><%= t('about_page.liability_body') %></p>
   </div>
 
   <div class="card" id="privacy">
     <h2><%= t('about_page.section_privacy') %></h2>
-    <p>We collect username, email address, encrypted password, and basic activity data required for platform functionality.</p>
-    <p>Email addresses are used for account verification, security/account communication, important platform updates, and optional future season invitations.</p>
-    <p>We do not sell personal data and do not send marketing newsletters.</p>
+    <p><%= t('about_page.privacy_body_1') %></p>
+    <p><%= t('about_page.privacy_body_2') %></p>
+    <p><%= t('about_page.privacy_body_3') %></p>
 
     <h3><%= t('about_page.cookies') %></h3>
-    <p>We use essential cookies/sessions for login state, account security, language preference, and core platform functionality.</p>
+    <p><%= t('about_page.cookies_body') %></p>
 
     <h3><%= t('about_page.retention') %></h3>
-    <p>Account data is retained while an account is active. Users can delete their account in account settings.</p>
-    <p>Accounts inactive for 24 months may be removed to minimize stored data; we may attempt to notify users beforehand by email.</p>
-    <p>Deleted accounts and associated personal data are removed from active systems, except where retention is required for legal or security reasons.</p>
+    <p><%= t('about_page.retention_body_1') %></p>
+    <p><%= t('about_page.retention_body_2') %></p>
+    <p><%= t('about_page.retention_body_3') %></p>
 
     <h3><%= t('about_page.export') %></h3>
-    <p>Users may request a summary/export of account data by contacting us via email.</p>
+    <p><%= t('about_page.export_body') %></p>
   </div>
 
   <div class="card" id="contact">
     <h2><%= t('about_page.section_contact') %></h2>
-    <p>For support, privacy, data access/export, or legal questions: <a class="link" href="mailto:info@crashalong.com">info@crashalong.com</a>.</p>
+    <p><%= t('about_page.contact_body') %> <a class="link" href="mailto:info@crashalong.com">info@crashalong.com</a>.</p>
   </div>
 </section>
 

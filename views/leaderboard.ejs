@@ -1,21 +1,21 @@
-﻿<%- include('partials/header', { title: 'Leaderboard', user }) %>
+<%- include('partials/header', { title: t('leaderboard.page_title'), user }) %>
 
 <div class="card">
-  <h1><%= group.name %>: Leaderboard</h1>
-  <p class="muted">Scores are calculated from the season actuals.</p>
+  <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
+  <p class="muted"><%= t('leaderboard.subtitle') %></p>
 
   <% if (Object.keys(actuals || {}).length === 0) { %>
-    <div class="alert">No actuals have been entered yet. Set them on the “Set actuals” page to compute scores.</div>
+    <div class="alert"><%= t('leaderboard.no_actuals') %></div>
   <% } %>
 
   <% if (leaderboard.length === 0) { %>
-    <div class="alert">No scored responses yet. Make sure actuals are entered and predictions have been saved.</div>
+    <div class="alert"><%= t('leaderboard.no_scored_responses') %></div>
   <% } else { %>
     <table class="table">
       <thead>
         <tr>
-          <th>Member</th>
-          <th>Total points</th>
+          <th><%= t('leaderboard.member') %></th>
+          <th><%= t('leaderboard.total_points') %></th>
         </tr>
       </thead>
       <tbody>
@@ -28,19 +28,71 @@
       </tbody>
     </table>
 
-    <h2 style="margin-top:24px;">Details</h2>
-    <% leaderboard.forEach(row => { %>
-      <div class="card" style="padding:16px; margin-top:12px;">
-        <strong><%= row.name %></strong>
+    <h2 style="margin-top:24px;"><%= t('leaderboard.details') %></h2>
+    <div class="leaderboard-member-switcher" data-member-switcher>
+      <button
+        type="button"
+        class="secondary leaderboard-strip-arrow"
+        data-member-scroll="prev"
+        aria-label="Scroll members left"
+      >
+        &#8249;
+      </button>
+
+      <div class="leaderboard-member-strip" data-member-strip role="tablist" aria-label="Members">
+        <% leaderboard.forEach((row, index) => { %>
+          <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
+          <% const tabId = `leaderboard-member-tab-${row.userId}`; %>
+          <button
+            type="button"
+            id="<%= tabId %>"
+            role="tab"
+            aria-controls="<%= panelId %>"
+            aria-selected="<%= index === 0 ? 'true' : 'false' %>"
+            tabindex="<%= index === 0 ? '0' : '-1' %>"
+            class="leaderboard-member-tab <%= index === 0 ? 'is-active' : '' %>"
+            data-member-tab
+            data-target="<%= panelId %>"
+          >
+            <span class="leaderboard-member-rank">#<%= index + 1 %></span>
+            <span><%= row.name %></span>
+          </button>
+        <% }) %>
+      </div>
+
+      <button
+        type="button"
+        class="secondary leaderboard-strip-arrow"
+        data-member-scroll="next"
+        aria-label="Scroll members right"
+      >
+        &#8250;
+      </button>
+    </div>
+
+    <% leaderboard.forEach((row, index) => { %>
+      <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
+      <% const tabId = `leaderboard-member-tab-${row.userId}`; %>
+      <section
+        id="<%= panelId %>"
+        role="tabpanel"
+        aria-labelledby="<%= tabId %>"
+        class="card leaderboard-member-panel <%= index === 0 ? 'is-active' : '' %>"
+        <%= index === 0 ? '' : 'hidden' %>
+      >
+        <div class="leaderboard-member-heading">
+          <strong><%= row.name %></strong>
+          <span class="muted"><%= row.total %> <%= t('leaderboard.points_short') %></span>
+        </div>
         <ul class="list" style="margin-top:8px;">
           <% questions.forEach(q => { %>
             <li>
               <span><%= q.prompt %></span>
-              <span class="muted"> - <%= row.byQuestion[q.id] ?? 0 %> pts</span>
+              <span class="muted"> - <%= row.byQuestion[q.id] ?? 0 %> <%= t('leaderboard.points_short') %></span>
             </li>
           <% }) %>
         </ul>
-      </div>
+      </section>
     <% }) %>
   <% } %>
 </div>

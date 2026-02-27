@@ -11,7 +11,45 @@
     <p class="muted"><%= adminSuccess %></p>
   <% } %>
 
-  <h2>Users</h2>
+  <h2>Groups</h2>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Group</th>
+        <th>Owner</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% groups.forEach(row => { %>
+        <tr>
+          <td><%= row.name %></td>
+          <td><%= row.owner_name %></td>
+          <td><%= new Date(row.created_at).toLocaleString() %></td>
+          <td>
+            <div class="table-actions">
+              <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
+              <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+                <button class="secondary" type="submit">Delete group</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <div class="inline-actions" style="margin-top: 10px;">
+    <% if (currentGroupPage > 1) { %>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage - 1 %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Previous <%= groupsPerPage %></a>
+    <% } %>
+    <span class="muted">Groups page <%= currentGroupPage %> of <%= totalGroupPages %></span>
+    <% if (currentGroupPage < totalGroupPages) { %>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage + 1 %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Next <%= groupsPerPage %></a>
+    <% } %>
+  </div>
+
+  <h2 style="margin-top:24px;">Users</h2>
   <table class="table compact">
     <thead>
       <tr>
@@ -49,35 +87,15 @@
       <% }) %>
     </tbody>
   </table>
-
-  <h2 style="margin-top:24px;">Groups</h2>
-  <table class="table compact">
-    <thead>
-      <tr>
-        <th>Group</th>
-        <th>Owner</th>
-        <th>Created</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% groups.forEach(row => { %>
-        <tr>
-          <td><%= row.name %></td>
-          <td><%= row.owner_name %></td>
-          <td><%= new Date(row.created_at).toLocaleString() %></td>
-          <td>
-            <div class="table-actions">
-              <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
-              <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
-                <button class="secondary" type="submit">Delete group</button>
-              </form>
-            </div>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+  <div class="inline-actions" style="margin-top: 10px;">
+    <% if (currentUserPage > 1) { %>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage - 1 %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Previous <%= usersPerPage %></a>
+    <% } %>
+    <span class="muted">Users page <%= currentUserPage %> of <%= totalUserPages %></span>
+    <% if (currentUserPage < totalUserPages) { %>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage + 1 %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Next <%= usersPerPage %></a>
+    <% } %>
+  </div>
 
   <h2 style="margin-top:24px;">Memberships</h2>
   <table class="table compact">
@@ -100,6 +118,15 @@
       <% }) %>
     </tbody>
   </table>
+  <div class="inline-actions" style="margin-top: 10px;">
+    <% if (currentMembershipsPage > 1) { %>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage - 1 %>&responsePage=<%= currentResponsePage %>">Previous <%= membershipsPerPage %></a>
+    <% } %>
+    <span class="muted">Memberships page <%= currentMembershipsPage %> of <%= totalMembershipPages %></span>
+    <% if (currentMembershipsPage < totalMembershipPages) { %>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage + 1 %>&responsePage=<%= currentResponsePage %>">Next <%= membershipsPerPage %></a>
+    <% } %>
+  </div>
 
   <h2 style="margin-top:24px;">Responses</h2>
   <table class="table compact">
@@ -126,11 +153,11 @@
   </table>
   <div class="inline-actions" style="margin-top: 10px;">
     <% if (currentResponsePage > 1) { %>
-      <a class="link" href="/admin/overview?page=<%= currentResponsePage - 1 %>">Previous 50</a>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage - 1 %>">Previous <%= responsesPerPage %></a>
     <% } %>
     <span class="muted">Page <%= currentResponsePage %> of <%= totalResponsePages %></span>
     <% if (currentResponsePage < totalResponsePages) { %>
-      <a class="link" href="/admin/overview?page=<%= currentResponsePage + 1 %>">Next 50</a>
+      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage + 1 %>">Next <%= responsesPerPage %></a>
     <% } %>
   </div>
 </div>

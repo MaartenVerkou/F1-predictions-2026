@@ -87,7 +87,7 @@
               <% }) %>
               <option value="tie" <%= savedObj.winner === 'tie' ? 'selected' : '' %>>Tie</option>
             </select>
-            <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="Points diff" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
+            <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
           </div>
         <% } else if (type === 'boolean_with_optional_driver') { 
           const savedObj = saved || {};

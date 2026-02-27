@@ -181,6 +181,13 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS question_settings (
+    question_id TEXT PRIMARY KEY,
+    included INTEGER NOT NULL DEFAULT 1,
+    points_override TEXT,
+    updated_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS email_verifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -233,6 +240,9 @@ function ensureUserColumns() {
   }
   if (!names.has("is_admin")) {
     db.exec("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0;");
+  }
+  if (!names.has("is_simulated")) {
+    db.exec("ALTER TABLE users ADD COLUMN is_simulated INTEGER DEFAULT 0;");
   }
 }
 
@@ -471,7 +481,86 @@ function readJsonFile(filePath) {
   }
 }
 
-function getQuestions(locale = DEFAULT_LOCALE) {
+function getQuestionSettingsMap() {
+  const rows = db
+    .prepare(
+      "SELECT question_id, included, points_override FROM question_settings"
+    )
+    .all();
+  const map = new Map();
+  for (const row of rows) {
+    const included = Number(row.included) !== 0;
+    const rawOverride =
+      row.points_override == null ? "" : String(row.points_override).trim();
+    let parsedOverride = null;
+    let hasValidOverride = false;
+    if (rawOverride) {
+      try {
+        parsedOverride = JSON.parse(rawOverride);
+        hasValidOverride = true;
+      } catch (err) {
+        console.warn(
+          `Ignoring invalid points_override JSON for question ${row.question_id}:`,
+          err.message
+        );
+      }
+    }
+    map.set(row.question_id, {
+      included,
+      rawOverride,
+      parsedOverride,
+      hasValidOverride
+    });
+  }
+  return map;
+}
+
+function applyQuestionSettings(
+  questions,
+  settingsMap,
+  { includeExcluded = false, includeMeta = false } = {}
+) {
+  const out = [];
+  for (const original of questions || []) {
+    const setting = settingsMap.get(original.id);
+    const included = setting ? setting.included : true;
+    if (!includeExcluded && !included) continue;
+
+    const question = { ...original };
+    const basePoints = question.points;
+    if (setting?.hasValidOverride) {
+      question.points = setting.parsedOverride;
+      // points_display in questions.json can become stale if points are overridden.
+      delete question.points_display;
+    }
+
+    if (includeMeta) {
+      question._included = included;
+      question._basePoints = basePoints;
+      question._effectivePoints = question.points;
+      question._pointsOverrideRaw = setting?.rawOverride || "";
+      question._hasValidPointsOverride = Boolean(setting?.hasValidOverride);
+    }
+
+    out.push(question);
+  }
+  return out;
+}
+
+function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
+  let resolvedLocale = locale;
+  let resolvedOptions = options;
+  if (resolvedLocale && typeof resolvedLocale === "object") {
+    resolvedOptions = resolvedLocale;
+    resolvedLocale = DEFAULT_LOCALE;
+  }
+  resolvedLocale = SUPPORTED_LOCALES.includes(resolvedLocale)
+    ? resolvedLocale
+    : DEFAULT_LOCALE;
+
+  const includeExcluded = Boolean(resolvedOptions?.includeExcluded);
+  const includeMeta = Boolean(resolvedOptions?.includeMeta);
+
   if (!fs.existsSync(QUESTIONS_PATH)) {
     const fallback = [
       {
@@ -487,7 +576,12 @@ function getQuestions(locale = DEFAULT_LOCALE) {
         helper: "Example: Ferrari"
       }
     ];
-    return localizeQuestions(fallback, locale);
+    const settings = getQuestionSettingsMap();
+    const adjustedFallback = applyQuestionSettings(fallback, settings, {
+      includeExcluded,
+      includeMeta
+    });
+    return localizeQuestions(adjustedFallback, resolvedLocale);
   }
 
   const parsed = readJsonFile(QUESTIONS_PATH);
@@ -497,7 +591,13 @@ function getQuestions(locale = DEFAULT_LOCALE) {
   } else if (parsed && Array.isArray(parsed.questions)) {
     questions = parsed.questions;
   }
-  return localizeQuestions(questions, locale);
+
+  const settings = getQuestionSettingsMap();
+  const adjustedQuestions = applyQuestionSettings(questions, settings, {
+    includeExcluded,
+    includeMeta
+  });
+  return localizeQuestions(adjustedQuestions, resolvedLocale);
 }
 
 function localizeQuestions(questions, locale = DEFAULT_LOCALE) {

@@ -1,0 +1,76 @@
+<%- include('partials/header', { title: 'Question settings', user }) %>
+<%- include('partials/admin_nav', { active: 'questions' }) %>
+
+<div class="card">
+  <h1>Question settings</h1>
+  <p class="muted">
+    Enable/disable questions and override points for simulation. Changes apply immediately to prediction forms, actuals, and leaderboard scoring.
+  </p>
+
+  <% if (saveError) { %>
+    <div class="alert"><%= saveError %></div>
+  <% } %>
+  <% if (saveSuccess) { %>
+    <p class="muted"><%= saveSuccess %></p>
+  <% } %>
+
+  <% const formatValue = (value) => {
+    if (value == null) return "-";
+    if (typeof value === "string") return value;
+    if (typeof value === "number") return String(value);
+    return JSON.stringify(value);
+  }; %>
+
+  <form method="post" action="/admin/questions">
+    <div class="admin-question-table-wrap">
+    <table class="table compact admin-question-table">
+      <thead>
+        <tr>
+          <th>Question</th>
+          <th>Type</th>
+          <th>Included</th>
+          <th>Default points</th>
+          <th>Points override (JSON)</th>
+          <th>Effective points</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% questions.forEach((question) => { %>
+          <tr>
+            <td class="admin-question-cell">
+              <div class="admin-question-title"><%= question.prompt %></div>
+              <div class="muted admin-question-id"><code class="admin-question-code"><%= question.id %></code></div>
+            </td>
+            <td><%= question.type || 'text' %></td>
+            <td class="admin-question-included">
+              <label class="muted">
+                <input
+                  type="checkbox"
+                  name="<%= question.id %>__included"
+                  value="1"
+                  <%= question._included ? 'checked' : '' %>
+                />
+                Yes
+              </label>
+            </td>
+            <td><code class="admin-question-code"><%= formatValue(question._basePoints) %></code></td>
+            <td class="admin-question-override">
+              <input
+                type="text"
+                name="<%= question.id %>__points"
+                value="<%= question._pointsOverrideRaw || '' %>"
+                placeholder='Empty = default. Ex: 10 or {"1st":50}'
+              />
+            </td>
+            <td><code class="admin-question-code"><%= formatValue(question._effectivePoints) %></code></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    </div>
+
+    <button type="submit">Save question settings</button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>
