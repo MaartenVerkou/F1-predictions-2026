@@ -1,13 +1,12 @@
 ﻿{
   "name": "f1-predictions-2026",
   "version": "0.1.0",
-  "description": "Wheel of Knowledge - group-based Formula 1 season prediction game",
+  "description": "Group-based F1 2026 prediction game",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "analyze:balance": "node scripts/analyze-balance.js",
-    "backup:state": "node scripts/backup-state.js"
+    "analyze:balance": "node scripts/analyze-balance.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

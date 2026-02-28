@@ -1,6 +1,6 @@
 {
   "header": {
-    "site_title": "Wheel of Knowledge",
+    "site_title": "F1 Predictions 2026",
     "countdown_prefix": "Voorspellingen sluiten over",
     "language": "Taal",
     "signed_in_as": "Ingelogd als",
@@ -129,19 +129,19 @@
   },
   "home": {
     "badge_how_it_works": "Hoe het werkt",
-    "headline": "Doe gewaagde voorspellingen voor het Formule 1-seizoen met vrienden.",
+    "headline": "Doe gewaagde F1 2026 voorspellingen met vrienden.",
     "subtitle": "Vul je voorspellingen in, maak een groep en nodig vrienden uit. We berekenen later de score op basis van de officiele seizoensuitslagen.",
     "create_account": "Maak een account",
     "start_predicting": "Start met voorspellen",
     "go_dashboard": "Ga naar je dashboard",
-    "about_link": "Over Wheel of Knowledge",
+    "about_link": "Over F1 Predictions",
     "flow_title": "In drie stappen",
     "flow_step_1": "Maak een groep en deel een invite-link.",
     "flow_step_2": "Iedereen joint en vult voorspellingen in.",
     "flow_step_3": "Bekijk alle groepsantwoorden op een plek."
   },
   "about_page": {
-    "title": "Over Wheel of Knowledge",
+    "title": "Over F1 Predictions",
     "last_updated": "Laatst bijgewerkt",
     "nav_about": "Over",
     "nav_terms": "Voorwaarden",

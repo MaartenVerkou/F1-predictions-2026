@@ -5,4 +5,3 @@
 /data/sessions.db-shm
 /data/sessions.db-wal
 .env
-backups/
