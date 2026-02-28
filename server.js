@@ -24,6 +24,9 @@ const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_HOST = process.env.SMTP_HOST || "";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_CLIENT_NAME = process.env.SMTP_CLIENT_NAME || "";
+const PAYPAL_DONATION_URL = String(process.env.PAYPAL_DONATION_URL || "").trim();
+const PAYPAL_DONATION_LABEL =
+  String(process.env.PAYPAL_DONATION_LABEL || "").trim() || "Donate";
 function deriveBaseUrl() {
   const rawDomain = String(process.env.APP_DOMAIN || "localhost")
     .trim()
@@ -454,6 +457,8 @@ app.use((req, res, next) => {
     label: LOCALE_LABELS[code] || code
   }));
   res.locals.t = (key, params = {}) => translate(locale, key, params);
+  res.locals.paypalDonationUrl = PAYPAL_DONATION_URL;
+  res.locals.paypalDonationLabel = PAYPAL_DONATION_LABEL;
   next();
 });
 

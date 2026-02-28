@@ -199,5 +199,7 @@ npm run analyze:balance -- --players 1000 --seasons 200 --json balance-report.js
 - `DEV_AUTO_LOGIN_NAME` - display name used for dev auto-login (default `Dev Admin`)
 - `PREDICTIONS_CLOSE_AT` - ISO datetime after which predictions are locked
 - `LEADERBOARD_ENABLED` - set to `1` to enable leaderboard for non-admin users
+- `PAYPAL_DONATION_URL` - optional full PayPal donation URL; when set, a donation button is shown on home page
+- `PAYPAL_DONATION_LABEL` - optional button label for donation button (default `Donate`)
 
 Note: for Docker, variables from `.env` must be referenced in `docker-compose.yml` (`environment:` or `env_file:`) to be available inside the app container.
