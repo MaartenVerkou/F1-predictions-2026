@@ -75,12 +75,6 @@
                 <span class="header-link-label"><%= t('header.admin') %></span>
               </a>
             <% } %>
-            <form action="/logout" method="post" style="margin:0;">
-              <button class="secondary" type="submit">
-                <span class="header-nav-icon header-nav-icon-logout" aria-hidden="true"></span>
-                <span class="header-logout-label"><%= t('header.logout') %></span>
-              </button>
-            </form>
           <% } else { %>
             <a class="link" href="/login"><%= t('header.login') %></a>
           <% } %>

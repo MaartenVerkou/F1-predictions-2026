@@ -179,7 +179,7 @@ header {
 .brand-tagline {
   color: #ffffff;
   font-family: var(--font-body);
-  font-size: 0.52rem;
+  font-size: 0.5rem;
   font-weight: 500;
   letter-spacing: 0.02em;
   line-height: 1.05;
@@ -247,29 +247,8 @@ header.is-tight:not(.is-collapsed) .header-main-links .header-nav-icon-logout {
   flex: 0 0 16px;
 }
 
-header.is-tight:not(.is-collapsed) .header-main-links .header-link-dashboard .header-nav-icon-dashboard {
-  display: inline-block;
-  flex: 0 0 16px;
-}
-
-header.is-tight:not(.is-collapsed) .header-main-links .header-link-dashboard .header-link-label {
-  display: none;
-}
-
 header.is-tight:not(.is-collapsed) .header-main-links .header-logout-label {
   display: none;
-}
-
-header.is-tight:not(.is-collapsed) .header-main-links .header-link-dashboard {
-  width: 38px;
-  min-width: 38px;
-  height: 38px;
-  padding: 0;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
 }
 
 header.is-tight:not(.is-collapsed) .header-main-links form button.secondary {
@@ -1222,6 +1201,12 @@ header.is-collapsed .header-actions {
   z-index: 120;
 }
 
+header.is-collapsed .countdown {
+  gap: 7px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
 header.is-collapsed .header-actions.is-open {
   display: flex;
 }
@@ -1360,7 +1345,7 @@ header.is-collapsed .lang-popover {
   }
 
   .brand-tagline {
-    font-size: 0.52rem;
+    font-size: 0.5rem;
   }
 
   .header-main-links {

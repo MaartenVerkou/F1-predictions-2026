@@ -12,6 +12,9 @@
     <h1>My account</h1>
     <p class="muted">Signed in as <strong><%= user.name %></strong></p>
     <p class="muted">Email: <strong><%= user.email %></strong></p>
+    <form method="post" action="/logout" style="margin-top:10px;">
+      <button class="secondary" type="submit"><%= t('header.logout') %></button>
+    </form>
   </div>
 
   <div class="card">
