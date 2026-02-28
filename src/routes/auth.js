@@ -19,7 +19,7 @@ function registerAuthRoutes(app, deps) {
     NODE_ENV
   } = deps;
 
-  const BRAND_NAME = String(COMPANY_NAME || "F1 Predictions").trim() || "F1 Predictions";
+  const BRAND_NAME = String(COMPANY_NAME || "Wheel of Knowledge").trim() || "Wheel of Knowledge";
   const TEAM_SIGNOFF = `The ${BRAND_NAME} Team`;
   const EMAIL_SENDER = String(SMTP_FROM || "").trim()
     || (SMTP_USER ? `${BRAND_NAME} <${SMTP_USER}>` : BRAND_NAME);

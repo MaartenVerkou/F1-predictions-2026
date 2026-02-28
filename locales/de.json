@@ -1,6 +1,6 @@
 {
   "header": {
-    "site_title": "F1 Predictions 2026",
+    "site_title": "Wheel of Knowledge",
     "countdown_prefix": "Tippschluss in",
     "language": "Sprache",
     "signed_in_as": "Angemeldet als",
@@ -129,19 +129,19 @@
   },
   "home": {
     "badge_how_it_works": "So funktioniert es",
-    "headline": "Triff mutige F1 2026 Prognosen mit Freunden.",
+    "headline": "Triff mutige Formel-1-Saisonprognosen mit Freunden.",
     "subtitle": "Gib deine Prognosen ab, erstelle eine Gruppe und lade Freunde ein. Die Auswertung folgt spaeter auf Basis der offiziellen Saisonergebnisse.",
     "create_account": "Konto erstellen",
     "start_predicting": "Jetzt tippen",
     "go_dashboard": "Zum Dashboard",
-    "about_link": "Ueber F1 Predictions",
+    "about_link": "Ueber Wheel of Knowledge",
     "flow_title": "Ablauf in drei Schritten",
     "flow_step_1": "Gruppe erstellen und Einladungslink teilen.",
     "flow_step_2": "Alle treten bei und geben ihre Prognosen ab.",
     "flow_step_3": "Gruppenantworten zentral ansehen."
   },
   "about_page": {
-    "title": "Ueber F1 Predictions",
+    "title": "Ueber Wheel of Knowledge",
     "last_updated": "Zuletzt aktualisiert",
     "nav_about": "Ueber",
     "nav_terms": "Bedingungen",
