@@ -1,4 +1,4 @@
-﻿# F1 Predictions 2026
+# Wheel of Knowledge
 
 Simple group-based prediction game for the 2026 F1 season.
 
@@ -55,9 +55,61 @@ docker compose -f docker-compose.yml -f docker-compose.server.yml --profile edge
 Notes:
 
 - App URL: `http://localhost:3000`
-- Login/user/session data persists in Docker volume `f1predictions_f1_state` (`/app/state` in container).
+- Login/user/session data persists at `/app/state` in container.
+- By default this uses Docker volume `f1predictions_f1_state`; set `STATE_DIR` in `.env` to use a host path instead (for example a Hetzner volume mount).
 - Question config stays in repo `./data` and is mounted read-only at `/app/config`.
 - `docker compose down -v` removes the Docker volume (database + sessions).
+
+## Backups (recommended on server)
+
+This repo includes a backup script with retention, so backup storage does not grow forever.
+
+Run one backup now:
+
+```bash
+sh ./scripts/run-backup.sh
+```
+
+What it does:
+
+- Uses SQLite online backup for `app.db` and `sessions.db`
+- Compresses to `.sqlite.gz`
+- Writes metadata `.json` (hash + size)
+- Prunes old backup + metadata files by age/count
+
+Defaults:
+
+- Backup folder: `./backups` (on host, not in DB volume)
+- Keep files up to `30` days
+- Keep max `90` backup files per DB type
+
+Override retention/folder:
+
+```bash
+BACKUP_DIR=/srv/backups/f1 KEEP_DAYS=21 KEEP_COUNT=60 sh ./scripts/run-backup.sh
+```
+
+If you need extra compose files (for example server override), pass them via `COMPOSE_ARGS`:
+
+```bash
+COMPOSE_ARGS="-f docker-compose.yml -f docker-compose.server.yml" sh ./scripts/run-backup.sh
+```
+
+Cron example (daily 03:00):
+
+```bash
+0 3 * * * cd /root/F1-predictions-2026 && BACKUP_DIR=/srv/backups/f1 KEEP_DAYS=30 KEEP_COUNT=90 sh ./scripts/run-backup.sh >> /var/log/f1-backup.log 2>&1
+```
+
+Restore (example):
+
+```bash
+gunzip -c /srv/backups/f1/f1predictions-app-YYYYMMDD-HHMMSSZ.sqlite.gz > /tmp/app.db
+gunzip -c /srv/backups/f1/f1predictions-sessions-YYYYMMDD-HHMMSSZ.sqlite.gz > /tmp/sessions.db
+docker compose down
+docker run --rm -v f1predictions_f1_state:/state -v /tmp:/restore alpine sh -c "cp -f /restore/app.db /state/app.db && cp -f /restore/sessions.db /state/sessions.db"
+docker compose up -d
+```
 
 If you previously used `./data:/app/data` and want to keep that old database, run this once before first start with the new setup (Linux/macOS shell):
 
@@ -181,6 +233,7 @@ npm run analyze:balance -- --players 1000 --seasons 200 --json balance-report.js
 ## Environment variables
 
 - `PORT` - server port (default `3000`)
+- `STATE_DIR` - optional Docker host path mounted to `/app/state`; if unset, Compose uses Docker named volume `f1_state` (recommended for local dev)
 - `DATA_DIR` - data directory (default `./data`)
 - `DB_PATH` - sqlite db path (default `DATA_DIR/app.db`)
 - `QUESTIONS_PATH` - question file path (default `DATA_DIR/questions.json`)

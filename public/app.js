@@ -241,6 +241,7 @@ const initThemeToggle = () => {
   if (!toggle) return;
 
   const root = document.documentElement;
+  const labelEl = toggle.querySelector('[data-theme-toggle-label]');
   const labelDark = toggle.dataset.labelDark || 'Dark mode';
   const labelLight = toggle.dataset.labelLight || 'Light mode';
   const getTheme = () => root.getAttribute('data-theme') || 'light';
@@ -254,6 +255,9 @@ const initThemeToggle = () => {
     const nextLabel = theme === 'dark' ? labelLight : labelDark;
     toggle.setAttribute('aria-label', nextLabel);
     toggle.setAttribute('title', nextLabel);
+    if (labelEl) {
+      labelEl.textContent = nextLabel;
+    }
   };
 
   setTheme(getTheme());
@@ -262,6 +266,92 @@ const initThemeToggle = () => {
     const next = getTheme() === 'dark' ? 'light' : 'dark';
     setTheme(next);
   });
+};
+
+const initHeaderMenu = () => {
+  const header = document.querySelector('header');
+  const toggle = document.querySelector('[data-header-menu-toggle]');
+  const menu = document.querySelector('[data-header-menu]');
+  const left = header?.querySelector('.header-left');
+  if (!header || !toggle || !menu || !left) return;
+
+  const isOpen = () => menu.classList.contains('is-open');
+  const isTight = () => header.classList.contains('is-tight');
+  const isCollapsed = () => header.classList.contains('is-collapsed');
+  const closeMenu = () => {
+    menu.classList.remove('is-open');
+    toggle.setAttribute('aria-expanded', 'false');
+    menu.querySelectorAll('details[open]').forEach(details => {
+      details.open = false;
+    });
+  };
+  const openMenu = () => {
+    menu.classList.add('is-open');
+    toggle.setAttribute('aria-expanded', 'true');
+  };
+  const syncLayout = () => {
+    // Stage 1: normal layout. Stage 2: tight logout icon. Stage 3: collapsed burger.
+    if (isCollapsed() || isTight()) {
+      header.classList.remove('is-collapsed', 'is-tight');
+    }
+
+    const normalRequired = left.scrollWidth + menu.scrollWidth + 56;
+    if (normalRequired <= header.clientWidth) {
+      closeMenu();
+      return;
+    }
+
+    header.classList.add('is-tight');
+    const tightRequired = left.scrollWidth + menu.scrollWidth + 34;
+    if (tightRequired <= header.clientWidth) {
+      closeMenu();
+      return;
+    }
+
+    header.classList.remove('is-tight');
+    header.classList.add('is-collapsed');
+  };
+
+  toggle.addEventListener('click', (event) => {
+    if (!isCollapsed()) return;
+    event.stopPropagation();
+    if (isOpen()) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    if (!isCollapsed()) return;
+    if (!isOpen()) return;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (menu.contains(target) || toggle.contains(target)) return;
+    closeMenu();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (!isCollapsed()) return;
+    if (event.key !== 'Escape') return;
+    if (!isOpen()) return;
+    closeMenu();
+  });
+
+  menu.addEventListener('click', (event) => {
+    if (!isCollapsed()) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const closeTrigger = target.closest('a.link, .account-name-link, [data-theme-toggle], form button[type="submit"]');
+    if (!closeTrigger) return;
+    closeMenu();
+  });
+
+  window.addEventListener('resize', syncLayout);
+  window.addEventListener('load', syncLayout);
+  setTimeout(syncLayout, 0);
+  setTimeout(syncLayout, 220);
+  syncLayout();
 };
 
 const initScrollToEndButton = () => {
@@ -376,6 +466,7 @@ const initLeaderboardMemberSwitcher = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  initHeaderMenu();
   initThemeToggle();
   initRankingGroups();
   initCheckboxLimits();
