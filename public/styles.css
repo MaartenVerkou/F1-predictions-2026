@@ -130,18 +130,6 @@ header {
   border: none;
 }
 
-.brand-logo-dark {
-  display: none;
-}
-
-:root[data-theme="dark"] .brand-logo-light {
-  display: none;
-}
-
-:root[data-theme="dark"] .brand-logo-dark {
-  display: block;
-}
-
 .brand-text {
   display: inline-flex;
   flex-direction: column;
@@ -157,7 +145,7 @@ header {
 }
 
 .brand-line-top {
-  color: #ffffff;
+  color: #111111;
   font-weight: 700;
   font-size: 0.96rem;
 }
@@ -189,13 +177,18 @@ header {
 }
 
 .brand-tagline {
-  color: #ffffff;
+  color: #111111;
   font-family: var(--font-body);
   font-size: 0.5rem;
   font-weight: 500;
   letter-spacing: 0.02em;
   line-height: 1.05;
   margin-top: 3px;
+}
+
+:root[data-theme="dark"] .brand-line-top,
+:root[data-theme="dark"] .brand-tagline {
+  color: #ffffff;
 }
 
 .header-actions {

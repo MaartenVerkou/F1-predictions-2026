@@ -238,13 +238,24 @@ const initVisibilityToggle = () => {
 
 const initThemeToggle = () => {
   const toggle = document.querySelector('[data-theme-toggle]');
-  if (!toggle) return;
+  const logos = Array.from(document.querySelectorAll('[data-logo-light][data-logo-dark]'));
+  if (!toggle && logos.length === 0) return;
 
   const root = document.documentElement;
-  const labelEl = toggle.querySelector('[data-theme-toggle-label]');
-  const labelDark = toggle.dataset.labelDark || 'Dark mode';
-  const labelLight = toggle.dataset.labelLight || 'Light mode';
+  const labelEl = toggle ? toggle.querySelector('[data-theme-toggle-label]') : null;
+  const labelDark = toggle ? (toggle.dataset.labelDark || 'Dark mode') : 'Dark mode';
+  const labelLight = toggle ? (toggle.dataset.labelLight || 'Light mode') : 'Light mode';
   const getTheme = () => root.getAttribute('data-theme') || 'light';
+  const syncLogos = (theme) => {
+    logos.forEach((img) => {
+      const lightSrc = img.dataset.logoLight;
+      const darkSrc = img.dataset.logoDark;
+      const nextSrc = theme === 'dark' ? darkSrc : lightSrc;
+      if (nextSrc && img.getAttribute('src') !== nextSrc) {
+        img.setAttribute('src', nextSrc);
+      }
+    });
+  };
   const setTheme = (theme) => {
     root.setAttribute('data-theme', theme);
     try {
@@ -252,9 +263,12 @@ const initThemeToggle = () => {
     } catch (err) {
       // ignore storage errors
     }
+    syncLogos(theme);
     const nextLabel = theme === 'dark' ? labelLight : labelDark;
-    toggle.setAttribute('aria-label', nextLabel);
-    toggle.setAttribute('title', nextLabel);
+    if (toggle) {
+      toggle.setAttribute('aria-label', nextLabel);
+      toggle.setAttribute('title', nextLabel);
+    }
     if (labelEl) {
       labelEl.textContent = nextLabel;
     }
@@ -262,10 +276,12 @@ const initThemeToggle = () => {
 
   setTheme(getTheme());
 
-  toggle.addEventListener('click', () => {
-    const next = getTheme() === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-  });
+  if (toggle) {
+    toggle.addEventListener('click', () => {
+      const next = getTheme() === 'dark' ? 'light' : 'dark';
+      setTheme(next);
+    });
+  }
 };
 
 const initHeaderMenu = () => {
@@ -276,6 +292,7 @@ const initHeaderMenu = () => {
   if (!header || !toggle || !menu || !left) return;
 
   const isOpen = () => menu.classList.contains('is-open');
+  const isTimeCompact = () => header.classList.contains('is-time-compact');
   const isTight = () => header.classList.contains('is-tight');
   const isCollapsed = () => header.classList.contains('is-collapsed');
   const closeMenu = () => {
@@ -290,25 +307,32 @@ const initHeaderMenu = () => {
     toggle.setAttribute('aria-expanded', 'true');
   };
   const syncLayout = () => {
-    // Stage 1: normal layout. Stage 2: tight logout icon. Stage 3: collapsed burger.
-    if (isCollapsed() || isTight()) {
-      header.classList.remove('is-collapsed', 'is-tight');
+    // Stage 1: normal. Stage 2: countdown text only. Stage 3: tight logout icon. Stage 4: collapsed burger.
+    if (isCollapsed() || isTight() || isTimeCompact()) {
+      header.classList.remove('is-collapsed', 'is-tight', 'is-time-compact');
     }
 
-    const normalRequired = left.scrollWidth + menu.scrollWidth + 56;
+    const normalRequired = left.scrollWidth + menu.scrollWidth + 72;
     if (normalRequired <= header.clientWidth) {
       closeMenu();
       return;
     }
 
+    header.classList.add('is-time-compact');
+    const timeCompactRequired = left.scrollWidth + menu.scrollWidth + 64;
+    if (timeCompactRequired <= header.clientWidth) {
+      closeMenu();
+      return;
+    }
+
     header.classList.add('is-tight');
-    const tightRequired = left.scrollWidth + menu.scrollWidth + 34;
+    const tightRequired = left.scrollWidth + menu.scrollWidth + 56;
     if (tightRequired <= header.clientWidth) {
       closeMenu();
       return;
     }
 
-    header.classList.remove('is-tight');
+    header.classList.remove('is-tight', 'is-time-compact');
     header.classList.add('is-collapsed');
   };
 
