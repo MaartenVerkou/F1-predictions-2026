@@ -179,8 +179,9 @@
   "home": {
     "badge_how_it_works": "How it works",
     "headline": "Make bold F1 2026 predictions.",
-    "subtitle": "Answer 23 original F1 questions that test your racing knowledge.",
+    "subtitle": "Answer 23 F1 questions that test your racing knowledge.",
     "create_account": "Create an account",
+    "or_login": "or log in",
     "start_predicting": "Start predicting",
     "go_dashboard": "Go to your dashboard",
     "about_link": "About {company_name}",

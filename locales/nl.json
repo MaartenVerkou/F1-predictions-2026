@@ -179,8 +179,9 @@
   "home": {
     "badge_how_it_works": "Hoe het werkt",
     "headline": "Doe gewaagde F1 2026 voorspellingen.",
-    "subtitle": "Beantwoord 23 originele F1-vragen die je racekennis testen.",
+    "subtitle": "Beantwoord 23 F1-vragen die je racekennis testen.",
     "create_account": "Maak een account",
+    "or_login": "of log in",
     "start_predicting": "Start met voorspellen",
     "go_dashboard": "Ga naar je dashboard",
     "about_link": "Over {company_name}",

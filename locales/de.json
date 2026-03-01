@@ -179,8 +179,9 @@
   "home": {
     "badge_how_it_works": "So funktioniert es",
     "headline": "Triff mutige F1 2026 Prognosen.",
-    "subtitle": "Beantworte 23 originelle F1-Fragen, die dein Racing-Wissen testen.",
+    "subtitle": "Beantworte 23 F1-Fragen, die dein Racing-Wissen testen.",
     "create_account": "Konto erstellen",
+    "or_login": "oder einloggen",
     "start_predicting": "Jetzt tippen",
     "go_dashboard": "Zum Dashboard",
     "about_link": "Ueber {company_name}",
