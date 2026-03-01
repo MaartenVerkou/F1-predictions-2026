@@ -185,15 +185,15 @@
         <div class="responses-question-head">
           <h2><%= q.prompt %></h2>
           <% if (hasLastSeasonDetails) { %>
-            <details class="responses-last-season-details">
-              <summary class="responses-last-season-toggle"><%= t('questions.last_season_link') %></summary>
-              <div class="responses-last-season-panel">
+            <div class="question-last-season-peek" tabindex="0">
+              <span class="question-last-season-toggle"><%= t('questions.last_season_link') %></span>
+              <div class="question-last-season-panel">
                 <% if (lastSeasonResult) { %>
-                  <div class="responses-last-season-result"><%= lastSeasonResult %></div>
+                  <div class="question-last-season-result"><%= lastSeasonResult %></div>
                 <% } %>
                 <% if (lastSeasonSourceUrl) { %>
                   <a
-                    class="link responses-last-season-source"
+                    class="link question-last-season-source"
                     href="<%= lastSeasonSourceUrl %>"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -202,7 +202,7 @@
                   </a>
                 <% } %>
               </div>
-            </details>
+            </div>
           <% } %>
         </div>
         <% const rows = responsesByQuestion[q.id] || []; %>

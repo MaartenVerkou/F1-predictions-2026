@@ -214,7 +214,7 @@ function registerAuthRoutes(app, deps) {
 
     return res.render("verify_notice", {
       email: normalizedEmail,
-      message: "Verification email sent. Please check your inbox.",
+      message: "Verification email sent. Please check your inbox and spam/junk folder.",
       verifyUrl: null
     });
   });
@@ -315,7 +315,7 @@ function registerAuthRoutes(app, deps) {
 
     return res.render("login", {
       error: null,
-      notice: "Verification email re-sent. Please check your inbox.",
+      notice: "Verification email re-sent. Please check your inbox and spam/junk folder.",
       unverifiedEmail: null,
       email: normalizedEmail
     });
@@ -383,13 +383,13 @@ function registerAuthRoutes(app, deps) {
 
       return res.render("forgot_password", {
         error: null,
-        message: "If that email exists, a reset link has been sent."
+        message: "If that email exists, a reset link has been sent. Check spam/junk too."
       });
     }
 
     return res.render("forgot_password", {
       error: null,
-      message: "If that email exists, a reset link has been sent."
+      message: "If that email exists, a reset link has been sent. Check spam/junk too."
     });
   });
 

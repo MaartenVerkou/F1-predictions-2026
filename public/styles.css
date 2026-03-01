@@ -695,12 +695,16 @@ button:disabled {
 
 .question-points {
   margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .question-last-season-peek {
   position: relative;
   display: inline-flex;
   align-items: center;
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .question-last-season-toggle {
@@ -741,7 +745,8 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.question-last-season-peek:hover .question-last-season-panel {
+.question-last-season-peek:hover .question-last-season-panel,
+.question-last-season-peek:focus-within .question-last-season-panel {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
@@ -947,58 +952,8 @@ button:disabled {
   margin: 0;
 }
 
-.responses-last-season-details {
+.responses-question-head .question-last-season-peek {
   margin-left: auto;
-  display: grid;
-  justify-items: end;
-}
-
-.responses-last-season-toggle {
-  cursor: pointer;
-  font-size: 12px;
-  line-height: 1.2;
-  font-weight: 700;
-  color: var(--muted);
-  list-style: none;
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--rules-bg);
-}
-
-.responses-last-season-toggle::-webkit-details-marker {
-  display: none;
-}
-
-.responses-last-season-toggle::after {
-  content: " ▾";
-  font-size: 10px;
-}
-
-.responses-last-season-details[open] .responses-last-season-toggle::after {
-  content: " ▴";
-}
-
-.responses-last-season-panel {
-  margin: 6px 0 0;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--rules-bg);
-  display: grid;
-  gap: 4px;
-  font-size: 12px;
-  line-height: 1.35;
-  max-width: min(460px, 90vw);
-  overflow-wrap: anywhere;
-}
-
-.responses-last-season-result {
-  color: var(--text);
-}
-
-.responses-last-season-source {
-  width: fit-content;
 }
 
 .responses-viewer-pick {
@@ -1285,17 +1240,21 @@ button:disabled {
 
   .question-meta-row,
   .question-meta-row.is-last-season-only {
-    justify-content: flex-start;
+    justify-content: space-between;
+    width: 100%;
   }
 
-  .question-last-season-peek,
-  .responses-last-season-details {
-    margin-left: 0;
+  .question-last-season-peek {
+    margin-left: auto;
+  }
+
+  .responses-question-head .question-last-season-peek {
+    align-self: flex-end;
   }
 
   .question-last-season-panel {
-    left: 0;
-    right: auto;
+    left: auto;
+    right: 0;
     bottom: calc(100% + 6px);
     max-width: calc(100vw - 32px);
     min-width: min(240px, calc(100vw - 32px));
