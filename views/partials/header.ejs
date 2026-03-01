@@ -90,18 +90,12 @@
                   <span class="header-nav-icon header-nav-icon-dashboard" aria-hidden="true"></span>
                   <span class="header-link-label"><%= t('header.dashboard') %></span>
                 </a>
-                <% if (paypalDonationUrl) { %>
-                  <a class="link" href="<%= paypalDonationUrl %>" target="_blank" rel="noopener noreferrer"><%= paypalDonationLabel %></a>
-                <% } %>
                 <span class="muted">
                   <%= t('header.signed_in_as') %>
                   <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
                 </span>
               <% } else { %>
                 <a class="link" href="/login"><%= t('header.login') %></a>
-                <% if (paypalDonationUrl) { %>
-                  <a class="link" href="<%= paypalDonationUrl %>" target="_blank" rel="noopener noreferrer"><%= paypalDonationLabel %></a>
-                <% } %>
               <% } %>
             </div>
             <div class="header-icon-actions">

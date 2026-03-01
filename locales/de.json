@@ -248,7 +248,7 @@
     "retention_body_3": "Geloeschte Konten und zugehoerige personenbezogene Daten werden aus aktiven Systemen entfernt, ausser wenn eine Aufbewahrung aus rechtlichen oder sicherheitsrelevanten Gruenden erforderlich ist.",
     "export_body": "Nutzer koennen per E-Mail eine Zusammenfassung/einen Export ihrer Kontodaten anfordern.",
     "contact_body": "Fuer Support, Datenschutz, Datenauskunft/-export oder rechtliche Fragen:",
-    "donate_support_line": "Du kannst die Macher auch mit einer Spende unterstuetzen, um die Hostingkosten mitzutragen."
+    "donate_support_line": "Du kannst die Macher auch unterstuetzen!"
   },
   "question_prompts": {
     "drivers_championship_top_3": {
