@@ -77,6 +77,10 @@
     "invite_link": "Invite link",
     "copy": "Copy",
     "created_at": "Created",
+    "invite_link_open": "Invite link is open",
+    "invite_link_closed": "Invite link is closed",
+    "open_link": "Open link",
+    "close_link": "Close link",
     "no_invite_link": "No invite link yet.",
     "generate_new_link": "Generate new link",
     "remove_link": "Remove link",
@@ -86,7 +90,10 @@
     "remove_admin": "Remove admin",
     "group_password": "Group password",
     "set_new_password": "Set new password",
-    "update_password": "Update password"
+    "update_password": "Update password",
+    "previous_25": "Previous 25",
+    "next_25": "Next 25",
+    "page_x_of_y": "Page {current} of {total}"
   },
   "questions": {
     "page_title": "Predictions",
@@ -117,6 +124,8 @@
     "position_word": "posicion",
     "driver_word": "piloto",
     "scroll_to_end": "Ir al final de la pagina",
+    "last_season_link": "Temporada pasada",
+    "last_season_default_result": "No directamente comparable",
     "couple_to_global_label": "Acoplar las predicciones de este grupo a mis predicciones de {group_name}",
     "couple_to_global_help": "Activado = este grupo siempre usa tus picks Global. Desactivalo para hacer picks distintos en este grupo.",
     "points_multi_select_penalty": "{points} {points_word} por cada {driver_word} correcto, -{penalty} por cada {driver_word} faltante o incorrecto (min {minimum})",
@@ -140,6 +149,7 @@
     "no_responses": "Aun no hay respuestas.",
     "summary_title": "Distribucion",
     "response_count_label": "respuestas",
+    "season_result_toggle": "Resultado {season} (detalles)",
     "position_label": "Posicion {n}",
     "your_pick": "Tu eleccion",
     "other": "Otros",
@@ -151,16 +161,16 @@
   },
   "home": {
     "badge_how_it_works": "Como funciona",
-    "headline": "Haz predicciones atrevidas de F1 2026 con tus amigos.",
-    "subtitle": "Completa tus predicciones, crea un grupo e invita a tus amigos. Calcularemos la puntuacion mas tarde con los resultados oficiales de la temporada.",
+    "headline": "Haz predicciones atrevidas de F1 2026.",
+    "subtitle": "Responde 23 preguntas originales de F1 que ponen a prueba tu conocimiento.",
     "create_account": "Crear una cuenta",
     "start_predicting": "Empezar a predecir",
     "go_dashboard": "Ir al panel",
     "about_link": "Acerca de F1 Predictions",
-    "flow_title": "Flujo en tres pasos",
-    "flow_step_1": "Crea un grupo y comparte un enlace de invitacion.",
-    "flow_step_2": "Todos se unen y completan sus predicciones.",
-    "flow_step_3": "Ve las respuestas del grupo en un solo lugar."
+    "flow_title": "Tres pasos rapidos",
+    "flow_step_1": "Abre Predicciones y responde una vez 23 preguntas (unos 3-5 minutos).",
+    "flow_step_2": "Crea o unete a grupos privados/publicos para comparar tus pronosticos con gente que conoces.",
+    "flow_step_3": "Sigue las proyecciones del leaderboard carrera a carrera (proximamente) para ver donde acabarias si la temporada terminara hoy."
   },
   "about_page": {
     "title": "Acerca de F1 Predictions",

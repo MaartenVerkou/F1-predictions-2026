@@ -77,6 +77,10 @@
     "invite_link": "Invite link",
     "copy": "Copy",
     "created_at": "Created",
+    "invite_link_open": "Invite link is open",
+    "invite_link_closed": "Invite link is closed",
+    "open_link": "Open link",
+    "close_link": "Close link",
     "no_invite_link": "No invite link yet.",
     "generate_new_link": "Generate new link",
     "remove_link": "Remove link",
@@ -86,7 +90,10 @@
     "remove_admin": "Remove admin",
     "group_password": "Group password",
     "set_new_password": "Set new password",
-    "update_password": "Update password"
+    "update_password": "Update password",
+    "previous_25": "Previous 25",
+    "next_25": "Next 25",
+    "page_x_of_y": "Page {current} of {total}"
   },
   "questions": {
     "page_title": "Predictions",
@@ -117,6 +124,8 @@
     "position_word": "position",
     "driver_word": "pilote",
     "scroll_to_end": "Aller en bas de page",
+    "last_season_link": "Saison precedente",
+    "last_season_default_result": "Pas directement comparable",
     "couple_to_global_label": "Coupler les pronostics de ce groupe a mes pronostics {group_name}",
     "couple_to_global_help": "Active = ce groupe utilise toujours tes picks Global. Desactive pour faire des picks specifiques a ce groupe.",
     "points_multi_select_penalty": "{points} {points_word} par {driver_word} correct, -{penalty} pour chaque {driver_word} manquant ou incorrect (min {minimum})",
@@ -140,6 +149,7 @@
     "no_responses": "Aucune reponse pour le moment.",
     "summary_title": "Repartition",
     "response_count_label": "reponses",
+    "season_result_toggle": "Resultat {season} (details)",
     "position_label": "Position {n}",
     "your_pick": "Ton choix",
     "other": "Autres",
@@ -151,16 +161,16 @@
   },
   "home": {
     "badge_how_it_works": "Comment ca marche",
-    "headline": "Faites des pronostics F1 2026 audacieux avec vos amis.",
-    "subtitle": "Remplissez vos pronostics, creez un groupe et invitez vos amis. Le classement est calcule plus tard selon les resultats officiels de la saison.",
+    "headline": "Faites des pronostics F1 2026 audacieux.",
+    "subtitle": "Repondez a 23 questions F1 originales qui testent vos connaissances.",
     "create_account": "Creer un compte",
     "start_predicting": "Commencer les pronostics",
     "go_dashboard": "Aller au tableau de bord",
     "about_link": "A propos de F1 Predictions",
-    "flow_title": "Fonctionnement en trois etapes",
-    "flow_step_1": "Creez un groupe et partagez un lien dinvitation.",
-    "flow_step_2": "Tout le monde rejoint et complete ses pronostics.",
-    "flow_step_3": "Consultez les reponses du groupe au meme endroit."
+    "flow_title": "Trois etapes rapides",
+    "flow_step_1": "Ouvrez Pronostics et repondez une seule fois a 23 questions (environ 3-5 minutes).",
+    "flow_step_2": "Creez ou rejoignez des groupes prives/publics pour comparer vos choix avec des personnes que vous connaissez.",
+    "flow_step_3": "Suivez les projections du classement course par course (bientot) pour voir ou vous finiriez si la saison se terminait maintenant."
   },
   "about_page": {
     "title": "A propos de F1 Predictions",

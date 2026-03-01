@@ -203,6 +203,24 @@ Race options are loaded from `data/races.json`:
 
 Enter season results at `/admin/actuals` after the season. Leaderboard scoring is currently disabled until season results are finalized.
 
+## Last season references per question
+
+The app can show a clickable "last season" source link and short result text under each question (on both Questions and Responses pages).
+
+Generate/update the references file:
+
+```powershell
+npm run build:last-season-results
+```
+
+Optional custom season:
+
+```powershell
+node scripts/build-last-season-results.js 2025
+```
+
+The generated file is `data/last-season-results.json` by default (or `LAST_SEASON_RESULTS_PATH` if set in `.env`).
+
 ## Points balance simulation
 
 You can run a local Monte Carlo style balance check with synthetic players that use "global F1 knowledge" (strong/weak teams) plus noise.
@@ -242,10 +260,11 @@ npm run analyze:balance -- --players 1000 --seasons 200 --json balance-report.js
 - `SESSION_SECRET` - session cookie secret
 - `ADMIN_EMAILS` - comma-separated admin whitelist emails (e.g. `admin@example.com,owner@example.com`)
 - `SMTP_USER` - sender mailbox username/login (e.g. `no-reply@example.com`)
+- `CONTACT_EMAIL` - contact email shown on the About/Contact section (defaults to `CONTACT_EMAIL`, then `SMTP_FROM` mailbox, then `SMTP_USER`)
 - `SMTP_PASS` - sender mailbox password
 - `SMTP_HOST` - SMTP host (e.g. `mail.example.com`)
 - `SMTP_PORT` - optional SMTP port (default `465`); SSL/TLS is chosen automatically (`465` secure, others STARTTLS/plain)
-- `SMTP_CLIENT_NAME` - optional SMTP client/EHLO name; defaults to the domain part of `SMTP_USER`
+- `SMTP_CLIENT_NAME` - optional SMTP client/EHLO name; defaults to `APP_DOMAIN` host (then `SMTP_USER` domain as fallback)
 - `APP_DOMAIN` - app domain/host (default `localhost`); used by built-in Caddy edge profile and for email verification/reset links. For localhost, the app uses `http://localhost:PORT`; otherwise it uses `https://APP_DOMAIN`.
 - `DEV_AUTO_LOGIN` - set to `1` to auto-login a dev user on each request (disabled when `NODE_ENV=production`)
 - `DEV_AUTO_LOGIN_EMAIL` - email used for dev auto-login (default `dev@example.com`)

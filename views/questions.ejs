@@ -109,6 +109,16 @@
         const entries = Object.entries(q.points).map(([key, value]) => `${key}: ${value}`);
         return entries.length ? `${t('questions.points_label')}: ${entries.join(', ')}` : null;
       }; %>
+      <% const isHumanReadableSourceUrl = (url) => {
+        if (!url || typeof url !== 'string') return false;
+        const value = url.trim();
+        if (!/^https?:\/\//i.test(value)) return false;
+        const lower = value.toLowerCase();
+        if (lower.includes('api.jolpi.ca')) return false;
+        if (lower.includes('/ergast/')) return false;
+        if (lower.endsWith('.json') || lower.includes('.json?')) return false;
+        return true;
+      }; %>
 
       <% questions.forEach(question => { 
         const sourceOptions = question.options_source === 'drivers'
@@ -122,14 +132,50 @@
         const optionLabels = question.option_labels || {};
         const getOptionLabel = (option) => optionLabels[option] || option;
         const type = question.type || 'text';
+        const lastSeason = question.last_season || null;
+        const hasLastSeasonReference = Boolean(lastSeason);
+        const lastSeasonResult = hasLastSeasonReference
+          ? (String(lastSeason?.result || '').trim() || t('questions.last_season_default_result'))
+          : '';
+        const lastSeasonUrl = String(lastSeason?.url || '').trim();
+        const lastSeasonLabel = String(lastSeason?.label || '').trim();
+        const lastSeasonSourceUrl = isHumanReadableSourceUrl(lastSeasonUrl) ? lastSeasonUrl : '';
+        const hasLastSeasonDetails = hasLastSeasonReference && Boolean(lastSeasonResult || lastSeasonSourceUrl);
       %>
         <div class="question">
-          <div style="font-weight:600;"><%= question.prompt %></div>
+          <div class="question-head-row">
+            <div class="question-title"><%= question.prompt %></div>
+          </div>
           <% if (question.helper) { %>
             <div class="muted"><%= question.helper %></div>
           <% } %>
-          <% const pointsText = formatPoints(question); if (pointsText) { %>
-            <div class="muted question-points"><%= pointsText %></div>
+          <% const pointsText = formatPoints(question); %>
+          <% if (pointsText || hasLastSeasonDetails) { %>
+            <div class="question-meta-row <%= !pointsText ? 'is-last-season-only' : '' %>">
+              <% if (pointsText) { %>
+                <div class="muted question-points"><%= pointsText %></div>
+              <% } %>
+              <% if (hasLastSeasonDetails) { %>
+                <div class="question-last-season-peek" tabindex="0">
+                  <span class="question-last-season-toggle"><%= t('questions.last_season_link') %></span>
+                  <div class="question-last-season-panel">
+                    <% if (lastSeasonResult) { %>
+                      <div class="question-last-season-result"><%= lastSeasonResult %></div>
+                    <% } %>
+                    <% if (lastSeasonSourceUrl) { %>
+                      <a
+                        class="link question-last-season-source"
+                        href="<%= lastSeasonSourceUrl %>"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <%= lastSeasonLabel || lastSeasonSourceUrl %>
+                      </a>
+                    <% } %>
+                  </div>
+                </div>
+              <% } %>
+            </div>
           <% } %>
           <% if ((type === 'ranking' || type === 'single_choice' || type === 'multi_select' || type === 'multi_select_limited') && (!options || options.length === 0)) { %>
             <div class="alert"><%= t('questions.no_options_loaded') %></div>

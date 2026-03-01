@@ -14,11 +14,6 @@
     <div class="inline-actions">
       <a class="button-link" href="/groups/<%= group.id %>/questions"><%= t('group.answer_questions') %></a>
       <a class="link" href="/groups/<%= group.id %>/responses"><%= t('group.view_responses') %></a>
-      <% if (!group.is_global) { %>
-        <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('<%= t('group.leave_confirm') %>');" style="margin:0;">
-          <button class="secondary" type="submit"><%= t('group.leave_group') %></button>
-        </form>
-      <% } %>
     </div>
   </div>
 
@@ -40,12 +35,15 @@
     <div class="card">
       <h2><%= t('group.invite_link') %></h2>
       <% if (invite) { %>
-        <div class="card" style="padding:12px;">
+        <div class="group-invite-link-card">
           <div class="inline-actions" style="justify-content: space-between;">
-            <span class="link" id="invite-link" data-copy-value="https://f1predictions.crashalong.com/join/<%= invite.code %>">/join/<%= invite.code %></span>
+            <span class="link" id="invite-link" data-copy-value="<%= baseUrl %>/join/<%= invite.code %>">/join/<%= invite.code %></span>
             <button type="button" class="secondary" data-copy-target="invite-link"><%= t('group.copy') %></button>
           </div>
-          <div class="muted"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
+          <div class="group-invite-meta"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
+          <div class="group-invite-status <%= Number(group.invite_link_open ?? 1) === 1 ? 'is-open' : 'is-closed' %>">
+            <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.invite_link_open') : t('group.invite_link_closed') %>
+          </div>
         </div>
       <% } else { %>
         <p class="muted"><%= t('group.no_invite_link') %></p>
@@ -53,11 +51,11 @@
 
       <% if (role === 'owner' || role === 'admin') { %>
         <div class="inline-actions" style="margin-top:12px;">
-          <form method="post" action="/groups/<%= group.id %>/invites">
-            <button type="submit"><%= t('group.generate_new_link') %></button>
-          </form>
-          <form method="post" action="/groups/<%= group.id %>/invites/remove">
-            <button class="secondary" type="submit"><%= t('group.remove_link') %></button>
+          <form method="post" action="/groups/<%= group.id %>/invite-link/toggle">
+            <input type="hidden" name="open" value="<%= Number(group.invite_link_open ?? 1) === 1 ? 0 : 1 %>" />
+            <button class="secondary" type="submit">
+              <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.close_link') : t('group.open_link') %>
+            </button>
           </form>
         </div>
       <% } %>
@@ -66,31 +64,47 @@
 
   <div class="card">
     <h2><%= t('group.members') %></h2>
-    <ul class="list">
+    <ul class="list group-members-list">
       <% members.forEach(member => { %>
-        <li>
-          <strong><%= member.name %></strong>
-          <span class="muted">(<%= member.role %>)</span>
+        <li class="group-member-item">
+          <div class="group-member-main">
+            <strong><%= member.name %></strong>
+            <span class="muted">(<%= member.role %>)</span>
+          </div>
           <% if (role === 'owner' || role === 'admin') { %>
-            <% if (member.role !== 'owner') { %>
-              <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick" style="display:inline;">
-                <button class="secondary" type="submit"><%= t('group.kick') %></button>
-              </form>
-            <% } %>
-            <% if (member.role === 'member') { %>
-              <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote" style="display:inline;">
-                <button class="secondary" type="submit"><%= t('group.make_admin') %></button>
-              </form>
-            <% } %>
-            <% if (member.role === 'admin') { %>
-              <form method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote" style="display:inline;">
-                <button class="secondary" type="submit"><%= t('group.remove_admin') %></button>
-              </form>
-            <% } %>
+            <div class="group-member-actions">
+              <% if (member.role !== 'owner') { %>
+                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick">
+                  <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
+                </form>
+              <% } %>
+              <% if (member.role === 'member') { %>
+                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote">
+                  <button class="secondary group-member-action-btn" type="submit"><%= t('group.make_admin') %></button>
+                </form>
+              <% } %>
+              <% if (member.role === 'admin') { %>
+                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote">
+                  <button class="secondary group-member-action-btn" type="submit"><%= t('group.remove_admin') %></button>
+                </form>
+              <% } %>
+            </div>
           <% } %>
         </li>
       <% }) %>
     </ul>
+    <% if (totalMembersPages > 1) { %>
+      <% const membersPageHref = (page) => `/groups/${group.id}?membersPage=${page}`; %>
+      <div class="inline-actions group-members-pagination">
+        <% if (currentMembersPage > 1) { %>
+          <a class="link" href="<%= membersPageHref(currentMembersPage - 1) %>"><%= t('group.previous_25') %></a>
+        <% } %>
+        <span class="muted"><%= t('group.page_x_of_y', { current: currentMembersPage, total: totalMembersPages }) %></span>
+        <% if (currentMembersPage < totalMembersPages) { %>
+          <a class="link" href="<%= membersPageHref(currentMembersPage + 1) %>"><%= t('group.next_25') %></a>
+        <% } %>
+      </div>
+    <% } %>
   </div>
 
   <% if (!group.is_public && (role === 'owner' || role === 'admin')) { %>
@@ -102,6 +116,14 @@
           <input type="password" name="joinPassword" required minlength="4" />
         </label>
         <button type="submit"><%= t('group.update_password') %></button>
+      </form>
+    </div>
+  <% } %>
+
+  <% if (!group.is_global) { %>
+    <div class="card">
+      <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('<%= t('group.leave_confirm') %>');" style="margin:0;">
+        <button class="secondary" type="submit"><%= t('group.leave_group') %></button>
       </form>
     </div>
   <% } %>

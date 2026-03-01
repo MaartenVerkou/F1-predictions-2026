@@ -669,8 +669,90 @@ button:disabled {
   margin-bottom: 32px;
 }
 
-.question-points {
+.question-head-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+.question-title {
+  font-weight: 600;
+}
+
+.question-meta-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   margin: 0 0 8px;
+}
+
+.question-meta-row.is-last-season-only {
+  justify-content: flex-end;
+}
+
+.question-points {
+  margin: 0;
+}
+
+.question-last-season-peek {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.question-last-season-toggle {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--muted);
+  user-select: none;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--rules-bg);
+}
+
+.question-last-season-panel {
+  position: absolute;
+  bottom: 0;
+  right: calc(100% + 6px);
+  left: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--rules-bg);
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.35;
+  max-width: min(460px, 90vw);
+  min-width: 240px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+  transform-origin: bottom right;
+  z-index: 20;
+}
+
+.question-last-season-peek:hover .question-last-season-panel {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.question-last-season-result {
+  color: var(--text);
+}
+
+.question-last-season-source {
+  width: fit-content;
 }
 
 .questions-couple-toggle {
@@ -774,7 +856,7 @@ button:disabled {
 
 .hero-start-predicting {
   font-size: 17px;
-  padding: 12px 22px;
+  padding: 24px 22px;
   box-shadow: var(--shadow-strong);
 }
 
@@ -852,6 +934,71 @@ button:disabled {
   font-weight: 700;
 }
 
+.responses-question-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.responses-question-head h2 {
+  margin: 0;
+}
+
+.responses-last-season-details {
+  margin-left: auto;
+  display: grid;
+  justify-items: end;
+}
+
+.responses-last-season-toggle {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--muted);
+  list-style: none;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--rules-bg);
+}
+
+.responses-last-season-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.responses-last-season-toggle::after {
+  content: " ▾";
+  font-size: 10px;
+}
+
+.responses-last-season-details[open] .responses-last-season-toggle::after {
+  content: " ▴";
+}
+
+.responses-last-season-panel {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--rules-bg);
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.35;
+  max-width: min(460px, 90vw);
+}
+
+.responses-last-season-result {
+  color: var(--text);
+}
+
+.responses-last-season-source {
+  width: fit-content;
+}
+
 .responses-viewer-pick {
   display: flex;
   flex-wrap: wrap;
@@ -879,7 +1026,7 @@ button:disabled {
 
 .responses-bars {
   --responses-label-col: clamp(150px, 30%, 280px);
-  --responses-value-col: 88px;
+  --responses-value-col: 108px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1125,7 +1272,30 @@ button:disabled {
 @media (max-width: 760px) {
   .responses-bars {
     --responses-label-col: clamp(120px, 42%, 220px);
-    --responses-value-col: 78px;
+    --responses-value-col: 96px;
+  }
+
+  .question-head-row,
+  .responses-question-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .question-meta-row,
+  .question-meta-row.is-last-season-only {
+    justify-content: flex-start;
+  }
+
+  .question-last-season-peek,
+  .responses-last-season-details {
+    margin-left: 0;
+  }
+
+  .question-last-season-panel {
+    bottom: 0;
+    left: auto;
+    right: calc(100% + 6px);
+    max-width: min(92vw, 460px);
   }
 }
 
@@ -1406,6 +1576,90 @@ button:disabled {
   font-weight: 400;
   line-height: 1.45;
   color: var(--text);
+}
+
+.group-invite-link-card {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.group-invite-meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.group-invite-status {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.group-invite-status.is-open {
+  color: #2d6a3a;
+}
+
+.group-invite-status.is-closed {
+  color: var(--text);
+}
+
+.group-members-list {
+  gap: 4px;
+}
+
+.group-member-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--rules-bg);
+}
+
+.group-member-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.group-member-main strong {
+  line-height: 1.1;
+  font-size: 14px;
+}
+
+.group-member-main .muted {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.group-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.group-member-action-form {
+  margin: 0;
+  display: block;
+}
+
+.group-member-action-btn {
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.group-members-pagination {
+  margin-top: 8px;
+  gap: 10px;
 }
 
 .questions-top-actions {
@@ -1711,6 +1965,16 @@ header.is-collapsed .lang-popover {
   .scroll-to-end-btn {
     right: 16px;
     bottom: 16px;
+  }
+
+  .group-member-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .group-member-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 

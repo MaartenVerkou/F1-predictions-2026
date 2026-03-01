@@ -18,6 +18,7 @@ services:
       - QUESTIONS_PATH=/app/config/questions.json
       - ROSTER_PATH=/app/config/roster.json
       - RACES_PATH=/app/config/races.json
+      - LAST_SEASON_RESULTS_PATH=${LAST_SEASON_RESULTS_PATH:-/app/config/last-season-results.json}
       - SESSION_SECRET=${SESSION_SECRET:-change-me}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}

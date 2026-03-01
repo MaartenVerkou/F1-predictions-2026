@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "analyze:balance": "node scripts/analyze-balance.js"
+    "analyze:balance": "node scripts/analyze-balance.js",
+    "build:last-season-results": "node scripts/build-last-season-results.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

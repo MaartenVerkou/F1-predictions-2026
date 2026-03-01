@@ -77,6 +77,10 @@
     "invite_link": "Invite-link",
     "copy": "Kopieer",
     "created_at": "Aangemaakt",
+    "invite_link_open": "Invite-link staat open",
+    "invite_link_closed": "Invite-link is gesloten",
+    "open_link": "Link openen",
+    "close_link": "Link sluiten",
     "no_invite_link": "Nog geen invite-link.",
     "generate_new_link": "Nieuwe link genereren",
     "remove_link": "Link verwijderen",
@@ -86,7 +90,10 @@
     "remove_admin": "Admin weghalen",
     "group_password": "Groepswachtwoord",
     "set_new_password": "Nieuw wachtwoord instellen",
-    "update_password": "Wachtwoord bijwerken"
+    "update_password": "Wachtwoord bijwerken",
+    "previous_25": "Vorige 25",
+    "next_25": "Volgende 25",
+    "page_x_of_y": "Pagina {current} van {total}"
   },
   "questions": {
     "page_title": "Voorspellingen",
@@ -117,6 +124,8 @@
     "position_word": "positie",
     "driver_word": "coureur",
     "scroll_to_end": "Ga naar einde van pagina",
+    "last_season_link": "Vorig seizoen",
+    "last_season_default_result": "Niet direct vergelijkbaar",
     "couple_to_global_label": "Koppel de voorspellingen van deze groep aan mijn {group_name}-voorspellingen",
     "couple_to_global_help": "AAN betekent dat deze groep altijd je Global picks gebruikt. Zet uit om voor deze groep afwijkende picks te maken.",
     "points_multi_select_penalty": "{points} {points_word} per correcte {driver_word}, -{penalty} voor elke ontbrekende of onjuiste {driver_word} (min {minimum})",
@@ -140,6 +149,7 @@
     "no_responses": "Nog geen antwoorden.",
     "summary_title": "Verdeling",
     "response_count_label": "antwoorden",
+    "season_result_toggle": "Resultaat {season} (details)",
     "position_label": "Positie {n}",
     "your_pick": "Jouw keuze",
     "other": "Overig",
@@ -151,16 +161,16 @@
   },
   "home": {
     "badge_how_it_works": "Hoe het werkt",
-    "headline": "Doe gewaagde F1 2026 voorspellingen met vrienden.",
-    "subtitle": "Vul je voorspellingen in, maak een groep en nodig vrienden uit. We berekenen later de score op basis van de officiele seizoensuitslagen.",
+    "headline": "Doe gewaagde F1 2026 voorspellingen.",
+    "subtitle": "Beantwoord 23 originele F1-vragen die je racekennis testen.",
     "create_account": "Maak een account",
     "start_predicting": "Start met voorspellen",
     "go_dashboard": "Ga naar je dashboard",
     "about_link": "Over F1 Predictions",
-    "flow_title": "In drie stappen",
-    "flow_step_1": "Maak een groep en deel een invite-link.",
-    "flow_step_2": "Iedereen joint en vult voorspellingen in.",
-    "flow_step_3": "Bekijk alle groepsantwoorden op een plek."
+    "flow_title": "Drie snelle stappen",
+    "flow_step_1": "Open Voorspellingen en beantwoord 23 vragen eenmalig (ongeveer 3-5 minuten).",
+    "flow_step_2": "Maak of join private/public groepen om picks te vergelijken met mensen die je kent.",
+    "flow_step_3": "Volg race-voor-race leaderboardprojecties (komt later) om te zien waar je zou eindigen als het seizoen nu stopte."
   },
   "about_page": {
     "title": "Over F1 Predictions",

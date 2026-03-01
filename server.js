@@ -10,16 +10,72 @@ const nodemailer = require("nodemailer");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
 
+function loadDotEnvIfPresent(filePath = path.join(__dirname, ".env")) {
+  if (!fs.existsSync(filePath)) return;
+  let raw = "";
+  try {
+    raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, "");
+  } catch (err) {
+    console.error(`Failed to read env file: ${filePath}`, err);
+    return;
+  }
+
+  for (const rawLine of raw.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const idx = line.indexOf("=");
+    if (idx <= 0) continue;
+
+    const key = line.slice(0, idx).trim();
+    if (!key || process.env[key] != null) continue;
+
+    let value = line.slice(idx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
+loadDotEnvIfPresent();
+
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questions.json");
 const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json");
 const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
+const LAST_SEASON_RESULTS_PATH =
+  process.env.LAST_SEASON_RESULTS_PATH ||
+  path.join(DATA_DIR, "last-season-results.json");
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_FROM = process.env.SMTP_FROM || "";
 const COMPANY_NAME = process.env.COMPANY_NAME || "F1 Predictions";
+function deriveContactEmail() {
+  const explicit = String(process.env.CONTACT_EMAIL || "").trim();
+  if (explicit) return explicit;
+
+  const from = String(SMTP_FROM || "").trim();
+  if (from) {
+    const bracketMatch = from.match(/<([^>]+)>/);
+    if (bracketMatch && bracketMatch[1]) {
+      return bracketMatch[1].trim();
+    }
+    if (from.includes("@") && !/\s/.test(from)) {
+      return from;
+    }
+  }
+
+  const smtpUser = String(SMTP_USER || "").trim();
+  if (smtpUser) return smtpUser;
+
+  return "info@crashalong.com";
+}
+const CONTACT_EMAIL = deriveContactEmail();
 const SMTP_PASS = process.env.SMTP_PASS || "";
 const SMTP_HOST = process.env.SMTP_HOST || "";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
@@ -43,6 +99,19 @@ function deriveBaseUrl() {
   return `https://${host}`;
 }
 const BASE_URL = deriveBaseUrl();
+function deriveAppDomainHost() {
+  try {
+    return new URL(BASE_URL).hostname || "";
+  } catch (err) {
+    const raw = String(process.env.APP_DOMAIN || "")
+      .trim()
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/+$/, "");
+    const host = raw.split("/")[0] || "";
+    return host.split(":")[0] || "";
+  }
+}
+const APP_DOMAIN_HOST = deriveAppDomainHost();
 const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "1";
 const DEV_AUTO_LOGIN_EMAIL =
   process.env.DEV_AUTO_LOGIN_EMAIL || "dev@example.com";
@@ -266,6 +335,12 @@ function ensureGroupColumns() {
   if (!names.has("is_simulated")) {
     db.exec("ALTER TABLE groups ADD COLUMN is_simulated INTEGER DEFAULT 0;");
   }
+  if (!names.has("invite_link_open")) {
+    db.exec("ALTER TABLE groups ADD COLUMN invite_link_open INTEGER DEFAULT 1;");
+  }
+  db.prepare(
+    "UPDATE groups SET invite_link_open = 1 WHERE invite_link_open IS NULL"
+  ).run();
 }
 
 ensureGroupColumns();
@@ -513,6 +588,8 @@ app.use((req, res, next) => {
   res.locals.t = (key, params = {}) => translate(locale, key, params);
   res.locals.paypalDonationUrl = PAYPAL_DONATION_URL;
   res.locals.paypalDonationLabel = PAYPAL_DONATION_LABEL;
+  res.locals.contactEmail = CONTACT_EMAIL;
+  res.locals.baseUrl = BASE_URL;
   next();
 });
 
@@ -683,7 +760,9 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
       includeExcluded,
       includeMeta
     });
-    return localizeQuestions(adjustedFallback, resolvedLocale);
+    return attachLastSeasonReferences(
+      localizeQuestions(adjustedFallback, resolvedLocale)
+    );
   }
 
   const parsed = readJsonFile(QUESTIONS_PATH);
@@ -699,7 +778,9 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
     includeExcluded,
     includeMeta
   });
-  return localizeQuestions(adjustedQuestions, resolvedLocale);
+  return attachLastSeasonReferences(
+    localizeQuestions(adjustedQuestions, resolvedLocale)
+  );
 }
 
 function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
@@ -725,6 +806,33 @@ function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
     }
     return localized;
   });
+}
+
+function getLastSeasonReferences() {
+  const candidates = [
+    LAST_SEASON_RESULTS_PATH,
+    path.join(path.dirname(QUESTIONS_PATH), "last-season-results.json"),
+    path.join(__dirname, "data", "last-season-results.json")
+  ];
+
+  for (const filePath of candidates) {
+    if (!filePath || !fs.existsSync(filePath)) continue;
+    const parsed = readJsonFile(filePath);
+    if (!parsed || typeof parsed !== "object") continue;
+    const map = parsed.questions;
+    if (!map || typeof map !== "object" || Array.isArray(map)) continue;
+    return map;
+  }
+
+  return {};
+}
+
+function attachLastSeasonReferences(questions) {
+  const refs = getLastSeasonReferences();
+  return (questions || []).map((question) => ({
+    ...question,
+    last_season: refs[question.id] || null
+  }));
 }
 
 function getRoster() {
@@ -929,6 +1037,42 @@ function getCopySourceGroups(userId, currentGroupId) {
     .all(userId, currentGroupId);
 }
 
+function getLatestInviteForGroup(groupId) {
+  return db
+    .prepare(
+      "SELECT * FROM invites WHERE group_id = ? ORDER BY created_at DESC LIMIT 1"
+    )
+    .get(groupId);
+}
+
+function createInviteForGroup(groupId, createdByUserId) {
+  const maxAttempts = 5;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const code = crypto.randomBytes(4).toString("hex");
+    try {
+      db.prepare(
+        "INSERT INTO invites (group_id, code, created_at, created_by) VALUES (?, ?, ?, ?)"
+      ).run(groupId, code, new Date().toISOString(), createdByUserId);
+      return getLatestInviteForGroup(groupId);
+    } catch (err) {
+      const isUniqueError =
+        err && String(err.message || "").toLowerCase().includes("unique");
+      if (!isUniqueError) throw err;
+    }
+  }
+  throw new Error("Failed to generate unique invite code");
+}
+
+function ensureInviteForGroup(groupId) {
+  const group = db
+    .prepare("SELECT id, owner_id, is_global FROM groups WHERE id = ?")
+    .get(groupId);
+  if (!group || Number(group.is_global) === 1) return null;
+  const existing = getLatestInviteForGroup(groupId);
+  if (existing) return existing;
+  return createInviteForGroup(groupId, group.owner_id);
+}
+
 function getGroupRulesText(group, locale = DEFAULT_LOCALE) {
   const customRules = String(group?.rules_text || "").trim();
   return customRules || getDefaultGroupRules(locale);
@@ -937,7 +1081,9 @@ function getGroupRulesText(group, locale = DEFAULT_LOCALE) {
 function getMailer() {
   if (!SMTP_USER || !SMTP_PASS || !SMTP_HOST) return null;
   const smtpName =
-    SMTP_CLIENT_NAME || (SMTP_USER.includes("@") ? SMTP_USER.split("@")[1] : "");
+    SMTP_CLIENT_NAME ||
+    APP_DOMAIN_HOST ||
+    (SMTP_USER.includes("@") ? SMTP_USER.split("@")[1] : "");
   return nodemailer.createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
@@ -1153,6 +1299,7 @@ app.post("/groups", requireAuth, (req, res) => {
   db.prepare(
     "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
   ).run(user.id, groupInfo.lastInsertRowid, "owner", now);
+  ensureInviteForGroup(groupInfo.lastInsertRowid);
   syncFromGlobalIfCoupled(user.id, groupInfo.lastInsertRowid, now);
 
   res.redirect(`/groups/${groupInfo.lastInsertRowid}`);
@@ -1258,12 +1405,26 @@ app.get("/groups/:id", requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(req.params.id);
+  const membersPerPage = 25;
+  const requestedMembersPage = Number(req.query.membersPage || 1);
+  const currentMembersPage =
+    Number.isFinite(requestedMembersPage) && requestedMembersPage > 0
+      ? Math.floor(requestedMembersPage)
+      : 1;
   if (!isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
   const group = db
     .prepare("SELECT * FROM groups WHERE id = ?")
     .get(groupId);
+  const membersTotal = Number(
+    db
+      .prepare("SELECT COUNT(*) AS count FROM group_members WHERE group_id = ?")
+      .get(groupId)?.count || 0
+  );
+  const totalMembersPages = Math.max(1, Math.ceil(membersTotal / membersPerPage));
+  const safeMembersPage = Math.min(currentMembersPage, totalMembersPages);
+  const membersOffset = (safeMembersPage - 1) * membersPerPage;
   const members = db
     .prepare(
       `
@@ -1272,14 +1433,11 @@ app.get("/groups/:id", requireAuth, (req, res) => {
       JOIN users u ON u.id = gm.user_id
       WHERE gm.group_id = ?
       ORDER BY gm.joined_at ASC
+      LIMIT ? OFFSET ?
       `
     )
-    .all(groupId);
-  const invite = db
-    .prepare(
-      "SELECT * FROM invites WHERE group_id = ? ORDER BY created_at DESC LIMIT 1"
-    )
-    .get(groupId);
+    .all(groupId, membersPerPage, membersOffset);
+  const invite = ensureInviteForGroup(groupId);
 
   const role = getMemberRole(user.id, groupId);
   const canEditRules = role === "owner" || role === "admin";
@@ -1292,6 +1450,9 @@ app.get("/groups/:id", requireAuth, (req, res) => {
     role,
     canEditRules,
     groupRules,
+    membersPerPage,
+    currentMembersPage: safeMembersPage,
+    totalMembersPages,
     error: null,
     success: null
   });
@@ -1303,13 +1464,7 @@ app.post("/groups/:id/invites", requireAuth, (req, res) => {
   if (!isGroupAdmin(user.id, groupId)) {
     return sendError(req, res, 403, "Admin access only.");
   }
-
-  db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
-  const code = crypto.randomBytes(4).toString("hex");
-  db.prepare(
-    "INSERT INTO invites (group_id, code, created_at, created_by) VALUES (?, ?, ?, ?)"
-  ).run(groupId, code, new Date().toISOString(), user.id);
-
+  ensureInviteForGroup(groupId);
   res.redirect(`/groups/${groupId}`);
 });
 
@@ -1319,7 +1474,30 @@ app.post("/groups/:id/invites/remove", requireAuth, (req, res) => {
   if (!isGroupAdmin(user.id, groupId)) {
     return sendError(req, res, 403, "Admin access only.");
   }
-  db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
+  res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/invite-link/toggle", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  if (!isGroupAdmin(user.id, groupId)) {
+    return sendError(req, res, 403, "Admin access only.");
+  }
+  const group = db.prepare("SELECT id, is_global FROM groups WHERE id = ?").get(groupId);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.is_global) === 1) {
+    return sendError(req, res, 400, "Global group invite link cannot be toggled.");
+  }
+  const shouldOpen = req.body.open === "1";
+  db.prepare("UPDATE groups SET invite_link_open = ? WHERE id = ?").run(
+    shouldOpen ? 1 : 0,
+    groupId
+  );
+  if (shouldOpen) {
+    ensureInviteForGroup(groupId);
+  }
   res.redirect(`/groups/${groupId}`);
 });
 
@@ -1338,6 +1516,12 @@ app.get("/join/:code", requireAuth, (req, res) => {
   const group = db
     .prepare("SELECT * FROM groups WHERE id = ?")
     .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
   const members = db
     .prepare(
       `
@@ -1369,6 +1553,9 @@ app.post("/join/:code", requireAuth, async (req, res) => {
     .get(invite.group_id);
   if (!group) {
     return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
   }
   if (!group.is_public && group.join_password_hash) {
     const { password } = req.body;

@@ -77,6 +77,10 @@
     "invite_link": "Invite link",
     "copy": "Copy",
     "created_at": "Created",
+    "invite_link_open": "Invite link is open",
+    "invite_link_closed": "Invite link is closed",
+    "open_link": "Open link",
+    "close_link": "Close link",
     "no_invite_link": "No invite link yet.",
     "generate_new_link": "Generate new link",
     "remove_link": "Remove link",
@@ -86,7 +90,10 @@
     "remove_admin": "Remove admin",
     "group_password": "Group password",
     "set_new_password": "Set new password",
-    "update_password": "Update password"
+    "update_password": "Update password",
+    "previous_25": "Previous 25",
+    "next_25": "Next 25",
+    "page_x_of_y": "Page {current} of {total}"
   },
   "questions": {
     "page_title": "Predictions",
@@ -117,6 +124,8 @@
     "position_word": "position",
     "driver_word": "driver",
     "scroll_to_end": "Go to end of page",
+    "last_season_link": "Last season",
+    "last_season_default_result": "Not directly comparable",
     "couple_to_global_label": "Couple this group's predictions to my {group_name} predictions",
     "couple_to_global_help": "Enabled means this group always uses your Global picks. Turn off to make custom picks for this group.",
     "points_multi_select_penalty": "{points} {points_word} per correct {driver_word}, -{penalty} for each missing or incorrect {driver_word} (min {minimum})",
@@ -140,6 +149,7 @@
     "no_responses": "No responses yet.",
     "summary_title": "Summary",
     "response_count_label": "responses",
+    "season_result_toggle": "{season} result details",
     "position_label": "Position {n}",
     "your_pick": "Your pick",
     "other": "Other",
@@ -151,16 +161,16 @@
   },
   "home": {
     "badge_how_it_works": "How it works",
-    "headline": "Make bold F1 2026 predictions with friends.",
-    "subtitle": "Fill in your predictions, create a group, and invite friends. We'll score it later once the real season results are in.",
+    "headline": "Make bold F1 2026 predictions.",
+    "subtitle": "Answer 23 original F1 questions that test your racing knowledge.",
     "create_account": "Create an account",
     "start_predicting": "Start predicting",
     "go_dashboard": "Go to your dashboard",
     "about_link": "About F1 Predictions",
-    "flow_title": "Flow in three steps",
-    "flow_step_1": "Create a group and share an invite link.",
-    "flow_step_2": "Everyone joins and fills out their predictions.",
-    "flow_step_3": "View group responses in one place."
+    "flow_title": "Three quick steps",
+    "flow_step_1": "Open Predictions and answer 23 questions once (about 3-5 minutes).",
+    "flow_step_2": "Create or join private/public groups to compare picks with people you know.",
+    "flow_step_3": "Follow race-by-race leaderboard projections (coming soon) to see where you would finish if the season ended now."
   },
   "about_page": {
     "title": "About F1 Predictions",

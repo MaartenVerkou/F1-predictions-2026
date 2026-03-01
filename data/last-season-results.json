@@ -1,0 +1,145 @@
+{
+  "season": 2025,
+  "generated_at": "2026-03-01T01:33:25.668Z",
+  "notes": "Generated from Ergast/Jolpica race and standings endpoints plus selected external reference links.",
+  "questions": {
+    "drivers_championship_top_3": {
+      "season": 2025,
+      "result": "Lando Norris > Max Verstappen > Oscar Piastri",
+      "label": "2025 driver standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/driverStandings.json"
+    },
+    "drivers_championship_last": {
+      "season": 2025,
+      "result": "Jack Doohan",
+      "label": "2025 driver standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/driverStandings.json"
+    },
+    "constructors_championship_top_3": {
+      "season": 2025,
+      "result": "McLaren > Mercedes > Red Bull",
+      "label": "2025 constructor standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json"
+    },
+    "constructors_championship_last": {
+      "season": 2025,
+      "result": "Alpine F1 Team",
+      "label": "2025 constructor standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json"
+    },
+    "all_teams_score_points": {
+      "season": 2025,
+      "result": "Yes",
+      "label": "2025 constructor standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json"
+    },
+    "most_driver_of_the_day": {
+      "season": 2025,
+      "result": "Max Verstappen (8)",
+      "label": "2025 Driver of the Day standings",
+      "url": "https://tracinginsights.com/2025/driver-of-the-day/"
+    },
+    "most_dnfs_driver": {
+      "season": 2025,
+      "result": "Fernando Alonso (5)",
+      "label": "2025 race results (DNF statuses)",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/results.json"
+    },
+    "destructors_team": {
+      "season": 2025,
+      "result": "Alpine ($5,348,000 = 1,327,000 + 1,877,000 + 2,144,000)",
+      "label": "2025 estimated damage standings",
+      "url": "https://www.racingstatisticsf1.com/f1-destructors-championship"
+    },
+    "destructors_driver": {
+      "season": 2025,
+      "result": "Gabriel Bortoleto ($3,967,000)",
+      "label": "2025 estimated damage standings",
+      "url": "https://www.racingstatisticsf1.com/f1-destructors-championship"
+    },
+    "all_podium_finishers": {
+      "season": 2025,
+      "result": "Andrea Kimi Antonelli, Carlos Sainz, Charles Leclerc, George Russell, Isack Hadjar, Lando Norris, Max Verstappen, Nico Hulkenberg, Oscar Piastri",
+      "label": "2025 race results (all podium finishers)",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/results.json"
+    },
+    "teammate_battle_antonelli_russell": {
+      "season": 2025,
+      "result": "George Russell (169)",
+      "label": "2025 driver standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/driverStandings.json"
+    },
+    "teammate_battle_lawson_lindblad": {
+      "season": 2025,
+      "result": "Lando Norris (13)",
+      "label": "2025 driver standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/driverStandings.json"
+    },
+    "alpine_vs_cadillac_audi": {
+      "season": 2025,
+      "result": "Not directly comparable (Cadillac and Audi did not both race in 2025)",
+      "label": "2025 constructor standings",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json"
+    },
+    "most_points_no_podium": {
+      "season": 2025,
+      "result": "Aston Martin (89)",
+      "label": "2025 constructor standings + podium teams",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json"
+    },
+    "lowest_grid_win_position": {
+      "season": 2025,
+      "result": "4 - Oscar Piastri (Miami Grand Prix)",
+      "label": "2025 race winner grid positions",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/results.json"
+    },
+    "select_three_races_dnfs": {
+      "season": 2025,
+      "result": "Australian Grand Prix (6), British Grand Prix (4), Mexico City Grand Prix (4)",
+      "label": "2025 DNF counts by race",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/results.json"
+    },
+    "closest_qualifying_teammates": {
+      "season": 2025,
+      "result": "Sauber (Gabriel Bortoleto 12-11 Nico Hulkenberg)",
+      "label": "2025 qualifying head-to-head",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/qualifying.json"
+    },
+    "races_before_title_decided": {
+      "season": 2025,
+      "result": "0",
+      "label": "2025 driver standings by round",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/driverStandings.json"
+    },
+    "mini_q1_first_race_winner_champion": {
+      "season": 2025,
+      "result": "Yes",
+      "label": "2025 race 1 winner vs champion",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/1/results.json"
+    },
+    "mini_q2_mercedes_engines_top5": {
+      "season": 2025,
+      "result": "No",
+      "label": "2025 top-5 constructors with Mercedes engines (3/5)",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json"
+    },
+    "mini_q3_ferrari_podium": {
+      "season": 2025,
+      "result": "No",
+      "label": "2025 race podium results",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/results.json"
+    },
+    "mini_q4_sprint_champion_same": {
+      "season": 2025,
+      "result": "No",
+      "label": "2025 sprint points summary",
+      "url": "https://api.jolpi.ca/ergast/f1/2025/sprint.json"
+    },
+    "mini_q5_team_engine_switch_2027_2028": {
+      "season": 2025,
+      "result": "See season announcement archive",
+      "label": "2025 team news archive",
+      "url": "https://www.formula1.com/en/latest/all.html?keyword=engine+2025"
+    }
+  }
+}
