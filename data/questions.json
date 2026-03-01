@@ -15,7 +15,7 @@
     },
     {
       "id": "drivers_championship_last",
-      "prompt": "Last driver in the championship (from the initial season lineup)",
+      "prompt": "Which driver finishes last in the championship?",
       "type": "single_choice",
       "options_source": "drivers",
       "points": 10,
@@ -83,7 +83,7 @@
     },
     {
       "id": "all_podium_finishers",
-      "prompt": "Select all race podium finishers (no sprints)",
+      "prompt": "Select all race podium finishers",
       "type": "multi_select",
       "options_source": "drivers",
       "points": 5,

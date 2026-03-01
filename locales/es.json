@@ -131,6 +131,13 @@
     "scroll_to_end": "Ir al final de la pagina",
     "last_season_link": "Temporada pasada",
     "last_season_default_result": "No directamente comparable",
+    "tip_dnf": "DNF significa Did Not Finish en un Gran Premio. DNS y DQ/DSQ no cuentan como DNF.",
+    "tip_dns": "DNS significa Did Not Start. Los DNS no se cuentan como DNF.",
+    "tip_dq": "DQ/DSQ significa descalificado. Las descalificaciones no se cuentan como DNF.",
+    "tip_gp_only_no_sprints": "Esto se refiere solo a carreras de Gran Premio. Las sprints se excluyen salvo que se indique expresamente.",
+    "tip_sprints_only": "Esta pregunta es solo de sprint: solo cuentan resultados de sprint.",
+    "tip_grand_prix": "Grand Prix se refiere a la carrera principal (no al sprint).",
+    "tip_initial_lineup": "Parrilla inicial de la temporada significa la alineacion oficial de pilotos al inicio de temporada.",
     "couple_to_global_label": "Acoplar las predicciones de este grupo a mis predicciones de {group_name}",
     "couple_to_global_help": "Activado = este grupo siempre usa tus picks Global. Desactivalo para hacer picks distintos en este grupo.",
     "points_multi_select_penalty": "{points} {points_word} por cada {driver_word} correcto, -{penalty} por cada {driver_word} faltante o incorrecto (min {minimum})",
@@ -242,7 +249,7 @@
       "points_display": "Puntos: puesto 1 = 50, puesto 2 = 25, puesto 3 = 15"
     },
     "drivers_championship_last": {
-      "prompt": "Ultimo piloto del campeonato (de la parrilla inicial de la temporada)"
+      "prompt": "Que piloto termina ultimo en el campeonato?"
     },
     "constructors_championship_top_3": {
       "prompt": "Campeonato de constructores: elige tu top 3",
@@ -267,7 +274,7 @@
       "prompt": "Campeonato destructors: que piloto tiene mas danos?"
     },
     "all_podium_finishers": {
-      "prompt": "Selecciona todos los pilotos con podio en carrera (sin sprints)"
+      "prompt": "Selecciona todos los pilotos con podio en carrera"
     },
     "teammate_battle_antonelli_russell": {
       "prompt": "Duelo de companeros: Antonelli vs Russell - predice diferencia de puntos y quien suma mas"

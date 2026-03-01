@@ -131,6 +131,13 @@
     "scroll_to_end": "Go to end of page",
     "last_season_link": "Last season",
     "last_season_default_result": "Not directly comparable",
+    "tip_dnf": "DNF means Did Not Finish in a Grand Prix. DNS and DQ/DSQ do not count as DNF.",
+    "tip_dns": "DNS means Did Not Start. DNS entries are not counted as DNF.",
+    "tip_dq": "DQ/DSQ means Disqualified. Disqualifications are not counted as DNF.",
+    "tip_gp_only_no_sprints": "This refers to Grand Prix races only. Sprint sessions are excluded unless explicitly stated.",
+    "tip_sprints_only": "This question is sprint-only: only sprint results are counted.",
+    "tip_grand_prix": "Grand Prix means the main race event (not the sprint).",
+    "tip_initial_lineup": "Initial season lineup means the starting driver lineup at the beginning of the season.",
     "couple_to_global_label": "Couple this group's predictions to my {group_name} predictions",
     "couple_to_global_help": "Enabled means this group always uses your Global picks. Turn off to make custom picks for this group.",
     "points_multi_select_penalty": "{points} {points_word} per correct {driver_word}, -{penalty} for each missing or incorrect {driver_word} (min {minimum})",
@@ -242,7 +249,7 @@
       "points_display": "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts"
     },
     "drivers_championship_last": {
-      "prompt": "Last driver in the championship (from the initial season lineup)"
+      "prompt": "Which driver finishes last in the championship?"
     },
     "constructors_championship_top_3": {
       "prompt": "Constructors' Championship: pick your Top 3",
@@ -267,7 +274,7 @@
       "prompt": "Destructors championship: most damage for which driver?"
     },
     "all_podium_finishers": {
-      "prompt": "Select all race podium finishers (no sprints)"
+      "prompt": "Select all race podium finishers"
     },
     "teammate_battle_antonelli_russell": {
       "prompt": "Team mate battle: Antonelli vs Russell - predict points difference and who scores more"

@@ -110,6 +110,110 @@
         const entries = Object.entries(q.points).map(([key, value]) => `${key}: ${value}`);
         return entries.length ? `${t('questions.points_label')}: ${entries.join(', ')}` : null;
       }; %>
+      <% const escapeHtml = (value) =>
+        String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;'); %>
+      <% const buildPromptTooltipHtml = (questionObj) => {
+        const text = String(questionObj?.prompt || '');
+        if (!text) return '';
+
+        const termDefs = [
+          {
+            tip: t('questions.tip_dnf'),
+            patterns: [/\bDNF(?:'s|s)?\b/gi]
+          },
+          {
+            tip: t('questions.tip_dns'),
+            patterns: [/\bDNS\b/gi]
+          },
+          {
+            tip: t('questions.tip_dq'),
+            patterns: [/\bDQ\b/gi, /\bDSQ\b/gi]
+          },
+          {
+            tip: t('questions.tip_gp_only_no_sprints'),
+            patterns: [
+              /\bno sprints\b/gi,
+              /\bgeen sprints\b/gi,
+              /\bkeine sprints\b/gi,
+              /\bsin sprints\b/gi,
+              /\bsans sprints\b/gi,
+              /\brace podium finishers\b/gi,
+              /\bpodiumfinishers van races\b/gi,
+              /\bpodiumsfahrer in rennen\b/gi,
+              /\bpilotos con podio en carrera\b/gi,
+              /\bpilotes de podium en course\b/gi
+            ]
+          },
+          {
+            tip: t('questions.tip_grand_prix'),
+            patterns: [/\bGrand Prix\b/gi]
+          }
+        ];
+
+        if (String(questionObj?.id || '') === 'drivers_championship_last') {
+          termDefs.push({
+            tip: t('questions.tip_initial_lineup'),
+            patterns: [/\bdriver\b/gi, /\bcoureur\b/gi, /\bfahrer\b/gi, /\bpiloto\b/gi, /\bpilote\b/gi]
+          });
+        }
+
+        const matches = [];
+        termDefs.forEach((def, defIndex) => {
+          def.patterns.forEach((regex) => {
+            const flags = regex.flags.includes('g') ? regex.flags : `${regex.flags}g`;
+            const re = new RegExp(regex.source, flags);
+            let match = re.exec(text);
+            while (match) {
+              if (match[0]) {
+                matches.push({
+                  start: match.index,
+                  end: match.index + match[0].length,
+                  label: match[0],
+                  tip: def.tip,
+                  defIndex
+                });
+              }
+              if (re.lastIndex === match.index) {
+                re.lastIndex += 1;
+              }
+              match = re.exec(text);
+            }
+          });
+        });
+
+        if (!matches.length) return escapeHtml(text);
+
+        matches.sort((a, b) => {
+          if (a.start !== b.start) return a.start - b.start;
+          const aLen = a.end - a.start;
+          const bLen = b.end - b.start;
+          if (aLen !== bLen) return bLen - aLen;
+          return a.defIndex - b.defIndex;
+        });
+
+        const selected = [];
+        let lastEnd = -1;
+        matches.forEach((match) => {
+          if (match.start < lastEnd) return;
+          selected.push(match);
+          lastEnd = match.end;
+        });
+
+        let out = '';
+        let cursor = 0;
+        selected.forEach((match) => {
+          out += escapeHtml(text.slice(cursor, match.start));
+          out += `<span class="question-term" tabindex="0"><span class="question-term-label">${escapeHtml(match.label)}</span><span class="question-term-tooltip">${escapeHtml(match.tip)}</span></span>`;
+          cursor = match.end;
+        });
+        out += escapeHtml(text.slice(cursor));
+        return out;
+      }; %>
       <% const isHumanReadableSourceUrl = (url) => {
         if (!url || typeof url !== 'string') return false;
         const value = url.trim();
@@ -145,7 +249,7 @@
       %>
         <div class="question">
           <div class="question-head-row">
-            <div class="question-title"><%= question.prompt %></div>
+            <div class="question-title"><%- buildPromptTooltipHtml(question) %></div>
           </div>
           <% if (question.helper) { %>
             <div class="muted"><%= question.helper %></div>

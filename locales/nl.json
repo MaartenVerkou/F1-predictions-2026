@@ -131,6 +131,13 @@
     "scroll_to_end": "Ga naar einde van pagina",
     "last_season_link": "Vorig seizoen",
     "last_season_default_result": "Niet direct vergelijkbaar",
+    "tip_dnf": "DNF betekent Did Not Finish in een Grand Prix. DNS en DQ/DSQ tellen niet als DNF.",
+    "tip_dns": "DNS betekent Did Not Start. DNS-resultaten tellen niet als DNF.",
+    "tip_dq": "DQ/DSQ betekent diskwalificatie. Diskwalificaties tellen niet als DNF.",
+    "tip_gp_only_no_sprints": "Dit gaat alleen over Grand Prix-races. Sprintsessies tellen niet mee, tenzij dat expliciet staat.",
+    "tip_sprints_only": "Deze vraag is sprint-only: alleen sprintresultaten tellen mee.",
+    "tip_grand_prix": "Grand Prix betekent de hoofdrace (niet de sprint).",
+    "tip_initial_lineup": "Startopstelling bij seizoensstart betekent de coureurs die aan het begin van het seizoen officieel op de grid stonden.",
     "couple_to_global_label": "Koppel de voorspellingen van deze groep aan mijn {group_name}-voorspellingen",
     "couple_to_global_help": "AAN betekent dat deze groep altijd je Global picks gebruikt. Zet uit om voor deze groep afwijkende picks te maken.",
     "points_multi_select_penalty": "{points} {points_word} per correcte {driver_word}, -{penalty} voor elke ontbrekende of onjuiste {driver_word} (min {minimum})",
@@ -242,7 +249,7 @@
       "points_display": "Punten: plek 1 = 50, plek 2 = 25, plek 3 = 15"
     },
     "drivers_championship_last": {
-      "prompt": "Laatste coureur in het kampioenschap (uit de startopstelling bij seizoensstart)"
+      "prompt": "Welke coureur eindigt als laatste in het kampioenschap?"
     },
     "constructors_championship_top_3": {
       "prompt": "WK constructeurs: kies je top 3",
@@ -267,7 +274,7 @@
       "prompt": "Destructors-kampioenschap: welke coureur heeft de meeste schade?"
     },
     "all_podium_finishers": {
-      "prompt": "Selecteer alle podiumfinishers van races (geen sprints)"
+      "prompt": "Selecteer alle podiumfinishers van races"
     },
     "teammate_battle_antonelli_russell": {
       "prompt": "Teamgenootduel: Antonelli vs Russell - voorspel puntenverschil en wie meer scoort"

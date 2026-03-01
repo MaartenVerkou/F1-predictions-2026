@@ -131,6 +131,13 @@
     "scroll_to_end": "Zum Seitenende",
     "last_season_link": "Letzte Saison",
     "last_season_default_result": "Nicht direkt vergleichbar",
+    "tip_dnf": "DNF bedeutet Did Not Finish in einem Grand Prix. DNS und DQ/DSQ zaehlen nicht als DNF.",
+    "tip_dns": "DNS bedeutet Did Not Start. DNS-Eintraege werden nicht als DNF gewertet.",
+    "tip_dq": "DQ/DSQ bedeutet disqualifiziert. Disqualifikationen werden nicht als DNF gewertet.",
+    "tip_gp_only_no_sprints": "Das bezieht sich nur auf Grand Prix Rennen. Sprint-Sessions sind ausgeschlossen, ausser es steht ausdruecklich dabei.",
+    "tip_sprints_only": "Diese Frage ist sprint-only: es werden nur Sprint-Ergebnisse gewertet.",
+    "tip_grand_prix": "Grand Prix meint das Hauptrennen (nicht den Sprint).",
+    "tip_initial_lineup": "Initiales Startfeld bedeutet die offizielle Fahreraufstellung zu Saisonbeginn.",
     "couple_to_global_label": "Diese Gruppen-Prognosen mit meinen {group_name}-Prognosen koppeln",
     "couple_to_global_help": "Aktiv bedeutet: diese Gruppe nutzt immer deine Global-Tipps. Deaktiviere es fuer eigene Tipps in dieser Gruppe.",
     "points_multi_select_penalty": "{points} {points_word} pro korrektem {driver_word}, -{penalty} fuer jeden fehlenden oder falschen {driver_word} (min {minimum})",
@@ -242,7 +249,7 @@
       "points_display": "Punkte: Platz 1 = 50, Platz 2 = 25, Platz 3 = 15"
     },
     "drivers_championship_last": {
-      "prompt": "Letzter Fahrer in der WM (aus dem Startfeld zum Saisonstart)"
+      "prompt": "Welcher Fahrer beendet die WM als Letzter?"
     },
     "constructors_championship_top_3": {
       "prompt": "Konstrukteurs-WM: waehle deine Top 3",
@@ -267,7 +274,7 @@
       "prompt": "Destructors-Wertung: welcher Fahrer hat den meisten Schaden?"
     },
     "all_podium_finishers": {
-      "prompt": "Waehle alle Podiumsfahrer in Rennen (keine Sprints)"
+      "prompt": "Waehle alle Podiumsfahrer in Rennen"
     },
     "teammate_battle_antonelli_russell": {
       "prompt": "Teamduell: Antonelli vs Russell - prognostiziere Punktedifferenz und wer mehr holt"
