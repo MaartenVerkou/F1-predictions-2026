@@ -1,5 +1,10 @@
 <%- include('partials/header', { title: 'Test group analysis', user }) %>
 <%- include('partials/admin_nav', { active: 'analysis' }) %>
+<% const formatSig4 = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "0";
+  return Number(num.toPrecision(4)).toString();
+}; %>
 
 <div class="card">
   <h1>Test group analysis</h1>
@@ -10,6 +15,7 @@
     <a class="link" href="/admin/analysis">Back to admin</a>
     <a class="link <%= analysisMode === 'actuals' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=actuals">Analyze actuals</a>
     <a class="link <%= analysisMode === 'sim200' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=sim200">Analyze 200 seasons</a>
+    <a class="link" href="/groups/<%= group.id %>/responses">Open responses</a>
     <% if (analysisMode === 'sim200') { %>
       <a class="link" href="/admin/analysis/<%= group.id %>/leaderboard?mode=sim200">Open leaderboard</a>
     <% } else { %>
@@ -24,7 +30,7 @@
   </p>
   <% if (analysis.winner) { %>
     <p class="muted">
-      Current winner: <strong><%= analysis.winner.name %></strong> (<%= analysis.winnerTotal.toFixed(2) %> pts)
+      Current winner: <strong><%= analysis.winner.name %></strong> (<%= formatSig4(analysis.winnerTotal) %> pts)
     </p>
   <% } %>
   <% if (analysisMode === 'sim200') { %>
@@ -45,15 +51,14 @@
   <ul class="muted">
     <li><strong>Impact</strong>: quick label of dominance. HIGH means this question has relatively large influence.</li>
     <li>
-      <strong>Flip %</strong>:
+      <strong>Winner flips</strong>:
       <% if (analysisMode === 'sim200') { %>
         percentage of simulated seasons where the winner changes if this question is removed.
       <% } else { %>
         in actuals mode this is snapshot-based, so it is 100% if removing this question changes the current winner, otherwise 0%.
       <% } %>
     </li>
-    <li><strong>Winner flips?</strong>: direct yes/no version of flip behavior for the current view.</li>
-    <li><strong>Winner %</strong>: share of the winner's total score that comes from this question.</li>
+    <li><strong>Winner score share %</strong>: share of the winner's total score that comes from this question.</li>
     <li><strong>Winner points</strong>: average points the winner gets from this question.</li>
     <li><strong>Avg/player</strong>: average points for all players from this question.</li>
   </ul>
@@ -71,9 +76,8 @@
         <tr>
           <th>Question ID</th>
           <th>Impact</th>
-          <th>Flip %</th>
-          <th>Winner flips?</th>
-          <th>Winner %</th>
+          <th>Winner flips</th>
+          <th>Winner score share %</th>
           <th>Winner points</th>
           <th>Avg/player</th>
         </tr>
@@ -84,9 +88,8 @@
             <td><code><%= row.id %></code></td>
             <td><%= row.impact %></td>
             <td><%= row.flipPercent.toFixed(1) %>%</td>
-            <td><%= row.winnerFlips ? 'Yes' : 'No' %></td>
-            <td><%= row.winnerShare.toFixed(1) %>%</td>
-            <td><%= row.avgWinner.toFixed(2) %></td>
+            <td><%= formatSig4(row.winnerShare) %>%</td>
+            <td><%= formatSig4(row.avgWinner) %></td>
             <td><%= row.avgPlayer.toFixed(2) %></td>
           </tr>
         <% }) %>

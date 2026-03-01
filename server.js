@@ -69,6 +69,41 @@ const LOCALE_LABELS = {
 };
 const localeCache = new Map();
 
+function detectLocaleFromAcceptLanguage(headerValue) {
+  const raw = String(headerValue || "").trim();
+  if (!raw) return DEFAULT_LOCALE;
+
+  const candidates = raw
+    .split(",")
+    .map((part, index) => {
+      const [langRaw, ...params] = part.trim().split(";");
+      const lang = String(langRaw || "").trim().toLowerCase();
+      if (!lang) return null;
+      const base = lang.split("-")[0];
+      let quality = 1;
+      for (const param of params) {
+        const [k, v] = param.trim().split("=");
+        if (String(k || "").trim().toLowerCase() !== "q") continue;
+        const parsed = Number(v);
+        if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
+          quality = parsed;
+        }
+      }
+      return { lang, base, quality, index };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (b.quality !== a.quality) return b.quality - a.quality;
+      return a.index - b.index;
+    });
+
+  for (const candidate of candidates) {
+    if (SUPPORTED_LOCALES.includes(candidate.lang)) return candidate.lang;
+    if (SUPPORTED_LOCALES.includes(candidate.base)) return candidate.base;
+  }
+  return DEFAULT_LOCALE;
+}
+
 function formatCloseDateForRules(locale = DEFAULT_LOCALE) {
   const closeDate = new Date(PREDICTIONS_CLOSE_AT);
   if (Number.isNaN(closeDate.getTime())) return "";
@@ -234,6 +269,19 @@ function ensureGroupColumns() {
 }
 
 ensureGroupColumns();
+
+function ensureGroupMemberColumns() {
+  const columns = db.prepare("PRAGMA table_info(group_members);").all();
+  const names = new Set(columns.map((col) => col.name));
+  if (!names.has("coupled_to_global")) {
+    db.exec("ALTER TABLE group_members ADD COLUMN coupled_to_global INTEGER DEFAULT 1;");
+  }
+  db.prepare(
+    "UPDATE group_members SET coupled_to_global = 1 WHERE coupled_to_global IS NULL"
+  ).run();
+}
+
+ensureGroupMemberColumns();
 
 function ensureUserColumns() {
   const columns = db.prepare("PRAGMA table_info(users);").all();
@@ -447,9 +495,15 @@ app.use(
 
 app.use((req, res, next) => {
   const savedLocale = req.session?.locale;
-  const locale = SUPPORTED_LOCALES.includes(savedLocale)
+  let locale = SUPPORTED_LOCALES.includes(savedLocale)
     ? savedLocale
-    : DEFAULT_LOCALE;
+    : detectLocaleFromAcceptLanguage(req.get("accept-language"));
+  if (!SUPPORTED_LOCALES.includes(locale)) {
+    locale = DEFAULT_LOCALE;
+  }
+  if (req.session && !SUPPORTED_LOCALES.includes(savedLocale)) {
+    req.session.locale = locale;
+  }
   res.locals.locale = locale;
   res.locals.currentPath = req.originalUrl || "/";
   res.locals.supportedLocales = SUPPORTED_LOCALES.map((code) => ({
@@ -780,6 +834,87 @@ function getResponsesByGroup(userId, groupId) {
     }, {});
 }
 
+function isCoupledToGlobal(userId, groupId) {
+  const row = db
+    .prepare(
+      "SELECT coupled_to_global FROM group_members WHERE user_id = ? AND group_id = ?"
+    )
+    .get(userId, groupId);
+  if (!row) return true;
+  return Number(row.coupled_to_global ?? 1) === 1;
+}
+
+function setCoupledToGlobal(userId, groupId, enabled) {
+  db.prepare(
+    "UPDATE group_members SET coupled_to_global = ? WHERE user_id = ? AND group_id = ?"
+  ).run(enabled ? 1 : 0, userId, groupId);
+}
+
+function syncResponsesFromSourceGroup(userId, sourceGroupId, targetGroupId, now) {
+  if (Number(sourceGroupId) === Number(targetGroupId)) return;
+  const sourceRows = db
+    .prepare(
+      "SELECT question_id, answer FROM responses WHERE user_id = ? AND group_id = ?"
+    )
+    .all(userId, sourceGroupId);
+  const timestamp = now || new Date().toISOString();
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM responses WHERE user_id = ? AND group_id = ?").run(
+      userId,
+      targetGroupId
+    );
+    if (sourceRows.length === 0) return;
+    const upsert = db.prepare(
+      `
+      INSERT INTO responses (user_id, group_id, question_id, answer, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, group_id, question_id)
+      DO UPDATE SET answer = excluded.answer, updated_at = excluded.updated_at
+      `
+    );
+    for (const row of sourceRows) {
+      upsert.run(
+        userId,
+        targetGroupId,
+        row.question_id,
+        row.answer,
+        timestamp,
+        timestamp
+      );
+    }
+  });
+  tx();
+}
+
+function syncGlobalResponsesToCoupledGroups(userId, now) {
+  const globalGroup = getGlobalGroup();
+  if (!globalGroup) return;
+  const targets = db
+    .prepare(
+      `
+      SELECT gm.group_id
+      FROM group_members gm
+      JOIN groups g ON g.id = gm.group_id
+      WHERE gm.user_id = ?
+      AND g.is_global = 0
+      AND gm.coupled_to_global = 1
+      `
+    )
+    .all(userId);
+  for (const target of targets) {
+    syncResponsesFromSourceGroup(userId, globalGroup.id, target.group_id, now);
+  }
+}
+
+function syncFromGlobalIfCoupled(userId, groupId, now) {
+  const group = db.prepare("SELECT id, is_global FROM groups WHERE id = ?").get(groupId);
+  if (!group || Number(group.is_global) === 1) return;
+  if (!isCoupledToGlobal(userId, groupId)) return;
+  const globalGroup = getGlobalGroup();
+  if (!globalGroup || Number(globalGroup.id) === Number(groupId)) return;
+  syncResponsesFromSourceGroup(userId, globalGroup.id, groupId, now);
+}
+
 function getCopySourceGroups(userId, currentGroupId) {
   return db
     .prepare(
@@ -1018,6 +1153,7 @@ app.post("/groups", requireAuth, (req, res) => {
   db.prepare(
     "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
   ).run(user.id, groupInfo.lastInsertRowid, "owner", now);
+  syncFromGlobalIfCoupled(user.id, groupInfo.lastInsertRowid, now);
 
   res.redirect(`/groups/${groupInfo.lastInsertRowid}`);
 });
@@ -1030,9 +1166,11 @@ app.post("/groups/:id/join-public", requireAuth, (req, res) => {
     return sendError(req, res, 404, "Group not found.");
   }
   if (!isMember(user.id, groupId)) {
+    const now = new Date().toISOString();
     db.prepare(
       "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-    ).run(user.id, groupId, "member", new Date().toISOString());
+    ).run(user.id, groupId, "member", now);
+    syncFromGlobalIfCoupled(user.id, groupId, now);
   }
   res.redirect(`/groups/${groupId}`);
 });
@@ -1100,9 +1238,11 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   }
 
   if (!isMember(user.id, group.id)) {
+    const now = new Date().toISOString();
     db.prepare(
       "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-    ).run(user.id, group.id, "member", new Date().toISOString());
+    ).run(user.id, group.id, "member", now);
+    syncFromGlobalIfCoupled(user.id, group.id, now);
   }
 
   res.render("dashboard", {
@@ -1278,6 +1418,7 @@ app.post("/join/:code", requireAuth, async (req, res) => {
   db.prepare(
     "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
   ).run(user.id, invite.group_id, "member", now);
+  syncFromGlobalIfCoupled(user.id, invite.group_id, now);
 
   res.redirect(`/groups/${invite.group_id}`);
 });
@@ -1458,12 +1599,23 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
   const races = getRaces();
   const currentAnswers = getResponsesByGroup(user.id, groupId);
   const copyGroups = getCopySourceGroups(user.id, groupId);
+  const globalGroup = getGlobalGroup();
+  const canCoupleToGlobal =
+    !!globalGroup && group.is_global !== 1 && globalGroup.id !== groupId;
+  const coupledToGlobal = canCoupleToGlobal ? isCoupledToGlobal(user.id, groupId) : false;
   const requestedCopyGroupId = Number(req.query.copyFrom || 0);
   let selectedCopyGroupId = null;
   let prefillNotice = null;
   let answers = currentAnswers;
 
-  if (requestedCopyGroupId > 0) {
+  if (canCoupleToGlobal && coupledToGlobal) {
+    syncFromGlobalIfCoupled(user.id, groupId);
+    const globalAnswers = getResponsesByGroup(user.id, globalGroup.id);
+    answers = globalAnswers;
+    prefillNotice = translate(locale, "questions.prefilled_from_group", {
+      group_name: globalGroup.name
+    });
+  } else if (requestedCopyGroupId > 0) {
     const sourceGroup = copyGroups.find((row) => row.id === requestedCopyGroupId);
     if (sourceGroup) {
       selectedCopyGroupId = sourceGroup.id;
@@ -1480,13 +1632,13 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
       }
     }
   } else if (Object.keys(currentAnswers).length === 0) {
-    const globalGroup = copyGroups.find((row) => row.is_global === 1);
-    if (globalGroup) {
-      const globalAnswers = getResponsesByGroup(user.id, globalGroup.id);
+    const copyGlobalGroup = copyGroups.find((row) => row.is_global === 1);
+    if (copyGlobalGroup) {
+      const globalAnswers = getResponsesByGroup(user.id, copyGlobalGroup.id);
       if (Object.keys(globalAnswers).length > 0) {
         answers = globalAnswers;
         prefillNotice = translate(locale, "questions.prefilled_from_group", {
-          group_name: globalGroup.name
+          group_name: copyGlobalGroup.name
         });
       }
     }
@@ -1506,7 +1658,10 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
     roster,
     races,
     closed,
-    closeAt: PREDICTIONS_CLOSE_AT
+    closeAt: PREDICTIONS_CLOSE_AT,
+    canCoupleToGlobal,
+    coupledToGlobal,
+    globalGroupName: globalGroup ? globalGroup.name : "Global"
   });
 });
 
@@ -1521,12 +1676,26 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
     return sendError(req, res, 404, "Group not found.");
   }
 
+  const globalGroup = getGlobalGroup();
+  const canCoupleToGlobal =
+    !!globalGroup && group.is_global !== 1 && globalGroup.id !== groupId;
+  const coupledToGlobal = canCoupleToGlobal ? req.body.coupleToGlobal === "1" : false;
+
   if (predictionsClosed()) {
     return sendError(req, res, 403, "Predictions are closed.");
   }
 
   const questions = getQuestions();
   const now = new Date().toISOString();
+
+  if (canCoupleToGlobal) {
+    setCoupledToGlobal(user.id, groupId, coupledToGlobal);
+    if (coupledToGlobal) {
+      syncResponsesFromSourceGroup(user.id, globalGroup.id, groupId, now);
+      return res.redirect(`/groups/${groupId}/questions`);
+    }
+  }
+
   const insert = db.prepare(
     `
     INSERT INTO responses (user_id, group_id, question_id, answer, created_at, updated_at)
@@ -1652,9 +1821,12 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
   });
   tx();
 
+  if (group.is_global) {
+    syncGlobalResponsesToCoupledGroups(user.id, now);
+  }
+
   // First group submission can seed the Global league as a baseline.
   if (!group.is_global) {
-    const globalGroup = getGlobalGroup();
     if (globalGroup && globalGroup.id !== groupId) {
       const existingGlobalResponses = db
         .prepare("SELECT COUNT(*) as count FROM responses WHERE user_id = ? AND group_id = ?")
@@ -1709,7 +1881,7 @@ app.get("/groups/:id/responses", requireAuth, (req, res) => {
   const responses = db
     .prepare(
       `
-      SELECT u.name as user_name, r.question_id, r.answer, r.updated_at
+      SELECT r.user_id, u.name as user_name, r.question_id, r.answer, r.updated_at
       FROM responses r
       JOIN users u ON u.id = r.user_id
       WHERE r.group_id = ?

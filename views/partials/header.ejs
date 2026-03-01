@@ -5,15 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <script>
       (function () {
+        var root = document.documentElement;
+        var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = prefersDark ? "dark" : "light";
         try {
           var saved = localStorage.getItem("theme");
-          var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var theme = saved || (prefersDark ? "dark" : "light");
-          document.documentElement.setAttribute("data-theme", theme);
+          if (saved === "dark" || saved === "light") {
+            theme = saved;
+          }
         } catch (e) {}
+        root.setAttribute("data-theme", theme);
       })();
     </script>
     <title><%= title %></title>
+    <link rel="icon" type="image/png" href="/assets/brand/logo-header.png" />
+    <link rel="shortcut icon" type="image/png" href="/assets/brand/logo-header.png" />
+    <link rel="apple-touch-icon" href="/assets/brand/logo-header.png" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,118 +29,128 @@
   </head>
   <body>
     <header>
-      <div class="header-left">
-        <a class="header-brand" href="/" aria-label="<%= t('header.site_title') %>">
-          <span class="brand-lockup">
-            <img
-              class="brand-logo"
-              src="/assets/brand/logo-header-inverted.png"
-              data-logo-light="/assets/brand/logo-header-inverted.png"
-              data-logo-dark="/assets/brand/logo-header.png"
-              alt="Wheel of Knowledge logo"
-              width="48"
-              height="48"
-            />
-            <span class="brand-text">
-              <span class="brand-line brand-line-top">WHEEL OF</span>
-              <span class="brand-line brand-line-knowledge">KNOWLEDGE</span>
-              <span class="brand-divider" aria-hidden="true"></span>
-              <span class="brand-tagline">Predict the Formula 1 Season</span>
+      <div class="header-inner">
+        <div class="header-left">
+          <a class="header-brand" href="/" aria-label="<%= t('header.site_title') %>">
+            <span class="brand-lockup">
+              <img
+                class="brand-logo"
+                src="/assets/brand/logo-header-inverted.png"
+                data-logo-light="/assets/brand/logo-header-inverted.png"
+                data-logo-dark="/assets/brand/logo-header.png"
+                alt="Wheel of Knowledge logo"
+                width="48"
+                height="48"
+              />
+              <span class="brand-text">
+                <span class="brand-line brand-line-top">WHEEL OF</span>
+                <span class="brand-line brand-line-knowledge">KNOWLEDGE</span>
+                <span class="brand-divider" aria-hidden="true"></span>
+                <span class="brand-tagline">Predict the Formula 1 Season</span>
+                <span class="brand-mobile-timer">
+                  <span class="brand-mobile-timer-prefix"><%= t('header.countdown_prefix') %></span>
+                  <strong class="brand-mobile-timer-value" data-brand-mobile-timer-value>--</strong>
+                </span>
+              </span>
             </span>
-          </span>
-        </a>
-        <div class="countdown" data-close-date="2026-03-05T23:59:59Z">
-          <span class="muted"><%= t('header.countdown_prefix') %></span>
-          <strong class="countdown-value">--</strong>
+          </a>
         </div>
-      </div>
-      <button
-        type="button"
-        class="header-menu-toggle icon-btn"
-        data-header-menu-toggle
-        aria-expanded="false"
-        aria-controls="header-actions"
-        aria-label="Toggle menu"
-        title="Toggle menu"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-        </svg>
-      </button>
-      <div class="header-actions" id="header-actions" data-header-menu>
-        <div class="header-main-links">
-          <% if (user) { %>
-            <a class="link header-link-dashboard" href="/dashboard">
-              <span class="header-nav-icon header-nav-icon-dashboard" aria-hidden="true"></span>
-              <span class="header-link-label"><%= t('header.dashboard') %></span>
-            </a>
-            <span class="muted">
-              <%= t('header.signed_in_as') %>
-              <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
-            </span>
-            <% if (user.is_admin) { %>
-              <a class="link" href="/admin/overview">
-                <span class="header-nav-icon header-nav-icon-admin" aria-hidden="true"></span>
-                <span class="header-link-label"><%= t('header.admin') %></span>
-              </a>
-            <% } %>
-          <% } else { %>
-            <a class="link" href="/login"><%= t('header.login') %></a>
-          <% } %>
-        </div>
-        <div class="header-icon-actions">
-          <details class="lang-menu">
-          <summary class="icon-btn header-menu-row" aria-label="<%= t('header.language') %>" title="<%= t('header.language') %>">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
-              <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.5"></path>
-            </svg>
-            <span class="header-menu-row-label"><%= t('header.language') %></span>
-          </summary>
-          <div class="lang-popover">
-            <form method="post" action="/language" class="lang-list-form">
-              <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
-              <% supportedLocales.forEach(({ code, label }) => { %>
-                <button
-                  type="submit"
-                  name="locale"
-                  value="<%= code %>"
-                  class="<%= locale === code ? 'lang-option is-active' : 'lang-option' %>"
-                >
-                  <%= label %>
-                </button>
-              <% }) %>
-            </form>
+        <div class="header-center" data-header-center>
+          <div class="countdown" data-close-date="2026-03-05T23:59:59Z">
+            <span class="muted"><%= t('header.countdown_prefix') %></span>
+            <strong class="countdown-value">--</strong>
           </div>
-          </details>
+        </div>
+        <div class="header-right" data-header-right>
           <button
             type="button"
-            class="secondary theme-toggle icon-btn header-menu-row"
-            data-theme-toggle
-            data-label-dark="<%= t('theme.dark_mode') %>"
-            data-label-light="<%= t('theme.light_mode') %>"
-            aria-label="<%= t('theme.dark_mode') %>"
-            title="<%= t('theme.dark_mode') %>"
+            class="header-menu-toggle icon-btn"
+            data-header-menu-toggle
+            aria-expanded="false"
+            aria-controls="header-actions"
+            aria-label="Toggle menu"
+            title="Toggle menu"
           >
-            <span class="theme-icon theme-icon-moon" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <defs>
-                  <mask id="theme-moon-cutout">
-                    <rect width="24" height="24" fill="white"></rect>
-                    <circle cx="16" cy="12" r="7.1" fill="black"></circle>
-                  </mask>
-                </defs>
-                <circle cx="12" cy="12" r="9" fill="currentColor" mask="url(#theme-moon-cutout)"></circle>
-              </svg>
-            </span>
-            <span class="theme-icon theme-icon-sun" aria-hidden="true">
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
-                <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
-              </svg>
-            </span>
-            <span class="header-menu-row-label" data-theme-toggle-label><%= t('theme.dark_mode') %></span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+            </svg>
           </button>
+          <div class="header-actions" id="header-actions" data-header-menu>
+            <div class="header-main-links">
+              <% if (user) { %>
+                <% if (user.is_admin) { %>
+                  <a class="link" href="/admin/overview">
+                    <span class="header-nav-icon header-nav-icon-admin" aria-hidden="true"></span>
+                    <span class="header-link-label"><%= t('header.admin') %></span>
+                  </a>
+                <% } %>
+                <a class="link header-link-dashboard" href="/dashboard">
+                  <span class="header-nav-icon header-nav-icon-dashboard" aria-hidden="true"></span>
+                  <span class="header-link-label"><%= t('header.dashboard') %></span>
+                </a>
+                <span class="muted">
+                  <%= t('header.signed_in_as') %>
+                  <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
+                </span>
+              <% } else { %>
+                <a class="link" href="/login"><%= t('header.login') %></a>
+              <% } %>
+            </div>
+            <div class="header-icon-actions">
+              <details class="lang-menu">
+              <summary class="icon-btn header-menu-row" aria-label="<%= t('header.language') %>" title="<%= t('header.language') %>">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
+                  <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+                </svg>
+                <span class="header-menu-row-label"><%= t('header.language') %></span>
+              </summary>
+              <div class="lang-popover">
+                <form method="post" action="/language" class="lang-list-form">
+                  <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+                  <% supportedLocales.forEach(({ code, label }) => { %>
+                    <button
+                      type="submit"
+                      name="locale"
+                      value="<%= code %>"
+                      class="<%= locale === code ? 'lang-option is-active' : 'lang-option' %>"
+                    >
+                      <%= label %>
+                    </button>
+                  <% }) %>
+                </form>
+              </div>
+              </details>
+              <button
+                type="button"
+                class="secondary theme-toggle icon-btn header-menu-row"
+                data-theme-toggle
+                data-label-dark="<%= t('theme.dark_mode') %>"
+                data-label-light="<%= t('theme.light_mode') %>"
+                aria-label="<%= t('theme.dark_mode') %>"
+                title="<%= t('theme.dark_mode') %>"
+              >
+                <span class="theme-icon theme-icon-moon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <defs>
+                      <mask id="theme-moon-cutout">
+                        <rect width="24" height="24" fill="white"></rect>
+                        <circle cx="16" cy="12" r="7.1" fill="black"></circle>
+                      </mask>
+                    </defs>
+                    <circle cx="12" cy="12" r="9" fill="currentColor" mask="url(#theme-moon-cutout)"></circle>
+                  </svg>
+                </span>
+                <span class="theme-icon theme-icon-sun" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.7"></circle>
+                    <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+                  </svg>
+                </span>
+                <span class="header-menu-row-label" data-theme-toggle-label><%= t('theme.dark_mode') %></span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </header>

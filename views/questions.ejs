@@ -2,6 +2,9 @@
 
 <div class="card">
   <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
+  <div class="page-title-actions">
+    <a class="button-link" href="/groups/<%= group.id %>"><%= t('group.back_to_group') %></a>
+  </div>
   <div class="group-rules-box">
     <div class="group-rules-label"><%= t('group.rules_label') %></div>
     <p class="muted group-rules-text"><%= groupRules %></p>
@@ -12,7 +15,7 @@
   <% } %>
 
   <div class="questions-top-actions">
-    <% if (copyGroups && copyGroups.length > 0) { %>
+    <% if (copyGroups && copyGroups.length > 0 && !(canCoupleToGlobal && coupledToGlobal)) { %>
       <form method="get" action="/groups/<%= group.id %>/questions" class="inline-actions">
         <label class="muted" style="display:flex; align-items:center; gap:8px; font-weight:600;">
           <%= t('questions.copy_from') %>
@@ -38,74 +41,126 @@
   <% } %>
 
   <form id="predictions-form" method="post" action="/groups/<%= group.id %>/questions">
-
-    <% if (questions.length === 0) { %>
-      <div class="alert"><%= t('questions.no_questions') %></div>
+    <% if (canCoupleToGlobal) { %>
+      <div class="questions-couple-toggle">
+        <label class="muted" style="display:inline-flex; align-items:center; gap:8px; font-weight:600;">
+          <input
+            type="checkbox"
+            name="coupleToGlobal"
+            value="1"
+            data-couple-toggle
+            <%= coupledToGlobal ? 'checked' : '' %>
+            <%= closed ? 'disabled' : '' %>
+          />
+          <%= t('questions.couple_to_global_label', { group_name: globalGroupName }) %>
+        </label>
+        <div class="muted"><%= t('questions.couple_to_global_help') %></div>
+      </div>
     <% } %>
 
-    <% const formatPoints = (q) => {
-      if (q.points_display) return q.points_display;
-      if (q.points == null) return null;
-      if (typeof q.points === 'number') return `${q.points} ${t('questions.points_word')}`;
-      if (typeof q.points === 'string') return q.points;
-      if (q.points.position || q.points.driver) {
-        return `${t('questions.points_label')}: ${t('questions.position_word')} ${q.points.position || 0}, ${t('questions.driver_word')} ${q.points.driver || 0}`;
-      }
-      const entries = Object.entries(q.points).map(([key, value]) => `${key}: ${value}`);
-      return entries.length ? `${t('questions.points_label')}: ${entries.join(', ')}` : null;
-    }; %>
+    <fieldset class="questions-fields" data-coupled-fields <%= canCoupleToGlobal && coupledToGlobal ? 'disabled' : '' %>>
+      <% if (questions.length === 0) { %>
+        <div class="alert"><%= t('questions.no_questions') %></div>
+      <% } %>
 
-    <% questions.forEach(question => { 
-      const sourceOptions = question.options_source === 'drivers'
-        ? roster.drivers
-        : question.options_source === 'teams'
-          ? roster.teams
-          : question.options_source === 'races'
-            ? races
-            : [];
-      const options = (question.options || []).concat(sourceOptions || []);
-      const optionLabels = question.option_labels || {};
-      const getOptionLabel = (option) => optionLabels[option] || option;
-      const type = question.type || 'text';
-    %>
-      <div class="question">
-        <div style="font-weight:600;"><%= question.prompt %></div>
-        <% if (question.helper) { %>
-          <div class="muted"><%= question.helper %></div>
-        <% } %>
-        <% const pointsText = formatPoints(question); if (pointsText) { %>
-          <div class="muted"><%= pointsText %></div>
-        <% } %>
-        <% if ((type === 'ranking' || type === 'single_choice' || type === 'multi_select' || type === 'multi_select_limited') && (!options || options.length === 0)) { %>
-          <div class="alert"><%= t('questions.no_options_loaded') %></div>
-        <% } %>
-        <% if (type === 'ranking') { 
-          const count = Number(question.count) || 3;
-          let saved = [];
-          try { saved = JSON.parse(answers[question.id] || '[]'); } catch (err) { saved = []; }
-        %>
-          <div class="ranking-group" data-count="<%= count %>">
-            <% for (let i = 1; i <= count; i += 1) { %>
-              <select class="ranking-select" name="<%= question.id %>_<%= i %>">
-                <option value=""><%= t('questions.select_position') %> <%= i %></option>
-                <% options.forEach(option => { %>
-                  <option value="<%= option %>" <%= saved[i - 1] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
-                <% }) %>
-              </select>
-            <% } %>
-          </div>
-        <% } else if (type === 'single_choice') { %>
-          <select name="<%= question.id %>">
-            <option value=""><%= t('questions.select_one') %></option>
-            <% options.forEach(option => { %>
-              <option value="<%= option %>" <%= answers[question.id] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
-            <% }) %>
-          </select>
-        <% } else if (type === 'multi_select' || type === 'multi_select_limited') { 
-          let saved = [];
-          try { saved = JSON.parse(answers[question.id] || '[]'); } catch (err) { saved = []; }
-          const limit = type === 'multi_select_limited' ? (Number(question.count) || 0) : 0;
-        %>
+      <% const formatPoints = (q) => {
+        if (q.type === 'multi_select' && typeof q.points === 'number' && typeof q.penalty === 'number' && typeof q.minimum === 'number') {
+          return t('questions.points_multi_select_penalty', {
+            points: q.points,
+            penalty: q.penalty,
+            minimum: q.minimum,
+            points_word: t('questions.points_word'),
+            driver_word: t('questions.driver_word')
+          });
+        }
+        if (q.type === 'teammate_battle' && typeof q.points === 'number') {
+          return t('questions.points_teammate_battle', {
+            base: q.points,
+            tie_bonus: Number(q.tie_bonus || 0),
+            points_word: t('questions.points_word')
+          });
+        }
+        if (q.special_case === 'all_podiums_bonus' && typeof q.points === 'number' && typeof q.bonus_points === 'number') {
+          return t('questions.points_all_podiums_bonus', {
+            base: q.points,
+            bonus: q.bonus_points,
+            points_word: t('questions.points_word')
+          });
+        }
+        if (q.type === 'multi_select_limited' && q.options_source === 'races' && typeof q.points === 'number') {
+          return t('questions.points_per_dnf_selected_races', {
+            points: q.points,
+            points_word: t('questions.points_word')
+          });
+        }
+        if (q.points_display) {
+          const simplePoints = String(q.points_display).trim().match(/^(\d+)\s+points?$/i);
+          if (simplePoints) {
+            return `${simplePoints[1]} ${t('questions.points_word')}`;
+          }
+          return q.points_display;
+        }
+        if (q.points == null) return null;
+        if (typeof q.points === 'number') return `${q.points} ${t('questions.points_word')}`;
+        if (typeof q.points === 'string') return q.points;
+        if (q.points.position || q.points.driver) {
+          return `${t('questions.points_label')}: ${t('questions.position_word')} ${q.points.position || 0}, ${t('questions.driver_word')} ${q.points.driver || 0}`;
+        }
+        const entries = Object.entries(q.points).map(([key, value]) => `${key}: ${value}`);
+        return entries.length ? `${t('questions.points_label')}: ${entries.join(', ')}` : null;
+      }; %>
+
+      <% questions.forEach(question => { 
+        const sourceOptions = question.options_source === 'drivers'
+          ? roster.drivers
+          : question.options_source === 'teams'
+            ? roster.teams
+            : question.options_source === 'races'
+              ? races
+              : [];
+        const options = (question.options || []).concat(sourceOptions || []);
+        const optionLabels = question.option_labels || {};
+        const getOptionLabel = (option) => optionLabels[option] || option;
+        const type = question.type || 'text';
+      %>
+        <div class="question">
+          <div style="font-weight:600;"><%= question.prompt %></div>
+          <% if (question.helper) { %>
+            <div class="muted"><%= question.helper %></div>
+          <% } %>
+          <% const pointsText = formatPoints(question); if (pointsText) { %>
+            <div class="muted question-points"><%= pointsText %></div>
+          <% } %>
+          <% if ((type === 'ranking' || type === 'single_choice' || type === 'multi_select' || type === 'multi_select_limited') && (!options || options.length === 0)) { %>
+            <div class="alert"><%= t('questions.no_options_loaded') %></div>
+          <% } %>
+          <% if (type === 'ranking') { 
+            const count = Number(question.count) || 3;
+            let saved = [];
+            try { saved = JSON.parse(answers[question.id] || '[]'); } catch (err) { saved = []; }
+          %>
+            <div class="ranking-group" data-count="<%= count %>">
+              <% for (let i = 1; i <= count; i += 1) { %>
+                <select class="ranking-select" name="<%= question.id %>_<%= i %>">
+                  <option value=""><%= t('questions.select_position') %> <%= i %></option>
+                  <% options.forEach(option => { %>
+                    <option value="<%= option %>" <%= saved[i - 1] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+                  <% }) %>
+                </select>
+              <% } %>
+            </div>
+          <% } else if (type === 'single_choice') { %>
+            <select name="<%= question.id %>">
+              <option value=""><%= t('questions.select_one') %></option>
+              <% options.forEach(option => { %>
+                <option value="<%= option %>" <%= answers[question.id] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+              <% }) %>
+            </select>
+          <% } else if (type === 'multi_select' || type === 'multi_select_limited') { 
+            let saved = [];
+            try { saved = JSON.parse(answers[question.id] || '[]'); } catch (err) { saved = []; }
+            const limit = type === 'multi_select_limited' ? (Number(question.count) || 0) : 0;
+          %>
           <div class="checkbox-grid" data-limit="<%= limit %>">
             <% options.forEach(option => { %>
               <label class="muted">
@@ -114,96 +169,94 @@
               </label>
             <% }) %>
           </div>
-          <% if (limit) { %>
-            <div class="muted"><%= t('questions.select_exactly') %> <%= limit %>.</div>
-          <% } %>
         <% } else if (type === 'teammate_battle') { 
-          let saved = {};
-          try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
-        %>
-          <div class="inline-actions">
-            <select name="<%= question.id %>_winner" data-toggle-diff="<%= question.id %>">
-              <option value=""><%= t('questions.select_winner') %></option>
-              <% (question.options || []).forEach(option => { %>
-                <option value="<%= option %>" <%= saved.winner === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
-              <% }) %>
-              <option value="tie" <%= saved.winner === 'tie' ? 'selected' : '' %>><%= t('questions.tie') %></option>
-            </select>
-            <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= saved.diff ?? '' %>" />
-          </div>
-        <% } else if (type === 'boolean_with_optional_driver') { 
-          let saved = {};
-          try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
-        %>
-          <div class="inline-actions">
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="yes" <%= saved.choice === 'yes' ? 'checked' : '' %> />
-              <%= t('questions.yes') %>
-            </label>
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="no" <%= saved.choice === 'no' ? 'checked' : '' %> />
-              <%= t('questions.no') %>
-            </label>
-            <select name="<%= question.id %>_driver" data-toggle-driver="<%= question.id %>">
-              <option value=""><%= t('questions.select_driver_if_yes') %></option>
-              <% roster.drivers.forEach(option => { %>
-                <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
-              <% }) %>
-            </select>
-          </div>
-        <% } else if (type === 'numeric_with_driver') { 
-          let saved = {};
-          try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
-        %>
-          <div class="inline-actions">
-            <input type="number" name="<%= question.id %>_value" placeholder="<%= t('questions.number') %>" min="0" max="999" value="<%= saved.value ?? '' %>" />
-            <select name="<%= question.id %>_driver">
-              <option value=""><%= t('questions.select_driver') %></option>
-              <% roster.drivers.forEach(option => { %>
-                <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
-              <% }) %>
-            </select>
-          </div>
-        <% } else if (type === 'single_choice_with_driver') { 
-          let saved = {};
-          try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
-          const driverOptions = roster.drivers;
-          const positionOptions = question.options || [];
-        %>
-          <div class="inline-actions">
-            <select name="<%= question.id %>_value">
-              <option value=""><%= t('questions.select_position') %></option>
-              <% positionOptions.forEach(option => { %>
-                <option value="<%= option %>" <%= saved.value === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
-              <% }) %>
-            </select>
-            <select name="<%= question.id %>_driver">
-              <option value=""><%= t('questions.select_driver') %></option>
-              <% driverOptions.forEach(option => { %>
-                <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
-              <% }) %>
-            </select>
-          </div>
-        <% } else if (type === 'boolean') { %>
-          <div class="inline-actions">
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="yes" <%= answers[question.id] === 'yes' ? 'checked' : '' %> />
-              <%= t('questions.yes') %>
-            </label>
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="no" <%= answers[question.id] === 'no' ? 'checked' : '' %> />
-              <%= t('questions.no') %>
-            </label>
-          </div>
-        <% } else if (type === 'numeric') { %>
-          <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= answers[question.id] || '' %>" />
-        <% } else if (type === 'textarea') { %>
-          <textarea name="<%= question.id %>" rows="3"><%= answers[question.id] || '' %></textarea>
-        <% } else { %>
-          <input type="text" name="<%= question.id %>" value="<%= answers[question.id] || '' %>" />
-        <% } %>
-      </div>
-    <% }) %>
+            let saved = {};
+            try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
+          %>
+            <div class="inline-actions">
+              <select name="<%= question.id %>_winner" data-toggle-diff="<%= question.id %>">
+                <option value=""><%= t('questions.select_winner') %></option>
+                <% (question.options || []).forEach(option => { %>
+                  <option value="<%= option %>" <%= saved.winner === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+                <% }) %>
+                <option value="tie" <%= saved.winner === 'tie' ? 'selected' : '' %>><%= t('questions.tie') %></option>
+              </select>
+              <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= saved.diff ?? '' %>" />
+            </div>
+          <% } else if (type === 'boolean_with_optional_driver') { 
+            let saved = {};
+            try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
+          %>
+            <div class="inline-actions">
+              <label class="muted">
+                <input type="radio" name="<%= question.id %>" value="yes" <%= saved.choice === 'yes' ? 'checked' : '' %> />
+                <%= t('questions.yes') %>
+              </label>
+              <label class="muted">
+                <input type="radio" name="<%= question.id %>" value="no" <%= saved.choice === 'no' ? 'checked' : '' %> />
+                <%= t('questions.no') %>
+              </label>
+              <select name="<%= question.id %>_driver" data-toggle-driver="<%= question.id %>">
+                <option value=""><%= t('questions.select_driver_if_yes') %></option>
+                <% roster.drivers.forEach(option => { %>
+                  <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
+                <% }) %>
+              </select>
+            </div>
+          <% } else if (type === 'numeric_with_driver') { 
+            let saved = {};
+            try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
+          %>
+            <div class="inline-actions">
+              <input type="number" name="<%= question.id %>_value" placeholder="<%= t('questions.number') %>" min="0" max="999" value="<%= saved.value ?? '' %>" />
+              <select name="<%= question.id %>_driver">
+                <option value=""><%= t('questions.select_driver') %></option>
+                <% roster.drivers.forEach(option => { %>
+                  <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
+                <% }) %>
+              </select>
+            </div>
+          <% } else if (type === 'single_choice_with_driver') { 
+            let saved = {};
+            try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
+            const driverOptions = roster.drivers;
+            const positionOptions = question.options || [];
+          %>
+            <div class="inline-actions">
+              <select name="<%= question.id %>_value">
+                <option value=""><%= t('questions.select_position') %></option>
+                <% positionOptions.forEach(option => { %>
+                  <option value="<%= option %>" <%= saved.value === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+                <% }) %>
+              </select>
+              <select name="<%= question.id %>_driver">
+                <option value=""><%= t('questions.select_driver') %></option>
+                <% driverOptions.forEach(option => { %>
+                  <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
+                <% }) %>
+              </select>
+            </div>
+          <% } else if (type === 'boolean') { %>
+            <div class="inline-actions">
+              <label class="muted">
+                <input type="radio" name="<%= question.id %>" value="yes" <%= answers[question.id] === 'yes' ? 'checked' : '' %> />
+                <%= t('questions.yes') %>
+              </label>
+              <label class="muted">
+                <input type="radio" name="<%= question.id %>" value="no" <%= answers[question.id] === 'no' ? 'checked' : '' %> />
+                <%= t('questions.no') %>
+              </label>
+            </div>
+          <% } else if (type === 'numeric') { %>
+            <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= answers[question.id] || '' %>" />
+          <% } else if (type === 'textarea') { %>
+            <textarea name="<%= question.id %>" rows="3"><%= answers[question.id] || '' %></textarea>
+          <% } else { %>
+            <input type="text" name="<%= question.id %>" value="<%= answers[question.id] || '' %>" />
+          <% } %>
+        </div>
+      <% }) %>
+    </fieldset>
 
     <button type="submit" <%= closed ? 'disabled' : '' %>><%= t('questions.save_predictions') %></button>
     <div id="questions-form-end"></div>

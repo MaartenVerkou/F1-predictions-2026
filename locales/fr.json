@@ -67,6 +67,7 @@
     "code_not_set": "Not set yet",
     "answer_questions": "Answer questions",
     "view_responses": "View responses",
+    "back_to_group": "Retour au groupe",
     "leave_group": "Leave group",
     "leave_confirm": "Leave this group?",
     "edit_rules": "Edit group rules",
@@ -115,7 +116,13 @@
     "points_label": "Points",
     "position_word": "position",
     "driver_word": "pilote",
-    "scroll_to_end": "Aller en bas de page"
+    "scroll_to_end": "Aller en bas de page",
+    "couple_to_global_label": "Coupler les pronostics de ce groupe a mes pronostics {group_name}",
+    "couple_to_global_help": "Active = ce groupe utilise toujours tes picks Global. Desactive pour faire des picks specifiques a ce groupe.",
+    "points_multi_select_penalty": "{points} {points_word} par {driver_word} correct, -{penalty} pour chaque {driver_word} manquant ou incorrect (min {minimum})",
+    "points_teammate_battle": "{base} {points_word} moins 1 par point d ecart (le vainqueur doit etre correct). Egalite + correct: {tie_bonus} {points_word}",
+    "points_all_podiums_bonus": "{base} {points_word}, ou {bonus} si toutes les equipes font un podium et que tu le prevois",
+    "points_per_dnf_selected_races": "{points} {points_word} par DNF dans tes courses selectionnees"
   },
   "leaderboard": {
     "page_title": "Classement",
@@ -126,6 +133,21 @@
     "total_points": "Total points",
     "details": "Details",
     "points_short": "pts"
+  },
+  "responses": {
+    "page_title": "Reponses",
+    "subtitle": "Tous les pronostics envoyes jusqu'ici.",
+    "no_responses": "Aucune reponse pour le moment.",
+    "summary_title": "Repartition",
+    "response_count_label": "reponses",
+    "position_label": "Position {n}",
+    "your_pick": "Ton choix",
+    "other": "Autres",
+    "member": "Membre",
+    "answer": "Reponse",
+    "diff_label": "ecart",
+    "na": "n/a",
+    "raw_private_only": "Le tableau detaille par membre est affiche uniquement dans les groupes prives."
   },
   "home": {
     "badge_how_it_works": "Comment ca marche",
@@ -201,13 +223,15 @@
   },
   "question_prompts": {
     "drivers_championship_top_3": {
-      "prompt": "Championnat pilotes: choisissez votre top 3"
+      "prompt": "Championnat pilotes: choisissez votre top 3",
+      "points_display": "Points: place 1 = 50, place 2 = 25, place 3 = 15"
     },
     "drivers_championship_last": {
       "prompt": "Dernier pilote du championnat (parmi la grille initiale de saison)"
     },
     "constructors_championship_top_3": {
-      "prompt": "Championnat constructeurs: choisissez votre top 3"
+      "prompt": "Championnat constructeurs: choisissez votre top 3",
+      "points_display": "Points: place 1 = 50, place 2 = 25, place 3 = 15"
     },
     "constructors_championship_last": {
       "prompt": "Derniere equipe du championnat constructeurs"
@@ -249,11 +273,9 @@
         "All teams scored a podium": "Toutes les equipes ont fait un podium"
       }
     },
-    "race_ban": {
-      "prompt": "Un pilote recevra-t-il une suspension de course ?"
-    },
     "lowest_grid_win_position": {
-      "prompt": "Position de depart la plus basse depuis laquelle une course est gagnee (et par qui)"
+      "prompt": "Position de depart la plus basse depuis laquelle une course est gagnee (et par qui)",
+      "points_display": "Score position: exact = 10; ecart de 1/2/3/4 = 7/5/3/1. Plus 20 pour le bon pilote."
     },
     "select_three_races_dnfs": {
       "prompt": "Choisissez 3 courses. Gagnez 2 points par DNF dans ces courses."

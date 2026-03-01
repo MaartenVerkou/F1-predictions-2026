@@ -1,15 +1,35 @@
-﻿<%- include('partials/header', { title: 'Responses', user }) %>
+<%- include('partials/header', { title: t('responses.page_title'), user }) %>
 
 <div class="card">
-  <h1><%= group.name %>: Responses</h1>
-  <p class="muted">All predictions submitted so far.</p>
+  <h1><%= group.name %>: <%= t('responses.page_title') %></h1>
+  <div class="page-title-actions">
+    <a class="button-link" href="/groups/<%= group.id %>"><%= t('group.back_to_group') %></a>
+  </div>
+  <p class="muted"><%= t('responses.subtitle') %></p>
 
   <% const questionMap = questions.reduce((acc, q) => { acc[q.id] = q; return acc; }, {}); %>
+  <% const yesText = t('questions.yes'); %>
+  <% const noText = t('questions.no'); %>
+  <% const tieText = t('questions.tie'); %>
+  <% const naText = t('responses.na'); %>
+  <% const currentUserId = Number(user?.id || 0); %>
   <% const responsesByQuestion = responses.reduce((acc, row) => {
       if (!acc[row.question_id]) acc[row.question_id] = [];
       acc[row.question_id].push(row);
       return acc;
     }, {}); %>
+  <% const formatPercent = (value) => {
+      const rounded = Math.round(Number(value || 0) * 10) / 10;
+      return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    }; %>
+  <% const parseArrayAnswer = (value) => {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err) {
+        return [];
+      }
+    }; %>
   <% const formatAnswer = (row) => {
       const q = questionMap[row.question_id];
       let answerText = row.answer;
@@ -22,53 +42,210 @@
         } catch (err) {}
       }
       if (q && q.type === 'boolean') {
-        answerText = row.answer === 'yes' ? 'Yes' : row.answer === 'no' ? 'No' : row.answer;
+        answerText = row.answer === 'yes' ? yesText : row.answer === 'no' ? noText : row.answer;
       }
       if (q && (q.type === 'teammate_battle' || q.type === 'boolean_with_optional_driver' || q.type === 'numeric_with_driver' || q.type === 'single_choice_with_driver')) {
         try {
           const obj = JSON.parse(row.answer);
           if (q.type === 'teammate_battle') {
-            answerText = `${obj.winner || 'n/a'} (diff: ${obj.diff ?? 'n/a'})`;
+            const winner = obj.winner === 'tie' ? tieText : (obj.winner || naText);
+            answerText = `${winner} (${t('responses.diff_label')}: ${obj.diff ?? naText})`;
           }
           if (q.type === 'boolean_with_optional_driver') {
-            answerText = `${obj.choice || 'n/a'}${obj.driver ? ` - ${obj.driver}` : ''}`;
+            const choice = obj.choice === 'yes' ? yesText : obj.choice === 'no' ? noText : (obj.choice || naText);
+            answerText = `${choice}${obj.driver ? ` - ${obj.driver}` : ''}`;
           }
           if (q.type === 'numeric_with_driver' || q.type === 'single_choice_with_driver') {
-            answerText = `${obj.value ?? 'n/a'}${obj.driver ? ` - ${obj.driver}` : ''}`;
+            answerText = `${obj.value ?? naText}${obj.driver ? ` - ${obj.driver}` : ''}`;
           }
         } catch (err) {}
       }
       return answerText;
     }; %>
+  <% const summarizeAnswers = (rows) => {
+      const counts = new Map();
+      rows.forEach((row) => {
+        const label = formatAnswer(row);
+        counts.set(label, (counts.get(label) || 0) + 1);
+      });
+      const total = rows.length;
+      return Array.from(counts.entries())
+        .map(([label, count]) => ({
+          label,
+          count,
+          percent: total > 0 ? (count * 100) / total : 0
+        }))
+        .sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return a.label.localeCompare(b.label);
+        });
+    }; %>
+  <% const summarizeMultiSelectOptions = (rows) => {
+      const counts = new Map();
+      rows.forEach((row) => {
+        const seen = new Set();
+        const items = parseArrayAnswer(row.answer);
+        items.forEach((item) => {
+          const label = String(item || '').trim();
+          if (!label || seen.has(label)) return;
+          seen.add(label);
+          counts.set(label, (counts.get(label) || 0) + 1);
+        });
+      });
+      const total = rows.length;
+      return Array.from(counts.entries())
+        .map(([label, count]) => ({
+          label,
+          count,
+          percent: total > 0 ? (count * 100) / total : 0
+        }))
+        .sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          return a.label.localeCompare(b.label);
+        });
+    }; %>
+  <% const summarizeRankingByPlace = (rows, question) => {
+      const placeCount = Number(question?.count || 0) || 3;
+      const buckets = Array.from({ length: placeCount }, () => new Map());
+      rows.forEach((row) => {
+        let picks = [];
+        try {
+          const parsed = JSON.parse(row.answer);
+          if (Array.isArray(parsed)) picks = parsed;
+        } catch (err) {}
+        for (let i = 0; i < placeCount; i += 1) {
+          const pick = picks[i];
+          if (!pick) continue;
+          buckets[i].set(pick, (buckets[i].get(pick) || 0) + 1);
+        }
+      });
+      const total = rows.length;
+      return buckets.map((bucket) =>
+        Array.from(bucket.entries())
+          .map(([label, count]) => ({
+            label,
+            count,
+            percent: total > 0 ? (count * 100) / total : 0
+          }))
+          .sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            return a.label.localeCompare(b.label);
+          })
+      );
+    }; %>
+  <% const limitRowsWithViewer = (items, viewerLabel, limit = 5) => {
+      const top = items.slice(0, limit);
+      if (!viewerLabel) return top;
+      const inTop = top.some((item) => item.label === viewerLabel);
+      if (inTop) return top;
+      const viewerItem = items.find((item) => item.label === viewerLabel);
+      if (!viewerItem) return top;
+      if (top.length < limit) return top.concat([viewerItem]);
+      if (limit <= 1) return [viewerItem];
+      return top.slice(0, limit - 1).concat([viewerItem]);
+    }; %>
+  <% const limitRowsWithViewerSet = (items, viewerLabels, limit = 5) => {
+      const top = items.slice(0, limit);
+      const labels = Array.isArray(viewerLabels) ? viewerLabels : [];
+      if (labels.length === 0) return top;
+      const topLabelSet = new Set(top.map((item) => item.label));
+      const viewerItem = labels
+        .map((label) => items.find((item) => item.label === label))
+        .find((item) => item && !topLabelSet.has(item.label));
+      if (!viewerItem) return top;
+      if (top.length < limit) return top.concat([viewerItem]);
+      if (limit <= 1) return [viewerItem];
+      return top.slice(0, limit - 1).concat([viewerItem]);
+    }; %>
 
   <% if (responses.length === 0) { %>
-    <div class="alert">No responses yet.</div>
+    <div class="alert"><%= t('responses.no_responses') %></div>
   <% } else { %>
     <% questions.forEach(q => { %>
       <div class="card" style="margin-top:12px;">
         <h2><%= q.prompt %></h2>
         <% const rows = responsesByQuestion[q.id] || []; %>
         <% if (rows.length === 0) { %>
-          <p class="muted">No responses yet.</p>
+          <p class="muted"><%= t('responses.no_responses') %></p>
         <% } else { %>
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Member</th>
-                <th>Answer</th>
-                <th>Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% rows.forEach(row => { %>
-                <tr>
-                  <td><%= row.user_name %></td>
-                  <td><%= formatAnswer(row) %></td>
-                  <td><%= new Date(row.updated_at).toLocaleString() %></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
+          <% const viewerRow = rows.find((row) => Number(row.user_id) === currentUserId) || null; %>
+          <% const viewerAnswerLabel = viewerRow ? formatAnswer(viewerRow) : ''; %>
+          <% const viewerBooleanChoice = q.type === 'boolean' && viewerRow ? String(viewerRow.answer || '') : ''; %>
+          <% const viewerMultiSelectPicks = (q.type === 'multi_select' || q.type === 'multi_select_limited') && viewerRow ? parseArrayAnswer(viewerRow.answer) : []; %>
+          <% const viewerRankingPicks = q.type === 'ranking' && viewerRow ? parseArrayAnswer(viewerRow.answer) : []; %>
+          <% const isFullMultiColumnSummary = q.id === 'all_podium_finishers' || q.id === 'select_three_races_dnfs'; %>
+          <% const summary = isFullMultiColumnSummary ? summarizeMultiSelectOptions(rows) : summarizeAnswers(rows); %>
+          <% const summaryDisplayRows = isFullMultiColumnSummary
+            ? limitRowsWithViewerSet(summary, viewerMultiSelectPicks, 5)
+            : (q.type === 'boolean' || q.type === 'ranking'
+              ? summary
+              : limitRowsWithViewer(summary, viewerAnswerLabel, 5)); %>
+          <% const yesCount = q.type === 'boolean' ? rows.filter((row) => row.answer === 'yes').length : 0; %>
+          <% const noCount = q.type === 'boolean' ? rows.filter((row) => row.answer === 'no').length : 0; %>
+          <% const yesPercent = rows.length > 0 ? (yesCount * 100) / rows.length : 0; %>
+          <% const noPercent = rows.length > 0 ? (noCount * 100) / rows.length : 0; %>
+          <% const rankingByPlace = q.type === 'ranking' ? summarizeRankingByPlace(rows, q) : []; %>
+          <div class="responses-summary">
+            <div class="muted responses-summary-title">
+              <%= t('responses.summary_title') %> &middot; <%= rows.length %> <%= t('responses.response_count_label') %>
+            </div>
+            <% if (q.type === 'boolean') { %>
+              <div class="responses-yesno-head">
+                <span class="<%= viewerBooleanChoice === 'yes' ? 'is-viewer-choice' : '' %>"><%= yesText %> &middot; <%= yesCount %> &middot; <%= formatPercent(yesPercent) %>%</span>
+                <span class="<%= viewerBooleanChoice === 'no' ? 'is-viewer-choice' : '' %>"><%= noText %> &middot; <%= noCount %> &middot; <%= formatPercent(noPercent) %>%</span>
+              </div>
+              <div class="responses-yesno-track" aria-hidden="true">
+                <span class="responses-yesno-yes <%= viewerBooleanChoice === 'yes' ? 'is-viewer-choice' : '' %>" style="width:<%= yesPercent %>%;"></span>
+                <span class="responses-yesno-no <%= viewerBooleanChoice === 'no' ? 'is-viewer-choice' : '' %>" style="width:<%= noPercent %>%;"></span>
+              </div>
+            <% } else if (q.type === 'ranking') { %>
+              <div class="responses-ranking-splits">
+                <% rankingByPlace.forEach((placeRows, index) => { %>
+                  <% if (placeRows.length > 0) { %>
+                    <% const viewerPlacePick = viewerRankingPicks[index]; %>
+                    <% const placeDisplayRows = limitRowsWithViewer(placeRows, viewerPlacePick, 5); %>
+                    <div class="responses-ranking-place">
+                      <div class="muted responses-ranking-place-title"><%= t('responses.position_label', { n: index + 1 }) %></div>
+                      <ul class="responses-bars">
+                        <% placeDisplayRows.forEach(item => { %>
+                          <li class="responses-bars-item <%= viewerRankingPicks[index] === item.label ? 'is-viewer-choice' : '' %>">
+                            <span class="responses-bars-label"><%= item.label %></span>
+                            <span class="responses-bars-track" aria-hidden="true">
+                              <span class="responses-bars-fill" style="width:<%= item.percent %>%;"></span>
+                            </span>
+                            <span class="responses-bars-value"><%= item.count %> &middot; <%= formatPercent(item.percent) %>%</span>
+                          </li>
+                        <% }) %>
+                      </ul>
+                    </div>
+                  <% } %>
+                <% }) %>
+              </div>
+            <% } else if (isFullMultiColumnSummary) { %>
+              <ul class="responses-podium-columns">
+                <% summary.forEach(item => { %>
+                  <% const isViewerChoice = viewerMultiSelectPicks.includes(item.label); %>
+                  <li class="responses-podium-item <%= isViewerChoice ? 'is-viewer-choice' : '' %>">
+                    <span class="responses-podium-label"><%= item.label %></span>
+                    <span class="responses-podium-value"><%= formatPercent(item.percent) %>%</span>
+                  </li>
+                <% }) %>
+              </ul>
+            <% } else { %>
+              <ul class="responses-bars">
+                <% summaryDisplayRows.forEach(item => { %>
+                  <% const isViewerChoice = viewerAnswerLabel && item.label === viewerAnswerLabel; %>
+                  <li class="responses-bars-item <%= isViewerChoice ? 'is-viewer-choice' : '' %>">
+                    <span class="responses-bars-label"><%= item.label %></span>
+                    <span class="responses-bars-track" aria-hidden="true">
+                      <span class="responses-bars-fill" style="width:<%= item.percent %>%;"></span>
+                    </span>
+                    <span class="responses-bars-value"><%= item.count %> &middot; <%= formatPercent(item.percent) %>%</span>
+                  </li>
+                <% }) %>
+              </ul>
+            <% } %>
+          </div>
         <% } %>
       </div>
     <% }) %>

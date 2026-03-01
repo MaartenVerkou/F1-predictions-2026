@@ -83,22 +83,30 @@ const initCountdown = () => {
   const el = document.querySelector('.countdown');
   if (!el) return;
   const valueEl = el.querySelector('.countdown-value');
+  if (!valueEl) return;
+  const brandTimerEls = Array.from(document.querySelectorAll('[data-brand-mobile-timer-value]'));
   const rawDate = el.dataset.closeDate;
   const target = new Date(rawDate);
   if (Number.isNaN(target.getTime())) return;
+  const setTimerText = (text) => {
+    valueEl.textContent = text;
+    brandTimerEls.forEach(timerEl => {
+      timerEl.textContent = text;
+    });
+  };
 
   const tick = () => {
     const now = new Date();
     let diff = target - now;
     if (diff <= 0) {
-      valueEl.textContent = 'Closed';
+      setTimerText('Closed');
       return;
     }
     const totalMinutes = Math.floor(diff / 60000);
     const days = Math.floor(totalMinutes / (60 * 24));
     const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
     const minutes = totalMinutes % 60;
-    valueEl.textContent = `${days}d ${hours}h ${minutes}m`;
+    setTimerText(`${days}d ${hours}h ${minutes}m`);
     requestAnimationFrame(() => setTimeout(tick, 30000));
   };
   tick();
@@ -236,6 +244,19 @@ const initVisibilityToggle = () => {
   update();
 };
 
+const initQuestionsCouplingToggle = () => {
+  const toggle = document.querySelector('[data-couple-toggle]');
+  const fields = document.querySelector('[data-coupled-fields]');
+  if (!toggle || !fields) return;
+
+  const sync = () => {
+    fields.disabled = toggle.checked;
+  };
+
+  toggle.addEventListener('change', sync);
+  sync();
+};
+
 const initThemeToggle = () => {
   const toggle = document.querySelector('[data-theme-toggle]');
   const logos = Array.from(document.querySelectorAll('[data-logo-light][data-logo-dark]'));
@@ -245,7 +266,23 @@ const initThemeToggle = () => {
   const labelEl = toggle ? toggle.querySelector('[data-theme-toggle-label]') : null;
   const labelDark = toggle ? (toggle.dataset.labelDark || 'Dark mode') : 'Dark mode';
   const labelLight = toggle ? (toggle.dataset.labelLight || 'Light mode') : 'Light mode';
-  const getTheme = () => root.getAttribute('data-theme') || 'light';
+  const isValidTheme = (value) => value === 'dark' || value === 'light';
+  const getPreferredTheme = () =>
+    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  const getTheme = () => {
+    const attrTheme = root.getAttribute('data-theme');
+    if (isValidTheme(attrTheme)) return attrTheme;
+
+    try {
+      const storedTheme = localStorage.getItem('theme');
+      if (isValidTheme(storedTheme)) return storedTheme;
+    } catch (err) {
+      // ignore storage errors
+    }
+    return getPreferredTheme();
+  };
   const syncLogos = (theme) => {
     logos.forEach((img) => {
       const lightSrc = img.dataset.logoLight;
@@ -288,12 +325,13 @@ const initHeaderMenu = () => {
   const header = document.querySelector('header');
   const toggle = document.querySelector('[data-header-menu-toggle]');
   const menu = document.querySelector('[data-header-menu]');
-  const left = header?.querySelector('.header-left');
-  if (!header || !toggle || !menu || !left) return;
+  if (!header || !toggle || !menu) return;
+
+  const TIMER_COMPACT_WIDTH = 1000;
+  const MENU_COLLAPSE_WIDTH = 800;
+  const TIMER_COMPACT_COLLAPSED_WIDTH = 600;
 
   const isOpen = () => menu.classList.contains('is-open');
-  const isTimeCompact = () => header.classList.contains('is-time-compact');
-  const isTight = () => header.classList.contains('is-tight');
   const isCollapsed = () => header.classList.contains('is-collapsed');
   const closeMenu = () => {
     menu.classList.remove('is-open');
@@ -307,33 +345,18 @@ const initHeaderMenu = () => {
     toggle.setAttribute('aria-expanded', 'true');
   };
   const syncLayout = () => {
-    // Stage 1: normal. Stage 2: countdown text only. Stage 3: tight logout icon. Stage 4: collapsed burger.
-    if (isCollapsed() || isTight() || isTimeCompact()) {
-      header.classList.remove('is-collapsed', 'is-tight', 'is-time-compact');
-    }
+    const width = window.innerWidth || document.documentElement.clientWidth || 0;
+    const shouldCollapseMenu = width <= MENU_COLLAPSE_WIDTH;
+    const shouldCompactTimer =
+      (width <= TIMER_COMPACT_WIDTH && !shouldCollapseMenu) ||
+      width <= TIMER_COMPACT_COLLAPSED_WIDTH;
 
-    const normalRequired = left.scrollWidth + menu.scrollWidth + 72;
-    if (normalRequired <= header.clientWidth) {
+    header.classList.toggle('is-collapsed', shouldCollapseMenu);
+    header.classList.toggle('is-time-compact', shouldCompactTimer);
+
+    if (!shouldCollapseMenu) {
       closeMenu();
-      return;
     }
-
-    header.classList.add('is-time-compact');
-    const timeCompactRequired = left.scrollWidth + menu.scrollWidth + 64;
-    if (timeCompactRequired <= header.clientWidth) {
-      closeMenu();
-      return;
-    }
-
-    header.classList.add('is-tight');
-    const tightRequired = left.scrollWidth + menu.scrollWidth + 56;
-    if (tightRequired <= header.clientWidth) {
-      closeMenu();
-      return;
-    }
-
-    header.classList.remove('is-tight', 'is-time-compact');
-    header.classList.add('is-collapsed');
   };
 
   toggle.addEventListener('click', (event) => {
@@ -366,15 +389,13 @@ const initHeaderMenu = () => {
     if (!isCollapsed()) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const closeTrigger = target.closest('a.link, .account-name-link, [data-theme-toggle], form button[type="submit"]');
+    const closeTrigger = target.closest('a.link, .account-name-link, [data-theme-toggle]');
     if (!closeTrigger) return;
     closeMenu();
   });
 
   window.addEventListener('resize', syncLayout);
   window.addEventListener('load', syncLayout);
-  setTimeout(syncLayout, 0);
-  setTimeout(syncLayout, 220);
   syncLayout();
 };
 
@@ -501,6 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCopyButtons();
   initNameAvailabilityChecks();
   initVisibilityToggle();
+  initQuestionsCouplingToggle();
   initScrollToEndButton();
   initLeaderboardMemberSwitcher();
 });

@@ -293,10 +293,36 @@ function registerAdminRoutes(app, deps) {
       return rankByScore(drivers, scores, 1)[0] || null;
     }
     if (id === "destructors_team") {
-      const scores = Object.fromEntries(
-        teams.map((team) => [team, (130 - Number(model.expectedTeam[team] || 0)) + randomNormal(0, noise * 0.45)])
-      );
-      return rankByScore(teams, scores, 1)[0] || null;
+      const orderedByExpected = rankByScore(teams, model.expectedTeam, teams.length, true);
+      const rankByTeam = new Map(orderedByExpected.map((team, idx) => [team, idx]));
+      const lastIndex = Math.max(1, orderedByExpected.length - 1);
+      const volatility = 0.08 + (1 - profile.knowledge) * 0.22 + profile.boldness * 0.1;
+
+      const weighted = teams.map((team) => {
+        const rankIndex = Number(rankByTeam.get(team) || 0);
+        const rankRisk = 1 - rankIndex / lastIndex;
+        const teamDrivers = model.teamDrivers[team] || [];
+        const avgSkill = teamDrivers.length
+          ? teamDrivers.reduce((sum, driver) => sum + Number(model.driverSkill[driver] || 75), 0) / teamDrivers.length
+          : 75;
+        const driverRisk = clamp((100 - avgSkill) / 28, 0.05, 1.2);
+        const riskScore = clamp(
+          0.62 * rankRisk + 0.38 * driverRisk + randomNormal(0, volatility),
+          0.01,
+          1.5
+        );
+        const weight = Math.max(0.01, Math.pow(riskScore, 0.9));
+        return { team, weight };
+      });
+
+      const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+      if (totalWeight <= 0) return randomOne(teams) || null;
+      let roll = Math.random() * totalWeight;
+      for (const entry of weighted) {
+        roll -= entry.weight;
+        if (roll <= 0) return entry.team;
+      }
+      return weighted[weighted.length - 1]?.team || null;
     }
     if (id === "all_podium_finishers") {
       const scores = Object.fromEntries(
@@ -305,17 +331,27 @@ function registerAdminRoutes(app, deps) {
       const count = clamp(Math.round(7 + profile.knowledge * 5 + randomNormal(0, 1.8)), 4, Math.min(16, drivers.length));
       return rankByScore(drivers, scores, count);
     }
-    if (id === "teammate_battle_antonelli_russell" || id === "teammate_battle_lawson_lindblad") {
+    if (question.type === "teammate_battle") {
       const pair = Array.isArray(question.options) ? question.options.slice(0, 2) : [];
       if (pair.length < 2) return null;
       const left = pair[0];
       const right = pair[1];
-      const leftScore = Number(model.expectedDriver[left] || 0);
-      const rightScore = Number(model.expectedDriver[right] || 0);
-      const winner = Math.abs(leftScore - rightScore) < 1.5 ? "tie" : (leftScore > rightScore ? left : right);
-      const diff = winner === "tie"
-        ? 0
-        : Math.max(0, Math.round(Math.abs(leftScore - rightScore) * 3 + randomNormal(0, noise * 0.8)));
+      const baseLeft = Number(model.expectedDriver[left] || 0);
+      const baseRight = Number(model.expectedDriver[right] || 0);
+      const spread = Math.max(0.35, noise * 0.12);
+      const leftScore = baseLeft + randomNormal(0, spread);
+      const rightScore = baseRight + randomNormal(0, spread);
+      const gap = Math.abs(leftScore - rightScore);
+      const tieWindow = clamp(0.35 + (1 - profile.knowledge) * 0.55, 0.35, 0.9);
+      const tieChance =
+        gap < tieWindow
+          ? clamp(0.72 - gap / (tieWindow * 1.5), 0.12, 0.72)
+          : 0.06;
+      const winner = Math.random() < tieChance ? "tie" : (leftScore > rightScore ? left : right);
+      const diff =
+        winner === "tie"
+          ? 0
+          : Math.max(0, Math.round(gap * 3 + randomNormal(0, noise * 0.45)));
       return { winner, diff };
     }
     if (id === "alpine_vs_cadillac_audi") {
@@ -332,8 +368,20 @@ function registerAdminRoutes(app, deps) {
       const allPodiumLabel =
         options.find((value) => String(value).toLowerCase().includes("all teams scored a podium")) ||
         "All teams scored a podium";
-      const likely = rankByScore(teams, model.expectedTeam, 1)[0] || allPodiumLabel;
-      if (Math.random() < 0.04) return allPodiumLabel;
+      const orderedTeams = rankByScore(teams, model.expectedTeam, teams.length);
+      const rankByTeam = new Map(orderedTeams.map((team, idx) => [team, idx]));
+      const lastIndex = Math.max(1, orderedTeams.length - 1);
+      const nonPodiumScores = Object.fromEntries(
+        teams.map((team) => {
+          const expected = Number(model.expectedTeam[team] || 0);
+          const rankIndex = Number(rankByTeam.get(team) || 0);
+          const podiumChance = clamp(0.88 - (rankIndex / lastIndex) * 0.78, 0.1, 0.88);
+          const nonPodiumPotential = expected * (1 - podiumChance);
+          return [team, nonPodiumPotential + randomNormal(0, noise * 0.45)];
+        })
+      );
+      const likely = rankByScore(teams, nonPodiumScores, 1)[0] || allPodiumLabel;
+      if (Math.random() < 0.03) return allPodiumLabel;
       return likely;
     }
     if (id === "race_ban") {
@@ -355,7 +403,13 @@ function registerAdminRoutes(app, deps) {
       const mean = 3.3 + (1 - profile.knowledge) * 2.2 + randomNormal(0, 1.7);
       const position = clamp(Math.round(mean), min, max);
       const value = Math.random() < 0.02 ? "Pitlane" : String(position);
-      const driver = rankByScore(drivers, model.expectedDriver, 1)[0] || null;
+      const driverScores = Object.fromEntries(
+        drivers.map((driver) => [
+          driver,
+          Number(model.expectedDriver[driver] || 0) + randomNormal(0, noise * 0.65)
+        ])
+      );
+      const driver = rankByScore(drivers, driverScores, 1)[0] || null;
       return { value, driver };
     }
     if (id === "select_three_races_dnfs") {
