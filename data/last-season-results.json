@@ -43,7 +43,10 @@
       "season": 2025,
       "result": "Fernando Alonso (5)",
       "label": "2025 race results (DNF statuses)",
-      "url": "https://api.jolpi.ca/ergast/f1/2025/results.json"
+      "url": "https://api.jolpi.ca/ergast/f1/2025/results.json",
+      "results": [
+        "Fernando Alonso (5)"
+      ]
     },
     "destructors_team": {
       "season": 2025,
@@ -85,7 +88,10 @@
       "season": 2025,
       "result": "Aston Martin (89)",
       "label": "2025 constructor standings + podium teams",
-      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json"
+      "url": "https://api.jolpi.ca/ergast/f1/2025/constructorStandings.json",
+      "results": [
+        "Aston Martin (89)"
+      ]
     },
     "lowest_grid_win_position": {
       "season": 2025,

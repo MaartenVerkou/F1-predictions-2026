@@ -33,6 +33,24 @@
       if (lower.endsWith('.json') || lower.includes('.json?')) return false;
       return true;
     }; %>
+  <% const formatLastSeasonResult = (entry) => {
+      if (!entry || typeof entry !== 'object') return '';
+      const parts = [];
+      const addValue = (value) => {
+        if (Array.isArray(value)) {
+          value.forEach(addValue);
+          return;
+        }
+        const text = String(value || '').trim();
+        if (!text) return;
+        parts.push(text);
+      };
+      addValue(entry.result);
+      addValue(entry.results);
+      const unique = Array.from(new Set(parts));
+      if (unique.length === 0) return t('questions.last_season_default_result');
+      return unique.join(' / ');
+    }; %>
   <% const parseArrayAnswer = (value) => {
       try {
         const parsed = JSON.parse(value);
@@ -175,9 +193,7 @@
     <% questions.forEach(q => { %>
       <% const lastSeason = q.last_season || null; %>
       <% const hasLastSeasonReference = Boolean(lastSeason); %>
-      <% const lastSeasonResult = hasLastSeasonReference
-        ? (String(lastSeason?.result || '').trim() || t('questions.last_season_default_result'))
-        : ''; %>
+      <% const lastSeasonResult = hasLastSeasonReference ? formatLastSeasonResult(lastSeason) : ''; %>
       <% const lastSeasonUrl = String(lastSeason?.url || '').trim(); %>
       <% const lastSeasonLabel = String(lastSeason?.label || '').trim(); %>
       <% const lastSeasonSourceUrl = isHumanReadableSourceUrl(lastSeasonUrl) ? lastSeasonUrl : ''; %>

@@ -292,6 +292,7 @@ db.exec(`
     question_id TEXT PRIMARY KEY,
     included INTEGER NOT NULL DEFAULT 1,
     points_override TEXT,
+    order_index INTEGER,
     updated_at TEXT NOT NULL
   );
 
@@ -376,6 +377,16 @@ function ensureUserColumns() {
 }
 
 ensureUserColumns();
+
+function ensureQuestionSettingsColumns() {
+  const columns = db.prepare("PRAGMA table_info(question_settings);").all();
+  const names = new Set(columns.map((col) => col.name));
+  if (!names.has("order_index")) {
+    db.exec("ALTER TABLE question_settings ADD COLUMN order_index INTEGER;");
+  }
+}
+
+ensureQuestionSettingsColumns();
 
 function syncAdminWhitelist() {
   if (!ADMIN_EMAILS.size) return;
@@ -709,7 +720,7 @@ function readJsonFile(filePath) {
 function getQuestionSettingsMap() {
   const rows = db
     .prepare(
-      "SELECT question_id, included, points_override FROM question_settings"
+      "SELECT question_id, included, points_override, order_index FROM question_settings"
     )
     .all();
   const map = new Map();
@@ -730,11 +741,17 @@ function getQuestionSettingsMap() {
         );
       }
     }
+    const orderIndexRaw = row.order_index;
+    const orderIndex =
+      orderIndexRaw == null || !Number.isFinite(Number(orderIndexRaw))
+        ? null
+        : Number(orderIndexRaw);
     map.set(row.question_id, {
       included,
       rawOverride,
       parsedOverride,
-      hasValidOverride
+      hasValidOverride,
+      orderIndex
     });
   }
   return map;
@@ -746,7 +763,7 @@ function applyQuestionSettings(
   { includeExcluded = false, includeMeta = false } = {}
 ) {
   const out = [];
-  for (const original of questions || []) {
+  for (const [sourceIndex, original] of (questions || []).entries()) {
     const setting = settingsMap.get(original.id);
     const included = setting ? setting.included : true;
     if (!includeExcluded && !included) continue;
@@ -765,9 +782,28 @@ function applyQuestionSettings(
       question._effectivePoints = question.points;
       question._pointsOverrideRaw = setting?.rawOverride || "";
       question._hasValidPointsOverride = Boolean(setting?.hasValidOverride);
+      question._orderIndex =
+        setting && Number.isFinite(Number(setting.orderIndex))
+          ? Number(setting.orderIndex)
+          : sourceIndex;
     }
 
+    question._sourceIndex = sourceIndex;
+    question._sortOrderIndex =
+      setting && Number.isFinite(Number(setting.orderIndex))
+        ? Number(setting.orderIndex)
+        : sourceIndex;
     out.push(question);
+  }
+  out.sort((a, b) => {
+    if (a._sortOrderIndex !== b._sortOrderIndex) {
+      return a._sortOrderIndex - b._sortOrderIndex;
+    }
+    return a._sourceIndex - b._sourceIndex;
+  });
+  for (const question of out) {
+    delete question._sortOrderIndex;
+    delete question._sourceIndex;
   }
   return out;
 }

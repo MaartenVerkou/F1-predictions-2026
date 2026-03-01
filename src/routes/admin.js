@@ -1119,19 +1119,20 @@ function registerAdminRoutes(app, deps) {
     const now = new Date().toISOString();
     const upsert = db.prepare(
       `
-      INSERT INTO question_settings (question_id, included, points_override, updated_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO question_settings (question_id, included, points_override, order_index, updated_at)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(question_id)
       DO UPDATE SET
         included = excluded.included,
         points_override = excluded.points_override,
+        order_index = excluded.order_index,
         updated_at = excluded.updated_at
       `
     );
 
     try {
       const tx = db.transaction(() => {
-        for (const question of questions) {
+        for (const [index, question] of questions.entries()) {
           const includeKey = `${question.id}__included`;
           const pointsKey = `${question.id}__points`;
           const included = req.body[includeKey] ? 1 : 0;
@@ -1145,7 +1146,7 @@ function registerAdminRoutes(app, deps) {
             validatePointsOverrideType(question, parsedOverride);
             storedOverride = JSON.stringify(parsedOverride);
           }
-          upsert.run(question.id, included, storedOverride, now);
+          upsert.run(question.id, included, storedOverride, index, now);
         }
       });
       tx();
@@ -1157,6 +1158,70 @@ function registerAdminRoutes(app, deps) {
 
     return res.redirect(
       `/admin/questions?success=${encodeURIComponent("Question settings saved.")}`
+    );
+  });
+
+  app.post("/admin/questions/reorder", requireAdmin, (req, res) => {
+    const questions = getQuestions("en", {
+      includeExcluded: true,
+      includeMeta: true
+    });
+    let questionId = String(req.body.questionId || "").trim();
+    let direction = String(req.body.direction || "").trim().toLowerCase();
+    if (!questionId || !direction) {
+      const move = String(req.body.move || "").trim();
+      if (move.includes(":")) {
+        const [idPart, dirPart] = move.split(":", 2);
+        questionId = String(idPart || "").trim();
+        direction = String(dirPart || "").trim().toLowerCase();
+      }
+    }
+    if (!questionId || (direction !== "up" && direction !== "down")) {
+      return res.redirect(
+        `/admin/questions?error=${encodeURIComponent("Invalid reorder request.")}`
+      );
+    }
+
+    const index = questions.findIndex((q) => q.id === questionId);
+    if (index < 0) {
+      return res.redirect(
+        `/admin/questions?error=${encodeURIComponent("Question not found.")}`
+      );
+    }
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= questions.length) {
+      return res.redirect("/admin/questions");
+    }
+
+    const reordered = questions.slice();
+    const current = reordered[index];
+    reordered[index] = reordered[swapIndex];
+    reordered[swapIndex] = current;
+
+    const now = new Date().toISOString();
+    const upsertOrder = db.prepare(
+      `
+      INSERT INTO question_settings (question_id, included, points_override, order_index, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(question_id)
+      DO UPDATE SET
+        order_index = excluded.order_index,
+        updated_at = excluded.updated_at
+      `
+    );
+
+    const tx = db.transaction(() => {
+      for (const [orderIndex, question] of reordered.entries()) {
+        const included = question._included ? 1 : 0;
+        const rawOverride = String(question._pointsOverrideRaw || "").trim();
+        const storedOverride = rawOverride ? rawOverride : null;
+        upsertOrder.run(question.id, included, storedOverride, orderIndex, now);
+      }
+    });
+    tx();
+
+    return res.redirect(
+      `/admin/questions?success=${encodeURIComponent("Question order updated.")}`
     );
   });
 

@@ -131,7 +131,7 @@
     "scroll_to_end": "Aller en bas de page",
     "last_season_link": "Saison precedente",
     "last_season_default_result": "Pas directement comparable",
-    "tip_dnf": "DNF signifie Did Not Finish en Grand Prix. DNS et DSQ ne comptent pas comme DNF.",
+    "tip_dnf": "Grands Prix uniquement, DNS et DSQ ne comptent pas comme DNF.",
     "tip_dns": "DNS signifie Did Not Start. Les DNS ne sont pas comptes comme DNF.",
     "tip_dq": "DSQ signifie disqualifie. Les disqualifications ne sont pas comptees comme DNF.",
     "tip_gp_only_no_sprints": "Cela concerne uniquement les Grands Prix, sans sprints sauf mention explicite.",
@@ -143,7 +143,12 @@
     "points_multi_select_penalty": "{points} {points_word} par {driver_word} correct, -{penalty} pour chaque {driver_word} manquant ou incorrect (min {minimum})",
     "points_teammate_battle": "{base} {points_word} moins 1 par point d ecart (le vainqueur doit etre correct). Egalite + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, ou {bonus} si toutes les equipes font un podium et que tu le prevois",
-    "points_per_dnf_selected_races": "{points} {points_word} par DNF dans tes courses selectionnees"
+    "points_per_dnf_selected_races": "{points} {points_word} par DNF dans tes courses selectionnees",
+    "tip_podium_gp_only": "Podiums en Grand Prix uniquement.",
+    "tip_race_gp_wins_only": "Victoires en Grand Prix uniquement.",
+    "tip_races_grand_prix_only": "Courses de Grand Prix uniquement.",
+    "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
+    "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
   },
   "leaderboard": {
     "page_title": "Classement",
@@ -241,7 +246,8 @@
     "retention_body_2": "Les comptes inactifs pendant 24 mois peuvent etre supprimes pour minimiser les donnees stockees; nous pouvons essayer de prevenir les utilisateurs par e-mail avant suppression.",
     "retention_body_3": "Les comptes supprimes et les donnees personnelles associees sont effaces des systemes actifs, sauf obligation legale ou securitaire de conservation.",
     "export_body": "Les utilisateurs peuvent demander un resume/export de leurs donnees de compte par e-mail.",
-    "contact_body": "Pour le support, la confidentialite, l acces/export des donnees ou des questions juridiques :"
+    "contact_body": "Pour le support, la confidentialite, l acces/export des donnees ou des questions juridiques :",
+    "donate_support_line": "Vous pouvez aussi soutenir les createurs avec un don pour aider a couvrir les frais d hebergement."
   },
   "question_prompts": {
     "drivers_championship_top_3": {
@@ -274,7 +280,7 @@
       "prompt": "Championnat destructors: quel pilote a le plus de degats ?"
     },
     "all_podium_finishers": {
-      "prompt": "Selectionnez tous les pilotes de podium en course"
+      "prompt": "Selectionnez tous les pilotes avec podium"
     },
     "teammate_battle_antonelli_russell": {
       "prompt": "Duel coequipiers: Antonelli vs Russell - predisez ecart de points et qui marque plus"
@@ -297,13 +303,13 @@
     },
     "lowest_grid_win_position": {
       "prompt": "Position de depart la plus basse depuis laquelle une course est gagnee (et par qui)",
-      "points_display": "Score position: exact = 10; ecart de 1/2/3/4 = 7/5/3/1. Plus 20 pour le bon pilote."
+      "points_display": "Score position: exact = 10; ecart de 1/2/3/4 = 7/5/3/1. Plus 10 pour le bon pilote (meme sans points de position)."
     },
     "select_three_races_dnfs": {
       "prompt": "Choisissez 3 courses. Gagnez 2 points par DNF dans ces courses."
     },
     "closest_qualifying_teammates": {
-      "prompt": "Quelle equipe a le duel qualifications le plus serre ?"
+      "prompt": "Quelle equipe a le duel qualifications le plus serre entre coequipiers ?"
     },
     "races_before_title_decided": {
       "prompt": "Combien de courses avant la fin le titre pilotes est-il decide ? (derniere course = 0)"
@@ -315,10 +321,10 @@
       "prompt": "Au championnat constructeurs, 4 des 5 premiers sont des equipes a moteur Mercedes"
     },
     "mini_q3_ferrari_podium": {
-      "prompt": "Les deux pilotes Ferrari obtiennent au moins un podium en Grand Prix"
+      "prompt": "Les deux pilotes Ferrari obtiennent au moins un podium"
     },
     "mini_q4_sprint_champion_same": {
-      "prompt": "Si on compte seulement les sprints, le meme pilote est champion"
+      "prompt": "Si on ne compte que les points des courses sprint, le meme pilote serait champion du monde"
     },
     "mini_q5_team_engine_switch_2027_2028": {
       "prompt": "Avant la fin de 2026, une ou plusieurs equipes annoncent un changement de motoriste pour 2027 ou 2028"

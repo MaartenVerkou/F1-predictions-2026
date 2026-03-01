@@ -26,6 +26,7 @@
     <table class="table compact admin-question-table">
       <thead>
         <tr>
+          <th>Order</th>
           <th>Question</th>
           <th>Type</th>
           <th>Included</th>
@@ -35,8 +36,32 @@
         </tr>
       </thead>
       <tbody>
-        <% questions.forEach((question) => { %>
+        <% questions.forEach((question, index) => { %>
           <tr>
+            <td class="admin-question-order">
+              <div class="admin-order-buttons">
+                <button
+                  type="submit"
+                  class="secondary admin-order-btn"
+                  formaction="/admin/questions/reorder"
+                  formmethod="post"
+                  name="move"
+                  value="<%= `${question.id}:up` %>"
+                  <%= index === 0 ? 'disabled' : '' %>
+                  title="Move up"
+                >&#8593;</button>
+                <button
+                  type="submit"
+                  class="secondary admin-order-btn"
+                  formaction="/admin/questions/reorder"
+                  formmethod="post"
+                  name="move"
+                  value="<%= `${question.id}:down` %>"
+                  <%= index === questions.length - 1 ? 'disabled' : '' %>
+                  title="Move down"
+                >&#8595;</button>
+              </div>
+            </td>
             <td class="admin-question-cell">
               <div class="admin-question-title"><%= question.prompt %></div>
               <div class="muted admin-question-id"><code class="admin-question-code"><%= question.id %></code></div>

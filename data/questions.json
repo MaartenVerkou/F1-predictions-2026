@@ -1,4 +1,4 @@
-﻿{
+{
   "questions": [
     {
       "id": "drivers_championship_top_3",
@@ -6,6 +6,19 @@
       "type": "ranking",
       "count": 3,
       "options_source": "drivers",
+      "points": {
+        "1st": 50,
+        "2nd": 25,
+        "3rd": 15
+      },
+      "points_display": "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts"
+    },
+    {
+      "id": "constructors_championship_top_3",
+      "prompt": "Constructors' Championship: pick your Top 3",
+      "type": "ranking",
+      "count": 3,
+      "options_source": "teams",
       "points": {
         "1st": 50,
         "2nd": 25,
@@ -22,19 +35,6 @@
       "points_display": "10 points"
     },
     {
-      "id": "constructors_championship_top_3",
-      "prompt": "Constructors' Championship: pick your Top 3",
-      "type": "ranking",
-      "count": 3,
-      "options_source": "teams",
-      "points": {
-        "1st": 50,
-        "2nd": 25,
-        "3rd": 15
-      },
-      "points_display": "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts"
-    },
-    {
       "id": "constructors_championship_last",
       "prompt": "Last team in the Constructors' Championship",
       "type": "single_choice",
@@ -43,11 +43,70 @@
       "points_display": "10 points"
     },
     {
-      "id": "all_teams_score_points",
-      "prompt": "Does every team score points?",
-      "type": "boolean",
+      "id": "lowest_grid_win_position",
+      "prompt": "Lowest starting position from which a race is won (and who wins)",
+      "type": "single_choice_with_driver",
+      "options": [
+        "Pitlane",
+        "22",
+        "21",
+        "20",
+        "19",
+        "18",
+        "17",
+        "16",
+        "15",
+        "14",
+        "13",
+        "12",
+        "11",
+        "10",
+        "9",
+        "8",
+        "7",
+        "6",
+        "5",
+        "4",
+        "3",
+        "2",
+        "1"
+      ],
+      "options_source": "drivers",
+      "points": {
+        "position": 10,
+        "driver": 10
+      },
+      "position_nearby_points": {
+        "1": 7,
+        "2": 5,
+        "3": 3,
+        "4": 1
+      },
+      "points_display": "Position score: exact = 10 pts; off by 1/2/3/4 = 7/5/3/1 pts. Plus 10 pts for the correct driver (can also be earned without position points)."
+    },
+    {
+      "id": "all_podium_finishers",
+      "prompt": "Select all podium finishers",
+      "type": "multi_select",
+      "options_source": "drivers",
       "points": 5,
-      "points_display": "5 points"
+      "penalty": 5,
+      "minimum": 0,
+      "points_display": "5 points per correct driver, -5 for each missing or incorrect driver (min 0)"
+    },
+    {
+      "id": "most_points_no_podium",
+      "prompt": "Which team scores the most points without a podium finish?",
+      "type": "single_choice",
+      "options": [
+        "All teams scored a podium"
+      ],
+      "options_source": "teams",
+      "points": 10,
+      "special_case": "all_podiums_bonus",
+      "bonus_value": "All teams scored a podium",
+      "bonus_points": 75,
+      "points_display": "10 points, or 75 if all teams score a podium and you predict that"
     },
     {
       "id": "most_driver_of_the_day",
@@ -66,14 +125,6 @@
       "points_display": "10 points"
     },
     {
-      "id": "destructors_team",
-      "prompt": "Destructors championship: most damage for which team?",
-      "type": "single_choice",
-      "options_source": "teams",
-      "points": 10,
-      "points_display": "10 points"
-    },
-    {
       "id": "destructors_driver",
       "prompt": "Destructors championship: most damage for which driver?",
       "type": "single_choice",
@@ -82,20 +133,21 @@
       "points_display": "10 points"
     },
     {
-      "id": "all_podium_finishers",
-      "prompt": "Select all race podium finishers",
-      "type": "multi_select",
-      "options_source": "drivers",
-      "points": 5,
-      "penalty": 5,
-      "minimum": 0,
-      "points_display": "5 points per correct driver, -5 for each missing or incorrect driver (min 0)"
+      "id": "destructors_team",
+      "prompt": "Destructors championship: most damage for which team?",
+      "type": "single_choice",
+      "options_source": "teams",
+      "points": 10,
+      "points_display": "10 points"
     },
     {
       "id": "teammate_battle_antonelli_russell",
       "prompt": "Team mate battle: Antonelli vs Russell - predict points difference and who scores more",
       "type": "teammate_battle",
-      "options": ["Kimi Antonelli", "George Russell"],
+      "options": [
+        "Kimi Antonelli",
+        "George Russell"
+      ],
       "points": 25,
       "tie_bonus": 75,
       "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points"
@@ -104,48 +156,32 @@
       "id": "teammate_battle_lawson_lindblad",
       "prompt": "Team mate battle: Norris vs Piastri - predict points difference and who scores more",
       "type": "teammate_battle",
-      "options": ["Lando Norris", "Oscar Piastri"],
+      "options": [
+        "Lando Norris",
+        "Oscar Piastri"
+      ],
       "points": 25,
       "tie_bonus": 75,
       "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points"
     },
     {
-      "id": "alpine_vs_cadillac_audi",
-      "prompt": "Alpine scores more or less points than Cadillac, Audi and Aston Martin combined",
+      "id": "closest_qualifying_teammates",
+      "prompt": "Which team has the closest qualifying head-to-head between teammates?",
       "type": "single_choice",
-      "options": ["More", "Less"],
+      "options_source": "teams",
       "points": 10,
       "points_display": "10 points"
     },
     {
-      "id": "most_points_no_podium",
-      "prompt": "Which team scores the most points without a podium finish?",
+      "id": "alpine_vs_cadillac_audi",
+      "prompt": "Alpine scores more or less points than Cadillac, Audi and Aston Martin combined",
       "type": "single_choice",
-      "options": ["All teams scored a podium"],
-      "options_source": "teams",
+      "options": [
+        "More",
+        "Less"
+      ],
       "points": 10,
-      "special_case": "all_podiums_bonus",
-      "bonus_value": "All teams scored a podium",
-      "bonus_points": 75,
-      "points_display": "10 points, or 75 if all teams score a podium and you predict that"
-    },
-    {
-      "id": "lowest_grid_win_position",
-      "prompt": "Lowest starting position from which a race is won (and who wins)",
-      "type": "single_choice_with_driver",
-      "options": ["Pitlane", "22", "21", "20", "19", "18", "17", "16", "15", "14", "13", "12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"],
-      "options_source": "drivers",
-      "points": {
-        "position": 10,
-        "driver": 20
-      },
-      "position_nearby_points": {
-        "1": 7,
-        "2": 5,
-        "3": 3,
-        "4": 1
-      },
-      "points_display": "Position score: exact = 10 pts; off by 1/2/3/4 = 7/5/3/1 pts. Plus 20 pts for the correct driver."
+      "points_display": "10 points"
     },
     {
       "id": "select_three_races_dnfs",
@@ -157,19 +193,18 @@
       "points_display": "2 points per DNF in your selected races"
     },
     {
-      "id": "closest_qualifying_teammates",
-      "prompt": "Which team has the closest qualifying head-to-head?",
-      "type": "single_choice",
-      "options_source": "teams",
-      "points": 10,
-      "points_display": "10 points"
-    },
-    {
       "id": "races_before_title_decided",
       "prompt": "How many races before the end is the Drivers' title decided? (last race = 0)",
       "type": "numeric",
       "points": 10,
       "points_display": "10 points"
+    },
+    {
+      "id": "all_teams_score_points",
+      "prompt": "Does every team score points?",
+      "type": "boolean",
+      "points": 5,
+      "points_display": "5 points"
     },
     {
       "id": "mini_q1_first_race_winner_champion",
@@ -187,14 +222,14 @@
     },
     {
       "id": "mini_q3_ferrari_podium",
-      "prompt": "Both Ferrari drivers score at least one Grand Prix podium",
+      "prompt": "Both Ferrari drivers score at least one podium",
       "type": "boolean",
       "points": 5,
       "points_display": "5 points"
     },
     {
       "id": "mini_q4_sprint_champion_same",
-      "prompt": "If we only count sprints, the same driver is champion",
+      "prompt": "If we only count points from sprint races, the same driver would be world champion",
       "type": "boolean",
       "points": 5,
       "points_display": "5 points"

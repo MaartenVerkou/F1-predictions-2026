@@ -121,6 +121,7 @@
       <% const buildPromptTooltipHtml = (questionObj) => {
         const text = String(questionObj?.prompt || '');
         if (!text) return '';
+        const questionId = String(questionObj?.id || '');
 
         const termDefs = [
           {
@@ -136,30 +137,51 @@
             patterns: [/\bDSQ\b/gi]
           },
           {
-            tip: t('questions.tip_gp_only_no_sprints'),
-            patterns: [
-              /\bno sprints\b/gi,
-              /\bgeen sprints\b/gi,
-              /\bkeine sprints\b/gi,
-              /\bsin sprints\b/gi,
-              /\bsans sprints\b/gi,
-              /\brace podium finishers\b/gi,
-              /\bpodiumfinishers van races\b/gi,
-              /\bpodiumsfahrer in rennen\b/gi,
-              /\bpilotos con podio en carrera\b/gi,
-              /\bpilotes de podium en course\b/gi
-            ]
-          },
-          {
             tip: t('questions.tip_grand_prix'),
             patterns: [/\bGrand Prix\b/gi]
           }
         ];
 
-        if (String(questionObj?.id || '') === 'drivers_championship_last') {
+        if (questionId === 'drivers_championship_last') {
           termDefs.push({
             tip: t('questions.tip_initial_lineup'),
             patterns: [/\bdriver\b/gi, /\bcoureur\b/gi, /\bfahrer\b/gi, /\bpiloto\b/gi, /\bpilote\b/gi]
+          });
+        }
+        if (questionId === 'all_podium_finishers' || questionId === 'mini_q3_ferrari_podium') {
+          termDefs.push({
+            tip: t('questions.tip_podium_gp_only'),
+            patterns: [/\bpodium(?:s)?\b/gi, /\bpodiumfinishers?\b/gi, /\bpodiumsfahrer\b/gi, /\bpodio(?:s)?\b/gi]
+          });
+        }
+        if (questionId === 'lowest_grid_win_position') {
+          termDefs.push({
+            tip: t('questions.tip_race_gp_wins_only'),
+            patterns: [/\brace(?:s)?\b/gi, /\brennen\b/gi, /\bcarrera(?:s)?\b/gi, /\bcourse(?:s)?\b/gi]
+          });
+        }
+        if (questionId === 'select_three_races_dnfs' || questionId === 'races_before_title_decided') {
+          termDefs.push({
+            tip: t('questions.tip_races_grand_prix_only'),
+            patterns: [/\braces\b/gi, /\brennen\b/gi, /\bcarreras\b/gi, /\bcourses\b/gi]
+          });
+        }
+        if (questionId === 'mini_q2_mercedes_engines_top5') {
+          termDefs.push({
+            tip: t('questions.tip_mercedes_engine_teams'),
+            patterns: [
+              /\bteams with Mercedes engines\b/gi,
+              /\bteams met Mercedes-motoren\b/gi,
+              /\bteams mit Mercedes-Motor\b/gi,
+              /\bequipos con motor Mercedes\b/gi,
+              /\bequipes a moteur Mercedes\b/gi
+            ]
+          });
+        }
+        if (questionId === 'destructors_driver' || questionId === 'destructors_team') {
+          termDefs.push({
+            tip: t('questions.tip_damage_source'),
+            patterns: [/\bdamage\b/gi, /\bschade\b/gi, /\bschaden\b/gi, /\bdanos\b/gi, /\bdegats\b/gi]
           });
         }
 
@@ -225,6 +247,24 @@
         if (lower.endsWith('.json') || lower.includes('.json?')) return false;
         return true;
       }; %>
+      <% const formatLastSeasonResult = (entry) => {
+        if (!entry || typeof entry !== 'object') return '';
+        const parts = [];
+        const addValue = (value) => {
+          if (Array.isArray(value)) {
+            value.forEach(addValue);
+            return;
+          }
+          const text = String(value || '').trim();
+          if (!text) return;
+          parts.push(text);
+        };
+        addValue(entry.result);
+        addValue(entry.results);
+        const unique = Array.from(new Set(parts));
+        if (unique.length === 0) return t('questions.last_season_default_result');
+        return unique.join(' / ');
+      }; %>
 
       <% questions.forEach(question => { 
         const sourceOptions = question.options_source === 'drivers'
@@ -240,9 +280,7 @@
         const type = question.type || 'text';
         const lastSeason = question.last_season || null;
         const hasLastSeasonReference = Boolean(lastSeason);
-        const lastSeasonResult = hasLastSeasonReference
-          ? (String(lastSeason?.result || '').trim() || t('questions.last_season_default_result'))
-          : '';
+        const lastSeasonResult = hasLastSeasonReference ? formatLastSeasonResult(lastSeason) : '';
         const lastSeasonUrl = String(lastSeason?.url || '').trim();
         const lastSeasonLabel = String(lastSeason?.label || '').trim();
         const lastSeasonSourceUrl = isHumanReadableSourceUrl(lastSeasonUrl) ? lastSeasonUrl : '';

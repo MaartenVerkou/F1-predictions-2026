@@ -131,7 +131,7 @@
     "scroll_to_end": "Ga naar einde van pagina",
     "last_season_link": "Vorig seizoen",
     "last_season_default_result": "Niet direct vergelijkbaar",
-    "tip_dnf": "DNF betekent Did Not Finish in een Grand Prix. DNS en DSQ tellen niet als DNF.",
+    "tip_dnf": "Alleen Grand Prix, DNS en DSQ tellen niet als DNF.",
     "tip_dns": "DNS betekent Did Not Start. DNS-resultaten tellen niet als DNF.",
     "tip_dq": "DSQ betekent diskwalificatie. Diskwalificaties tellen niet als DNF.",
     "tip_gp_only_no_sprints": "Dit gaat alleen over Grand Prix-races, geen sprints tenzij dat expliciet staat.",
@@ -143,7 +143,12 @@
     "points_multi_select_penalty": "{points} {points_word} per correcte {driver_word}, -{penalty} voor elke ontbrekende of onjuiste {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} min 1 per punt afwijking (winnaar moet kloppen). Gelijk + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, of {bonus} als alle teams een podium scoren en jij dat voorspelt",
-    "points_per_dnf_selected_races": "{points} {points_word} per DNF in je geselecteerde races"
+    "points_per_dnf_selected_races": "{points} {points_word} per DNF in je geselecteerde races",
+    "tip_podium_gp_only": "Alleen Grand Prix-podia.",
+    "tip_race_gp_wins_only": "Alleen Grand Prix-zeges.",
+    "tip_races_grand_prix_only": "Alleen Grand Prix-races.",
+    "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
+    "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
   },
   "leaderboard": {
     "page_title": "Klassement",
@@ -241,7 +246,8 @@
     "retention_body_2": "Accounts die 24 maanden inactief zijn kunnen worden verwijderd om opgeslagen data te beperken; we kunnen proberen gebruikers vooraf per e-mail te informeren.",
     "retention_body_3": "Verwijderde accounts en bijbehorende persoonsgegevens worden verwijderd uit actieve systemen, behalve wanneer bewaarplicht geldt voor juridische of beveiligingsredenen.",
     "export_body": "Gebruikers kunnen een samenvatting/export van accountdata opvragen via e-mail.",
-    "contact_body": "Voor support, privacy, data-inzage/export of juridische vragen:"
+    "contact_body": "Voor support, privacy, data-inzage/export of juridische vragen:",
+    "donate_support_line": "Je kunt de makers ook steunen met een donatie om de hostingkosten te helpen dekken."
   },
   "question_prompts": {
     "drivers_championship_top_3": {
@@ -274,7 +280,7 @@
       "prompt": "Destructors-kampioenschap: welke coureur heeft de meeste schade?"
     },
     "all_podium_finishers": {
-      "prompt": "Selecteer alle podiumfinishers van races"
+      "prompt": "Selecteer alle podiumfinishers"
     },
     "teammate_battle_antonelli_russell": {
       "prompt": "Teamgenootduel: Antonelli vs Russell - voorspel puntenverschil en wie meer scoort"
@@ -297,13 +303,13 @@
     },
     "lowest_grid_win_position": {
       "prompt": "Laagste startpositie van waaruit een race wordt gewonnen (en wie wint)",
-      "points_display": "Positiescore: exact = 10; 1/2/3/4 ernaast = 7/5/3/1. Plus 20 voor de juiste coureur."
+      "points_display": "Positiescore: exact = 10; 1/2/3/4 ernaast = 7/5/3/1. Plus 10 voor de juiste coureur (ook zonder positiepunten)."
     },
     "select_three_races_dnfs": {
       "prompt": "Kies 3 races. Verdien 2 punten per DNF in die races."
     },
     "closest_qualifying_teammates": {
-      "prompt": "Welk team heeft de kleinste kwalificatie-onderlinge stand?"
+      "prompt": "Welk team heeft de kleinste kwalificatie-onderlinge stand tussen teamgenoten?"
     },
     "races_before_title_decided": {
       "prompt": "Hoeveel races voor het einde wordt de rijderstitel beslist? (laatste race = 0)"
@@ -315,10 +321,10 @@
       "prompt": "In het constructeurskampioenschap zijn 4 van de top 5 teams met Mercedes-motoren"
     },
     "mini_q3_ferrari_podium": {
-      "prompt": "Beide Ferrari-coureurs pakken minstens een Grand Prix-podium"
+      "prompt": "Beide Ferrari-coureurs pakken minstens een podium"
     },
     "mini_q4_sprint_champion_same": {
-      "prompt": "Als we alleen sprints tellen, is dezelfde coureur kampioen"
+      "prompt": "Als we alleen punten uit sprintraces tellen, zou dezelfde coureur wereldkampioen zijn"
     },
     "mini_q5_team_engine_switch_2027_2028": {
       "prompt": "Voor het einde van 2026 kondigen een of meer teams aan dat ze vanaf 2027 of 2028 van motorleverancier wisselen"

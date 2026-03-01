@@ -131,7 +131,7 @@
     "scroll_to_end": "Go to end of page",
     "last_season_link": "Last season",
     "last_season_default_result": "Not directly comparable",
-    "tip_dnf": "DNF means Did Not Finish in a Grand Prix. DNS and DSQ do not count as DNF.",
+    "tip_dnf": "Grand Prix only, DNS and DSQ don't count as DNF.",
     "tip_dns": "DNS means Did Not Start. DNS entries are not counted as DNF.",
     "tip_dq": "DSQ means Disqualified. Disqualifications are not counted as DNF.",
     "tip_gp_only_no_sprints": "This refers to Grand Prix races only, no sprints unless explicitly stated.",
@@ -143,7 +143,12 @@
     "points_multi_select_penalty": "{points} {points_word} per correct {driver_word}, -{penalty} for each missing or incorrect {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} minus 1 per point off (winner must be correct). Tie + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, or {bonus} if all teams score a podium and you predict that",
-    "points_per_dnf_selected_races": "{points} {points_word} per DNF in your selected races"
+    "points_per_dnf_selected_races": "{points} {points_word} per DNF in your selected races",
+    "tip_podium_gp_only": "Grand Prix podiums only.",
+    "tip_race_gp_wins_only": "Grand Prix wins only.",
+    "tip_races_grand_prix_only": "Grand Prix races only.",
+    "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
+    "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
   },
   "leaderboard": {
     "page_title": "Leaderboard",
@@ -241,7 +246,8 @@
     "retention_body_2": "Accounts inactive for 24 months may be removed to minimize stored data; we may attempt to notify users beforehand by email.",
     "retention_body_3": "Deleted accounts and associated personal data are removed from active systems, except where retention is required for legal or security reasons.",
     "export_body": "Users may request a summary/export of account data by contacting us via email.",
-    "contact_body": "For support, privacy, data access/export, or legal questions:"
+    "contact_body": "For support, privacy, data access/export, or legal questions:",
+    "donate_support_line": "You can also support the creators with a donation to help cover hosting costs."
   },
   "question_prompts": {
     "drivers_championship_top_3": {
@@ -274,7 +280,7 @@
       "prompt": "Destructors championship: most damage for which driver?"
     },
     "all_podium_finishers": {
-      "prompt": "Select all race podium finishers"
+      "prompt": "Select all podium finishers"
     },
     "teammate_battle_antonelli_russell": {
       "prompt": "Team mate battle: Antonelli vs Russell - predict points difference and who scores more"
@@ -297,13 +303,13 @@
     },
     "lowest_grid_win_position": {
       "prompt": "Lowest starting position from which a race is won (and who wins)",
-      "points_display": "Position score: exact = 10 pts; off by 1/2/3/4 = 7/5/3/1 pts. Plus 20 pts for the correct driver."
+      "points_display": "Position score: exact = 10 pts; off by 1/2/3/4 = 7/5/3/1 pts. Plus 10 pts for the correct driver (can also be earned without position points)."
     },
     "select_three_races_dnfs": {
       "prompt": "Select 3 races. Earn 2 points per DNF in those races."
     },
     "closest_qualifying_teammates": {
-      "prompt": "Which team has the closest qualifying head-to-head?"
+      "prompt": "Which team has the closest qualifying head-to-head between teammates?"
     },
     "races_before_title_decided": {
       "prompt": "How many races before the end is the Drivers' title decided? (last race = 0)"
@@ -315,10 +321,10 @@
       "prompt": "In the Constructors' Championship, 4 of the top 5 are teams with Mercedes engines"
     },
     "mini_q3_ferrari_podium": {
-      "prompt": "Both Ferrari drivers score at least one Grand Prix podium"
+      "prompt": "Both Ferrari drivers score at least one podium"
     },
     "mini_q4_sprint_champion_same": {
-      "prompt": "If we only count sprints, the same driver is champion"
+      "prompt": "If we only count points from sprint races, the same driver would be world champion"
     },
     "mini_q5_team_engine_switch_2027_2028": {
       "prompt": "Before the end of the 2026 season, one or more teams announce they'll switch engine supplier from 2027 or 2028 onwards"

@@ -86,6 +86,14 @@ function pickClosestTeam(qualStats) {
   return rows[0] || null;
 }
 
+function topTiedRows(entries, getScore) {
+  const rows = Array.isArray(entries) ? entries.slice() : [];
+  rows.sort((a, b) => getScore(b) - getScore(a));
+  if (!rows.length) return [];
+  const topScore = getScore(rows[0]);
+  return rows.filter((row) => getScore(row) === topScore);
+}
+
 async function main() {
   const [driverStandingsJson, constructorStandingsJson, scheduleJson] = await Promise.all([
     fetchJson(`${API_BASE}/${SEASON}/driverStandings.json`),
@@ -209,9 +217,10 @@ async function main() {
     }
   }
 
-  const mostDnfDriverRow = Array.from(driverDnfCounts.entries())
+  const dnfRows = Array.from(driverDnfCounts.entries())
     .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] || null;
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  const mostDnfDriverRows = topTiedRows(dnfRows, (row) => Number(row.count || 0));
 
   const lowestGridWin = winnerGridRows
     .slice()
@@ -229,6 +238,10 @@ async function main() {
     .filter(([name]) => !podiumTeams.has(name))
     .map(([name, points]) => ({ name, points }))
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+  const topNoPodiumCandidates = topTiedRows(
+    noPodiumCandidates,
+    (row) => Number(row.points || 0)
+  );
 
   const mercedesEngineTeams = new Set(["Mercedes", "McLaren", "Williams", "Aston Martin"]);
   const top5ConstructorNames = constructorStandings
@@ -308,7 +321,10 @@ async function main() {
       },
       most_dnfs_driver: {
         season: SEASON,
-        result: mostDnfDriverRow ? `${mostDnfDriverRow.name} (${mostDnfDriverRow.count})` : "n/a",
+        result: mostDnfDriverRows.length
+          ? mostDnfDriverRows.map((row) => `${row.name} (${row.count})`).join(" / ")
+          : "n/a",
+        results: mostDnfDriverRows.map((row) => `${row.name} (${row.count})`),
         label: `${SEASON} race results (DNF statuses)`,
         url: `${API_BASE}/${SEASON}/results.json`
       },
@@ -350,9 +366,12 @@ async function main() {
       },
       most_points_no_podium: {
         season: SEASON,
-        result: noPodiumCandidates[0]
-          ? `${noPodiumCandidates[0].name} (${noPodiumCandidates[0].points})`
+        result: topNoPodiumCandidates[0]
+          ? topNoPodiumCandidates
+              .map((row) => `${row.name} (${row.points})`)
+              .join(" / ")
           : "All teams scored a podium",
+        results: topNoPodiumCandidates.map((row) => `${row.name} (${row.points})`),
         label: `${SEASON} constructor standings + podium teams`,
         url: `${API_BASE}/${SEASON}/constructorStandings.json`
       },
