@@ -257,6 +257,111 @@ const initQuestionsCouplingToggle = () => {
   sync();
 };
 
+const initPredictionsAutosave = () => {
+  const form = document.getElementById('predictions-form');
+  if (!form) return;
+
+  const saveButton = form.querySelector('[data-predictions-save-button]');
+  if (saveButton && saveButton.disabled) return;
+
+  const statusEl = form.querySelector('[data-autosave-status]');
+  const messages = {
+    unsaved: statusEl?.dataset.statusUnsaved || 'Unsaved changes',
+    saving: statusEl?.dataset.statusSaving || 'Saving...',
+    saved: statusEl?.dataset.statusSaved || 'Saved',
+    failed: statusEl?.dataset.statusFailed || 'Autosave failed'
+  };
+
+  const serializeForm = () => new URLSearchParams(new FormData(form)).toString();
+  const setStatus = (state) => {
+    if (!statusEl) return;
+    statusEl.dataset.state = state || '';
+    statusEl.textContent = messages[state] || '';
+  };
+
+  let debounceTimer = null;
+  let inFlight = false;
+  let pendingSave = false;
+  let lastSavedPayload = serializeForm();
+
+  const clearDebounce = () => {
+    if (!debounceTimer) return;
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  };
+
+  const saveNow = async () => {
+    const payload = serializeForm();
+    if (payload === lastSavedPayload) {
+      setStatus('saved');
+      return;
+    }
+    if (inFlight) {
+      pendingSave = true;
+      return;
+    }
+
+    inFlight = true;
+    pendingSave = false;
+    setStatus('saving');
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          Accept: 'text/html'
+        },
+        body: payload,
+        credentials: 'same-origin'
+      });
+      if (!response.ok) {
+        throw new Error(`Autosave failed with status ${response.status}`);
+      }
+      lastSavedPayload = payload;
+      setStatus('saved');
+    } catch (err) {
+      setStatus('failed');
+      return;
+    } finally {
+      inFlight = false;
+    }
+
+    if (pendingSave || serializeForm() !== lastSavedPayload) {
+      pendingSave = false;
+      saveNow();
+    }
+  };
+
+  const queueSave = () => {
+    clearDebounce();
+    setStatus('unsaved');
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      saveNow();
+    }, 900);
+  };
+
+  form.addEventListener('input', (event) => {
+    if (!(event.target instanceof HTMLElement)) return;
+    if (!event.target.closest('input, select, textarea')) return;
+    queueSave();
+  });
+
+  form.addEventListener('change', (event) => {
+    if (!(event.target instanceof HTMLElement)) return;
+    if (!event.target.closest('input, select, textarea')) return;
+    queueSave();
+  });
+
+  form.addEventListener('submit', () => {
+    clearDebounce();
+    setStatus('saving');
+  });
+
+  setStatus('saved');
+};
+
 const initSignupPasswordMatch = () => {
   const form = document.querySelector('form[data-signup-form]');
   if (!form) return;
@@ -550,6 +655,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initQuestionsCouplingToggle();
+  initPredictionsAutosave();
   initSignupPasswordMatch();
   initScrollToEndButton();
   initLeaderboardMemberSwitcher();

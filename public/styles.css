@@ -782,6 +782,11 @@ button:disabled {
   opacity: 0.62;
 }
 
+.questions-fields input[data-diff-for] {
+  width: 200px;
+  min-width: 200px;
+}
+
 .link {
   color: var(--accent);
   text-decoration: none;
@@ -1634,6 +1639,17 @@ button:disabled {
 
 .questions-top-actions .inline-actions {
   margin-left: auto;
+}
+
+.questions-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.questions-autosave-status[data-state="failed"] {
+  color: var(--alert-text);
 }
 
 .scroll-to-end-btn {

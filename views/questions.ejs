@@ -305,7 +305,18 @@
       <% }) %>
     </fieldset>
 
-    <button type="submit" <%= closed ? 'disabled' : '' %>><%= t('questions.save_predictions') %></button>
+    <div class="questions-save-row">
+      <button type="submit" data-predictions-save-button <%= closed ? 'disabled' : '' %>><%= t('questions.save_predictions') %></button>
+      <span
+        class="muted questions-autosave-status"
+        data-autosave-status
+        data-status-unsaved="<%= t('questions.autosave_unsaved') %>"
+        data-status-saving="<%= t('questions.autosave_saving') %>"
+        data-status-saved="<%= t('questions.autosave_saved') %>"
+        data-status-failed="<%= t('questions.autosave_failed') %>"
+        aria-live="polite"
+      ></span>
+    </div>
     <div id="questions-form-end"></div>
   </form>
 </div>
