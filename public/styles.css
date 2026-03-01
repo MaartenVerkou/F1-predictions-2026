@@ -738,6 +738,7 @@ button:disabled {
   transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
   transform-origin: bottom right;
   z-index: 20;
+  overflow-wrap: anywhere;
 }
 
 .question-last-season-peek:hover .question-last-season-panel {
@@ -989,6 +990,7 @@ button:disabled {
   font-size: 12px;
   line-height: 1.35;
   max-width: min(460px, 90vw);
+  overflow-wrap: anywhere;
 }
 
 .responses-last-season-result {
@@ -1292,10 +1294,11 @@ button:disabled {
   }
 
   .question-last-season-panel {
-    bottom: 0;
-    left: auto;
-    right: calc(100% + 6px);
-    max-width: min(92vw, 460px);
+    left: 0;
+    right: auto;
+    bottom: calc(100% + 6px);
+    max-width: calc(100vw - 32px);
+    min-width: min(240px, calc(100vw - 32px));
   }
 }
 
