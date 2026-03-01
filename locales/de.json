@@ -33,7 +33,8 @@
     "verify_required": "Kontobestätigung vor dem Login erforderlich.",
     "confirm_password": "Passwort bestätigen",
     "create_account": "Konto erstellen",
-    "has_account": "Schon ein Konto? Anmelden"
+    "has_account": "Schon ein Konto? Anmelden",
+    "passwords_do_not_match": "Passwoerter stimmen nicht ueberein."
   },
   "dashboard": {
     "page_title": "Dashboard",

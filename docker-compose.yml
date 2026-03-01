@@ -13,6 +13,8 @@ services:
       - DEV_AUTO_LOGIN_NAME=${DEV_AUTO_LOGIN_NAME:-Dev Admin}
       - PORT=3000
       - APP_DOMAIN=${APP_DOMAIN:-localhost}
+      - COMPANY_NAME=${COMPANY_NAME:-F1 Predictions}
+      - CONTACT_EMAIL=${CONTACT_EMAIL:-}
       - DATA_DIR=/app/state
       - DB_PATH=/app/state/app.db
       - QUESTIONS_PATH=/app/config/questions.json

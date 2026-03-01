@@ -33,7 +33,8 @@
     "verify_required": "Accountverificatie is vereist voor inloggen.",
     "confirm_password": "Bevestig wachtwoord",
     "create_account": "Account aanmaken",
-    "has_account": "Al een account? Log in"
+    "has_account": "Al een account? Log in",
+    "passwords_do_not_match": "Wachtwoorden komen niet overeen."
   },
   "dashboard": {
     "page_title": "Dashboard",

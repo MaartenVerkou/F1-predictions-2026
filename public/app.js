@@ -257,6 +257,33 @@ const initQuestionsCouplingToggle = () => {
   sync();
 };
 
+const initSignupPasswordMatch = () => {
+  const form = document.querySelector('form[data-signup-form]');
+  if (!form) return;
+
+  const passwordInput = form.querySelector('input[name="password"]');
+  const confirmInput = form.querySelector('input[name="passwordConfirm"]');
+  if (!passwordInput || !confirmInput) return;
+
+  const mismatchMessage =
+    confirmInput.dataset.passwordMismatchMessage || 'Passwords do not match.';
+
+  const sync = () => {
+    const shouldFail =
+      confirmInput.value.length > 0 && passwordInput.value !== confirmInput.value;
+    confirmInput.setCustomValidity(shouldFail ? mismatchMessage : '');
+  };
+
+  passwordInput.addEventListener('input', sync);
+  confirmInput.addEventListener('input', sync);
+  form.addEventListener('submit', (event) => {
+    sync();
+    if (form.checkValidity()) return;
+    event.preventDefault();
+    form.reportValidity();
+  });
+};
+
 const initThemeToggle = () => {
   const toggle = document.querySelector('[data-theme-toggle]');
   const logos = Array.from(document.querySelectorAll('[data-logo-light][data-logo-dark]'));
@@ -523,6 +550,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initQuestionsCouplingToggle();
+  initSignupPasswordMatch();
   initScrollToEndButton();
   initLeaderboardMemberSwitcher();
 });

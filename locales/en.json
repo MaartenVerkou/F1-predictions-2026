@@ -33,7 +33,8 @@
     "verify_required": "Account verification required before login.",
     "confirm_password": "Confirm password",
     "create_account": "Create account",
-    "has_account": "Already have an account? Log in"
+    "has_account": "Already have an account? Log in",
+    "passwords_do_not_match": "Passwords do not match."
   },
   "dashboard": {
     "page_title": "Dashboard",

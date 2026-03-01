@@ -97,8 +97,20 @@ function registerAuthRoutes(app, deps) {
     res.render("about", { user });
   });
 
+  const renderSignup = (res, options = {}) => {
+    const error = options.error || null;
+    const form = options.form || {};
+    res.render("signup", {
+      error,
+      form: {
+        name: String(form.name || ""),
+        email: String(form.email || "")
+      }
+    });
+  };
+
   app.get(["/signup", "/register"], (req, res) => {
-    res.render("signup", { error: null });
+    renderSignup(res);
   });
 
   app.get("/api/users/check-name", (req, res) => {
@@ -111,34 +123,51 @@ function registerAuthRoutes(app, deps) {
   });
 
   app.post("/signup", async (req, res) => {
-    const { name, email, password, passwordConfirm } = req.body;
-    if (!name || !email || !password || !passwordConfirm) {
-      return res.render("signup", { error: "All fields are required." });
+    const { password, passwordConfirm } = req.body;
+    const rawName = String(req.body.name || "");
+    const rawEmail = String(req.body.email || "");
+    const normalizedName = rawName.trim();
+    const normalizedEmail = rawEmail.trim().toLowerCase();
+    const signupForm = { name: normalizedName, email: normalizedEmail };
+
+    if (!normalizedName || !normalizedEmail || !password || !passwordConfirm) {
+      return renderSignup(res, {
+        error: "All fields are required.",
+        form: signupForm
+      });
     }
     if (String(password).length < MIN_PASSWORD_LENGTH) {
-      return res.render("signup", {
-        error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+      return renderSignup(res, {
+        error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+        form: signupForm
       });
     }
     if (password !== passwordConfirm) {
-      return res.render("signup", { error: "Passwords do not match." });
+      return renderSignup(res, {
+        error: "Passwords do not match.",
+        form: signupForm
+      });
     }
 
-    const normalizedName = name.trim();
     const nameTaken = db
       .prepare("SELECT id FROM users WHERE name = ?")
       .get(normalizedName);
     if (nameTaken) {
-      return res.render("signup", { error: "Name already in use." });
+      return renderSignup(res, {
+        error: "Name already in use.",
+        form: signupForm
+      });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
     const shouldBeAdmin = ADMIN_EMAILS.has(normalizedEmail);
     const existing = db
       .prepare("SELECT id, is_verified FROM users WHERE email = ?")
       .get(normalizedEmail);
     if (existing && existing.is_verified) {
-      return res.render("signup", { error: "Email already registered." });
+      return renderSignup(res, {
+        error: "Email already registered.",
+        form: signupForm
+      });
     }
 
     const passwordHash = await bcrypt.hash(password, 12);

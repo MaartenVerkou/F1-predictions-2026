@@ -33,7 +33,8 @@
     "verify_required": "La verification du compte est requise avant la connexion.",
     "confirm_password": "Confirmer le mot de passe",
     "create_account": "Creer le compte",
-    "has_account": "Vous avez deja un compte ? Connectez-vous"
+    "has_account": "Vous avez deja un compte ? Connectez-vous",
+    "passwords_do_not_match": "Les mots de passe ne correspondent pas."
   },
   "dashboard": {
     "page_title": "Tableau de bord",

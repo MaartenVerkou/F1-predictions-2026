@@ -1902,12 +1902,91 @@ function registerAdminRoutes(app, deps) {
   app.post("/admin/users/:userId/delete", requireAdmin, (req, res) => {
     const userId = Number(req.params.userId);
     if (!userId) return res.redirect("/admin/overview");
-    db.prepare("DELETE FROM responses WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM group_members WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM groups WHERE owner_id = ?").run(userId);
-    db.prepare("DELETE FROM invites WHERE created_by = ?").run(userId);
-    db.prepare("DELETE FROM users WHERE id = ?").run(userId);
-    res.redirect("/admin/overview");
+    const currentUser = getCurrentUser(req);
+    if (currentUser && Number(currentUser.id) === userId) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("You cannot delete your own user account from admin.")}`
+      );
+    }
+
+    const target = db
+      .prepare("SELECT id, name FROM users WHERE id = ?")
+      .get(userId);
+    if (!target) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("User not found.")}`
+      );
+    }
+
+    try {
+      const tx = db.transaction(() => {
+        const now = new Date().toISOString();
+        const ownedGlobalGroups = db
+          .prepare("SELECT id FROM groups WHERE owner_id = ? AND is_global = 1")
+          .all(userId);
+
+        const selectFallbackOwner = db.prepare(
+          `
+          SELECT gm.user_id
+          FROM group_members gm
+          WHERE gm.group_id = ?
+            AND gm.user_id != ?
+          ORDER BY gm.joined_at ASC
+          LIMIT 1
+          `
+        );
+
+        for (const row of ownedGlobalGroups) {
+          const groupId = Number(row.id);
+          let fallbackOwnerId =
+            currentUser && Number(currentUser.id) !== userId
+              ? Number(currentUser.id)
+              : null;
+          if (!fallbackOwnerId) {
+            const fallback = selectFallbackOwner.get(groupId, userId);
+            fallbackOwnerId = fallback ? Number(fallback.user_id) : null;
+          }
+          if (!fallbackOwnerId) {
+            throw new Error("Cannot delete user: Global group has no fallback owner.");
+          }
+
+          db.prepare(
+            "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'member', ?)"
+          ).run(fallbackOwnerId, groupId, now);
+          db.prepare("UPDATE group_members SET role = 'owner' WHERE user_id = ? AND group_id = ?")
+            .run(fallbackOwnerId, groupId);
+          db.prepare("UPDATE groups SET owner_id = ? WHERE id = ?")
+            .run(fallbackOwnerId, groupId);
+        }
+
+        const ownedGroups = db
+          .prepare("SELECT id FROM groups WHERE owner_id = ? AND is_global = 0")
+          .all(userId);
+        for (const row of ownedGroups) {
+          const groupId = Number(row.id);
+          db.prepare("DELETE FROM responses WHERE group_id = ?").run(groupId);
+          db.prepare("DELETE FROM group_members WHERE group_id = ?").run(groupId);
+          db.prepare("DELETE FROM invites WHERE group_id = ?").run(groupId);
+          db.prepare("DELETE FROM groups WHERE id = ?").run(groupId);
+        }
+
+        db.prepare("DELETE FROM responses WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM group_members WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM invites WHERE created_by = ?").run(userId);
+        db.prepare("DELETE FROM email_verifications WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM password_resets WHERE user_id = ?").run(userId);
+        db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+      });
+      tx();
+    } catch (err) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent(`Failed to delete user: ${err.message}`)}`
+      );
+    }
+
+    return res.redirect(
+      `/admin/overview?success=${encodeURIComponent(`User "${target.name}" deleted.`)}`
+    );
   });
 
   app.post("/admin/groups/:groupId/delete", requireAdmin, (req, res) => {

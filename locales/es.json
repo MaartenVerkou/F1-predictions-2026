@@ -33,7 +33,8 @@
     "verify_required": "Se requiere verificación de cuenta antes de iniciar sesión.",
     "confirm_password": "Confirmar contraseña",
     "create_account": "Crear cuenta",
-    "has_account": "¿Ya tienes cuenta? Inicia sesión"
+    "has_account": "¿Ya tienes cuenta? Inicia sesión",
+    "passwords_do_not_match": "Las contraseñas no coinciden."
   },
   "dashboard": {
     "page_title": "Panel",
