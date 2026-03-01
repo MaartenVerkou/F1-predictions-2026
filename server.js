@@ -590,6 +590,7 @@ app.use((req, res, next) => {
   res.locals.paypalDonationLabel = PAYPAL_DONATION_LABEL;
   res.locals.contactEmail = CONTACT_EMAIL;
   res.locals.baseUrl = BASE_URL;
+  res.locals.companyName = COMPANY_NAME;
   next();
 });
 
