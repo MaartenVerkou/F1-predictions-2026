@@ -609,7 +609,7 @@ function registerAuthRoutes(app, deps) {
     const groups = db
       .prepare(
         `
-        SELECT g.id, g.name, g.owner_id, gm.role
+        SELECT g.id, g.name, g.owner_id, g.is_global, gm.role
         FROM groups g
         JOIN group_members gm ON gm.group_id = g.id
         WHERE gm.user_id = ?
@@ -648,7 +648,7 @@ function registerAuthRoutes(app, deps) {
     if (!globalGroup || !globalGroup.id) {
       return sendError(req, res, 500, "Global group is not available.");
     }
-    return res.redirect(`/groups/${globalGroup.id}/questions`);
+    return res.redirect("/global/questions");
   });
 }
 

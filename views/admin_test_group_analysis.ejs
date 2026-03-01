@@ -15,11 +15,11 @@
     <a class="link" href="/admin/analysis">Back to admin</a>
     <a class="link <%= analysisMode === 'actuals' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=actuals">Analyze actuals</a>
     <a class="link <%= analysisMode === 'sim200' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=sim200">Analyze 200 seasons</a>
-    <a class="link" href="/groups/<%= group.id %>/responses">Open responses</a>
+    <a class="link" href="<%= groupPath(group, '/responses') %>">Open responses</a>
     <% if (analysisMode === 'sim200') { %>
       <a class="link" href="/admin/analysis/<%= group.id %>/leaderboard?mode=sim200">Open leaderboard</a>
     <% } else { %>
-      <a class="link" href="/groups/<%= group.id %>/leaderboard">Open leaderboard</a>
+      <a class="link" href="<%= groupPath(group, '/leaderboard') %>">Open leaderboard</a>
     <% } %>
   </div>
 

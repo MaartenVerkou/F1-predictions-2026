@@ -396,6 +396,44 @@ function getGlobalGroup() {
   return db.prepare("SELECT * FROM groups WHERE is_global = 1 LIMIT 1").get();
 }
 
+function isGlobalGroup(group) {
+  return Number(group?.is_global || 0) === 1;
+}
+
+function getGroupBasePath(group) {
+  if (isGlobalGroup(group)) return "/global";
+  const groupId = Number(group?.id || 0);
+  return groupId > 0 ? `/groups/${groupId}` : "/groups";
+}
+
+function getGroupById(groupId) {
+  const normalizedGroupId = Number(groupId);
+  if (!Number.isFinite(normalizedGroupId) || normalizedGroupId <= 0) return null;
+  return db.prepare("SELECT * FROM groups WHERE id = ?").get(normalizedGroupId);
+}
+
+function getGroupFromRequest(req) {
+  const rawId = req?.params?.id;
+  if (rawId != null && String(rawId).trim() !== "") {
+    const byId = getGroupById(rawId);
+    if (byId) return byId;
+  }
+  return getGlobalGroup();
+}
+
+function generateUniqueGroupId() {
+  const min = 100000;
+  const maxExclusive = 1000000;
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const candidate = crypto.randomInt(min, maxExclusive);
+    const exists = db
+      .prepare("SELECT 1 FROM groups WHERE id = ? LIMIT 1")
+      .get(candidate);
+    if (!exists) return candidate;
+  }
+  throw new Error("Failed to generate a unique group id.");
+}
+
 function ensureGlobalGroup(ownerId) {
   let global = getGlobalGroup();
   if (global) {
@@ -422,12 +460,13 @@ function ensureGlobalGroup(ownerId) {
     }
   }
   const now = new Date().toISOString();
-  const info = db
+  const groupId = generateUniqueGroupId();
+  db
     .prepare(
-      "INSERT INTO groups (name, owner_id, created_at, is_global, is_public, join_password_hash, is_simulated) VALUES (?, ?, ?, 1, 1, NULL, 0)"
+      "INSERT INTO groups (id, name, owner_id, created_at, is_global, is_public, join_password_hash, is_simulated) VALUES (?, ?, ?, ?, 1, 1, NULL, 0)"
     )
-    .run("Global", ownerId, now);
-  global = db.prepare("SELECT * FROM groups WHERE id = ?").get(info.lastInsertRowid);
+    .run(groupId, "Global", ownerId, now);
+  global = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   return global;
 }
 
@@ -591,6 +630,12 @@ app.use((req, res, next) => {
   res.locals.contactEmail = CONTACT_EMAIL;
   res.locals.baseUrl = BASE_URL;
   res.locals.companyName = COMPANY_NAME;
+  res.locals.groupPath = (group, suffix = "") => {
+    const base = getGroupBasePath(group);
+    const tail = String(suffix || "");
+    if (!tail) return base;
+    return tail.startsWith("/") ? `${base}${tail}` : `${base}/${tail}`;
+  };
   next();
 });
 
@@ -1189,7 +1234,7 @@ app.post("/groups", requireAuth, (req, res) => {
     const groups = db
       .prepare(
         `
-        SELECT g.id, g.name, g.owner_id, gm.role
+        SELECT g.id, g.name, g.owner_id, g.is_global, gm.role
         FROM groups g
         JOIN group_members gm ON gm.group_id = g.id
         WHERE gm.user_id = ?
@@ -1223,7 +1268,7 @@ app.post("/groups", requireAuth, (req, res) => {
       const groups = db
         .prepare(
           `
-          SELECT g.id, g.name, g.owner_id, gm.role
+          SELECT g.id, g.name, g.owner_id, g.is_global, gm.role
           FROM groups g
           JOIN group_members gm ON gm.group_id = g.id
           WHERE gm.user_id = ?
@@ -1261,7 +1306,7 @@ app.post("/groups", requireAuth, (req, res) => {
     const groups = db
       .prepare(
         `
-        SELECT g.id, g.name, g.owner_id, gm.role
+        SELECT g.id, g.name, g.owner_id, g.is_global, gm.role
         FROM groups g
         JOIN group_members gm ON gm.group_id = g.id
         WHERE gm.user_id = ?
@@ -1292,18 +1337,19 @@ app.post("/groups", requireAuth, (req, res) => {
   const now = new Date().toISOString();
   const joinCode = isPublic ? null : crypto.randomBytes(3).toString("hex").toUpperCase();
   const joinPasswordHash = isPublic ? null : bcrypt.hashSync(joinPassword, 10);
-  const groupInfo = db
+  const groupId = generateUniqueGroupId();
+  db
     .prepare(
-      "INSERT INTO groups (name, owner_id, created_at, join_code, join_password_hash, is_public, is_global) VALUES (?, ?, ?, ?, ?, ?, 0)"
+      "INSERT INTO groups (id, name, owner_id, created_at, join_code, join_password_hash, is_public, is_global) VALUES (?, ?, ?, ?, ?, ?, ?, 0)"
     )
-    .run(normalizedName, user.id, now, joinCode, joinPasswordHash, isPublic ? 1 : 0);
+    .run(groupId, normalizedName, user.id, now, joinCode, joinPasswordHash, isPublic ? 1 : 0);
   db.prepare(
     "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-  ).run(user.id, groupInfo.lastInsertRowid, "owner", now);
-  ensureInviteForGroup(groupInfo.lastInsertRowid);
-  syncFromGlobalIfCoupled(user.id, groupInfo.lastInsertRowid, now);
+  ).run(user.id, groupId, "owner", now);
+  ensureInviteForGroup(groupId);
+  syncFromGlobalIfCoupled(user.id, groupId, now);
 
-  res.redirect(`/groups/${groupInfo.lastInsertRowid}`);
+  res.redirect(`/groups/${groupId}`);
 });
 
 app.post("/groups/:id/join-public", requireAuth, (req, res) => {
@@ -1320,7 +1366,7 @@ app.post("/groups/:id/join-public", requireAuth, (req, res) => {
     ).run(user.id, groupId, "member", now);
     syncFromGlobalIfCoupled(user.id, groupId, now);
   }
-  res.redirect(`/groups/${groupId}`);
+  res.redirect(getGroupBasePath(group));
 });
 
 app.post("/groups/join", requireAuth, async (req, res) => {
@@ -1329,7 +1375,7 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   const groups = db
     .prepare(
       `
-      SELECT g.id, g.name, g.owner_id, gm.role
+      SELECT g.id, g.name, g.owner_id, g.is_global, gm.role
       FROM groups g
       JOIN group_members gm ON gm.group_id = g.id
       WHERE gm.user_id = ?
@@ -1402,10 +1448,14 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   });
 });
 
-app.get("/groups/:id", requireAuth, (req, res) => {
+app.get(["/global", "/groups/:id"], requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
-  const groupId = Number(req.params.id);
+  const group = getGroupFromRequest(req);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  const groupId = Number(group.id);
   const membersPerPage = 25;
   const requestedMembersPage = Number(req.query.membersPage || 1);
   const currentMembersPage =
@@ -1415,9 +1465,7 @@ app.get("/groups/:id", requireAuth, (req, res) => {
   if (!isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
-  const group = db
-    .prepare("SELECT * FROM groups WHERE id = ?")
-    .get(groupId);
+  const groupBasePath = getGroupBasePath(group);
   const membersTotal = Number(
     db
       .prepare("SELECT COUNT(*) AS count FROM group_members WHERE group_id = ?")
@@ -1454,6 +1502,7 @@ app.get("/groups/:id", requireAuth, (req, res) => {
     membersPerPage,
     currentMembersPage: safeMembersPage,
     totalMembersPages,
+    groupBasePath,
     error: null,
     success: null
   });
@@ -1512,7 +1561,9 @@ app.get("/join/:code", requireAuth, (req, res) => {
     return sendError(req, res, 404, "Invite not found.");
   }
   if (isMember(user.id, invite.group_id)) {
-    return res.redirect(`/groups/${invite.group_id}`);
+    const existingGroup = getGroupById(invite.group_id);
+    if (!existingGroup) return sendError(req, res, 404, "Group not found.");
+    return res.redirect(getGroupBasePath(existingGroup));
   }
   const group = db
     .prepare("SELECT * FROM groups WHERE id = ?")
@@ -1547,7 +1598,9 @@ app.post("/join/:code", requireAuth, async (req, res) => {
     return sendError(req, res, 404, "Invite not found.");
   }
   if (isMember(user.id, invite.group_id)) {
-    return res.redirect(`/groups/${invite.group_id}`);
+    const existingGroup = getGroupById(invite.group_id);
+    if (!existingGroup) return sendError(req, res, 404, "Group not found.");
+    return res.redirect(getGroupBasePath(existingGroup));
   }
   const group = db
     .prepare("SELECT * FROM groups WHERE id = ?")
@@ -1608,7 +1661,7 @@ app.post("/join/:code", requireAuth, async (req, res) => {
   ).run(user.id, invite.group_id, "member", now);
   syncFromGlobalIfCoupled(user.id, invite.group_id, now);
 
-  res.redirect(`/groups/${invite.group_id}`);
+  res.redirect(getGroupBasePath(group));
 });
 
 app.post("/groups/:id/password", requireAuth, async (req, res) => {
@@ -1770,18 +1823,18 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
   res.redirect("/dashboard");
 });
 
-app.get("/groups/:id/questions", requireAuth, (req, res) => {
+app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
-  const groupId = Number(req.params.id);
-  if (!isMember(user.id, groupId)) {
-    return sendError(req, res, 403, "Not a group member.");
-  }
-
-  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  const group = getGroupFromRequest(req);
   if (!group) {
     return sendError(req, res, 404, "Group not found.");
   }
+  const groupId = Number(group.id);
+  if (!isMember(user.id, groupId)) {
+    return sendError(req, res, 403, "Not a group member.");
+  }
+  const groupBasePath = getGroupBasePath(group);
   const questions = getQuestions(locale);
   const roster = getRoster();
   const races = getRaces();
@@ -1849,20 +1902,22 @@ app.get("/groups/:id/questions", requireAuth, (req, res) => {
     closeAt: PREDICTIONS_CLOSE_AT,
     canCoupleToGlobal,
     coupledToGlobal,
-    globalGroupName: globalGroup ? globalGroup.name : "Global"
+    globalGroupName: globalGroup ? globalGroup.name : "Global",
+    groupBasePath
   });
 });
 
-app.post("/groups/:id/questions", requireAuth, (req, res) => {
+app.post(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) => {
   const user = getCurrentUser(req);
-  const groupId = Number(req.params.id);
-  if (!isMember(user.id, groupId)) {
-    return sendError(req, res, 403, "Not a group member.");
-  }
-  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
+  const group = getGroupFromRequest(req);
   if (!group) {
     return sendError(req, res, 404, "Group not found.");
   }
+  const groupId = Number(group.id);
+  if (!isMember(user.id, groupId)) {
+    return sendError(req, res, 403, "Not a group member.");
+  }
+  const groupBasePath = getGroupBasePath(group);
 
   const globalGroup = getGlobalGroup();
   const canCoupleToGlobal =
@@ -1880,7 +1935,7 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
     setCoupledToGlobal(user.id, groupId, coupledToGlobal);
     if (coupledToGlobal) {
       syncResponsesFromSourceGroup(user.id, globalGroup.id, groupId, now);
-      return res.redirect(`/groups/${groupId}/questions`);
+      return res.redirect(`${groupBasePath}/questions`);
     }
   }
 
@@ -2054,17 +2109,20 @@ app.post("/groups/:id/questions", requireAuth, (req, res) => {
     }
   }
 
-  res.redirect(`/groups/${groupId}/questions`);
+  res.redirect(`${groupBasePath}/questions`);
 });
 
-app.get("/groups/:id/responses", requireAuth, (req, res) => {
+app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
-  const groupId = Number(req.params.id);
+  const group = getGroupFromRequest(req);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  const groupId = Number(group.id);
   if (!isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
-  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   const questions = getQuestions(locale);
   const responses = db
     .prepare(
@@ -2078,10 +2136,16 @@ app.get("/groups/:id/responses", requireAuth, (req, res) => {
     )
     .all(groupId);
 
-  res.render("responses", { user, group, questions, responses });
+  res.render("responses", {
+    user,
+    group,
+    questions,
+    responses,
+    groupBasePath: getGroupBasePath(group)
+  });
 });
 
-app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
+app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const adminAccess = isAdmin(req);
@@ -2093,12 +2157,14 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
       "Leaderboard is not available yet. It will be enabled after season results are finalized."
     );
   }
-  const groupId = Number(req.params.id);
+  const group = getGroupFromRequest(req);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  const groupId = Number(group.id);
   if (!adminAccess && !isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
-
-  const group = db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId);
   const questions = getQuestions(locale);
   const actualRows = db.prepare("SELECT * FROM actuals").all();
   const actuals = actualRows.reduce((acc, row) => {
@@ -2370,7 +2436,8 @@ app.get("/groups/:id/leaderboard", requireAuth, (req, res) => {
     leaderboardTotal: leaderboard.length,
     leaderboardPerPage,
     currentLeaderboardPage: safeLeaderboardPage,
-    totalLeaderboardPages
+    totalLeaderboardPages,
+    leaderboardBasePath: `${getGroupBasePath(group)}/leaderboard`
   });
 });
 
@@ -2381,7 +2448,8 @@ registerAdminRoutes(app, {
   getQuestions,
   getRoster,
   getRaces,
-  clampNumber
+  clampNumber,
+  generateUniqueGroupId
 });
 
 app.use((req, res) => {

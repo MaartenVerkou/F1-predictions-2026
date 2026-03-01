@@ -101,8 +101,8 @@
     "closed_message": "Voorspellingen zijn gesloten.",
     "copy_from": "Kopieer voorspellingen van",
     "select_group": "Selecteer groep",
-    "global_tag": "Global",
-    "reset": "Reset",
+    "global_tag": "Globaal",
+    "reset": "Resetten",
     "save": "Opslaan",
     "save_predictions": "Voorspellingen opslaan",
     "no_questions": "Nog geen vragen geladen. Voeg ze toe in data/questions.json.",
@@ -171,7 +171,7 @@
     "flow_title": "Drie snelle stappen",
     "flow_step_1": "Open Voorspellingen en beantwoord 23 vragen eenmalig (ongeveer 3-5 minuten).",
     "flow_step_2": "Maak of join private/public groepen om picks te vergelijken met mensen die je kent.",
-    "flow_step_3": "Volg race-voor-race leaderboardprojecties (komt later) om te zien waar je zou eindigen als het seizoen nu stopte."
+    "flow_step_3": "Volg race-voor-race leaderboardprojecties om te zien waar je zou eindigen als het seizoen vandaag stopte."
   },
   "about_page": {
     "title": "Over {company_name}",

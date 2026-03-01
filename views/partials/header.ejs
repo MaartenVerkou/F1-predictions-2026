@@ -18,9 +18,11 @@
       })();
     </script>
     <title><%= companyName %></title>
-    <link rel="icon" type="image/png" href="/assets/brand/logo-header.png?v=main" />
-    <link rel="shortcut icon" type="image/png" href="/assets/brand/logo-header.png?v=main" />
-    <link rel="apple-touch-icon" href="/assets/brand/logo-header.png?v=main" />
+    <meta property="og:image" content="<%= `${baseUrl}/assets/brand/logo-header-inverted.png` %>" />
+    <meta property="og:image:alt" content="<%= companyName %> logo" />
+    <link rel="icon" type="image/png" href="/assets/brand/logo-header.png?v=header" />
+    <link rel="shortcut icon" type="image/png" href="/assets/brand/logo-header.png?v=header" />
+    <link rel="apple-touch-icon" href="/assets/brand/logo-header.png?v=header" />
     <link rel="stylesheet" href="/styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

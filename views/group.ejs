@@ -12,8 +12,8 @@
       <p class="muted"><%= t('group.group_code') %>: <strong><%= group.join_code || t('group.code_not_set') %></strong></p>
     <% } %>
     <div class="inline-actions">
-      <a class="button-link" href="/groups/<%= group.id %>/questions"><%= t('group.answer_questions') %></a>
-      <a class="link" href="/groups/<%= group.id %>/responses"><%= t('group.view_responses') %></a>
+      <a class="button-link" href="<%= groupPath(group, '/questions') %>"><%= t('group.answer_questions') %></a>
+      <a class="link" href="<%= groupPath(group, '/responses') %>"><%= t('group.view_responses') %></a>
     </div>
   </div>
 
@@ -40,10 +40,12 @@
             <span class="link" id="invite-link" data-copy-value="<%= baseUrl %>/join/<%= invite.code %>">/join/<%= invite.code %></span>
             <button type="button" class="secondary" data-copy-target="invite-link"><%= t('group.copy') %></button>
           </div>
-          <div class="group-invite-meta"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
-          <div class="group-invite-status <%= Number(group.invite_link_open ?? 1) === 1 ? 'is-open' : 'is-closed' %>">
-            <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.invite_link_open') : t('group.invite_link_closed') %>
-          </div>
+          <% if (role === 'owner' || role === 'admin') { %>
+            <div class="group-invite-meta"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
+            <div class="group-invite-status <%= Number(group.invite_link_open ?? 1) === 1 ? 'is-open' : 'is-closed' %>">
+              <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.invite_link_open') : t('group.invite_link_closed') %>
+            </div>
+          <% } %>
         </div>
       <% } else { %>
         <p class="muted"><%= t('group.no_invite_link') %></p>
@@ -94,7 +96,7 @@
       <% }) %>
     </ul>
     <% if (totalMembersPages > 1) { %>
-      <% const membersPageHref = (page) => `/groups/${group.id}?membersPage=${page}`; %>
+      <% const membersPageHref = (page) => `${groupBasePath || groupPath(group)}?membersPage=${page}`; %>
       <div class="inline-actions group-members-pagination">
         <% if (currentMembersPage > 1) { %>
           <a class="link" href="<%= membersPageHref(currentMembersPage - 1) %>"><%= t('group.previous_25') %></a>

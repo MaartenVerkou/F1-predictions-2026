@@ -21,7 +21,7 @@
     <ul class="list">
       <% groups.forEach(group => { %>
         <li class="card dashboard-group-item">
-          <a class="dashboard-group-link" href="/groups/<%= group.id %>" aria-label="<%= `${t('dashboard.view_group')}: ${group.name}` %>">
+          <a class="dashboard-group-link" href="<%= groupPath(group) %>" aria-label="<%= `${t('dashboard.view_group')}: ${group.name}` %>">
             <div class="inline-actions" style="justify-content: space-between;">
               <div>
                 <strong><%= group.name %></strong>

@@ -1,9 +1,10 @@
 ﻿<%- include('partials/header', { title: t('questions.page_title'), user }) %>
 
 <div class="card">
+  <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
   <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
   <div class="page-title-actions">
-    <a class="button-link" href="/groups/<%= group.id %>"><%= t('group.back_to_group') %></a>
+    <a class="button-link" href="<%= currentGroupPath %>"><%= t('group.back_to_group') %></a>
   </div>
   <div class="group-rules-box">
     <div class="group-rules-label"><%= t('group.rules_label') %></div>
@@ -16,7 +17,7 @@
 
   <div class="questions-top-actions">
     <% if (copyGroups && copyGroups.length > 0 && !(canCoupleToGlobal && coupledToGlobal)) { %>
-      <form method="get" action="/groups/<%= group.id %>/questions" class="inline-actions">
+      <form method="get" action="<%= `${currentGroupPath}/questions` %>" class="inline-actions">
         <label class="muted" style="display:flex; align-items:center; gap:8px; font-weight:600;">
           <%= t('questions.copy_from') %>
           <select name="copyFrom" onchange="this.form.submit()">
@@ -29,7 +30,7 @@
           </select>
         </label>
         <% if (selectedCopyGroupId) { %>
-          <a class="link underlined-link" href="/groups/<%= group.id %>/questions"><%= t('questions.reset') %></a>
+          <a class="link underlined-link" href="<%= `${currentGroupPath}/questions` %>"><%= t('questions.reset') %></a>
           <button type="submit" form="predictions-form" class="link underlined-link link-button" <%= closed ? 'disabled' : '' %>><%= t('questions.save') %></button>
         <% } %>
       </form>
@@ -40,7 +41,7 @@
     <p class="muted" style="margin:0 0 14px;"><%= prefillNotice %></p>
   <% } %>
 
-  <form id="predictions-form" method="post" action="/groups/<%= group.id %>/questions">
+  <form id="predictions-form" method="post" action="<%= `${currentGroupPath}/questions` %>">
     <% if (canCoupleToGlobal) { %>
       <div class="questions-couple-toggle">
         <label class="muted" style="display:inline-flex; align-items:center; gap:8px; font-weight:600;">

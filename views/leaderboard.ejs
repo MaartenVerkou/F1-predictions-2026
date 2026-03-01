@@ -50,7 +50,7 @@
   <% const leaderboardBaseHref =
     typeof leaderboardBasePath === "string" && leaderboardBasePath
       ? leaderboardBasePath
-      : `/groups/${group.id}/leaderboard`; %>
+      : groupPath(group, "/leaderboard"); %>
   <% const leaderboardQueryPart =
     typeof leaderboardQuery === "string" && leaderboardQuery.trim()
       ? leaderboardQuery.trim()
