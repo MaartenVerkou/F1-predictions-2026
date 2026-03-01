@@ -54,7 +54,7 @@ const LAST_SEASON_RESULTS_PATH =
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_FROM = process.env.SMTP_FROM || "";
-const COMPANY_NAME = process.env.COMPANY_NAME || "F1 Predictions";
+const COMPANY_NAME = process.env.COMPANY_NAME || "Wheel of Knowledge";
 function deriveContactEmail() {
   const explicit = String(process.env.CONTACT_EMAIL || "").trim();
   if (explicit) return explicit;

@@ -1,6 +1,6 @@
 {
   "header": {
-    "site_title": "F1 Predictions 2026",
+    "site_title": "{company_name}",
     "countdown_prefix": "Voorspellingen sluiten over",
     "language": "Taal",
     "signed_in_as": "Ingelogd als",
@@ -167,14 +167,14 @@
     "create_account": "Maak een account",
     "start_predicting": "Start met voorspellen",
     "go_dashboard": "Ga naar je dashboard",
-    "about_link": "Over F1 Predictions",
+    "about_link": "Over {company_name}",
     "flow_title": "Drie snelle stappen",
     "flow_step_1": "Open Voorspellingen en beantwoord 23 vragen eenmalig (ongeveer 3-5 minuten).",
     "flow_step_2": "Maak of join private/public groepen om picks te vergelijken met mensen die je kent.",
     "flow_step_3": "Volg race-voor-race leaderboardprojecties (komt later) om te zien waar je zou eindigen als het seizoen nu stopte."
   },
   "about_page": {
-    "title": "Over F1 Predictions",
+    "title": "Over {company_name}",
     "last_updated": "Laatst bijgewerkt",
     "nav_about": "Over",
     "nav_terms": "Voorwaarden",

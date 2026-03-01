@@ -1,6 +1,6 @@
 {
   "header": {
-    "site_title": "F1 Predictions 2026",
+    "site_title": "{company_name}",
     "countdown_prefix": "Tippschluss in",
     "language": "Sprache",
     "signed_in_as": "Angemeldet als",
@@ -167,14 +167,14 @@
     "create_account": "Konto erstellen",
     "start_predicting": "Jetzt tippen",
     "go_dashboard": "Zum Dashboard",
-    "about_link": "Ueber F1 Predictions",
+    "about_link": "Ueber {company_name}",
     "flow_title": "Drei schnelle Schritte",
     "flow_step_1": "Oeffne Prognosen und beantworte 23 Fragen einmalig (etwa 3-5 Minuten).",
     "flow_step_2": "Erstelle oder tritt privaten/oeffentlichen Gruppen bei, um Tipps mit Leuten zu vergleichen, die du kennst.",
     "flow_step_3": "Verfolge rennenweise Leaderboard-Projektionen (kommt bald), um zu sehen, wo du stehen wuerdest, wenn die Saison jetzt enden wuerde."
   },
   "about_page": {
-    "title": "Ueber F1 Predictions",
+    "title": "Ueber {company_name}",
     "last_updated": "Zuletzt aktualisiert",
     "nav_about": "Ueber",
     "nav_terms": "Bedingungen",

@@ -1,6 +1,6 @@
 {
   "header": {
-    "site_title": "F1 Predictions 2026",
+    "site_title": "{company_name}",
     "countdown_prefix": "Las predicciones cierran en",
     "language": "Idioma",
     "signed_in_as": "Conectado como",
@@ -167,14 +167,14 @@
     "create_account": "Crear una cuenta",
     "start_predicting": "Empezar a predecir",
     "go_dashboard": "Ir al panel",
-    "about_link": "Acerca de F1 Predictions",
+    "about_link": "Acerca de {company_name}",
     "flow_title": "Tres pasos rapidos",
     "flow_step_1": "Abre Predicciones y responde una vez 23 preguntas (unos 3-5 minutos).",
     "flow_step_2": "Crea o unete a grupos privados/publicos para comparar tus pronosticos con gente que conoces.",
     "flow_step_3": "Sigue las proyecciones del leaderboard carrera a carrera (proximamente) para ver donde acabarias si la temporada terminara hoy."
   },
   "about_page": {
-    "title": "Acerca de F1 Predictions",
+    "title": "Acerca de {company_name}",
     "last_updated": "Ultima actualizacion",
     "nav_about": "Acerca de",
     "nav_terms": "Terminos",

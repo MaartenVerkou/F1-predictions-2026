@@ -1,8 +1,8 @@
-<%- include('partials/header', { title: t('about_page.title'), user }) %>
+<%- include('partials/header', { title: t('about_page.title', { company_name: companyName }), user }) %>
 
 <section class="hero">
   <div class="card">
-    <h1><%= t('about_page.title') %></h1>
+    <h1><%= t('about_page.title', { company_name: companyName }) %></h1>
     <p class="muted"><%= t('about_page.last_updated') %>: February 26, 2026</p>
     <div class="inline-actions">
       <a class="link" href="#about"><%= t('about_page.nav_about') %></a>
