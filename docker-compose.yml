@@ -27,6 +27,8 @@ services:
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-465}
       - SMTP_CLIENT_NAME=${SMTP_CLIENT_NAME:-}
+      - PAYPAL_DONATION_URL=${PAYPAL_DONATION_URL:-}
+      - PAYPAL_DONATION_LABEL=${PAYPAL_DONATION_LABEL:-Donate}
     volumes:
       - ${STATE_DIR:-f1_state}:/app/state
       - ./data:/app/config:ro
