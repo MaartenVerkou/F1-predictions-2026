@@ -3,7 +3,8 @@
 <div class="card">
   <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
   <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
-  <div class="page-title-actions">
+  <div class="page-title-actions inline-actions">
+    <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= t('group.view_responses') %></a>
     <a class="button-link" href="<%= currentGroupPath %>"><%= t('group.back_to_group') %></a>
   </div>
   <div class="group-rules-box">
