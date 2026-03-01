@@ -222,7 +222,7 @@
     "def_1": "Les resultats Formula 1 publies sont utilises lorsque possible.",
     "def_2": "Lorsque plusieurs reponses sont correctes, toutes les reponses correctes rapportent des points.",
     "def_3": "Lorsque course, DNF, podium, etc. est mentionne, cela signifie un Grand Prix et non un sprint (sauf mention contraire).",
-    "def_4": "Un DNS ne compte pas comme DNF.",
+    "def_4": "Un DNS ou DSQ ne compte pas comme DNF.",
     "def_5": "La saison se termine directement apres la derniere course et la disponibilite des resultats, sauf raison connue de retarder pour des controverses importantes (comme une disqualification).",
     "results_body_1": "Les classements finaux sont calcules a partir des resultats officiels Formula 1 de la saison.",
     "results_body_2_prefix": "Pour certains composants statistiques (comme les estimations de dommages), nous pouvons utiliser des donnees publiques de",

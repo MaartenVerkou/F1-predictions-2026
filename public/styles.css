@@ -688,7 +688,8 @@ button:disabled {
 }
 
 .question-term-label {
-  border-bottom: 1px dotted rgba(81, 96, 128, 0.85);
+  border-bottom: 2px dotted rgba(64, 82, 120, 0.95);
+  padding-bottom: 1px;
   cursor: help;
 }
 
@@ -721,6 +722,15 @@ button:disabled {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
+}
+
+.question-term:hover .question-term-label,
+.question-term:focus-within .question-term-label {
+  border-bottom-color: var(--accent);
+}
+
+:root[data-theme="dark"] .question-term-label {
+  border-bottom-color: rgba(169, 188, 224, 0.96);
 }
 
 .question-meta-row {

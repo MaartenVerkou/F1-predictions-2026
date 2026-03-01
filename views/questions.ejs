@@ -148,7 +148,11 @@
             patterns: [/\bdriver\b/gi, /\bcoureur\b/gi, /\bfahrer\b/gi, /\bpiloto\b/gi, /\bpilote\b/gi]
           });
         }
-        if (questionId === 'all_podium_finishers' || questionId === 'mini_q3_ferrari_podium') {
+        if (
+          questionId === 'all_podium_finishers' ||
+          questionId === 'mini_q3_ferrari_podium' ||
+          questionId === 'most_points_no_podium'
+        ) {
           termDefs.push({
             tip: t('questions.tip_podium_gp_only'),
             patterns: [/\bpodium(?:s)?\b/gi, /\bpodiumfinishers?\b/gi, /\bpodiumsfahrer\b/gi, /\bpodio(?:s)?\b/gi]

@@ -222,7 +222,7 @@
     "def_1": "Waar mogelijk worden de gepubliceerde Formula 1 resultaten gebruikt.",
     "def_2": "Wanneer meerdere antwoorden correct zijn, leveren alle correcte antwoorden punten op.",
     "def_3": "Waar race, DNF, podium, enz. staat, bedoelen we een Grand Prix en geen sprint (tenzij anders vermeld).",
-    "def_4": "Een DNS telt niet als DNF.",
+    "def_4": "Een DNS of DSQ telt niet als DNF.",
     "def_5": "Het seizoen eindigt direct na de laatste race en beschikbaarheid van resultaten, tenzij er een bekende reden is om te wachten op impactvolle controverses (zoals diskwalificatie).",
     "results_body_1": "De eindstand wordt berekend op basis van officiele Formula 1 seizoensresultaten.",
     "results_body_2_prefix": "Voor specifieke statistische onderdelen (zoals schattingen van schade) kunnen we publieke data gebruiken van",
