@@ -233,9 +233,13 @@ const initNameAvailabilityChecks = () => {
 const initVisibilityToggle = () => {
   const visibility = document.querySelector('select[name="visibility"]');
   const passwordInput = document.querySelector('input[name="joinPassword"]');
+  const privatePasswordField = document.querySelector('[data-private-password-field]');
   if (!visibility || !passwordInput) return;
   const update = () => {
     const isPublic = visibility.value === 'public';
+    if (privatePasswordField) {
+      privatePasswordField.hidden = isPublic;
+    }
     passwordInput.required = !isPublic;
     passwordInput.disabled = isPublic;
     if (isPublic) passwordInput.value = '';
