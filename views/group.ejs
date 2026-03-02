@@ -10,8 +10,43 @@
       <p class="muted"><%= t('group.invite_friends') %></p>
     <% } %>
     <div class="group-rules-box">
-      <div class="group-rules-label"><%= t('group.rules_label') %></div>
+      <div class="group-rules-header">
+        <div class="group-rules-label"><%= t('group.rules_label') %></div>
+        <% if (canEditRules) { %>
+          <button
+            type="button"
+            class="group-rules-edit-icon-btn"
+            data-group-rules-toggle
+            aria-label="<%= t('group.edit_rules') %>"
+            title="<%= t('group.edit_rules') %>"
+            aria-expanded="false"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 20h4.5L19 9.5a1.7 1.7 0 0 0 0-2.4l-1.1-1.1a1.7 1.7 0 0 0-2.4 0L5 16.5V20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path>
+              <path d="m13.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
+            </svg>
+          </button>
+        <% } %>
+      </div>
       <p class="muted group-rules-text"><%= groupRules %></p>
+      <% if (canEditRules) { %>
+        <form
+          class="group-rules-inline-form"
+          data-group-rules-form
+          method="post"
+          action="/groups/<%= group.id %>/rules"
+          hidden
+        >
+          <p class="muted"><%= t('group.leave_empty_uses_default') %></p>
+          <label>
+            <%= t('group.rules_text') %>
+            <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
+          </label>
+          <div class="inline-actions">
+            <button type="submit"><%= t('group.save_rules') %></button>
+          </div>
+        </form>
+      <% } %>
     </div>
     <% if (!group.is_public) { %>
       <p class="muted"><%= t('group.group_code') %>: <strong><%= group.join_code || t('group.code_not_set') %></strong></p>
@@ -21,20 +56,6 @@
       <a class="link" href="<%= groupPath(group, '/responses') %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
     </div>
   </div>
-
-  <% if (canEditRules) { %>
-    <div class="card">
-      <h2><%= t('group.edit_rules') %></h2>
-      <p class="muted"><%= t('group.leave_empty_uses_default') %></p>
-      <form method="post" action="/groups/<%= group.id %>/rules">
-        <label>
-          <%= t('group.rules_text') %>
-          <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
-        </label>
-        <button type="submit"><%= t('group.save_rules') %></button>
-      </form>
-    </div>
-  <% } %>
 
   <% if (!group.is_global) { %>
     <div class="card">
@@ -135,5 +156,28 @@
     </div>
   <% } %>
 </section>
+
+<% if (canEditRules) { %>
+  <script>
+    (function () {
+      const toggle = document.querySelector("[data-group-rules-toggle]");
+      const form = document.querySelector("[data-group-rules-form]");
+      if (!toggle || !form) return;
+
+      toggle.addEventListener("click", () => {
+        const isHidden = form.hasAttribute("hidden");
+        if (isHidden) {
+          form.removeAttribute("hidden");
+          toggle.setAttribute("aria-expanded", "true");
+          const textarea = form.querySelector("textarea");
+          if (textarea) textarea.focus();
+          return;
+        }
+        form.setAttribute("hidden", "");
+        toggle.setAttribute("aria-expanded", "false");
+      });
+    })();
+  </script>
+<% } %>
 
 <%- include('partials/footer') %>

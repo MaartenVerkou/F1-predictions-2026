@@ -1,0 +1,98 @@
+<%- include('partials/header', { title: `Admin guest: ${guestId}`, user }) %>
+<%- include('partials/admin_nav', { active: 'overview' }) %>
+
+<div class="card">
+  <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+    <h1 style="margin:0;">Guest overview</h1>
+    <a class="link" href="<%= returnTo %>">&lt; Back</a>
+  </div>
+
+  <h2 style="margin-top:0;">Guest ID</h2>
+  <p style="margin-top:0;"><code class="admin-question-code"><%= guestId %></code></p>
+
+  <table class="table compact">
+    <tbody>
+      <tr>
+        <th style="width: 180px;">Total responses</th>
+        <td><%= Number(guestStats?.response_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>Groups with responses</th>
+        <td><%= Number(guestStats?.groups_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>Questions answered</th>
+        <td><%= Number(guestStats?.questions_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>First seen</th>
+        <td><%= guestStats?.first_seen_at ? new Date(guestStats.first_seen_at).toLocaleString() : '-' %></td>
+      </tr>
+      <tr>
+        <th>Last response</th>
+        <td><%= guestStats?.last_seen_at ? new Date(guestStats.last_seen_at).toLocaleString() : '-' %></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:24px;">Groups touched</h2>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Group</th>
+        <th>Responses</th>
+        <th>Questions</th>
+        <th>Last updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!groups || groups.length === 0) { %>
+        <tr>
+          <td colspan="4" class="muted">No groups.</td>
+        </tr>
+      <% } else { %>
+        <% groups.forEach(row => { %>
+          <% const groupPath = Number(row.is_global) === 1 ? '/global' : `/groups/${row.group_id}`; %>
+          <tr>
+            <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
+            <td><%= Number(row.responses_count || 0) %></td>
+            <td><%= Number(row.questions_count || 0) %></td>
+            <td><%= row.last_updated_at ? new Date(row.last_updated_at).toLocaleString() : '-' %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:24px;">Latest responses</h2>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Group</th>
+        <th>Question</th>
+        <th>Answer</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!responses || responses.length === 0) { %>
+        <tr>
+          <td colspan="4" class="muted">No responses yet.</td>
+        </tr>
+      <% } else { %>
+        <% responses.forEach(row => { %>
+          <% const groupPath = Number(row.is_global) === 1 ? '/global' : `/groups/${row.group_id}`; %>
+          <tr>
+            <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
+            <td><code class="admin-question-code"><%= row.question_id %></code></td>
+            <td><code class="admin-question-code"><%= row.answer %></code></td>
+            <td><%= row.updated_at ? new Date(row.updated_at).toLocaleString() : '-' %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+  <p class="muted" style="margin-top:8px;">Showing latest <%= responses.length %> rows (max 500).</p>
+</div>
+
+<%- include('partials/footer') %>

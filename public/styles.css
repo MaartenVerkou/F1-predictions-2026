@@ -62,6 +62,7 @@
 
 html {
   background: var(--page-grad-start);
+  overflow-x: hidden;
 }
 
 body {
@@ -535,6 +536,10 @@ h1, h2, h3 {
   letter-spacing: 0.01em;
 }
 
+h2[id] {
+  scroll-margin-top: 96px;
+}
+
 h1 {
   margin-bottom: 8px;
 }
@@ -760,11 +765,13 @@ button:disabled {
 }
 
 .question-term-tooltip {
+  --tooltip-shift: 0px;
   position: absolute;
   left: 0;
   bottom: calc(100% + 6px);
-  min-width: min(220px, 70vw);
-  max-width: min(360px, 82vw);
+  width: max-content;
+  min-width: 0;
+  max-width: min(360px, calc(100vw - 24px));
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -777,7 +784,7 @@ button:disabled {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transform: translateY(2px);
+  transform: translate(var(--tooltip-shift), 2px);
   transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
   z-index: 25;
   overflow-wrap: anywhere;
@@ -787,7 +794,7 @@ button:disabled {
 .question-term:focus-within .question-term-tooltip {
   opacity: 1;
   visibility: visible;
-  transform: translateY(0);
+  transform: translate(var(--tooltip-shift), 0);
 }
 
 .question-term:hover .question-term-label,
@@ -844,6 +851,7 @@ button:disabled {
   bottom: 0;
   right: calc(100% + 6px);
   left: auto;
+  width: max-content;
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -853,7 +861,7 @@ button:disabled {
   font-size: 12px;
   line-height: 1.35;
   max-width: min(460px, 90vw);
-  min-width: 240px;
+  min-width: 0;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -1420,8 +1428,9 @@ button:disabled {
     left: auto;
     right: 0;
     bottom: calc(100% + 6px);
+    width: max-content;
     max-width: calc(100vw - 32px);
-    min-width: min(240px, calc(100vw - 32px));
+    min-width: 0;
   }
 
 }
@@ -1477,6 +1486,58 @@ button:disabled {
   border-color: var(--accent);
   color: var(--accent);
   background: rgba(214, 11, 34, 0.1);
+}
+
+.admin-pagination {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-page-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-page-link:hover,
+.admin-page-link:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.admin-page-link.is-active {
+  border-color: var(--accent);
+  background: rgba(214, 11, 34, 0.1);
+  color: var(--accent);
+}
+
+.admin-page-link.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.admin-page-ellipsis {
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.admin-pagination-summary {
+  margin-left: 8px;
+  font-size: 13px;
 }
 
 :root[data-theme="dark"] .admin-nav-link {
@@ -1725,8 +1786,16 @@ button:disabled {
   background: var(--rules-bg);
 }
 
+.group-rules-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .group-rules-label {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 13px;
   font-weight: 700;
   color: var(--muted);
@@ -1740,6 +1809,48 @@ button:disabled {
   font-weight: 400;
   line-height: 1.45;
   color: var(--text);
+}
+
+.group-rules-edit-icon-btn {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.group-rules-edit-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.group-rules-edit-icon-btn:hover:not(:disabled),
+.group-rules-edit-icon-btn:focus-visible {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--accent);
+  background: rgba(214, 11, 34, 0.08);
+  color: var(--accent);
+}
+
+.group-rules-inline-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: grid;
+  gap: 10px;
+}
+
+.group-rules-inline-form .muted {
+  margin: 0;
 }
 
 .group-invite-link-card {

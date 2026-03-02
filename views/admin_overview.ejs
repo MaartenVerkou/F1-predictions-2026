@@ -2,8 +2,23 @@
 <%- include('partials/admin_nav', { active: 'overview' }) %>
 
 <div class="card">
+  <% const overviewReturn = `/admin/overview?groupPage=${currentGroupPage}&usersPage=${currentUserPage}&guestPage=${currentGuestPage}`; %>
+  <% const groupsReturn = `${overviewReturn}#admin-groups`; %>
+  <% const adminsReturn = `${overviewReturn}#admin-admins`; %>
+  <% const usersReturn = `${overviewReturn}#admin-users`; %>
+  <% const guestsReturn = `${overviewReturn}#admin-guests`; %>
+  <% const revealedEmailsSet = new Set((revealedEmailUserIds || []).map((id) => Number(id))); %>
+  <% const maskEmail = (email) => {
+    const value = String(email || '');
+    const atIndex = value.indexOf('@');
+    if (atIndex <= 0) return '****';
+    const local = value.slice(0, atIndex);
+    const domain = value.slice(atIndex + 1);
+    const visibleLocal = local.length > 2 ? local.slice(0, 2) : local.slice(0, 1);
+    return `${visibleLocal}****@${domain}`;
+  }; %>
   <h1>Admin overview</h1>
-  <p class="muted">Accounts, groups, memberships, and responses.</p>
+  <p class="muted">Accounts, groups, and guest activity.</p>
   <% if (adminError) { %>
     <div class="alert"><%= adminError %></div>
   <% } %>
@@ -11,7 +26,7 @@
     <p class="muted"><%= adminSuccess %></p>
   <% } %>
 
-  <h2>Groups</h2>
+  <h2 id="admin-groups">Groups</h2>
   <table class="table compact">
     <thead>
       <tr>
@@ -31,6 +46,7 @@
             <div class="table-actions">
               <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
               <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+                <input type="hidden" name="returnTo" value="<%= groupsReturn %>">
                 <button class="secondary" type="submit">Delete group</button>
               </form>
             </div>
@@ -39,23 +55,90 @@
       <% }) %>
     </tbody>
   </table>
-  <div class="inline-actions" style="margin-top: 10px;">
-    <% if (currentGroupPage > 1) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage - 1 %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Previous <%= groupsPerPage %></a>
-    <% } %>
-    <span class="muted">Groups page <%= currentGroupPage %> of <%= totalGroupPages %></span>
-    <% if (currentGroupPage < totalGroupPages) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage + 1 %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Next <%= groupsPerPage %></a>
-    <% } %>
-  </div>
+  <%- include('partials/admin_pagination', {
+    basePath: '/admin/overview',
+    pageParamName: 'groupPage',
+    currentPage: currentGroupPage,
+    totalPages: totalGroupPages,
+    perPage: groupsPerPage,
+    label: 'Groups',
+    extraParams: { usersPage: currentUserPage, guestPage: currentGuestPage },
+    anchorId: 'admin-groups'
+  }) %>
 
-  <h2 style="margin-top:24px;">Users</h2>
+  <h2 id="admin-admins" style="margin-top:24px;">Admins</h2>
+  <p class="muted">
+    Admins: <strong><%= Number(adminStats?.admin_count || 0) %></strong>
+    | Admin responses: <strong><%= Number(adminStats?.response_count || 0) %></strong>
+    | Groups touched: <strong><%= Number(adminStats?.groups_count || 0) %></strong>
+    <% if (adminStats?.last_activity_at) { %>
+      | Last activity: <strong><%= new Date(adminStats.last_activity_at).toLocaleString() %></strong>
+    <% } %>
+  </p>
   <table class="table compact">
     <thead>
       <tr>
         <th>Name</th>
         <th>Email</th>
-        <th>Admin</th>
+        <th>Created</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!admins || admins.length === 0) { %>
+        <tr>
+          <td colspan="4" class="muted">No admins found.</td>
+        </tr>
+      <% } else { %>
+        <% admins.forEach(row => { %>
+          <tr>
+            <td>
+              <a class="link" href="/admin/users/<%= row.id %>?returnTo=<%= encodeURIComponent(adminsReturn) %>"><%= row.name %></a>
+            </td>
+            <td>
+              <% const showAdminEmail = revealedEmailsSet.has(Number(row.id)); %>
+              <span><%= showAdminEmail ? row.email : maskEmail(row.email) %></span>
+              <% if (!showAdminEmail) { %>
+                <form id="reveal-email-admin-<%= row.id %>" method="post" action="/admin/users/<%= row.id %>/reveal-email" style="display:inline;">
+                  <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
+                  <input type="hidden" name="adminPassword" value="">
+                  <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-admin-<%= row.id %>')">View</button>
+                </form>
+              <% } %>
+            </td>
+            <td><%= new Date(row.created_at).toLocaleString() %></td>
+            <td>
+              <div class="table-actions">
+                <form method="post" action="/admin/users/<%= row.id %>/remove-admin">
+                  <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
+                  <button class="secondary admin-toggle-btn" type="submit">Remove admin</button>
+                </form>
+                <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+                  <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
+                  <button class="secondary" type="submit">Delete user</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <h2 id="admin-users" style="margin-top:24px;">Users</h2>
+  <p class="muted">
+    Users: <strong><%= Number(userStats?.user_count || 0) %></strong>
+    | User responses: <strong><%= Number(userStats?.response_count || 0) %></strong>
+    | Groups touched: <strong><%= Number(userStats?.groups_count || 0) %></strong>
+    <% if (userStats?.last_activity_at) { %>
+      | Last activity: <strong><%= new Date(userStats.last_activity_at).toLocaleString() %></strong>
+    <% } %>
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
         <th>Created</th>
         <th>Actions</th>
       </tr>
@@ -63,104 +146,119 @@
     <tbody>
       <% users.forEach(row => { %>
         <tr>
-          <td><%= row.name %></td>
-          <td><%= row.email %></td>
-          <td><%= row.is_admin ? 'Yes' : 'No' %></td>
-          <td><%= new Date(row.created_at).toLocaleString() %></td>
-          <td>
-            <div class="table-actions">
-              <% if (row.is_admin) { %>
-                <form method="post" action="/admin/users/<%= row.id %>/remove-admin">
-                  <button class="secondary admin-toggle-btn" type="submit">Remove admin</button>
-                </form>
-              <% } else { %>
-                <form method="post" action="/admin/users/<%= row.id %>/make-admin">
-                  <button class="secondary admin-toggle-btn" type="submit">Make admin</button>
+            <td>
+              <a class="link" href="/admin/users/<%= row.id %>?returnTo=<%= encodeURIComponent(usersReturn) %>"><%= row.name %></a>
+            </td>
+            <td>
+              <% const showUserEmail = revealedEmailsSet.has(Number(row.id)); %>
+              <span><%= showUserEmail ? row.email : maskEmail(row.email) %></span>
+              <% if (!showUserEmail) { %>
+                <form id="reveal-email-user-<%= row.id %>" method="post" action="/admin/users/<%= row.id %>/reveal-email" style="display:inline;">
+                  <input type="hidden" name="returnTo" value="<%= usersReturn %>">
+                  <input type="hidden" name="adminPassword" value="">
+                  <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-user-<%= row.id %>')">View</button>
                 </form>
               <% } %>
-              <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
-                <button class="secondary" type="submit">Delete user</button>
-              </form>
+            </td>
+            <td><%= new Date(row.created_at).toLocaleString() %></td>
+            <td>
+              <div class="table-actions">
+                <form method="post" action="/admin/users/<%= row.id %>/make-admin">
+                  <input type="hidden" name="returnTo" value="<%= usersReturn %>">
+                  <button class="secondary admin-toggle-btn" type="submit">Make admin</button>
+                </form>
+                <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+                  <input type="hidden" name="returnTo" value="<%= usersReturn %>">
+                  <button class="secondary" type="submit">Delete user</button>
+                </form>
             </div>
           </td>
         </tr>
       <% }) %>
     </tbody>
   </table>
-  <div class="inline-actions" style="margin-top: 10px;">
-    <% if (currentUserPage > 1) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage - 1 %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Previous <%= usersPerPage %></a>
-    <% } %>
-    <span class="muted">Users page <%= currentUserPage %> of <%= totalUserPages %></span>
-    <% if (currentUserPage < totalUserPages) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage + 1 %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage %>">Next <%= usersPerPage %></a>
-    <% } %>
-  </div>
+  <%- include('partials/admin_pagination', {
+    basePath: '/admin/overview',
+    pageParamName: 'usersPage',
+    currentPage: currentUserPage,
+    totalPages: totalUserPages,
+    perPage: usersPerPage,
+    label: 'Users',
+    extraParams: { groupPage: currentGroupPage, guestPage: currentGuestPage },
+    anchorId: 'admin-users'
+  }) %>
 
-  <h2 style="margin-top:24px;">Memberships</h2>
+  <h2 id="admin-guests" style="margin-top:24px;">Guests</h2>
+  <p class="muted">
+    Active guests: <strong><%= Number(guestStats?.guest_count || 0) %></strong>
+    | Guest responses: <strong><%= Number(guestStats?.response_count || 0) %></strong>
+    | Groups touched: <strong><%= Number(guestStats?.group_count || 0) %></strong>
+    <% if (guestStats?.last_activity_at) { %>
+      | Last activity: <strong><%= new Date(guestStats.last_activity_at).toLocaleString() %></strong>
+    <% } %>
+  </p>
   <table class="table compact">
     <thead>
       <tr>
-        <th>User</th>
-        <th>Group</th>
-        <th>Role</th>
-        <th>Joined</th>
+        <th>Guest ID</th>
+        <th>Answers</th>
+        <th>Questions</th>
+        <th>Groups</th>
+        <th>Latest group</th>
+        <th>First seen</th>
+        <th>Last seen</th>
       </tr>
     </thead>
     <tbody>
-      <% memberships.forEach(row => { %>
+      <% if (!guestProfiles || guestProfiles.length === 0) { %>
         <tr>
-          <td><%= row.user_name %></td>
-          <td><%= row.group_name %></td>
-          <td><%= row.role %></td>
-          <td><%= new Date(row.joined_at).toLocaleString() %></td>
+          <td colspan="7" class="muted">No guest data yet.</td>
         </tr>
-      <% }) %>
+      <% } else { %>
+        <% guestProfiles.forEach(row => { %>
+          <% const guestId = String(row.guest_id || ''); %>
+          <% const shortGuestId = guestId.length > 14 ? `${guestId.slice(0, 6)}...${guestId.slice(-4)}` : guestId; %>
+          <tr>
+            <td>
+              <a class="link" href="/admin/guests/<%= encodeURIComponent(guestId) %>?returnTo=<%= encodeURIComponent(guestsReturn) %>">
+                <code title="<%= guestId %>"><%= shortGuestId %></code>
+              </a>
+            </td>
+            <td><%= Number(row.answers_count || 0) %></td>
+            <td><%= Number(row.questions_count || 0) %></td>
+            <td><%= Number(row.groups_count || 0) %></td>
+            <td><%= row.latest_group_name || '-' %></td>
+            <td><%= row.first_seen_at ? new Date(row.first_seen_at).toLocaleString() : '-' %></td>
+            <td><%= row.last_seen_at ? new Date(row.last_seen_at).toLocaleString() : '-' %></td>
+          </tr>
+        <% }) %>
+      <% } %>
     </tbody>
   </table>
-  <div class="inline-actions" style="margin-top: 10px;">
-    <% if (currentMembershipsPage > 1) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage - 1 %>&responsePage=<%= currentResponsePage %>">Previous <%= membershipsPerPage %></a>
-    <% } %>
-    <span class="muted">Memberships page <%= currentMembershipsPage %> of <%= totalMembershipPages %></span>
-    <% if (currentMembershipsPage < totalMembershipPages) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage + 1 %>&responsePage=<%= currentResponsePage %>">Next <%= membershipsPerPage %></a>
-    <% } %>
-  </div>
+  <%- include('partials/admin_pagination', {
+    basePath: '/admin/overview',
+    pageParamName: 'guestPage',
+    currentPage: currentGuestPage,
+    totalPages: totalGuestPages,
+    perPage: guestProfilesPerPage,
+    label: 'Guests',
+    extraParams: { groupPage: currentGroupPage, usersPage: currentUserPage },
+    anchorId: 'admin-guests'
+  }) %>
 
-  <h2 style="margin-top:24px;">Responses</h2>
-  <table class="table compact">
-    <thead>
-      <tr>
-        <th>User</th>
-        <th>Group</th>
-        <th>Question</th>
-        <th>Answer</th>
-        <th>Updated</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% responses.forEach(row => { %>
-        <tr>
-          <td><%= row.user_name %></td>
-          <td><%= row.group_name %></td>
-          <td><%= row.question_id %></td>
-          <td><%= row.answer %></td>
-          <td><%= new Date(row.updated_at).toLocaleString() %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
-  <div class="inline-actions" style="margin-top: 10px;">
-    <% if (currentResponsePage > 1) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage - 1 %>">Previous <%= responsesPerPage %></a>
-    <% } %>
-    <span class="muted">Page <%= currentResponsePage %> of <%= totalResponsePages %></span>
-    <% if (currentResponsePage < totalResponsePages) { %>
-      <a class="link" href="/admin/overview?groupPage=<%= currentGroupPage %>&usersPage=<%= currentUserPage %>&membershipsPage=<%= currentMembershipsPage %>&responsePage=<%= currentResponsePage + 1 %>">Next <%= responsesPerPage %></a>
-    <% } %>
-  </div>
 </div>
 
-<%- include('partials/footer') %>
+<script>
+  function promptEmailReveal(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    const adminPassword = window.prompt("Enter your admin password to view this email:");
+    if (!adminPassword) return;
+    const passwordInput = form.querySelector('input[name=\"adminPassword\"]');
+    if (!passwordInput) return;
+    passwordInput.value = adminPassword;
+    form.submit();
+  }
+</script>
 
+<%- include('partials/footer') %>

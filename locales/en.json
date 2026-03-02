@@ -30,6 +30,7 @@
   "signup": {
     "page_title": "Sign up",
     "heading": "Create your account",
+    "name_hint": "Pick a fun account name. It does not need to be your real name.",
     "verify_required": "Account verification required before login.",
     "confirm_password": "Confirm password",
     "create_account": "Create account",
@@ -61,7 +62,7 @@
     "group_password": "Group password"
   },
   "group": {
-    "default_rules": "Fill in every question. You can return and update until the season starts.\nPredictions close on {close_date}.",
+    "default_rules": "Fill in every question. You can edit your response until the start of the season.\nPredictions close on {close_date}.",
     "invite_friends": "Invite friends, then head to the questions page to lock in picks.",
     "rules_label": "Group rules",
     "group_code": "Group code",
@@ -144,8 +145,8 @@
     "couple_to_global_label": "Couple this group's predictions to my {group_name} predictions",
     "couple_to_global_help": "Enabled means this group always uses your Global picks. Turn off to make custom picks for this group.",
     "guest_mode_notice": "Guest mode: create an account to join groups and view other responses.",
-    "guest_mode_notice_html": "Guest mode: {create_account_link} to join groups and see response insights.",
-    "guest_cta_button": "Create account for insights",
+    "guest_mode_notice_html": "Guest mode: {create_account_link} to save your predictions, create and join groups, and see response insights!",
+    "guest_cta_button": "Save predictions and create account",
     "points_multi_select_penalty": "{points} {points_word} per correct {driver_word}, -{penalty} for each missing or incorrect {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} minus 1 per point off (winner must be correct). Tie + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, or {bonus} if all teams score a podium and you predict that",

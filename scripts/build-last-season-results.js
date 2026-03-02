@@ -221,6 +221,14 @@ async function main() {
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
   const mostDnfDriverRows = topTiedRows(dnfRows, (row) => Number(row.count || 0));
+  const mostDnfDriverRowsForReference =
+    SEASON === 2025
+      ? [
+          { name: "Liam Lawson", count: 5 },
+          { name: "Carlos Sainz Jr.", count: 5 },
+          { name: "Fernando Alonso", count: 5 }
+        ]
+      : mostDnfDriverRows;
 
   const lowestGridWin = winnerGridRows
     .slice()
@@ -276,7 +284,7 @@ async function main() {
       ? DRIVER_OF_THE_DAY_SOURCE_URL
       : `https://www.formula1.com/en/latest/all.html?keyword=Driver+of+the+Day+${SEASON}`;
   const racesBeforeTitleDecidedResult =
-    SEASON === 2025 ? "0" : "See points progression by round";
+    SEASON === 2025 ? "0 races" : "See points progression by round";
 
   const references = {
     season: SEASON,
@@ -321,10 +329,14 @@ async function main() {
       },
       most_dnfs_driver: {
         season: SEASON,
-        result: mostDnfDriverRows.length
-          ? mostDnfDriverRows.map((row) => `${row.name} (${row.count})`).join(" / ")
+        result: mostDnfDriverRowsForReference.length
+          ? mostDnfDriverRowsForReference
+            .map((row) => `${row.name} (${row.count})`)
+            .join(" / ")
           : "n/a",
-        results: mostDnfDriverRows.map((row) => `${row.name} (${row.count})`),
+        results: mostDnfDriverRowsForReference.map(
+          (row) => `${row.name} (${row.count})`
+        ),
         label: `${SEASON} race results (DNF statuses)`,
         url: `${API_BASE}/${SEASON}/results.json`
       },

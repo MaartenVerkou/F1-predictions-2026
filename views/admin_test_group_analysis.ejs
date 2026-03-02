@@ -4,6 +4,11 @@
   const num = Number(value);
   if (!Number.isFinite(num)) return "0";
   return Number(num.toPrecision(4)).toString();
+};
+const questionsById = new Map((questions || []).map((q) => [q.id, q]));
+const questionLabel = (questionId) => {
+  const q = questionsById.get(questionId);
+  return q && q.prompt ? q.prompt : questionId;
 }; %>
 
 <div class="card">
@@ -74,7 +79,7 @@
     <table class="table compact">
       <thead>
         <tr>
-          <th>Question ID</th>
+          <th>Question</th>
           <th>Impact</th>
           <th>Winner flips</th>
           <th>Winner score share %</th>
@@ -85,7 +90,10 @@
       <tbody>
         <% analysis.rows.forEach((row) => { %>
           <tr>
-            <td><code><%= row.id %></code></td>
+            <td>
+              <div><%= questionLabel(row.id) %></div>
+              <code class="muted"><%= row.id %></code>
+            </td>
             <td><%= row.impact %></td>
             <td><%= row.flipPercent.toFixed(1) %>%</td>
             <td><%= formatSig4(row.winnerShare) %>%</td>

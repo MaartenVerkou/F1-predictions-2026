@@ -476,5 +476,54 @@
   </svg>
 </button>
 
+<script>
+  (function () {
+    const terms = Array.from(document.querySelectorAll(".question-term"));
+    if (terms.length === 0) return;
+
+    const setShift = (term, shiftPx) => {
+      const tip = term.querySelector(".question-term-tooltip");
+      if (!tip) return;
+      tip.style.setProperty("--tooltip-shift", `${Math.round(shiftPx)}px`);
+    };
+
+    const clearShift = (term) => setShift(term, 0);
+
+    const adjustShift = (term) => {
+      const tip = term.querySelector(".question-term-tooltip");
+      if (!tip) return;
+      clearShift(term);
+      const margin = 8;
+      const rect = tip.getBoundingClientRect();
+      let shift = 0;
+      if (rect.right > window.innerWidth - margin) {
+        shift -= rect.right - (window.innerWidth - margin);
+      }
+      if (rect.left < margin) {
+        shift += margin - rect.left;
+      }
+      setShift(term, shift);
+    };
+
+    terms.forEach((term) => {
+      term.addEventListener("mouseenter", () => adjustShift(term));
+      term.addEventListener("focusin", () => adjustShift(term));
+      term.addEventListener("mouseleave", () => clearShift(term));
+      term.addEventListener("focusout", (event) => {
+        if (event.relatedTarget && term.contains(event.relatedTarget)) return;
+        clearShift(term);
+      });
+    });
+
+    window.addEventListener("resize", () => {
+      terms.forEach((term) => {
+        if (term.matches(":hover") || term.contains(document.activeElement)) {
+          adjustShift(term);
+        }
+      });
+    });
+  })();
+</script>
+
 <%- include('partials/footer') %>
 

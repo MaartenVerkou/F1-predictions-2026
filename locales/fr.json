@@ -30,6 +30,7 @@
   "signup": {
     "page_title": "Inscription",
     "heading": "Creer votre compte",
+    "name_hint": "Choisis un nom de compte fun. Ce n'est pas oblige d'etre ton vrai nom.",
     "verify_required": "La verification du compte est requise avant la connexion.",
     "confirm_password": "Confirmer le mot de passe",
     "create_account": "Creer le compte",
@@ -145,7 +146,7 @@
     "couple_to_global_help": "Active = ce groupe utilise toujours tes picks Global. Desactive pour faire des picks specifiques a ce groupe.",
     "guest_mode_notice": "Mode invite: creez un compte pour rejoindre des groupes et voir les reponses des autres.",
     "guest_mode_notice_html": "Mode invite: {create_account_link} pour rejoindre des groupes et voir des insights de reponses.",
-    "guest_cta_button": "Creer un compte insights",
+    "guest_cta_button": "Enregistrer les pronostics et creer un compte",
     "points_multi_select_penalty": "{points} {points_word} par {driver_word} correct, -{penalty} pour chaque {driver_word} manquant ou incorrect (min {minimum})",
     "points_teammate_battle": "{base} {points_word} moins 1 par point d ecart (le vainqueur doit etre correct). Egalite + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, ou {bonus} si toutes les equipes font un podium et que tu le prevois",

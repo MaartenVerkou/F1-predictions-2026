@@ -63,15 +63,15 @@
     </table>
   <% } %>
 
-  <div class="inline-actions" style="margin-top: 10px;">
-    <% if (currentPage > 1) { %>
-      <a class="link" href="/admin/analysis?page=<%= currentPage - 1 %>">Previous <%= groupsPerPage %></a>
-    <% } %>
-    <span class="muted">Page <%= currentPage %> of <%= totalPages %></span>
-    <% if (currentPage < totalPages) { %>
-      <a class="link" href="/admin/analysis?page=<%= currentPage + 1 %>">Next <%= groupsPerPage %></a>
-    <% } %>
-  </div>
+  <%- include('partials/admin_pagination', {
+    basePath: '/admin/analysis',
+    pageParamName: 'page',
+    currentPage: currentPage,
+    totalPages: totalPages,
+    perPage: groupsPerPage,
+    label: 'Test groups',
+    extraParams: {}
+  }) %>
 </div>
 
 <%- include('partials/footer') %>

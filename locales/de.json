@@ -30,6 +30,7 @@
   "signup": {
     "page_title": "Registrieren",
     "heading": "Konto erstellen",
+    "name_hint": "Waehle einen lustigen Kontonamen. Es muss nicht dein echter Name sein.",
     "verify_required": "Kontobestätigung vor dem Login erforderlich.",
     "confirm_password": "Passwort bestätigen",
     "create_account": "Konto erstellen",
@@ -145,7 +146,7 @@
     "couple_to_global_help": "Aktiv bedeutet: diese Gruppe nutzt immer deine Global-Tipps. Deaktiviere es fuer eigene Tipps in dieser Gruppe.",
     "guest_mode_notice": "Gastmodus: Erstelle ein Konto, um Gruppen beizutreten und andere Antworten zu sehen.",
     "guest_mode_notice_html": "Gastmodus: {create_account_link}, um Gruppen beizutreten und Antwort-Einblicke zu sehen.",
-    "guest_cta_button": "Konto fuer Einblicke erstellen",
+    "guest_cta_button": "Tipps speichern und Konto erstellen",
     "points_multi_select_penalty": "{points} {points_word} pro korrektem {driver_word}, -{penalty} fuer jeden fehlenden oder falschen {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} minus 1 pro Punkt Abweichung (Sieger muss korrekt sein). Gleichstand + korrekt: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, oder {bonus}, wenn alle Teams ein Podium holen und du das vorhersagst",

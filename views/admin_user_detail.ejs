@@ -1,0 +1,114 @@
+<%- include('partials/header', { title: `Admin user: ${targetUser.name}`, user }) %>
+<%- include('partials/admin_nav', { active: 'overview' }) %>
+
+<div class="card">
+  <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+    <h1 style="margin:0;">User overview</h1>
+    <a class="link" href="<%= returnTo %>">&lt; Back</a>
+  </div>
+
+  <h2 style="margin-top:0;"><%= targetUser.name %></h2>
+  <table class="table compact">
+    <tbody>
+      <tr>
+        <th style="width: 180px;">User ID</th>
+        <td><%= targetUser.id %></td>
+      </tr>
+      <tr>
+        <th>Email</th>
+        <td><%= targetUser.email %></td>
+      </tr>
+      <tr>
+        <th>Admin</th>
+        <td><%= targetUser.is_admin ? 'Yes' : 'No' %></td>
+      </tr>
+      <tr>
+        <th>Verified</th>
+        <td><%= targetUser.is_verified ? 'Yes' : 'No' %></td>
+      </tr>
+      <tr>
+        <th>Created</th>
+        <td><%= targetUser.created_at ? new Date(targetUser.created_at).toLocaleString() : '-' %></td>
+      </tr>
+      <tr>
+        <th>Verified at</th>
+        <td><%= targetUser.verified_at ? new Date(targetUser.verified_at).toLocaleString() : '-' %></td>
+      </tr>
+      <tr>
+        <th>Total responses</th>
+        <td><%= Number(responseStats?.response_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>Groups with responses</th>
+        <td><%= Number(responseStats?.groups_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>Questions answered</th>
+        <td><%= Number(responseStats?.questions_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>Last response</th>
+        <td><%= responseStats?.last_updated_at ? new Date(responseStats.last_updated_at).toLocaleString() : '-' %></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:24px;">Memberships</h2>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Group</th>
+        <th>Role</th>
+        <th>Joined</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!memberships || memberships.length === 0) { %>
+        <tr>
+          <td colspan="3" class="muted">No memberships.</td>
+        </tr>
+      <% } else { %>
+        <% memberships.forEach(row => { %>
+          <% const groupPath = Number(row.is_global) === 1 ? '/global' : `/groups/${row.group_id}`; %>
+          <tr>
+            <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
+            <td><%= row.role %></td>
+            <td><%= row.joined_at ? new Date(row.joined_at).toLocaleString() : '-' %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:24px;">Latest responses</h2>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Group</th>
+        <th>Question</th>
+        <th>Answer</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!responses || responses.length === 0) { %>
+        <tr>
+          <td colspan="4" class="muted">No responses yet.</td>
+        </tr>
+      <% } else { %>
+        <% responses.forEach(row => { %>
+          <% const groupPath = Number(row.is_global) === 1 ? '/global' : `/groups/${row.group_id}`; %>
+          <tr>
+            <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
+            <td><code class="admin-question-code"><%= row.question_id %></code></td>
+            <td><code class="admin-question-code"><%= row.answer %></code></td>
+            <td><%= row.updated_at ? new Date(row.updated_at).toLocaleString() : '-' %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+  <p class="muted" style="margin-top:8px;">Showing latest <%= responses.length %> rows (max 500).</p>
+</div>
+
+<%- include('partials/footer') %>

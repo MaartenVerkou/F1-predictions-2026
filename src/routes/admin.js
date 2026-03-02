@@ -38,6 +38,15 @@ function registerAdminRoutes(app, deps) {
     );
   }
 
+  function withQueryParam(path, key, value) {
+    const fullPath = String(path || "");
+    const hashIndex = fullPath.indexOf("#");
+    const basePath = hashIndex >= 0 ? fullPath.slice(0, hashIndex) : fullPath;
+    const hash = hashIndex >= 0 ? fullPath.slice(hashIndex) : "";
+    const separator = basePath.includes("?") ? "&" : "?";
+    return `${basePath}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
+  }
+
   function validatePointsOverrideType(question, parsedOverride) {
     const basePoints = question?._basePoints;
     const baseIsObject =
@@ -1346,8 +1355,7 @@ function registerAdminRoutes(app, deps) {
     const adminSuccess = req.query.success ? String(req.query.success) : null;
     const groupsPerPage = 10;
     const usersPerPage = 10;
-    const membershipsPerPage = 10;
-    const responsesPerPage = 10;
+    const guestProfilesPerPage = 10;
 
     const requestedGroupPage = Number(req.query.groupPage || 1);
     const currentGroupPage = Number.isFinite(requestedGroupPage) && requestedGroupPage > 0
@@ -1359,16 +1367,32 @@ function registerAdminRoutes(app, deps) {
       ? Math.floor(requestedUsersPage)
       : 1;
 
-    const requestedMembershipsPage = Number(req.query.membershipsPage || 1);
-    const currentMembershipsPage =
-      Number.isFinite(requestedMembershipsPage) && requestedMembershipsPage > 0
-        ? Math.floor(requestedMembershipsPage)
+    const requestedGuestProfilesPage = Number(req.query.guestPage || 1);
+    const currentGuestProfilesPage =
+      Number.isFinite(requestedGuestProfilesPage) && requestedGuestProfilesPage > 0
+        ? Math.floor(requestedGuestProfilesPage)
         : 1;
 
-    const requestedResponsePage = Number(req.query.responsePage || req.query.page || 1);
-    const currentResponsePage = Number.isFinite(requestedResponsePage) && requestedResponsePage > 0
-      ? Math.floor(requestedResponsePage)
-      : 1;
+    const nowMs = Date.now();
+    const sessionRevealedEmails =
+      req.session &&
+      req.session.adminRevealedEmails &&
+      typeof req.session.adminRevealedEmails === "object"
+        ? req.session.adminRevealedEmails
+        : {};
+    const activeRevealedEmails = {};
+    for (const [userId, expiresAtRaw] of Object.entries(sessionRevealedEmails)) {
+      const expiresAt = Number(expiresAtRaw);
+      if (Number.isFinite(expiresAt) && expiresAt > nowMs) {
+        activeRevealedEmails[userId] = expiresAt;
+      }
+    }
+    if (req.session) {
+      req.session.adminRevealedEmails = activeRevealedEmails;
+    }
+    const revealedEmailUserIds = Object.keys(activeRevealedEmails)
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value));
 
     const groupCountRow = db
       .prepare(
@@ -1388,7 +1412,9 @@ function registerAdminRoutes(app, deps) {
     const groupOffset = (safeGroupPage - 1) * groupsPerPage;
 
     const userCountRow = db
-      .prepare("SELECT COUNT(*) as count FROM users WHERE is_simulated = 0")
+      .prepare(
+        "SELECT COUNT(*) as count FROM users WHERE is_simulated = 0 AND is_admin = 0"
+      )
       .get();
     const totalUsers = Number(userCountRow?.count || 0);
     const totalUserPages = Math.max(
@@ -1397,17 +1423,105 @@ function registerAdminRoutes(app, deps) {
     );
     const safeUsersPage = Math.min(currentUsersPage, totalUserPages);
     const usersOffset = (safeUsersPage - 1) * usersPerPage;
+    const admins = db
+      .prepare(
+        `
+        SELECT id, name, email, created_at, is_admin
+        FROM users
+        WHERE is_simulated = 0
+          AND is_admin = 1
+        ORDER BY created_at DESC
+        `
+      )
+      .all();
+
     const users = db
       .prepare(
         `
         SELECT id, name, email, created_at, is_admin
         FROM users
         WHERE is_simulated = 0
+          AND is_admin = 0
         ORDER BY created_at DESC
         LIMIT ? OFFSET ?
         `
       )
       .all(usersPerPage, usersOffset);
+
+    const userStats = db
+      .prepare(
+        `
+        SELECT
+          (SELECT COUNT(*) FROM users u WHERE u.is_simulated = 0 AND u.is_admin = 0) as user_count,
+          (
+            SELECT COUNT(*)
+            FROM responses r
+            JOIN users u ON u.id = r.user_id
+            JOIN groups g ON g.id = r.group_id
+            WHERE u.is_simulated = 0
+              AND u.is_admin = 0
+              AND COALESCE(g.is_simulated, 0) = 0
+          ) as response_count,
+          (
+            SELECT COUNT(DISTINCT r.group_id)
+            FROM responses r
+            JOIN users u ON u.id = r.user_id
+            JOIN groups g ON g.id = r.group_id
+            WHERE u.is_simulated = 0
+              AND u.is_admin = 0
+              AND COALESCE(g.is_simulated, 0) = 0
+          ) as groups_count,
+          (
+            SELECT MAX(r.updated_at)
+            FROM responses r
+            JOIN users u ON u.id = r.user_id
+            JOIN groups g ON g.id = r.group_id
+            WHERE u.is_simulated = 0
+              AND u.is_admin = 0
+              AND COALESCE(g.is_simulated, 0) = 0
+          ) as last_activity_at
+        `
+      )
+      .get();
+
+    const adminStats = db
+      .prepare(
+        `
+        SELECT
+          COUNT(*) as admin_count,
+          (
+            SELECT COUNT(*)
+            FROM responses r
+            JOIN users u ON u.id = r.user_id
+            JOIN groups g ON g.id = r.group_id
+            WHERE u.is_simulated = 0
+              AND u.is_admin = 1
+              AND COALESCE(g.is_simulated, 0) = 0
+          ) as response_count,
+          (
+            SELECT COUNT(DISTINCT r.group_id)
+            FROM responses r
+            JOIN users u ON u.id = r.user_id
+            JOIN groups g ON g.id = r.group_id
+            WHERE u.is_simulated = 0
+              AND u.is_admin = 1
+              AND COALESCE(g.is_simulated, 0) = 0
+          ) as groups_count,
+          (
+            SELECT MAX(r.updated_at)
+            FROM responses r
+            JOIN users u ON u.id = r.user_id
+            JOIN groups g ON g.id = r.group_id
+            WHERE u.is_simulated = 0
+              AND u.is_admin = 1
+              AND COALESCE(g.is_simulated, 0) = 0
+          ) as last_activity_at
+        FROM users
+        WHERE is_simulated = 0
+          AND is_admin = 1
+        `
+      )
+      .get();
 
     const groups = db
       .prepare(
@@ -1422,95 +1536,338 @@ function registerAdminRoutes(app, deps) {
       )
       .all(groupsPerPage, groupOffset);
 
-    const membershipCountRow = db
+    const guestStats = db
       .prepare(
         `
-        SELECT COUNT(*) as count
-        FROM group_members gm
-        JOIN users u ON u.id = gm.user_id
-        JOIN groups g ON g.id = gm.group_id
-        WHERE u.is_simulated = 0
-          AND COALESCE(g.is_simulated, 0) = 0
+        SELECT
+          COUNT(DISTINCT gr.guest_id) as guest_count,
+          COUNT(*) as response_count,
+          COUNT(DISTINCT gr.group_id) as group_count,
+          MAX(gr.updated_at) as last_activity_at
+        FROM guest_responses gr
+        JOIN groups g ON g.id = gr.group_id
+        WHERE COALESCE(g.is_simulated, 0) = 0
         `
       )
       .get();
-    const totalMemberships = Number(membershipCountRow?.count || 0);
-    const totalMembershipPages = Math.max(
-      1,
-      Math.ceil(totalMemberships / membershipsPerPage)
-    );
-    const safeMembershipsPage = Math.min(currentMembershipsPage, totalMembershipPages);
-    const membershipsOffset = (safeMembershipsPage - 1) * membershipsPerPage;
 
-    const memberships = db
-      .prepare(
-        `
-        SELECT gm.user_id, gm.group_id, gm.role, gm.joined_at, u.name as user_name, g.name as group_name
-        FROM group_members gm
-        JOIN users u ON u.id = gm.user_id
-        JOIN groups g ON g.id = gm.group_id
-        WHERE u.is_simulated = 0
-          AND COALESCE(g.is_simulated, 0) = 0
-        ORDER BY gm.joined_at DESC
-        LIMIT ? OFFSET ?
-        `
-      )
-      .all(membershipsPerPage, membershipsOffset);
-
-    const responseCountRow = db
+    const guestProfileCountRow = db
       .prepare(
         `
         SELECT COUNT(*) as count
-        FROM responses r
-        JOIN users u ON u.id = r.user_id
-        JOIN groups g ON g.id = r.group_id
-        WHERE u.is_simulated = 0
-          AND COALESCE(g.is_simulated, 0) = 0
+        FROM (
+          SELECT gr.guest_id
+          FROM guest_responses gr
+          JOIN groups g ON g.id = gr.group_id
+          WHERE COALESCE(g.is_simulated, 0) = 0
+          GROUP BY gr.guest_id
+        ) as guests
         `
       )
       .get();
-    const totalResponses = Number(responseCountRow?.count || 0);
-    const totalResponsePages = Math.max(
+    const totalGuestProfiles = Number(guestProfileCountRow?.count || 0);
+    const totalGuestProfilePages = Math.max(
       1,
-      Math.ceil(totalResponses / responsesPerPage)
+      Math.ceil(totalGuestProfiles / guestProfilesPerPage)
     );
-    const safeResponsePage = Math.min(currentResponsePage, totalResponsePages);
-    const responseOffset = (safeResponsePage - 1) * responsesPerPage;
-    const responses = db
+    const safeGuestProfilesPage = Math.min(currentGuestProfilesPage, totalGuestProfilePages);
+    const guestProfilesOffset = (safeGuestProfilesPage - 1) * guestProfilesPerPage;
+
+    const guestProfiles = db
       .prepare(
         `
-        SELECT r.user_id, u.name as user_name, r.group_id, g.name as group_name, r.question_id, r.answer, r.updated_at
-        FROM responses r
-        JOIN users u ON u.id = r.user_id
-        JOIN groups g ON g.id = r.group_id
-        WHERE u.is_simulated = 0
-          AND COALESCE(g.is_simulated, 0) = 0
-        ORDER BY r.updated_at DESC
+        SELECT
+          gr.guest_id,
+          COUNT(*) as answers_count,
+          COUNT(DISTINCT gr.group_id) as groups_count,
+          COUNT(DISTINCT gr.question_id) as questions_count,
+          MIN(gr.created_at) as first_seen_at,
+          MAX(gr.updated_at) as last_seen_at,
+          (
+            SELECT g2.name
+            FROM guest_responses gr2
+            JOIN groups g2 ON g2.id = gr2.group_id
+            WHERE gr2.guest_id = gr.guest_id
+              AND COALESCE(g2.is_simulated, 0) = 0
+            ORDER BY gr2.updated_at DESC
+            LIMIT 1
+          ) as latest_group_name
+        FROM guest_responses gr
+        JOIN groups g ON g.id = gr.group_id
+        WHERE COALESCE(g.is_simulated, 0) = 0
+        GROUP BY gr.guest_id
+        ORDER BY last_seen_at DESC
         LIMIT ? OFFSET ?
         `
       )
-      .all(responsesPerPage, responseOffset);
+      .all(guestProfilesPerPage, guestProfilesOffset);
 
     res.render("admin_overview", {
       user,
       adminError,
       adminSuccess,
+      revealedEmailUserIds,
+      admins,
+      adminStats,
       users,
+      userStats,
       groups,
-      memberships,
-      responses,
       currentGroupPage: safeGroupPage,
       totalGroupPages,
       groupsPerPage,
       currentUserPage: safeUsersPage,
       totalUserPages,
       usersPerPage,
-      currentMembershipsPage: safeMembershipsPage,
-      totalMembershipPages,
-      membershipsPerPage,
-      currentResponsePage: safeResponsePage,
-      totalResponsePages,
-      responsesPerPage
+      guestStats,
+      guestProfiles,
+      currentGuestPage: safeGuestProfilesPage,
+      totalGuestPages: totalGuestProfilePages,
+      guestProfilesPerPage
+    });
+  });
+
+  app.post("/admin/users/:id/reveal-email", requireAdmin, (req, res) => {
+    const targetUserId = Number(req.params.id);
+    const rawReturnTo = String(req.body.returnTo || "/admin/overview").trim();
+    const returnTo =
+      rawReturnTo.startsWith("/admin/overview") || rawReturnTo.startsWith("/admin/users/")
+        ? rawReturnTo
+        : "/admin/overview";
+
+    if (!targetUserId) {
+      return res.redirect(withQueryParam(returnTo, "error", "Invalid user id."));
+    }
+
+    const adminUser = getCurrentUser(req);
+    if (!adminUser || !adminUser.id) {
+      return res.redirect("/login");
+    }
+
+    const adminPassword = String(req.body.adminPassword || "");
+    if (!adminPassword) {
+      return res.redirect(
+        withQueryParam(returnTo, "error", "Admin password is required to view email.")
+      );
+    }
+
+    const adminRow = db
+      .prepare("SELECT id, password_hash FROM users WHERE id = ? AND is_admin = 1")
+      .get(adminUser.id);
+    if (!adminRow || !adminRow.password_hash) {
+      return res.redirect(
+        withQueryParam(returnTo, "error", "Admin account could not be verified.")
+      );
+    }
+
+    let passwordOk = false;
+    try {
+      passwordOk = bcrypt.compareSync(adminPassword, adminRow.password_hash);
+    } catch (err) {
+      passwordOk = false;
+    }
+    if (!passwordOk) {
+      return res.redirect(withQueryParam(returnTo, "error", "Incorrect admin password."));
+    }
+
+    const target = db
+      .prepare("SELECT id FROM users WHERE id = ? AND is_simulated = 0")
+      .get(targetUserId);
+    if (!target) {
+      return res.redirect(withQueryParam(returnTo, "error", "User not found."));
+    }
+
+    const activeMap =
+      req.session &&
+      req.session.adminRevealedEmails &&
+      typeof req.session.adminRevealedEmails === "object"
+        ? req.session.adminRevealedEmails
+        : {};
+    activeMap[String(targetUserId)] = Date.now() + 5 * 60 * 1000;
+    if (req.session) {
+      req.session.adminRevealedEmails = activeMap;
+    }
+    return res.redirect(returnTo);
+  });
+
+  app.get("/admin/users/:id", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const targetUserId = Number(req.params.id);
+    if (!targetUserId) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("Invalid user id.")}`
+      );
+    }
+
+    const rawReturnTo = String(req.query.returnTo || "/admin/overview").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview";
+
+    const targetUser = db
+      .prepare(
+        `
+        SELECT id, name, email, created_at, is_admin, is_verified, verified_at
+        FROM users
+        WHERE id = ?
+          AND is_simulated = 0
+        `
+      )
+      .get(targetUserId);
+
+    if (!targetUser) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("User not found.")}`
+      );
+    }
+
+    const memberships = db
+      .prepare(
+        `
+        SELECT
+          gm.group_id,
+          g.name as group_name,
+          g.is_global,
+          gm.role,
+          gm.joined_at
+        FROM group_members gm
+        JOIN groups g ON g.id = gm.group_id
+        WHERE gm.user_id = ?
+          AND COALESCE(g.is_simulated, 0) = 0
+        ORDER BY gm.joined_at DESC
+        `
+      )
+      .all(targetUserId);
+
+    const responseStats = db
+      .prepare(
+        `
+        SELECT
+          COUNT(*) as response_count,
+          COUNT(DISTINCT r.group_id) as groups_count,
+          COUNT(DISTINCT r.question_id) as questions_count,
+          MAX(r.updated_at) as last_updated_at
+        FROM responses r
+        JOIN groups g ON g.id = r.group_id
+        WHERE r.user_id = ?
+          AND COALESCE(g.is_simulated, 0) = 0
+        `
+      )
+      .get(targetUserId);
+
+    const responses = db
+      .prepare(
+        `
+        SELECT
+          r.group_id,
+          g.name as group_name,
+          g.is_global,
+          r.question_id,
+          r.answer,
+          r.updated_at
+        FROM responses r
+        JOIN groups g ON g.id = r.group_id
+        WHERE r.user_id = ?
+          AND COALESCE(g.is_simulated, 0) = 0
+        ORDER BY r.updated_at DESC
+        LIMIT 500
+        `
+      )
+      .all(targetUserId);
+
+    return res.render("admin_user_detail", {
+      user,
+      targetUser,
+      memberships,
+      responses,
+      responseStats,
+      returnTo
+    });
+  });
+
+  app.get("/admin/guests/:guestId", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const guestId = String(req.params.guestId || "").trim();
+    if (!guestId || !/^[A-Za-z0-9_-]{4,128}$/.test(guestId)) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("Invalid guest id.")}`
+      );
+    }
+
+    const rawReturnTo = String(req.query.returnTo || "/admin/overview").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview";
+
+    const guestStats = db
+      .prepare(
+        `
+        SELECT
+          COUNT(*) as response_count,
+          COUNT(DISTINCT gr.group_id) as groups_count,
+          COUNT(DISTINCT gr.question_id) as questions_count,
+          MIN(gr.created_at) as first_seen_at,
+          MAX(gr.updated_at) as last_seen_at
+        FROM guest_responses gr
+        JOIN groups g ON g.id = gr.group_id
+        WHERE gr.guest_id = ?
+          AND COALESCE(g.is_simulated, 0) = 0
+        `
+      )
+      .get(guestId);
+
+    if (!guestStats || Number(guestStats.response_count || 0) === 0) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("Guest not found.")}`
+      );
+    }
+
+    const groups = db
+      .prepare(
+        `
+        SELECT
+          gr.group_id,
+          g.name as group_name,
+          g.is_global,
+          COUNT(*) as responses_count,
+          COUNT(DISTINCT gr.question_id) as questions_count,
+          MAX(gr.updated_at) as last_updated_at
+        FROM guest_responses gr
+        JOIN groups g ON g.id = gr.group_id
+        WHERE gr.guest_id = ?
+          AND COALESCE(g.is_simulated, 0) = 0
+        GROUP BY gr.group_id, g.name, g.is_global
+        ORDER BY last_updated_at DESC
+        `
+      )
+      .all(guestId);
+
+    const responses = db
+      .prepare(
+        `
+        SELECT
+          gr.group_id,
+          g.name as group_name,
+          g.is_global,
+          gr.question_id,
+          gr.answer,
+          gr.updated_at
+        FROM guest_responses gr
+        JOIN groups g ON g.id = gr.group_id
+        WHERE gr.guest_id = ?
+          AND COALESCE(g.is_simulated, 0) = 0
+        ORDER BY gr.updated_at DESC
+        LIMIT 500
+        `
+      )
+      .all(guestId);
+
+    return res.render("admin_guest_detail", {
+      user,
+      guestId,
+      guestStats,
+      groups,
+      responses,
+      returnTo
     });
   });
 
@@ -1669,7 +2026,8 @@ function registerAdminRoutes(app, deps) {
       user,
       group,
       analysis,
-      analysisMode
+      analysisMode,
+      questions
     });
   }
   );
@@ -1913,60 +2271,64 @@ function registerAdminRoutes(app, deps) {
 
   app.post("/admin/users/:userId/make-admin", requireAdmin, (req, res) => {
     const userId = Number(req.params.userId);
-    if (!userId) return res.redirect("/admin/overview");
+    const rawReturnTo = String(req.body.returnTo || "/admin/overview").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview";
+    if (!userId) return res.redirect(returnTo);
     const target = db.prepare("SELECT id, is_admin FROM users WHERE id = ?").get(userId);
     if (!target) {
-      return res.redirect(
-        `/admin/overview?error=${encodeURIComponent("User not found.")}`
-      );
+      return res.redirect(withQueryParam(returnTo, "error", "User not found."));
     }
     if (target.is_admin === 1) {
-      return res.redirect(
-        `/admin/overview?success=${encodeURIComponent("User is already an admin.")}`
-      );
+      return res.redirect(withQueryParam(returnTo, "success", "User is already an admin."));
     }
     const now = new Date().toISOString();
     db.prepare(
       "UPDATE users SET is_admin = 1, is_verified = 1, verified_at = COALESCE(verified_at, ?) WHERE id = ?"
     ).run(now, userId);
-    return res.redirect(
-      `/admin/overview?success=${encodeURIComponent("Admin rights granted.")}`
-    );
+    return res.redirect(withQueryParam(returnTo, "success", "Admin rights granted."));
   });
 
   app.post("/admin/users/:userId/remove-admin", requireAdmin, (req, res) => {
     const userId = Number(req.params.userId);
-    if (!userId) return res.redirect("/admin/overview");
+    const rawReturnTo = String(req.body.returnTo || "/admin/overview").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview";
+    if (!userId) return res.redirect(returnTo);
     const currentUser = getCurrentUser(req);
     if (currentUser && currentUser.id === userId) {
       return res.redirect(
-        `/admin/overview?error=${encodeURIComponent("You cannot remove your own admin rights.")}`
+        withQueryParam(returnTo, "error", "You cannot remove your own admin rights.")
       );
     }
     const target = db.prepare("SELECT id, is_admin FROM users WHERE id = ?").get(userId);
     if (!target) {
-      return res.redirect(
-        `/admin/overview?error=${encodeURIComponent("User not found.")}`
-      );
+      return res.redirect(withQueryParam(returnTo, "error", "User not found."));
     }
     if (target.is_admin !== 1) {
-      return res.redirect(
-        `/admin/overview?success=${encodeURIComponent("User is not an admin.")}`
-      );
+      return res.redirect(withQueryParam(returnTo, "success", "User is not an admin."));
     }
     db.prepare("UPDATE users SET is_admin = 0 WHERE id = ?").run(userId);
-    return res.redirect(
-      `/admin/overview?success=${encodeURIComponent("Admin rights removed.")}`
-    );
+    return res.redirect(withQueryParam(returnTo, "success", "Admin rights removed."));
   });
 
   app.post("/admin/users/:userId/delete", requireAdmin, (req, res) => {
     const userId = Number(req.params.userId);
-    if (!userId) return res.redirect("/admin/overview");
+    const rawReturnTo = String(req.body.returnTo || "/admin/overview").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview";
+    if (!userId) return res.redirect(returnTo);
     const currentUser = getCurrentUser(req);
     if (currentUser && Number(currentUser.id) === userId) {
       return res.redirect(
-        `/admin/overview?error=${encodeURIComponent("You cannot delete your own user account from admin.")}`
+        withQueryParam(
+          returnTo,
+          "error",
+          "You cannot delete your own user account from admin."
+        )
       );
     }
 
@@ -1974,9 +2336,7 @@ function registerAdminRoutes(app, deps) {
       .prepare("SELECT id, name FROM users WHERE id = ?")
       .get(userId);
     if (!target) {
-      return res.redirect(
-        `/admin/overview?error=${encodeURIComponent("User not found.")}`
-      );
+      return res.redirect(withQueryParam(returnTo, "error", "User not found."));
     }
 
     try {
@@ -2041,21 +2401,24 @@ function registerAdminRoutes(app, deps) {
       tx();
     } catch (err) {
       return res.redirect(
-        `/admin/overview?error=${encodeURIComponent(`Failed to delete user: ${err.message}`)}`
+        withQueryParam(returnTo, "error", `Failed to delete user: ${err.message}`)
       );
     }
 
-    return res.redirect(
-      `/admin/overview?success=${encodeURIComponent(`User "${target.name}" deleted.`)}`
-    );
+    return res.redirect(withQueryParam(returnTo, "success", `User "${target.name}" deleted.`));
   });
 
   app.post("/admin/groups/:groupId/delete", requireAdmin, (req, res) => {
     const source = String(req.query.from || "").trim().toLowerCase();
-    const redirectPath =
+    const fallbackRedirectPath =
       source === "testing" || source === "analysis"
         ? "/admin/analysis"
         : "/admin/overview";
+    const rawReturnTo = String(req.body.returnTo || "").trim();
+    const redirectPath =
+      rawReturnTo.startsWith("/admin/overview") || rawReturnTo.startsWith("/admin/analysis")
+        ? rawReturnTo
+        : fallbackRedirectPath;
     const groupId = Number(req.params.groupId);
     if (!groupId) return res.redirect(redirectPath);
     const memberRows = db

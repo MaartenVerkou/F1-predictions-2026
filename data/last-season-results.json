@@ -41,10 +41,12 @@
     },
     "most_dnfs_driver": {
       "season": 2025,
-      "result": "Fernando Alonso (5)",
+      "result": "Liam Lawson (5) / Carlos Sainz Jr. (5) / Fernando Alonso (5)",
       "label": "2025 race results (DNF statuses)",
       "url": "https://api.jolpi.ca/ergast/f1/2025/results.json",
       "results": [
+        "Liam Lawson (5)",
+        "Carlos Sainz Jr. (5)",
         "Fernando Alonso (5)"
       ]
     },
@@ -113,7 +115,7 @@
     },
     "races_before_title_decided": {
       "season": 2025,
-      "result": "0",
+      "result": "0 races",
       "label": "2025 driver standings by round",
       "url": "https://api.jolpi.ca/ergast/f1/2025/driverStandings.json"
     },

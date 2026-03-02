@@ -1,0 +1,85 @@
+<%
+  const current = Math.max(1, Number(currentPage || 1));
+  const total = Math.max(1, Number(totalPages || 1));
+  const param = String(pageParamName || "page");
+  const path = String(basePath || "");
+  const params = (extraParams && typeof extraParams === "object") ? extraParams : {};
+  const fragment = String(anchorId || "").trim();
+  const sectionLabel = String(label || "Page");
+  const pageSize = Number(perPage || 0);
+
+  const buildHref = (pageNumber) => {
+    const qp = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (key === param) return;
+      if (value == null || value === "") return;
+      qp.set(String(key), String(value));
+    });
+    qp.set(param, String(pageNumber));
+    const baseHref = `${path}?${qp.toString()}`;
+    return fragment ? `${baseHref}#${encodeURIComponent(fragment)}` : baseHref;
+  };
+
+  const buildPageItems = () => {
+    if (total <= 9) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const items = [];
+    const add = (value) => {
+      if (items[items.length - 1] === value) return;
+      items.push(value);
+    };
+    add(1);
+
+    let start = Math.max(2, current - 2);
+    let end = Math.min(total - 1, current + 2);
+
+    if (current <= 4) {
+      start = 2;
+      end = Math.min(total - 1, 6);
+    } else if (current >= total - 3) {
+      start = Math.max(2, total - 5);
+      end = total - 1;
+    }
+
+    if (start > 2) add("...");
+    for (let page = start; page <= end; page += 1) add(page);
+    if (end < total - 1) add("...");
+    add(total);
+
+    return items;
+  };
+
+  const pageItems = buildPageItems();
+%>
+<div class="admin-pagination">
+  <% if (current > 1) { %>
+    <a class="admin-page-link" href="<%= buildHref(1) %>">First</a>
+    <a class="admin-page-link" href="<%= buildHref(current - 1) %>">Prev</a>
+  <% } else { %>
+    <span class="admin-page-link is-disabled">First</span>
+    <span class="admin-page-link is-disabled">Prev</span>
+  <% } %>
+
+  <% pageItems.forEach((item) => { %>
+    <% if (item === "...") { %>
+      <span class="admin-page-ellipsis">...</span>
+    <% } else if (Number(item) === current) { %>
+      <span class="admin-page-link is-active"><%= item %></span>
+    <% } else { %>
+      <a class="admin-page-link" href="<%= buildHref(item) %>"><%= item %></a>
+    <% } %>
+  <% }) %>
+
+  <% if (current < total) { %>
+    <a class="admin-page-link" href="<%= buildHref(current + 1) %>">Next</a>
+    <a class="admin-page-link" href="<%= buildHref(total) %>">Last</a>
+  <% } else { %>
+    <span class="admin-page-link is-disabled">Next</span>
+    <span class="admin-page-link is-disabled">Last</span>
+  <% } %>
+
+  <span class="muted admin-pagination-summary">
+    <%= sectionLabel %> page <%= current %> of <%= total %><%= pageSize > 0 ? ` (${pageSize}/page)` : "" %>
+  </span>
+</div>
