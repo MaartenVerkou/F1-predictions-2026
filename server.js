@@ -1413,6 +1413,57 @@ function getFocusedMemberResponses(groupId, { focusUserId, focusGuestId } = {}) 
   };
 }
 
+function getResponsesForGroup(groupId, { includeNamedGuests = true } = {}) {
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedGroupId) return [];
+  if (!includeNamedGuests) {
+    return db
+      .prepare(
+        `
+        SELECT r.user_id, u.name as user_name, r.question_id, r.answer, r.updated_at
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+        ORDER BY u.name ASC, r.question_id ASC
+        `
+      )
+      .all(normalizedGroupId);
+  }
+  return db
+    .prepare(
+      `
+      SELECT user_id, user_name, question_id, answer, updated_at
+      FROM (
+        SELECT
+          r.user_id AS user_id,
+          u.name AS user_name,
+          r.question_id AS question_id,
+          r.answer AS answer,
+          r.updated_at AS updated_at
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+
+        UNION ALL
+
+        SELECT
+          NULL AS user_id,
+          ngm.display_name AS user_name,
+          gr.question_id AS question_id,
+          gr.answer AS answer,
+          gr.updated_at AS updated_at
+        FROM guest_responses gr
+        JOIN named_guest_group_members ngm
+          ON ngm.group_id = gr.group_id
+         AND ngm.guest_id = gr.guest_id
+        WHERE gr.group_id = ?
+      ) all_group_responses
+      ORDER BY user_name ASC, question_id ASC
+      `
+    )
+    .all(normalizedGroupId, normalizedGroupId);
+}
+
 function claimGuestResponsesForUser(req, userId) {
   const guestId = getGuestIdFromSession(req, { create: false });
   const normalizedUserId = Number(userId || 0);
@@ -2279,17 +2330,7 @@ app.get("/join/:code/responses", (req, res) => {
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const guestId = getGuestIdFromSession(req, { create: false });
   const questions = getQuestions(locale);
-  const responses = db
-    .prepare(
-      `
-      SELECT r.user_id, u.name as user_name, r.question_id, r.answer, r.updated_at
-      FROM responses r
-      JOIN users u ON u.id = r.user_id
-      WHERE r.group_id = ?
-      ORDER BY u.name ASC, r.question_id ASC
-      `
-    )
-    .all(Number(group.id));
+  const responses = getResponsesForGroup(Number(group.id), { includeNamedGuests: true });
   const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
   const focused = getFocusedMemberResponses(Number(group.id), {
     focusUserId: req.query.focusUserId,
@@ -3005,17 +3046,7 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
     return sendError(req, res, 403, "Not a group member.");
   }
   const questions = getQuestions(locale);
-  const responses = db
-    .prepare(
-      `
-      SELECT r.user_id, u.name as user_name, r.question_id, r.answer, r.updated_at
-      FROM responses r
-      JOIN users u ON u.id = r.user_id
-      WHERE r.group_id = ?
-      ORDER BY u.name ASC, r.question_id ASC
-      `
-    )
-    .all(groupId);
+  const responses = getResponsesForGroup(groupId, { includeNamedGuests: true });
   const focused = getFocusedMemberResponses(groupId, {
     focusUserId: req.query.focusUserId,
     focusGuestId: req.query.focusGuestId
