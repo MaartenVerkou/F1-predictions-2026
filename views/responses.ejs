@@ -194,30 +194,6 @@
       return top.slice(0, limit - 1).concat([viewerItem]);
     }; %>
 
-  <% if (focusedMemberData) { %>
-    <div class="responses-section">
-      <div class="responses-question-head">
-        <h3 class="survey-question-title"><%= focusedMemberData.name %> (<%= focusedMemberData.role %>)</h3>
-        <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= t('responses.page_title') %></a>
-      </div>
-      <% if (focusedMemberResponsesData.length === 0) { %>
-        <p class="muted"><%= t('responses.no_responses') %></p>
-      <% } else { %>
-        <ul class="list">
-          <% questions.forEach((q) => { %>
-            <% const row = focusedRowsByQuestion[q.id]; %>
-            <% if (row) { %>
-              <li>
-                <strong><%= q.prompt %></strong>
-                <div class="muted"><%= formatAnswer(row) %></div>
-              </li>
-            <% } %>
-          <% }) %>
-        </ul>
-      <% } %>
-    </div>
-  <% } %>
-
   <% if (responses.length === 0) { %>
     <div class="alert"><%= t('responses.no_responses') %></div>
   <% } else { %>
@@ -262,17 +238,28 @@
           <% const viewerRow = memberViewerRow || (guestViewerRawAnswer
             ? { user_id: 0, question_id: q.id, answer: guestViewerRawAnswer }
             : null); %>
+          <% const focusedRow = focusedRowsByQuestion[q.id] || null; %>
+          <% const hasFocusedMember = Boolean(focusedMemberData); %>
           <% const viewerAnswerLabel = viewerRow ? formatAnswer(viewerRow) : ''; %>
+          <% const focusedAnswerLabel = focusedRow ? formatAnswer(focusedRow) : ''; %>
           <% const viewerBooleanChoice = q.type === 'boolean' && viewerRow ? String(viewerRow.answer || '') : ''; %>
+          <% const focusedBooleanChoice = q.type === 'boolean' && focusedRow ? String(focusedRow.answer || '') : ''; %>
           <% const viewerMultiSelectPicks = (q.type === 'multi_select' || q.type === 'multi_select_limited') && viewerRow ? parseArrayAnswer(viewerRow.answer) : []; %>
+          <% const focusedMultiSelectPicks = (q.type === 'multi_select' || q.type === 'multi_select_limited') && focusedRow ? parseArrayAnswer(focusedRow.answer) : []; %>
           <% const viewerRankingPicks = q.type === 'ranking' && viewerRow ? parseArrayAnswer(viewerRow.answer) : []; %>
+          <% const focusedRankingPicks = q.type === 'ranking' && focusedRow ? parseArrayAnswer(focusedRow.answer) : []; %>
+          <% const activeAnswerLabel = hasFocusedMember ? focusedAnswerLabel : viewerAnswerLabel; %>
+          <% const activeBooleanChoice = hasFocusedMember ? focusedBooleanChoice : viewerBooleanChoice; %>
+          <% const activeMultiSelectPicks = hasFocusedMember ? focusedMultiSelectPicks : viewerMultiSelectPicks; %>
+          <% const activeRankingPicks = hasFocusedMember ? focusedRankingPicks : viewerRankingPicks; %>
+          <% const activeChoiceClass = hasFocusedMember ? 'is-focused-choice' : 'is-viewer-choice'; %>
           <% const isFullMultiColumnSummary = q.id === 'all_podium_finishers' || q.id === 'select_three_races_dnfs'; %>
           <% const summary = isFullMultiColumnSummary ? summarizeMultiSelectOptions(rows) : summarizeAnswers(rows); %>
           <% const summaryDisplayRows = isFullMultiColumnSummary
-            ? limitRowsWithViewerSet(summary, viewerMultiSelectPicks, 5)
+            ? limitRowsWithViewerSet(summary, activeMultiSelectPicks, 5)
             : (q.type === 'boolean' || q.type === 'ranking'
               ? summary
-              : limitRowsWithViewer(summary, viewerAnswerLabel, 5)); %>
+              : limitRowsWithViewer(summary, activeAnswerLabel, 5)); %>
           <% const yesCount = q.type === 'boolean' ? rows.filter((row) => row.answer === 'yes').length : 0; %>
           <% const noCount = q.type === 'boolean' ? rows.filter((row) => row.answer === 'no').length : 0; %>
           <% const yesPercent = rows.length > 0 ? (yesCount * 100) / rows.length : 0; %>
@@ -284,24 +271,24 @@
             </div>
             <% if (q.type === 'boolean') { %>
               <div class="responses-yesno-head">
-                <span class="<%= viewerBooleanChoice === 'yes' ? 'is-viewer-choice' : '' %>"><%= yesText %> &middot; <%= formatPercent(yesPercent) %>% (<%= yesCount %>)</span>
-                <span class="<%= viewerBooleanChoice === 'no' ? 'is-viewer-choice' : '' %>"><%= noText %> &middot; <%= formatPercent(noPercent) %>% (<%= noCount %>)</span>
+                <span class="<%= activeBooleanChoice === 'yes' ? activeChoiceClass : '' %>"><%= yesText %> &middot; <%= formatPercent(yesPercent) %>% (<%= yesCount %>)</span>
+                <span class="<%= activeBooleanChoice === 'no' ? activeChoiceClass : '' %>"><%= noText %> &middot; <%= formatPercent(noPercent) %>% (<%= noCount %>)</span>
               </div>
               <div class="responses-yesno-track" aria-hidden="true">
-                <span class="responses-yesno-yes <%= viewerBooleanChoice === 'yes' ? 'is-viewer-choice' : '' %>" style="width:<%= yesPercent %>%;"></span>
-                <span class="responses-yesno-no <%= viewerBooleanChoice === 'no' ? 'is-viewer-choice' : '' %>" style="width:<%= noPercent %>%;"></span>
+                <span class="responses-yesno-yes <%= activeBooleanChoice === 'yes' ? activeChoiceClass : '' %>" style="width:<%= yesPercent %>%;"></span>
+                <span class="responses-yesno-no <%= activeBooleanChoice === 'no' ? activeChoiceClass : '' %>" style="width:<%= noPercent %>%;"></span>
               </div>
             <% } else if (q.type === 'ranking') { %>
               <div class="responses-ranking-splits">
                 <% rankingByPlace.forEach((placeRows, index) => { %>
                   <% if (placeRows.length > 0) { %>
-                    <% const viewerPlacePick = viewerRankingPicks[index]; %>
+                    <% const viewerPlacePick = activeRankingPicks[index]; %>
                     <% const placeDisplayRows = limitRowsWithViewer(placeRows, viewerPlacePick, 5); %>
                     <div class="responses-ranking-place">
                       <div class="muted responses-ranking-place-title"><%= t('responses.position_label', { n: index + 1 }) %></div>
                       <ul class="responses-bars">
                         <% placeDisplayRows.forEach(item => { %>
-                          <li class="responses-bars-item <%= viewerRankingPicks[index] === item.label ? 'is-viewer-choice' : '' %>">
+                          <li class="responses-bars-item <%= activeRankingPicks[index] === item.label ? activeChoiceClass : '' %>">
                             <span class="responses-bars-label"><%= item.label %></span>
                             <span class="responses-bars-track" aria-hidden="true">
                               <span class="responses-bars-fill" style="width:<%= item.percent %>%;"></span>
@@ -317,8 +304,8 @@
             <% } else if (isFullMultiColumnSummary) { %>
               <ul class="responses-podium-columns">
                 <% summary.forEach(item => { %>
-                  <% const isViewerChoice = viewerMultiSelectPicks.includes(item.label); %>
-                  <li class="responses-podium-item <%= isViewerChoice ? 'is-viewer-choice' : '' %>">
+                  <% const isViewerChoice = activeMultiSelectPicks.includes(item.label); %>
+                  <li class="responses-podium-item <%= isViewerChoice ? activeChoiceClass : '' %>">
                     <span class="responses-podium-label"><%= item.label %></span>
                     <span class="responses-podium-value"><%= formatPercent(item.percent) %>% (<%= item.count %>)</span>
                   </li>
@@ -327,8 +314,8 @@
             <% } else { %>
               <ul class="responses-bars">
                 <% summaryDisplayRows.forEach(item => { %>
-                  <% const isViewerChoice = viewerAnswerLabel && item.label === viewerAnswerLabel; %>
-                  <li class="responses-bars-item <%= isViewerChoice ? 'is-viewer-choice' : '' %>">
+                  <% const isViewerChoice = activeAnswerLabel && item.label === activeAnswerLabel; %>
+                  <li class="responses-bars-item <%= isViewerChoice ? activeChoiceClass : '' %>">
                     <span class="responses-bars-label"><%= item.label %></span>
                     <span class="responses-bars-track" aria-hidden="true">
                       <span class="responses-bars-fill" style="width:<%= item.percent %>%;"></span>

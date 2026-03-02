@@ -147,7 +147,7 @@
     "guest_mode_notice": "Mode invite: creez un compte pour rejoindre des groupes et voir les reponses des autres.",
     "guest_mode_notice_html": "Mode invite: {create_account_link} pour rejoindre des groupes et voir des insights de reponses.",
     "guest_cta_button": "Enregistrer les pronostics et creer un compte",
-    "visitor_mode_notice_html": "Visitor mode: {create_account_link} pour enregistrer tes pronostics, creer/rejoindre des groupes, et voir des insights de reponses.",
+    "visitor_mode_notice_html": "Mode visiteur: {create_account_link} pour enregistrer tes pronostics, creer/rejoindre des groupes, et voir des insights de reponses.",
     "visitor_cta_button": "Enregistrer les pronostics et creer un compte",
     "named_guest_account_notice_html": "Les modifications peuvent etre perdues en mode invite. {create_account_link} pour enregistrer les modifications de facon fiable, rejoindre d'autres groupes et apparaitre dans le classement Global.",
     "named_guest_view_responses_button": "Voir les reponses du groupe",

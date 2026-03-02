@@ -147,7 +147,7 @@
     "guest_mode_notice": "Gastmodus: maak een account om groepen te joinen en andere antwoorden te bekijken.",
     "guest_mode_notice_html": "Gastmodus: {create_account_link} om groepen te joinen en response inzichten te zien.",
     "guest_cta_button": "Voorspellingen opslaan en account aanmaken",
-    "visitor_mode_notice_html": "Visitor mode: {create_account_link} om je voorspellingen op te slaan, groepen te maken of te joinen, en response-inzichten te zien!",
+    "visitor_mode_notice_html": "Bezoekersmodus: {create_account_link} om je voorspellingen op te slaan, groepen te maken of te joinen, en response-inzichten te zien!",
     "visitor_cta_button": "Voorspellingen opslaan en account aanmaken",
     "named_guest_account_notice_html": "Wijzigingen kunnen verloren gaan in gastmodus. {create_account_link} om wijzigingen betrouwbaar op te slaan, andere groepen te joinen en mee te doen in de Global-ranking.",
     "named_guest_view_responses_button": "Bekijk groepsreacties",

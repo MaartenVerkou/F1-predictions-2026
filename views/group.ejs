@@ -40,7 +40,6 @@
           action="/groups/<%= group.id %>/rules"
           hidden
         >
-          <p class="muted"><%= t('group.leave_empty_uses_default') %></p>
           <label>
             <%= t('group.rules_text') %>
             <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
@@ -66,8 +65,19 @@
       <% if (invite) { %>
         <div class="group-invite-link-card">
           <div class="inline-actions" style="justify-content: space-between;">
-            <span class="link" id="invite-link" data-copy-value="<%= baseUrl %>/join/<%= invite.code %>">/join/<%= invite.code %></span>
-            <button type="button" class="secondary" data-copy-target="invite-link"><%= t('group.copy') %></button>
+            <span class="link" id="invite-link" data-copy-value="<%= baseUrl %>/join/<%= invite.code %>"><%= baseUrl %>/join/<%= invite.code %></span>
+            <button
+              type="button"
+              class="group-copy-icon-btn"
+              data-copy-target="invite-link"
+              aria-label="<%= t('group.copy') %>"
+              title="<%= t('group.copy') %>"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="9" y="9" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"></rect>
+                <rect x="5" y="5" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"></rect>
+              </svg>
+            </button>
           </div>
           <% if (role === 'owner' || role === 'admin') { %>
             <div class="group-invite-meta"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
@@ -174,16 +184,11 @@
       if (!toggle || !form) return;
 
       toggle.addEventListener("click", () => {
-        const isHidden = form.hasAttribute("hidden");
-        if (isHidden) {
-          form.removeAttribute("hidden");
-          toggle.setAttribute("aria-expanded", "true");
-          const textarea = form.querySelector("textarea");
-          if (textarea) textarea.focus();
-          return;
-        }
-        form.setAttribute("hidden", "");
-        toggle.setAttribute("aria-expanded", "false");
+        form.removeAttribute("hidden");
+        toggle.hidden = true;
+        toggle.setAttribute("aria-expanded", "true");
+        const textarea = form.querySelector("textarea");
+        if (textarea) textarea.focus();
       });
     })();
   </script>
