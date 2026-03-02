@@ -114,6 +114,28 @@ const initCountdown = () => {
 
 const initCopyButtons = () => {
   document.querySelectorAll('[data-copy-target]').forEach(button => {
+    const originalHtml = button.innerHTML;
+    const originalAriaLabel = button.getAttribute('aria-label') || '';
+    const originalTitle = button.getAttribute('title') || '';
+    let resetTimeoutId = null;
+
+    const restoreButton = () => {
+      button.innerHTML = originalHtml;
+      if (originalAriaLabel) button.setAttribute('aria-label', originalAriaLabel);
+      if (originalTitle) button.setAttribute('title', originalTitle);
+      resetTimeoutId = null;
+    };
+
+    const showTemporaryState = (label) => {
+      button.textContent = label;
+      button.setAttribute('aria-label', label);
+      button.setAttribute('title', label);
+      if (resetTimeoutId) {
+        clearTimeout(resetTimeoutId);
+      }
+      resetTimeoutId = setTimeout(restoreButton, 1500);
+    };
+
     button.addEventListener('click', async () => {
       const targetId = button.dataset.copyTarget;
       const target = document.getElementById(targetId);
@@ -121,15 +143,9 @@ const initCopyButtons = () => {
       const text = (target.dataset.copyValue || target.textContent || '').trim();
       try {
         await navigator.clipboard.writeText(text);
-        button.textContent = 'Copied';
-        setTimeout(() => {
-          button.textContent = 'Copy';
-        }, 1500);
+        showTemporaryState('Copied');
       } catch (err) {
-        button.textContent = 'Failed';
-        setTimeout(() => {
-          button.textContent = 'Copy';
-        }, 1500);
+        showTemporaryState('Failed');
       }
     });
   });

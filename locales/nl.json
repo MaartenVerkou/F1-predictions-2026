@@ -337,7 +337,7 @@
       "prompt": "Kies 3 races. Verdien 2 punten per DNF in die races."
     },
     "closest_qualifying_teammates": {
-      "prompt": "Welk team heeft de kleinste kwalificatie-onderlinge stand tussen teamgenoten?"
+      "prompt": "Welk team heeft het kleinste verschil in kwalificatie-duels tussen teamgenoten?"
     },
     "races_before_title_decided": {
       "prompt": "Hoeveel races voor het einde wordt de rijderstitel beslist? (laatste race = 0)"
