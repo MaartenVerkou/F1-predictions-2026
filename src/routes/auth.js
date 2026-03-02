@@ -16,7 +16,8 @@ function registerAuthRoutes(app, deps) {
     sendError,
     requireAuth,
     DEV_AUTO_LOGIN,
-    NODE_ENV
+    NODE_ENV,
+    claimGuestResponsesForUser
   } = deps;
 
   const BRAND_NAME = String(COMPANY_NAME || "Wheel of Knowledge").trim() || "Wheel of Knowledge";
@@ -37,7 +38,19 @@ function registerAuthRoutes(app, deps) {
     return normalized || "there";
   };
 
-  async function issueAndSendVerificationEmail(userId, email, name = "") {
+  const sanitizeRedirectPath = (rawValue) => {
+    const raw = String(rawValue || "").trim();
+    if (!raw) return "/";
+    if (raw.startsWith("/")) return raw;
+    try {
+      const parsed = new URL(raw);
+      return `${parsed.pathname || "/"}${parsed.search || ""}`;
+    } catch (err) {
+      return "/";
+    }
+  };
+
+  async function issueAndSendVerificationEmail(userId, email, name = "", options = {}) {
     const token = generateToken();
     const tokenHash = hashToken(token);
     const now = new Date().toISOString();
@@ -47,7 +60,11 @@ function registerAuthRoutes(app, deps) {
       "INSERT INTO email_verifications (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)"
     ).run(userId, tokenHash, expiresAt, now);
 
-    const verifyUrl = `${BASE_URL}/verify?token=${token}`;
+    const redirectTo = sanitizeRedirectPath(options.redirectTo || "/");
+    const verifyUrl =
+      redirectTo && redirectTo !== "/"
+        ? `${BASE_URL}/verify?token=${token}&redirect=${encodeURIComponent(redirectTo)}`
+        : `${BASE_URL}/verify?token=${token}`;
     const mailer = getMailer();
     if (!mailer) {
       return {
@@ -104,13 +121,18 @@ function registerAuthRoutes(app, deps) {
       error,
       form: {
         name: String(form.name || ""),
-        email: String(form.email || "")
+        email: String(form.email || ""),
+        redirectTo: sanitizeRedirectPath(form.redirectTo || "/")
       }
     });
   };
 
   app.get(["/signup", "/register"], (req, res) => {
-    renderSignup(res);
+    renderSignup(res, {
+      form: {
+        redirectTo: sanitizeRedirectPath(req.query.redirectTo || "/")
+      }
+    });
   });
 
   app.get("/api/users/check-name", (req, res) => {
@@ -126,9 +148,10 @@ function registerAuthRoutes(app, deps) {
     const { password, passwordConfirm } = req.body;
     const rawName = String(req.body.name || "");
     const rawEmail = String(req.body.email || "");
+    const redirectTo = sanitizeRedirectPath(req.body.redirectTo || "/");
     const normalizedName = rawName.trim();
     const normalizedEmail = rawEmail.trim().toLowerCase();
-    const signupForm = { name: normalizedName, email: normalizedEmail };
+    const signupForm = { name: normalizedName, email: normalizedEmail, redirectTo };
 
     if (!normalizedName || !normalizedEmail || !password || !passwordConfirm) {
       return renderSignup(res, {
@@ -191,31 +214,39 @@ function registerAuthRoutes(app, deps) {
       userId = info.lastInsertRowid;
     }
     ensureUserInGlobalGroup(userId);
+    req.session.postVerifyRedirect = redirectTo;
 
     const result = await issueAndSendVerificationEmail(
       userId,
       normalizedEmail,
-      normalizedName
+      normalizedName,
+      { redirectTo }
     );
     if (!result.ok && result.reason === "smtp_missing") {
       return res.render("verify_notice", {
         email: normalizedEmail,
         message: "SMTP is not configured. Use the link below to verify.",
-        verifyUrl: result.verifyUrl
+        verifyUrl: result.verifyUrl,
+        redirectTo,
+        allowResend: true
       });
     }
     if (!result.ok && result.reason === "send_failed") {
       return res.render("verify_notice", {
         email: normalizedEmail,
         message: "Email failed to send. Use the link below to verify.",
-        verifyUrl: result.verifyUrl
+        verifyUrl: result.verifyUrl,
+        redirectTo,
+        allowResend: true
       });
     }
 
     return res.render("verify_notice", {
       email: normalizedEmail,
       message: "Verification email sent. Please check your inbox and spam/junk folder.",
-      verifyUrl: null
+      verifyUrl: null,
+      redirectTo,
+      allowResend: true
     });
   });
 
@@ -270,12 +301,26 @@ function registerAuthRoutes(app, deps) {
       });
     }
     req.session.userId = user.id;
+    if (typeof claimGuestResponsesForUser === "function") {
+      claimGuestResponsesForUser(req, user.id);
+    }
     return res.redirect("/dashboard");
   });
 
   app.post("/resend-verification", async (req, res) => {
     const normalizedEmail = String(req.body.email || "").trim().toLowerCase();
+    const redirectTo = sanitizeRedirectPath(req.body.redirectTo || "/");
+    const returnToVerifyNotice = req.body.returnToVerifyNotice === "1";
     if (!normalizedEmail) {
+      if (returnToVerifyNotice) {
+        return res.render("verify_notice", {
+          email: "",
+          message: "Email is required.",
+          verifyUrl: null,
+          redirectTo,
+          allowResend: true
+        });
+      }
       return res.render("login", {
         error: "Email is required.",
         notice: null,
@@ -289,6 +334,15 @@ function registerAuthRoutes(app, deps) {
       .get(normalizedEmail);
 
     if (!user || user.is_verified) {
+      if (returnToVerifyNotice) {
+        return res.render("verify_notice", {
+          email: normalizedEmail,
+          message: "If your account exists and is unverified, a new verification email was sent.",
+          verifyUrl: null,
+          redirectTo,
+          allowResend: true
+        });
+      }
       return res.render("login", {
         error: null,
         notice: "If your account exists and is unverified, a new verification email was sent.",
@@ -300,16 +354,41 @@ function registerAuthRoutes(app, deps) {
     const result = await issueAndSendVerificationEmail(
       user.id,
       normalizedEmail,
-      user.name
+      user.name,
+      { redirectTo }
     );
     if (!result.ok && result.verifyUrl) {
+      if (returnToVerifyNotice) {
+        return res.render("verify_notice", {
+          email: normalizedEmail,
+          message:
+            result.reason === "smtp_missing"
+              ? "SMTP is not configured. Use the link below to verify."
+              : "Email failed to send. Use the link below to verify.",
+          verifyUrl: result.verifyUrl,
+          redirectTo,
+          allowResend: true
+        });
+      }
       return res.render("verify_notice", {
         email: normalizedEmail,
         message:
           result.reason === "smtp_missing"
             ? "SMTP is not configured. Use the link below to verify."
             : "Email failed to send. Use the link below to verify.",
-        verifyUrl: result.verifyUrl
+        verifyUrl: result.verifyUrl,
+        redirectTo,
+        allowResend: true
+      });
+    }
+
+    if (returnToVerifyNotice) {
+      return res.render("verify_notice", {
+        email: normalizedEmail,
+        message: "Verification email re-sent. Please check your inbox and spam/junk folder.",
+        verifyUrl: null,
+        redirectTo,
+        allowResend: true
       });
     }
 
@@ -494,7 +573,16 @@ function registerAuthRoutes(app, deps) {
       verification.user_id
     );
     req.session.userId = verification.user_id;
-    return res.redirect("/");
+    if (typeof claimGuestResponsesForUser === "function") {
+      claimGuestResponsesForUser(req, verification.user_id);
+    }
+    const queryRedirect = sanitizeRedirectPath(req.query.redirect || "/");
+    const sessionRedirect = sanitizeRedirectPath(req.session?.postVerifyRedirect || "/");
+    const target = queryRedirect && queryRedirect !== "/" ? queryRedirect : sessionRedirect;
+    if (req.session) {
+      req.session.postVerifyRedirect = null;
+    }
+    return res.redirect(target && target !== "/" ? target : "/");
   });
 
   app.get("/account", requireAuth, (req, res) => {
@@ -640,9 +728,9 @@ function registerAuthRoutes(app, deps) {
     });
   });
 
-  app.get("/start-predicting", requireAuth, (req, res) => {
+  app.get("/start-predicting", (req, res) => {
     const user = getCurrentUser(req);
-    if (!user) return res.redirect("/login");
+    if (!user) return res.redirect("/global/questions");
 
     const globalGroup = ensureUserInGlobalGroup(user.id);
     if (!globalGroup || !globalGroup.id) {

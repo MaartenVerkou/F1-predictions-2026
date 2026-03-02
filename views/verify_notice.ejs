@@ -8,6 +8,23 @@
     <div class="alert">Verification link (dev mode): <a class="link" href="<%= verifyUrl %>"><%= verifyUrl %></a></div>
   <% } %>
   <p class="muted">Email: <strong><%= email %></strong></p>
+  <% if (allowResend) { %>
+    <div class="inline-actions" style="margin-top:12px;">
+      <form method="post" action="/resend-verification" style="margin:0;">
+        <input type="hidden" name="email" value="<%= email %>" />
+        <input type="hidden" name="redirectTo" value="<%= redirectTo || '/' %>" />
+        <input type="hidden" name="returnToVerifyNotice" value="1" />
+        <button type="submit" class="secondary">Resend verification</button>
+      </form>
+      <button
+        type="button"
+        class="secondary"
+        onclick="window.close(); setTimeout(function () { window.location.href = '/'; }, 150);"
+      >
+        Close this window
+      </button>
+    </div>
+  <% } %>
 </div>
 
 <%- include('partials/footer') %>

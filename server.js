@@ -84,6 +84,10 @@ const PAYPAL_DONATION_URL = String(process.env.PAYPAL_DONATION_URL || "").trim()
 const PAYPAL_DONATION_LABEL =
   String(process.env.PAYPAL_DONATION_LABEL || "").trim() || "Donate";
 function deriveBaseUrl() {
+  const envMode = String(process.env.NODE_ENV || "development").trim().toLowerCase();
+  if (envMode !== "production") {
+    return `http://localhost:${PORT}`;
+  }
   const rawDomain = String(process.env.APP_DOMAIN || "localhost")
     .trim()
     .replace(/\/+$/, "");
@@ -116,6 +120,7 @@ const DEV_AUTO_LOGIN = process.env.DEV_AUTO_LOGIN === "1";
 const DEV_AUTO_LOGIN_EMAIL =
   process.env.DEV_AUTO_LOGIN_EMAIL || "dev@example.com";
 const DEV_AUTO_LOGIN_NAME = process.env.DEV_AUTO_LOGIN_NAME || "Dev Admin";
+const IS_DEVELOPMENT = (process.env.NODE_ENV || "development") !== "production";
 const PREDICTIONS_CLOSE_AT =
   process.env.PREDICTIONS_CLOSE_AT || "2026-03-05T23:59:59";
 const ADMIN_EMAILS = new Set(
@@ -279,6 +284,18 @@ db.exec(`
     updated_at TEXT NOT NULL,
     UNIQUE(user_id, group_id, question_id),
     FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(group_id) REFERENCES groups(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS guest_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guest_id TEXT NOT NULL,
+    group_id INTEGER NOT NULL,
+    question_id TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(guest_id, group_id, question_id),
     FOREIGN KEY(group_id) REFERENCES groups(id)
   );
 
@@ -464,8 +481,28 @@ function ensureGlobalGroup(ownerId) {
       const fallbackUser = db
         .prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1")
         .get();
-      if (!fallbackUser) return null;
-      ownerId = fallbackUser.id;
+      if (!fallbackUser) {
+        const systemEmail = "system-global-owner@crashalong.local";
+        let systemUser = db
+          .prepare("SELECT id FROM users WHERE email = ? LIMIT 1")
+          .get(systemEmail);
+        if (!systemUser) {
+          const createdAt = new Date().toISOString();
+          const passwordHash = bcrypt.hashSync(
+            crypto.randomBytes(16).toString("hex"),
+            10
+          );
+          const info = db
+            .prepare(
+              "INSERT INTO users (name, email, password_hash, created_at, is_verified, verified_at, is_admin, is_simulated) VALUES (?, ?, ?, ?, 1, ?, 0, 0)"
+            )
+            .run("System", systemEmail, passwordHash, createdAt, createdAt);
+          systemUser = { id: info.lastInsertRowid };
+        }
+        ownerId = systemUser.id;
+      } else {
+        ownerId = fallbackUser.id;
+      }
     } else {
       ownerId = firstUser.id;
     }
@@ -598,6 +635,64 @@ if (duplicateNames.length === 0) {
   );
 }
 
+function ensureDevAdminUser() {
+  const normalizedEmail = String(DEV_AUTO_LOGIN_EMAIL || "dev@example.com")
+    .trim()
+    .toLowerCase();
+  const normalizedName = String(DEV_AUTO_LOGIN_NAME || "Dev Admin").trim() || "Dev Admin";
+  const now = new Date().toISOString();
+  let user = db.prepare("SELECT id FROM users WHERE email = ?").get(normalizedEmail);
+  if (!user) {
+    const passwordHash = bcrypt.hashSync(
+      crypto.randomBytes(12).toString("hex"),
+      10
+    );
+    const info = db
+      .prepare(
+        "INSERT INTO users (name, email, password_hash, created_at, is_verified, verified_at, is_admin, is_simulated) VALUES (?, ?, ?, ?, 1, ?, 1, 0)"
+      )
+      .run(normalizedName, normalizedEmail, passwordHash, now, now);
+    user = { id: info.lastInsertRowid };
+  } else {
+    db.prepare(
+      "UPDATE users SET name = ?, is_admin = 1, is_verified = 1, verified_at = COALESCE(verified_at, ?), is_simulated = 0 WHERE id = ?"
+    ).run(normalizedName, now, user.id);
+  }
+  ensureUserInGlobalGroup(user.id);
+  return Number(user.id);
+}
+
+function createVerifiedDevMemberUser() {
+  const suffix = `${Date.now().toString(36)}${crypto.randomBytes(2).toString("hex")}`;
+  const name = `Dev Member ${suffix}`;
+  const email = `dev-member-${suffix}@example.local`;
+  const now = new Date().toISOString();
+  const passwordHash = bcrypt.hashSync(
+    crypto.randomBytes(12).toString("hex"),
+    10
+  );
+  const info = db
+    .prepare(
+      "INSERT INTO users (name, email, password_hash, created_at, is_verified, verified_at, is_admin, is_simulated) VALUES (?, ?, ?, ?, 1, ?, 0, 0)"
+    )
+    .run(name, email, passwordHash, now, now);
+  ensureUserInGlobalGroup(info.lastInsertRowid);
+  return Number(info.lastInsertRowid);
+}
+
+function sanitizeRedirectPath(rawValue) {
+  const redirectToRaw = String(rawValue || "/").trim();
+  if (redirectToRaw.startsWith("/")) {
+    return redirectToRaw;
+  }
+  try {
+    const parsed = new URL(redirectToRaw);
+    return `${parsed.pathname || "/"}${parsed.search || ""}`;
+  } catch (err) {
+    return "/";
+  }
+}
+
 const app = express();
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -641,6 +736,7 @@ app.use((req, res, next) => {
   res.locals.contactEmail = CONTACT_EMAIL;
   res.locals.baseUrl = BASE_URL;
   res.locals.companyName = COMPANY_NAME;
+  res.locals.isDevelopment = IS_DEVELOPMENT;
   res.locals.groupPath = (group, suffix = "") => {
     const base = getGroupBasePath(group);
     const tail = String(suffix || "");
@@ -655,23 +751,52 @@ app.post("/language", (req, res) => {
   if (SUPPORTED_LOCALES.includes(locale)) {
     req.session.locale = locale;
   }
-  const redirectToRaw = String(req.body.redirectTo || req.get("referer") || "/").trim();
-  let redirectTo = "/";
-  if (redirectToRaw.startsWith("/")) {
-    redirectTo = redirectToRaw;
-  } else {
-    try {
-      const parsed = new URL(redirectToRaw);
-      redirectTo = `${parsed.pathname || "/"}${parsed.search || ""}`;
-    } catch (err) {
-      redirectTo = "/";
-    }
-  }
+  const redirectTo = sanitizeRedirectPath(req.body.redirectTo || req.get("referer") || "/");
   return res.redirect(redirectTo);
 });
 
+app.post("/dev/switch-user", (req, res) => {
+  if (!IS_DEVELOPMENT) {
+    return sendError(req, res, 404, "Not found.");
+  }
+  const mode = String(req.body.mode || "").trim().toLowerCase();
+  const redirectTo = sanitizeRedirectPath(req.body.redirectTo || req.get("referer") || "/");
+  if (!req.session) {
+    return res.redirect(redirectTo);
+  }
+
+  if (mode === "guest") {
+    req.session.userId = null;
+    req.session.devIdentityMode = "guest";
+    req.session.devAutoLoginSkipOnce = false;
+    req.session.guestId = crypto.randomBytes(12).toString("hex");
+    return req.session.save(() => res.redirect(redirectTo));
+  }
+
+  if (mode === "member") {
+    const userId = createVerifiedDevMemberUser();
+    req.session.userId = userId;
+    req.session.devIdentityMode = "member";
+    req.session.guestId = null;
+    return req.session.save(() => res.redirect(redirectTo));
+  }
+
+  const userId = ensureDevAdminUser();
+  req.session.userId = userId;
+  req.session.devIdentityMode = "admin";
+  req.session.guestId = null;
+  return req.session.save(() => res.redirect(redirectTo));
+});
+
 app.use((req, res, next) => {
-  if (process.env.NODE_ENV === "production" || !DEV_AUTO_LOGIN) {
+  if (!IS_DEVELOPMENT || !DEV_AUTO_LOGIN) {
+    return next();
+  }
+  const identityMode = String(req.session?.devIdentityMode || "")
+    .trim()
+    .toLowerCase();
+  if (identityMode === "guest") {
+    req.session.userId = null;
     return next();
   }
   if (req.session.devAutoLoginDisabled) {
@@ -686,23 +811,12 @@ app.use((req, res, next) => {
   if (req.session.userId) {
     return next();
   }
-  const email = DEV_AUTO_LOGIN_EMAIL.trim().toLowerCase();
-  let user = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
-  if (!user) {
-    const passwordHash = bcrypt.hashSync(
-      crypto.randomBytes(12).toString("hex"),
-      10
-    );
-    const info = db
-      .prepare(
-        "INSERT INTO users (name, email, password_hash, created_at) VALUES (?, ?, ?, ?)"
-      )
-      .run(DEV_AUTO_LOGIN_NAME.trim(), email, passwordHash, new Date().toISOString());
-    user = { id: info.lastInsertRowid };
+  if (identityMode === "member") {
+    req.session.userId = createVerifiedDevMemberUser();
+    return req.session.save(() => next());
   }
-  ensureUserInGlobalGroup(user.id);
-  req.session.userId = user.id;
-  next();
+  req.session.userId = ensureDevAdminUser();
+  return req.session.save(() => next());
 });
 
 function readJsonFile(filePath) {
@@ -1024,6 +1138,105 @@ function getResponsesByGroup(userId, groupId) {
     }, {});
 }
 
+function getGuestIdFromSession(req, { create = false } = {}) {
+  const existing = String(req?.session?.guestId || "").trim();
+  if (existing) return existing;
+  if (!create || !req?.session) return "";
+  const guestId = crypto.randomBytes(12).toString("hex");
+  req.session.guestId = guestId;
+  return guestId;
+}
+
+function getGuestResponsesByGroup(guestId, groupId) {
+  const normalizedGuestId = String(guestId || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedGuestId || !normalizedGroupId) return {};
+  return db
+    .prepare(
+      "SELECT question_id, answer FROM guest_responses WHERE guest_id = ? AND group_id = ?"
+    )
+    .all(normalizedGuestId, normalizedGroupId)
+    .reduce((acc, row) => {
+      acc[row.question_id] = row.answer;
+      return acc;
+    }, {});
+}
+
+function claimGuestResponsesForUser(req, userId) {
+  const guestId = getGuestIdFromSession(req, { create: false });
+  const normalizedUserId = Number(userId || 0);
+  if (!guestId || !normalizedUserId) return;
+  const globalGroup = ensureGlobalGroup(normalizedUserId);
+  const rows = db
+    .prepare(
+      "SELECT group_id, question_id, answer FROM guest_responses WHERE guest_id = ?"
+    )
+    .all(guestId);
+  if (rows.length === 0) return;
+
+  const grouped = new Map();
+  for (const row of rows) {
+    const groupId = Number(row.group_id || 0);
+    if (!groupId) continue;
+    if (!grouped.has(groupId)) grouped.set(groupId, []);
+    grouped.get(groupId).push(row);
+  }
+
+  const globalGroupId = Number(globalGroup?.id || 0);
+  if (globalGroupId && !grouped.has(globalGroupId)) {
+    const sourceGroupEntry = Array.from(grouped.entries()).find(
+      ([groupId, groupRows]) => Number(groupId) !== globalGroupId && Array.isArray(groupRows) && groupRows.length > 0
+    );
+    if (sourceGroupEntry) {
+      const [, sourceRows] = sourceGroupEntry;
+      grouped.set(
+        globalGroupId,
+        sourceRows.map((row) => ({
+          ...row,
+          group_id: globalGroupId
+        }))
+      );
+    }
+  }
+
+  if (grouped.size === 0) return;
+
+  const now = new Date().toISOString();
+  const tx = db.transaction(() => {
+    const upsert = db.prepare(
+      `
+      INSERT INTO responses (user_id, group_id, question_id, answer, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(user_id, group_id, question_id)
+      DO UPDATE SET answer = excluded.answer, updated_at = excluded.updated_at
+      `
+    );
+    const addMember = db.prepare(
+      "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'member', ?)"
+    );
+    for (const [groupId, groupRows] of grouped.entries()) {
+      const group = getGroupById(groupId);
+      if (!group) continue;
+      addMember.run(normalizedUserId, groupId, now);
+      for (const row of groupRows) {
+        upsert.run(
+          normalizedUserId,
+          groupId,
+          row.question_id,
+          row.answer,
+          now,
+          now
+        );
+      }
+    }
+    db.prepare("DELETE FROM guest_responses WHERE guest_id = ?").run(guestId);
+  });
+  tx();
+  if (req?.session) {
+    req.session.guestId = null;
+  }
+}
+
 function isCoupledToGlobal(userId, groupId) {
   const row = db
     .prepare(
@@ -1232,6 +1445,69 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, num));
 }
 
+function serializeAnswerFromRequest(question, body) {
+  const type = question?.type || "text";
+  if (type === "ranking") {
+    const count = Number(question.count) || 3;
+    const selections = [];
+    for (let i = 1; i <= count; i += 1) {
+      const value = body?.[`${question.id}_${i}`];
+      if (!value) continue;
+      if (!selections.includes(value)) {
+        selections.push(value);
+      }
+    }
+    if (selections.length === 0) return null;
+    return JSON.stringify(selections);
+  }
+  if (type === "multi_select" || type === "multi_select_limited") {
+    const selected = body?.[question.id];
+    if (!selected) return null;
+    const selections = Array.isArray(selected) ? selected : [selected];
+    return JSON.stringify(selections);
+  }
+  if (type === "teammate_battle") {
+    const winner = body?.[`${question.id}_winner`];
+    const diffRaw = body?.[`${question.id}_diff`];
+    if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
+      return null;
+    }
+    const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
+    return JSON.stringify({ winner, diff });
+  }
+  if (type === "boolean_with_optional_driver") {
+    const choice = body?.[question.id];
+    const driver = body?.[`${question.id}_driver`];
+    if (!choice) return null;
+    return JSON.stringify({ choice, driver });
+  }
+  if (type === "numeric_with_driver") {
+    const valueRaw = body?.[`${question.id}_value`];
+    const driver = body?.[`${question.id}_driver`];
+    if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
+      return null;
+    }
+    const value = clampNumber(valueRaw, 0, 999);
+    return JSON.stringify({ value, driver });
+  }
+  if (type === "single_choice_with_driver") {
+    const value = body?.[`${question.id}_value`];
+    const driver = body?.[`${question.id}_driver`];
+    if ((!value || value === "") && (!driver || driver === "")) {
+      return null;
+    }
+    return JSON.stringify({ value, driver });
+  }
+  const answer = body?.[question.id];
+  if (answer === undefined || answer === "") return null;
+  if (type === "numeric") {
+    const value = clampNumber(answer, 0, 999);
+    if (value == null) return null;
+    return String(value);
+  }
+  return String(answer).trim();
+}
+
 registerAuthRoutes(app, {
   db,
   bcrypt,
@@ -1248,7 +1524,8 @@ registerAuthRoutes(app, {
   sendError,
   requireAuth,
   DEV_AUTO_LOGIN,
-  NODE_ENV: process.env.NODE_ENV || "development"
+  NODE_ENV: process.env.NODE_ENV || "development",
+  claimGuestResponsesForUser
 });
 
 app.get("/api/groups/check-name", requireAuth, (req, res) => {
@@ -1475,13 +1752,7 @@ app.post("/groups/join", requireAuth, async (req, res) => {
     syncFromGlobalIfCoupled(user.id, group.id, now);
   }
 
-  res.render("dashboard", {
-    user,
-    groups,
-    publicGroups,
-    error: null,
-    success: `Joined group ${group.name}.`
-  });
+  return res.redirect(getGroupBasePath(group));
 });
 
 app.get(["/global", "/groups/:id"], requireAuth, (req, res) => {
@@ -1587,19 +1858,14 @@ app.post("/groups/:id/invite-link/toggle", requireAuth, (req, res) => {
   res.redirect(`/groups/${groupId}`);
 });
 
-app.get("/join/:code", requireAuth, (req, res) => {
-  const user = getCurrentUser(req);
+app.get("/join/:code", (req, res) => {
   const code = req.params.code.trim();
+  const user = getCurrentUser(req);
   const invite = db
     .prepare("SELECT * FROM invites WHERE code = ?")
     .get(code);
   if (!invite) {
     return sendError(req, res, 404, "Invite not found.");
-  }
-  if (isMember(user.id, invite.group_id)) {
-    const existingGroup = getGroupById(invite.group_id);
-    if (!existingGroup) return sendError(req, res, 404, "Group not found.");
-    return res.redirect(getGroupBasePath(existingGroup));
   }
   const group = db
     .prepare("SELECT * FROM groups WHERE id = ?")
@@ -1610,18 +1876,140 @@ app.get("/join/:code", requireAuth, (req, res) => {
   if (Number(group.invite_link_open ?? 1) !== 1) {
     return sendError(req, res, 403, "Invite link is closed.");
   }
-  const members = db
-    .prepare(
-      `
-      SELECT u.id, u.name, gm.role
-      FROM group_members gm
-      JOIN users u ON u.id = gm.user_id
-      WHERE gm.group_id = ?
-      ORDER BY gm.joined_at ASC
-      `
-    )
-    .all(invite.group_id);
-  res.render("join_confirm", { user, group, members, code, error: null });
+  if (!user) {
+    return res.redirect(`/join/${code}/questions`);
+  }
+  if (isMember(user.id, invite.group_id)) {
+    return res.redirect(`${getGroupBasePath(group)}/questions`);
+  }
+  if (!isMember(user.id, invite.group_id)) {
+    const now = new Date().toISOString();
+    db.prepare(
+      "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
+    ).run(user.id, invite.group_id, "member", now);
+    syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+  }
+  return res.redirect(`${getGroupBasePath(group)}/questions`);
+});
+
+app.get("/join/:code/questions", (req, res) => {
+  const code = req.params.code.trim();
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+
+  const user = getCurrentUser(req);
+  if (user) {
+    if (!isMember(user.id, invite.group_id)) {
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
+      ).run(user.id, invite.group_id, "member", now);
+      syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+    }
+    return res.redirect(`${getGroupBasePath(group)}/questions`);
+  }
+
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const guestId = getGuestIdFromSession(req, { create: true });
+  const questions = getQuestions(locale);
+  const roster = getRoster();
+  const races = getRaces();
+  const answers = getGuestResponsesByGroup(guestId, Number(group.id));
+  const closed = predictionsClosed();
+  const groupRules = getGroupRulesText(group, locale);
+
+  return res.render("questions", {
+    user: null,
+    group,
+    groupRules,
+    questions,
+    answers,
+    prefillNotice: null,
+    roster,
+    races,
+    closed,
+    closeAt: PREDICTIONS_CLOSE_AT,
+    canCoupleToGlobal: false,
+    coupledToGlobal: false,
+    globalGroupName: "Global",
+    groupBasePath: `/join/${code}`,
+    isGuestMode: true,
+    guestSaveButtonLabel: translate(locale, "questions.save_to_join_group")
+  });
+});
+
+app.post("/join/:code/questions", (req, res) => {
+  const code = req.params.code.trim();
+  const user = getCurrentUser(req);
+  if (user) {
+    return res.redirect(`/join/${code}`);
+  }
+  if (predictionsClosed()) {
+    return sendError(req, res, 403, "Predictions are closed.");
+  }
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+
+  const guestId = getGuestIdFromSession(req, { create: true });
+  const questions = getQuestions();
+  const globalGroup = ensureGlobalGroup();
+  const targetGroupIds = [Number(group.id)];
+  if (globalGroup && Number(globalGroup.id) && Number(globalGroup.id) !== Number(group.id)) {
+    targetGroupIds.push(Number(globalGroup.id));
+  }
+  const now = new Date().toISOString();
+  const insert = db.prepare(
+    `
+    INSERT INTO guest_responses (guest_id, group_id, question_id, answer, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(guest_id, group_id, question_id)
+    DO UPDATE SET answer = excluded.answer, updated_at = excluded.updated_at
+    `
+  );
+  const tx = db.transaction(() => {
+    for (const targetGroupId of targetGroupIds) {
+      for (const question of questions) {
+        const serializedAnswer = serializeAnswerFromRequest(question, req.body);
+        if (serializedAnswer == null) continue;
+        insert.run(
+          guestId,
+          targetGroupId,
+          question.id,
+          serializedAnswer,
+          now,
+          now
+        );
+      }
+    }
+  });
+  tx();
+  return res.redirect(`/join/${code}/questions`);
 });
 
 app.post("/join/:code", requireAuth, async (req, res) => {
@@ -1859,6 +2247,79 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
   res.redirect("/dashboard");
 });
 
+app.get("/global/questions", (req, res, next) => {
+  const user = getCurrentUser(req);
+  if (user) return next();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const globalGroup = ensureGlobalGroup();
+  if (!globalGroup) {
+    return sendError(req, res, 500, "Global group is not available.");
+  }
+  const guestId = getGuestIdFromSession(req, { create: true });
+  const questions = getQuestions(locale);
+  const roster = getRoster();
+  const races = getRaces();
+  const answers = getGuestResponsesByGroup(guestId, Number(globalGroup.id));
+  const closed = predictionsClosed();
+  const groupRules = getGroupRulesText(globalGroup, locale);
+  return res.render("questions", {
+    user: null,
+    group: globalGroup,
+    groupRules,
+    questions,
+    answers,
+    prefillNotice: null,
+    roster,
+    races,
+    closed,
+    closeAt: PREDICTIONS_CLOSE_AT,
+    canCoupleToGlobal: false,
+    coupledToGlobal: false,
+    globalGroupName: globalGroup.name || "Global",
+    groupBasePath: getGroupBasePath(globalGroup),
+    isGuestMode: true
+  });
+});
+
+app.post("/global/questions", (req, res, next) => {
+  const user = getCurrentUser(req);
+  if (user) return next();
+  if (predictionsClosed()) {
+    return sendError(req, res, 403, "Predictions are closed.");
+  }
+  const globalGroup = ensureGlobalGroup();
+  if (!globalGroup) {
+    return sendError(req, res, 500, "Global group is not available.");
+  }
+  const guestId = getGuestIdFromSession(req, { create: true });
+  const questions = getQuestions();
+  const now = new Date().toISOString();
+  const insert = db.prepare(
+    `
+    INSERT INTO guest_responses (guest_id, group_id, question_id, answer, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(guest_id, group_id, question_id)
+    DO UPDATE SET answer = excluded.answer, updated_at = excluded.updated_at
+    `
+  );
+  const tx = db.transaction(() => {
+    for (const question of questions) {
+      const serializedAnswer = serializeAnswerFromRequest(question, req.body);
+      if (serializedAnswer == null) continue;
+      insert.run(
+        guestId,
+        Number(globalGroup.id),
+        question.id,
+        serializedAnswer,
+        now,
+        now
+      );
+    }
+  });
+  tx();
+  return res.redirect("/global/questions");
+});
+
 app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
@@ -1880,8 +2341,6 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
   const canCoupleToGlobal =
     !!globalGroup && group.is_global !== 1 && globalGroup.id !== groupId;
   const coupledToGlobal = canCoupleToGlobal ? isCoupledToGlobal(user.id, groupId) : false;
-  const requestedCopyGroupId = Number(req.query.copyFrom || 0);
-  let selectedCopyGroupId = null;
   let prefillNotice = null;
   let answers = currentAnswers;
 
@@ -1892,22 +2351,6 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
     prefillNotice = translate(locale, "questions.prefilled_from_group", {
       group_name: globalGroup.name
     });
-  } else if (requestedCopyGroupId > 0) {
-    const sourceGroup = copyGroups.find((row) => row.id === requestedCopyGroupId);
-    if (sourceGroup) {
-      selectedCopyGroupId = sourceGroup.id;
-      const sourceAnswers = getResponsesByGroup(user.id, sourceGroup.id);
-      if (Object.keys(sourceAnswers).length > 0) {
-        answers = sourceAnswers;
-        prefillNotice = translate(locale, "questions.prefilled_from_group", {
-          group_name: sourceGroup.name
-        });
-      } else {
-        prefillNotice = translate(locale, "questions.no_saved_predictions", {
-          group_name: sourceGroup.name
-        });
-      }
-    }
   } else if (Object.keys(currentAnswers).length === 0) {
     const copyGlobalGroup = copyGroups.find((row) => row.is_global === 1);
     if (copyGlobalGroup) {
@@ -1929,8 +2372,6 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
     groupRules,
     questions,
     answers,
-    copyGroups,
-    selectedCopyGroupId,
     prefillNotice,
     roster,
     races,
@@ -1939,7 +2380,8 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
     canCoupleToGlobal,
     coupledToGlobal,
     globalGroupName: globalGroup ? globalGroup.name : "Global",
-    groupBasePath
+    groupBasePath,
+    isGuestMode: false
   });
 });
 
@@ -1986,116 +2428,9 @@ app.post(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res)
 
   const tx = db.transaction(() => {
     for (const question of questions) {
-      const type = question.type || "text";
-      if (type === "ranking") {
-        const count = Number(question.count) || 3;
-        const selections = [];
-        for (let i = 1; i <= count; i += 1) {
-          const value = req.body[`${question.id}_${i}`];
-          if (!value) continue;
-          if (!selections.includes(value)) {
-            selections.push(value);
-          }
-        }
-        if (selections.length === 0) continue;
-        insert.run(
-          user.id,
-          groupId,
-          question.id,
-          JSON.stringify(selections),
-          now,
-          now
-        );
-        continue;
-      }
-      if (type === "multi_select" || type === "multi_select_limited") {
-        const selected = req.body[question.id];
-        if (!selected) continue;
-        const selections = Array.isArray(selected) ? selected : [selected];
-        insert.run(
-          user.id,
-          groupId,
-          question.id,
-          JSON.stringify(selections),
-          now,
-          now
-        );
-        continue;
-      }
-      if (type === "teammate_battle") {
-        const winner = req.body[`${question.id}_winner`];
-        const diffRaw = req.body[`${question.id}_diff`];
-        if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
-          continue;
-        }
-        const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
-        insert.run(
-          user.id,
-          groupId,
-          question.id,
-          JSON.stringify({ winner, diff }),
-          now,
-          now
-        );
-        continue;
-      }
-      if (type === "boolean_with_optional_driver") {
-        const choice = req.body[question.id];
-        const driver = req.body[`${question.id}_driver`];
-        if (!choice) continue;
-        insert.run(
-          user.id,
-          groupId,
-          question.id,
-          JSON.stringify({ choice, driver }),
-          now,
-          now
-        );
-        continue;
-      }
-      if (type === "numeric_with_driver") {
-        const valueRaw = req.body[`${question.id}_value`];
-        const driver = req.body[`${question.id}_driver`];
-        if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
-          continue;
-        }
-        const value = clampNumber(valueRaw, 0, 999);
-        insert.run(
-          user.id,
-          groupId,
-          question.id,
-          JSON.stringify({ value, driver }),
-          now,
-          now
-        );
-        continue;
-      }
-      if (type === "single_choice_with_driver") {
-        const value = req.body[`${question.id}_value`];
-        const driver = req.body[`${question.id}_driver`];
-        if ((!value || value === "") && (!driver || driver === "")) {
-          continue;
-        }
-        insert.run(
-          user.id,
-          groupId,
-          question.id,
-          JSON.stringify({ value, driver }),
-          now,
-          now
-        );
-        continue;
-      }
-
-      const answer = req.body[question.id];
-      if (answer === undefined || answer === "") continue;
-      if (type === "numeric") {
-        const value = clampNumber(answer, 0, 999);
-        if (value == null) continue;
-        insert.run(user.id, groupId, question.id, String(value), now, now);
-        continue;
-      }
-      insert.run(user.id, groupId, question.id, String(answer).trim(), now, now);
+      const serializedAnswer = serializeAnswerFromRequest(question, req.body);
+      if (serializedAnswer == null) continue;
+      insert.run(user.id, groupId, question.id, serializedAnswer, now, now);
     }
   });
   tx();

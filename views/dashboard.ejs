@@ -12,7 +12,10 @@
     <div class="inline-actions" style="justify-content: space-between; align-items: flex-start;">
       <h1 style="margin:0 0 12px 0;"><%= t('dashboard.my_groups') %></h1>
       <div class="inline-actions">
-        <a class="button-link" href="#create-group"><%= t('dashboard.create_group') %></a>
+        <a class="button-link dashboard-create-link" href="#create-group" aria-label="<%= t('dashboard.create_group') %>">
+          <span class="dashboard-create-link-icon" aria-hidden="true">+</span>
+          <span class="dashboard-create-link-label"><%= t('dashboard.create_group') %></span>
+        </a>
       </div>
     </div>
     <% if (groups.length === 0) { %>

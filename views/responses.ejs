@@ -1,10 +1,10 @@
 <%- include('partials/header', { title: t('responses.page_title'), user }) %>
 
-<div class="card">
+<div class="card survey-page-card">
   <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
-  <h1><%= group.name %>: <%= t('responses.page_title') %></h1>
-  <div class="page-title-actions">
-    <a class="button-link" href="<%= currentGroupPath %>"><%= t('group.back_to_group') %></a>
+  <div class="page-title-row">
+    <h1><%= group.name %>: <%= t('responses.page_title') %></h1>
+    <a class="link page-back-link" href="<%= currentGroupPath %>">&lt; Back</a>
   </div>
   <p class="muted"><%= t('responses.subtitle') %></p>
 
@@ -198,9 +198,9 @@
       <% const lastSeasonLabel = String(lastSeason?.label || '').trim(); %>
       <% const lastSeasonSourceUrl = isHumanReadableSourceUrl(lastSeasonUrl) ? lastSeasonUrl : ''; %>
       <% const hasLastSeasonDetails = hasLastSeasonReference && Boolean(lastSeasonResult || lastSeasonSourceUrl); %>
-      <div class="card" style="margin-top:12px;">
+      <div class="responses-section">
         <div class="responses-question-head">
-          <h2><%= q.prompt %></h2>
+          <h3 class="survey-question-title"><%= q.prompt %></h3>
           <% if (hasLastSeasonDetails) { %>
             <div class="question-last-season-peek" tabindex="0">
               <span class="question-last-season-toggle"><%= t('questions.last_season_link') %></span>

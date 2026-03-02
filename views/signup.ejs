@@ -6,6 +6,7 @@
     <div class="alert"><%= error %></div>
   <% } %>
   <form method="post" action="/signup" data-signup-form>
+    <input type="hidden" name="redirectTo" value="<%= form?.redirectTo || '/' %>" />
     <label>
       <%= t('common.name') %>
       <input

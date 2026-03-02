@@ -1,42 +1,32 @@
 ﻿<%- include('partials/header', { title: t('questions.page_title'), user }) %>
 
-<div class="card">
+<div class="card survey-page-card">
   <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
-  <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
-  <div class="page-title-actions inline-actions">
-    <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= t('group.view_responses') %></a>
-    <a class="button-link" href="<%= currentGroupPath %>"><%= t('group.back_to_group') %></a>
+  <% const guestMode = (typeof isGuestMode !== 'undefined') && Boolean(isGuestMode); %>
+  <% const guestSignupPath = `/signup?redirectTo=${encodeURIComponent(currentPath || currentGroupPath || '/global/questions')}`; %>
+  <div class="page-title-row">
+    <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
+    <% if (!guestMode) { %>
+      <a class="link page-back-link" href="<%= currentGroupPath %>">&lt; Back</a>
+    <% } %>
   </div>
   <div class="group-rules-box">
     <div class="group-rules-label"><%= t('group.rules_label') %></div>
     <p class="muted group-rules-text"><%= groupRules %></p>
   </div>
+  <% if (!guestMode) { %>
+    <div class="page-title-actions inline-actions">
+      <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
+    </div>
+  <% } %>
+  <% if (guestMode) { %>
+    <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
+    <p class="muted" style="margin:0 0 12px;"><%- t('questions.guest_mode_notice_html', { create_account_link: guestAccountLink }) %></p>
+  <% } %>
 
   <% if (closed) { %>
     <div class="alert"><%= t('questions.closed_message') %></div>
   <% } %>
-
-  <div class="questions-top-actions">
-    <% if (copyGroups && copyGroups.length > 0 && !(canCoupleToGlobal && coupledToGlobal)) { %>
-      <form method="get" action="<%= `${currentGroupPath}/questions` %>" class="inline-actions">
-        <label class="muted" style="display:flex; align-items:center; gap:8px; font-weight:600;">
-          <%= t('questions.copy_from') %>
-          <select name="copyFrom" onchange="this.form.submit()">
-            <option value=""><%= t('questions.select_group') %></option>
-            <% copyGroups.forEach(copyGroup => { %>
-              <option value="<%= copyGroup.id %>" <%= selectedCopyGroupId === copyGroup.id ? 'selected' : '' %>>
-                <%= copyGroup.name %><%= copyGroup.is_global ? ` (${t('questions.global_tag')})` : '' %>
-              </option>
-            <% }) %>
-          </select>
-        </label>
-        <% if (selectedCopyGroupId) { %>
-          <a class="link underlined-link" href="<%= `${currentGroupPath}/questions` %>"><%= t('questions.reset') %></a>
-          <button type="submit" form="predictions-form" class="link underlined-link link-button" <%= closed ? 'disabled' : '' %>><%= t('questions.save') %></button>
-        <% } %>
-      </form>
-    <% } %>
-  </div>
 
   <% if (prefillNotice) { %>
     <p class="muted" style="margin:0 0 14px;"><%= prefillNotice %></p>
@@ -292,7 +282,7 @@
       %>
         <div class="question">
           <div class="question-head-row">
-            <div class="question-title"><%- buildPromptTooltipHtml(question) %></div>
+            <h3 class="survey-question-title"><%- buildPromptTooltipHtml(question) %></h3>
           </div>
           <% if (question.helper) { %>
             <div class="muted"><%= question.helper %></div>
@@ -453,16 +443,21 @@
     </fieldset>
 
     <div class="questions-save-row">
-      <button type="submit" data-predictions-save-button <%= closed ? 'disabled' : '' %>><%= t('questions.save_predictions') %></button>
-      <span
-        class="muted questions-autosave-status"
-        data-autosave-status
-        data-status-unsaved="<%= t('questions.autosave_unsaved') %>"
-        data-status-saving="<%= t('questions.autosave_saving') %>"
-        data-status-saved="<%= t('questions.autosave_saved') %>"
-        data-status-failed="<%= t('questions.autosave_failed') %>"
-        aria-live="polite"
-      ></span>
+      <% if (guestMode) { %>
+        <a class="button-link" href="<%= guestSignupPath %>"><%= t('questions.guest_cta_button') %></a>
+      <% } else { %>
+        <% const saveButtonLabel = (typeof guestSaveButtonLabel === 'string' && guestSaveButtonLabel.trim()) ? guestSaveButtonLabel : t('questions.save_predictions'); %>
+        <button type="submit" data-predictions-save-button <%= closed ? 'disabled' : '' %>><%= saveButtonLabel %></button>
+        <span
+          class="muted questions-autosave-status"
+          data-autosave-status
+          data-status-unsaved="<%= t('questions.autosave_unsaved') %>"
+          data-status-saving="<%= t('questions.autosave_saving') %>"
+          data-status-saved="<%= t('questions.autosave_saved') %>"
+          data-status-failed="<%= t('questions.autosave_failed') %>"
+          aria-live="polite"
+        ></span>
+      <% } %>
     </div>
     <div id="questions-form-end"></div>
   </form>
