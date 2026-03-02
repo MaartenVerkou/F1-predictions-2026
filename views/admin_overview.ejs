@@ -2,11 +2,12 @@
 <%- include('partials/admin_nav', { active: 'overview' }) %>
 
 <div class="card">
-  <% const overviewReturn = `/admin/overview?groupPage=${currentGroupPage}&usersPage=${currentUserPage}&guestPage=${currentGuestPage}`; %>
+  <% const overviewReturn = `/admin/overview?groupPage=${currentGroupPage}&usersPage=${currentUserPage}&namedGuestPage=${currentNamedGuestPage}&visitorPage=${currentVisitorPage}`; %>
   <% const groupsReturn = `${overviewReturn}#admin-groups`; %>
   <% const adminsReturn = `${overviewReturn}#admin-admins`; %>
   <% const usersReturn = `${overviewReturn}#admin-users`; %>
-  <% const guestsReturn = `${overviewReturn}#admin-guests`; %>
+  <% const namedGuestsReturn = `${overviewReturn}#admin-named-guests`; %>
+  <% const visitorsReturn = `${overviewReturn}#admin-visitors`; %>
   <% const revealedEmailsSet = new Set((revealedEmailUserIds || []).map((id) => Number(id))); %>
   <% const maskEmail = (email) => {
     const value = String(email || '');
@@ -18,7 +19,7 @@
     return `${visibleLocal}****@${domain}`;
   }; %>
   <h1>Admin overview</h1>
-  <p class="muted">Accounts, groups, and guest activity.</p>
+  <p class="muted">Accounts, groups, named guests, and visitor activity.</p>
   <% if (adminError) { %>
     <div class="alert"><%= adminError %></div>
   <% } %>
@@ -62,7 +63,7 @@
     totalPages: totalGroupPages,
     perPage: groupsPerPage,
     label: 'Groups',
-    extraParams: { usersPage: currentUserPage, guestPage: currentGuestPage },
+    extraParams: { usersPage: currentUserPage, namedGuestPage: currentNamedGuestPage, visitorPage: currentVisitorPage },
     anchorId: 'admin-groups'
   }) %>
 
@@ -184,22 +185,23 @@
     totalPages: totalUserPages,
     perPage: usersPerPage,
     label: 'Users',
-    extraParams: { groupPage: currentGroupPage, guestPage: currentGuestPage },
+    extraParams: { groupPage: currentGroupPage, namedGuestPage: currentNamedGuestPage, visitorPage: currentVisitorPage },
     anchorId: 'admin-users'
   }) %>
 
-  <h2 id="admin-guests" style="margin-top:24px;">Guests</h2>
+  <h2 id="admin-named-guests" style="margin-top:24px;">Named guests</h2>
   <p class="muted">
-    Active guests: <strong><%= Number(guestStats?.guest_count || 0) %></strong>
-    | Guest responses: <strong><%= Number(guestStats?.response_count || 0) %></strong>
-    | Groups touched: <strong><%= Number(guestStats?.group_count || 0) %></strong>
-    <% if (guestStats?.last_activity_at) { %>
-      | Last activity: <strong><%= new Date(guestStats.last_activity_at).toLocaleString() %></strong>
+    Active named guests: <strong><%= Number(namedGuestStats?.guest_count || 0) %></strong>
+    | Named guest responses: <strong><%= Number(namedGuestStats?.response_count || 0) %></strong>
+    | Groups touched: <strong><%= Number(namedGuestStats?.group_count || 0) %></strong>
+    <% if (namedGuestStats?.last_activity_at) { %>
+      | Last activity: <strong><%= new Date(namedGuestStats.last_activity_at).toLocaleString() %></strong>
     <% } %>
   </p>
   <table class="table compact">
     <thead>
       <tr>
+        <th>Name</th>
         <th>Guest ID</th>
         <th>Answers</th>
         <th>Questions</th>
@@ -210,17 +212,22 @@
       </tr>
     </thead>
     <tbody>
-      <% if (!guestProfiles || guestProfiles.length === 0) { %>
+      <% if (!namedGuestProfiles || namedGuestProfiles.length === 0) { %>
         <tr>
-          <td colspan="7" class="muted">No guest data yet.</td>
+          <td colspan="8" class="muted">No named guest data yet.</td>
         </tr>
       <% } else { %>
-        <% guestProfiles.forEach(row => { %>
+        <% namedGuestProfiles.forEach(row => { %>
           <% const guestId = String(row.guest_id || ''); %>
           <% const shortGuestId = guestId.length > 14 ? `${guestId.slice(0, 6)}...${guestId.slice(-4)}` : guestId; %>
           <tr>
             <td>
-              <a class="link" href="/admin/guests/<%= encodeURIComponent(guestId) %>?returnTo=<%= encodeURIComponent(guestsReturn) %>">
+              <a class="link" href="/admin/guests/<%= encodeURIComponent(guestId) %>?returnTo=<%= encodeURIComponent(namedGuestsReturn) %>">
+                <%= row.display_name || 'Unnamed' %>
+              </a>
+            </td>
+            <td>
+              <a class="link" href="/admin/guests/<%= encodeURIComponent(guestId) %>?returnTo=<%= encodeURIComponent(namedGuestsReturn) %>">
                 <code title="<%= guestId %>"><%= shortGuestId %></code>
               </a>
             </td>
@@ -237,13 +244,71 @@
   </table>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
-    pageParamName: 'guestPage',
-    currentPage: currentGuestPage,
-    totalPages: totalGuestPages,
-    perPage: guestProfilesPerPage,
-    label: 'Guests',
-    extraParams: { groupPage: currentGroupPage, usersPage: currentUserPage },
-    anchorId: 'admin-guests'
+    pageParamName: 'namedGuestPage',
+    currentPage: currentNamedGuestPage,
+    totalPages: totalNamedGuestPages,
+    perPage: namedGuestProfilesPerPage,
+    label: 'Named guests',
+    extraParams: { groupPage: currentGroupPage, usersPage: currentUserPage, visitorPage: currentVisitorPage },
+    anchorId: 'admin-named-guests'
+  }) %>
+
+  <h2 id="admin-visitors" style="margin-top:24px;">Visitors</h2>
+  <p class="muted">
+    Active visitors: <strong><%= Number(visitorStats?.guest_count || 0) %></strong>
+    | Visitor responses: <strong><%= Number(visitorStats?.response_count || 0) %></strong>
+    | Groups touched: <strong><%= Number(visitorStats?.group_count || 0) %></strong>
+    <% if (visitorStats?.last_activity_at) { %>
+      | Last activity: <strong><%= new Date(visitorStats.last_activity_at).toLocaleString() %></strong>
+    <% } %>
+  </p>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Guest ID</th>
+        <th>Answers</th>
+        <th>Questions</th>
+        <th>Groups</th>
+        <th>Latest group</th>
+        <th>First seen</th>
+        <th>Last seen</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!visitorProfiles || visitorProfiles.length === 0) { %>
+        <tr>
+          <td colspan="7" class="muted">No visitor data yet.</td>
+        </tr>
+      <% } else { %>
+        <% visitorProfiles.forEach(row => { %>
+          <% const guestId = String(row.guest_id || ''); %>
+          <% const shortGuestId = guestId.length > 14 ? `${guestId.slice(0, 6)}...${guestId.slice(-4)}` : guestId; %>
+          <tr>
+            <td>
+              <a class="link" href="/admin/guests/<%= encodeURIComponent(guestId) %>?returnTo=<%= encodeURIComponent(visitorsReturn) %>">
+                <code title="<%= guestId %>"><%= shortGuestId %></code>
+              </a>
+            </td>
+            <td><%= Number(row.answers_count || 0) %></td>
+            <td><%= Number(row.questions_count || 0) %></td>
+            <td><%= Number(row.groups_count || 0) %></td>
+            <td><%= row.latest_group_name || '-' %></td>
+            <td><%= row.first_seen_at ? new Date(row.first_seen_at).toLocaleString() : '-' %></td>
+            <td><%= row.last_seen_at ? new Date(row.last_seen_at).toLocaleString() : '-' %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+  <%- include('partials/admin_pagination', {
+    basePath: '/admin/overview',
+    pageParamName: 'visitorPage',
+    currentPage: currentVisitorPage,
+    totalPages: totalVisitorPages,
+    perPage: visitorProfilesPerPage,
+    label: 'Visitors',
+    extraParams: { groupPage: currentGroupPage, usersPage: currentUserPage, namedGuestPage: currentNamedGuestPage },
+    anchorId: 'admin-visitors'
   }) %>
 
 </div>

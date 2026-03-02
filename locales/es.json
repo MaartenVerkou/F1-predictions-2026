@@ -147,6 +147,12 @@
     "guest_mode_notice": "Modo invitado: crea una cuenta para unirte a grupos y ver respuestas de otros.",
     "guest_mode_notice_html": "Modo invitado: {create_account_link} para unirte a grupos y ver insights de respuestas.",
     "guest_cta_button": "Guardar predicciones y crear una cuenta",
+    "visitor_mode_notice_html": "Visitor mode: {create_account_link} para guardar tus predicciones, crear/unirte a grupos y ver insights de respuestas.",
+    "visitor_cta_button": "Guardar predicciones y crear una cuenta",
+    "named_guest_account_notice_html": "Los cambios pueden perderse en modo invitado. {create_account_link} para guardar cambios de forma fiable, unirte a otros grupos y aparecer en el ranking Global.",
+    "named_guest_view_responses_button": "Ver respuestas del grupo",
+    "named_guest_mode_notice_html": "Modo invitado: {create_account_link} para guardar tus predicciones de forma permanente, editar despues, unirte a otros grupos y aparecer en el ranking Global.",
+    "named_guest_save_hint_html": "Quieres volver despues y seguir editando? {create_account_link}.",
     "points_multi_select_penalty": "{points} {points_word} por cada {driver_word} correcto, -{penalty} por cada {driver_word} faltante o incorrecto (min {minimum})",
     "points_teammate_battle": "{base} {points_word} menos 1 por cada punto de diferencia (el ganador debe ser correcto). Empate + correcto: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, o {bonus} si todos los equipos logran podio y tu lo predices",
@@ -156,6 +162,20 @@
     "tip_races_grand_prix_only": "Solo carreras de Gran Premio.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
     "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+  },
+  "join_guest": {
+    "page_title": "Unirse como invitado",
+    "title": "Unirse a {group_name}",
+    "subtitle": "Usa este enlace de invitacion como invitado, o crea una cuenta.",
+    "account_name_label": "Nombre de cuenta",
+    "account_name_placeholder": "Elige un nombre de cuenta",
+    "group_password_label": "Contrasena del grupo",
+    "join_as_guest": "Unirse como invitado",
+    "note": "Las respuestas de invitado no se pueden recuperar despues. Crea una cuenta verificada para seguir editando, unirte a otros grupos y aparecer en el ranking Global.",
+    "error_name_invalid": "El nombre de cuenta debe tener entre 2 y 40 caracteres.",
+    "error_name_taken": "Ese nombre de cuenta ya esta en uso en este grupo.",
+    "error_password_required": "La contrasena del grupo es obligatoria.",
+    "error_password_invalid": "La contrasena del grupo es incorrecta."
   },
   "leaderboard": {
     "page_title": "Clasificacion",

@@ -147,6 +147,12 @@
     "guest_mode_notice": "Mode invite: creez un compte pour rejoindre des groupes et voir les reponses des autres.",
     "guest_mode_notice_html": "Mode invite: {create_account_link} pour rejoindre des groupes et voir des insights de reponses.",
     "guest_cta_button": "Enregistrer les pronostics et creer un compte",
+    "visitor_mode_notice_html": "Visitor mode: {create_account_link} pour enregistrer tes pronostics, creer/rejoindre des groupes, et voir des insights de reponses.",
+    "visitor_cta_button": "Enregistrer les pronostics et creer un compte",
+    "named_guest_account_notice_html": "Les modifications peuvent etre perdues en mode invite. {create_account_link} pour enregistrer les modifications de facon fiable, rejoindre d'autres groupes et apparaitre dans le classement Global.",
+    "named_guest_view_responses_button": "Voir les reponses du groupe",
+    "named_guest_mode_notice_html": "Mode invite: {create_account_link} pour enregistrer tes pronostics de facon permanente, modifier plus tard, rejoindre d'autres groupes et apparaitre dans le classement Global.",
+    "named_guest_save_hint_html": "Tu veux revenir plus tard et continuer a modifier? {create_account_link}.",
     "points_multi_select_penalty": "{points} {points_word} par {driver_word} correct, -{penalty} pour chaque {driver_word} manquant ou incorrect (min {minimum})",
     "points_teammate_battle": "{base} {points_word} moins 1 par point d ecart (le vainqueur doit etre correct). Egalite + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, ou {bonus} si toutes les equipes font un podium et que tu le prevois",
@@ -156,6 +162,20 @@
     "tip_races_grand_prix_only": "Courses de Grand Prix uniquement.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
     "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+  },
+  "join_guest": {
+    "page_title": "Rejoindre en invite",
+    "title": "Rejoindre {group_name}",
+    "subtitle": "Utilise ce lien d invitation en mode invite, ou cree un compte.",
+    "account_name_label": "Nom de compte",
+    "account_name_placeholder": "Choisis un nom de compte",
+    "group_password_label": "Mot de passe du groupe",
+    "join_as_guest": "Rejoindre en invite",
+    "note": "Les reponses invite ne peuvent pas etre recuperees plus tard. Cree un compte verifie pour continuer a modifier, rejoindre d autres groupes et apparaitre dans le classement Global.",
+    "error_name_invalid": "Le nom de compte doit contenir entre 2 et 40 caracteres.",
+    "error_name_taken": "Ce nom de compte est deja utilise dans ce groupe.",
+    "error_password_required": "Le mot de passe du groupe est requis.",
+    "error_password_invalid": "Le mot de passe du groupe est incorrect."
   },
   "leaderboard": {
     "page_title": "Classement",

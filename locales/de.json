@@ -147,6 +147,12 @@
     "guest_mode_notice": "Gastmodus: Erstelle ein Konto, um Gruppen beizutreten und andere Antworten zu sehen.",
     "guest_mode_notice_html": "Gastmodus: {create_account_link}, um Gruppen beizutreten und Antwort-Einblicke zu sehen.",
     "guest_cta_button": "Tipps speichern und Konto erstellen",
+    "visitor_mode_notice_html": "Visitor mode: {create_account_link}, um deine Tipps zu speichern, Gruppen zu erstellen/beitreten und Antwort-Einblicke zu sehen.",
+    "visitor_cta_button": "Tipps speichern und Konto erstellen",
+    "named_guest_account_notice_html": "Aenderungen koennen im Gastmodus verloren gehen. {create_account_link}, um Aenderungen zuverlaessig zu speichern, weiteren Gruppen beizutreten und im Global-Ranking zu erscheinen.",
+    "named_guest_view_responses_button": "Gruppenantworten ansehen",
+    "named_guest_mode_notice_html": "Gastmodus: {create_account_link}, um Tipps dauerhaft zu speichern, spaeter zu bearbeiten, weiteren Gruppen beizutreten und im Global-Ranking zu erscheinen.",
+    "named_guest_save_hint_html": "Spaeter zurueckkommen und weiter bearbeiten? {create_account_link}.",
     "points_multi_select_penalty": "{points} {points_word} pro korrektem {driver_word}, -{penalty} fuer jeden fehlenden oder falschen {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} minus 1 pro Punkt Abweichung (Sieger muss korrekt sein). Gleichstand + korrekt: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, oder {bonus}, wenn alle Teams ein Podium holen und du das vorhersagst",
@@ -156,6 +162,20 @@
     "tip_races_grand_prix_only": "Nur Grand-Prix-Rennen.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
     "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+  },
+  "join_guest": {
+    "page_title": "Als Gast beitreten",
+    "title": "{group_name} beitreten",
+    "subtitle": "Nutze diesen Einladungslink als Gast oder erstelle ein Konto.",
+    "account_name_label": "Account-Name",
+    "account_name_placeholder": "Waehle einen Account-Namen",
+    "group_password_label": "Gruppenpasswort",
+    "join_as_guest": "Als Gast beitreten",
+    "note": "Gast-Antworten koennen spaeter nicht wiederhergestellt werden. Erstelle ein verifiziertes Konto, um spaeter zu bearbeiten, weiteren Gruppen beizutreten und im Global-Ranking zu erscheinen.",
+    "error_name_invalid": "Der Account-Name muss 2 bis 40 Zeichen lang sein.",
+    "error_name_taken": "Dieser Account-Name wird in dieser Gruppe bereits verwendet.",
+    "error_password_required": "Gruppenpasswort ist erforderlich.",
+    "error_password_invalid": "Gruppenpasswort ist falsch."
   },
   "leaderboard": {
     "page_title": "Rangliste",

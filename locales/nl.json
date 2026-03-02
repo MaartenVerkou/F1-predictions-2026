@@ -147,6 +147,12 @@
     "guest_mode_notice": "Gastmodus: maak een account om groepen te joinen en andere antwoorden te bekijken.",
     "guest_mode_notice_html": "Gastmodus: {create_account_link} om groepen te joinen en response inzichten te zien.",
     "guest_cta_button": "Voorspellingen opslaan en account aanmaken",
+    "visitor_mode_notice_html": "Visitor mode: {create_account_link} om je voorspellingen op te slaan, groepen te maken of te joinen, en response-inzichten te zien!",
+    "visitor_cta_button": "Voorspellingen opslaan en account aanmaken",
+    "named_guest_account_notice_html": "Wijzigingen kunnen verloren gaan in gastmodus. {create_account_link} om wijzigingen betrouwbaar op te slaan, andere groepen te joinen en mee te doen in de Global-ranking.",
+    "named_guest_view_responses_button": "Bekijk groepsreacties",
+    "named_guest_mode_notice_html": "Gastmodus: {create_account_link} om je voorspellingen blijvend op te slaan, later te wijzigen, andere groepen te joinen en mee te doen in de Global-ranking.",
+    "named_guest_save_hint_html": "Later terugkomen en blijven aanpassen? {create_account_link}.",
     "points_multi_select_penalty": "{points} {points_word} per correcte {driver_word}, -{penalty} voor elke ontbrekende of onjuiste {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} min 1 per punt afwijking (winnaar moet kloppen). Gelijk + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, of {bonus} als alle teams een podium scoren en jij dat voorspelt",
@@ -156,6 +162,20 @@
     "tip_races_grand_prix_only": "Alleen Grand Prix-races.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
     "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+  },
+  "join_guest": {
+    "page_title": "Joinen als gast",
+    "title": "Join {group_name}",
+    "subtitle": "Gebruik deze invite als gast, of maak een account.",
+    "account_name_label": "Accountnaam",
+    "account_name_placeholder": "Kies een accountnaam",
+    "group_password_label": "Groepswachtwoord",
+    "join_as_guest": "Join as guest",
+    "note": "Gastantwoorden kunnen later niet worden hersteld. Maak een geverifieerd account om te blijven aanpassen, andere groepen te joinen en mee te doen in de Global-ranking.",
+    "error_name_invalid": "Accountnaam moet tussen 2 en 40 tekens zijn.",
+    "error_name_taken": "Die accountnaam is al in gebruik in deze groep.",
+    "error_password_required": "Groepswachtwoord is verplicht.",
+    "error_password_invalid": "Groepswachtwoord is onjuist."
   },
   "leaderboard": {
     "page_title": "Klassement",

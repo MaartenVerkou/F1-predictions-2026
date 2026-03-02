@@ -1,4 +1,4 @@
-<%- include('partials/header', { title: `Admin guest: ${guestId}`, user }) %>
+<%- include('partials/header', { title: `Admin guest: ${namedGuestProfile?.display_name || guestId}`, user }) %>
 <%- include('partials/admin_nav', { active: 'overview' }) %>
 
 <div class="card">
@@ -7,7 +7,10 @@
     <a class="link" href="<%= returnTo %>">&lt; Back</a>
   </div>
 
-  <h2 style="margin-top:0;">Guest ID</h2>
+  <h2 style="margin-top:0;"><%= namedGuestProfile ? "Named guest" : "Guest ID" %></h2>
+  <% if (namedGuestProfile) { %>
+    <p style="margin:0 0 6px;"><strong><%= namedGuestProfile.display_name %></strong></p>
+  <% } %>
   <p style="margin-top:0;"><code class="admin-question-code"><%= guestId %></code></p>
 
   <table class="table compact">

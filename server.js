@@ -299,6 +299,25 @@ db.exec(`
     FOREIGN KEY(group_id) REFERENCES groups(id)
   );
 
+  CREATE TABLE IF NOT EXISTS named_guest_profiles (
+    guest_id TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    source_group_id INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(source_group_id) REFERENCES groups(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS named_guest_group_members (
+    group_id INTEGER NOT NULL,
+    guest_id TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    joined_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(group_id, guest_id),
+    FOREIGN KEY(group_id) REFERENCES groups(id)
+  );
+
   CREATE TABLE IF NOT EXISTS actuals (
     question_id TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -404,6 +423,25 @@ function ensureQuestionSettingsColumns() {
 }
 
 ensureQuestionSettingsColumns();
+
+function backfillNamedGuestGroupMembers() {
+  db.exec(
+    `
+    INSERT OR IGNORE INTO named_guest_group_members (group_id, guest_id, display_name, joined_at, updated_at)
+    SELECT
+      gr.group_id,
+      gr.guest_id,
+      ngp.display_name,
+      MIN(gr.created_at) as joined_at,
+      MAX(gr.updated_at) as updated_at
+    FROM guest_responses gr
+    JOIN named_guest_profiles ngp ON ngp.guest_id = gr.guest_id
+    GROUP BY gr.group_id, gr.guest_id, ngp.display_name
+    `
+  );
+}
+
+backfillNamedGuestGroupMembers();
 
 function syncAdminWhitelist() {
   if (!ADMIN_EMAILS.size) return;
@@ -770,6 +808,7 @@ app.post("/dev/switch-user", (req, res) => {
     req.session.devIdentityMode = "guest";
     req.session.devAutoLoginSkipOnce = false;
     req.session.guestId = crypto.randomBytes(12).toString("hex");
+    req.session.namedGuestAccess = null;
     return req.session.save(() => res.redirect(redirectTo));
   }
 
@@ -778,6 +817,7 @@ app.post("/dev/switch-user", (req, res) => {
     req.session.userId = userId;
     req.session.devIdentityMode = "member";
     req.session.guestId = null;
+    req.session.namedGuestAccess = null;
     return req.session.save(() => res.redirect(redirectTo));
   }
 
@@ -785,6 +825,7 @@ app.post("/dev/switch-user", (req, res) => {
   req.session.userId = userId;
   req.session.devIdentityMode = "admin";
   req.session.guestId = null;
+  req.session.namedGuestAccess = null;
   return req.session.save(() => res.redirect(redirectTo));
 });
 
@@ -1147,6 +1188,136 @@ function getGuestIdFromSession(req, { create = false } = {}) {
   return guestId;
 }
 
+function normalizeDisplayName(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNamedGuestAccessFromSession(req) {
+  const raw = req?.session?.namedGuestAccess;
+  if (!raw || typeof raw !== "object") return null;
+  const inviteCode = String(raw.inviteCode || "").trim();
+  const groupId = Number(raw.groupId || 0);
+  const displayName = String(raw.displayName || "").trim();
+  if (!inviteCode || !groupId || !displayName) return null;
+  return {
+    inviteCode,
+    groupId,
+    displayName
+  };
+}
+
+function hasNamedGuestAccess(req, inviteCode, groupId) {
+  const access = getNamedGuestAccessFromSession(req);
+  if (!access) return false;
+  return (
+    String(access.inviteCode || "") === String(inviteCode || "")
+    && Number(access.groupId || 0) === Number(groupId || 0)
+  );
+}
+
+function upsertNamedGuestProfile(guestId, displayName, groupId) {
+  const normalizedGuestId = String(guestId || "").trim();
+  const normalizedDisplayName = normalizeDisplayName(displayName);
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedGuestId || !normalizedDisplayName || !normalizedGroupId) {
+    return;
+  }
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT INTO named_guest_profiles (guest_id, display_name, source_group_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(guest_id)
+    DO UPDATE SET
+      display_name = excluded.display_name,
+      source_group_id = excluded.source_group_id,
+      updated_at = excluded.updated_at
+    `
+  ).run(normalizedGuestId, normalizedDisplayName, normalizedGroupId, now, now);
+}
+
+function upsertNamedGuestGroupMember(guestId, groupId, displayName) {
+  const normalizedGuestId = String(guestId || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  const normalizedDisplayName = normalizeDisplayName(displayName);
+  if (!normalizedGuestId || !normalizedGroupId || !normalizedDisplayName) {
+    return;
+  }
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT INTO named_guest_group_members (group_id, guest_id, display_name, joined_at, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(group_id, guest_id)
+    DO UPDATE SET
+      display_name = excluded.display_name,
+      updated_at = excluded.updated_at
+    `
+  ).run(normalizedGroupId, normalizedGuestId, normalizedDisplayName, now, now);
+}
+
+function isDisplayNameTakenInGroup(groupId, displayName, { excludeGuestId = "" } = {}) {
+  const normalizedGroupId = Number(groupId || 0);
+  const normalizedDisplayName = normalizeDisplayName(displayName);
+  const normalizedExcludeGuestId = String(excludeGuestId || "").trim();
+  if (!normalizedGroupId || !normalizedDisplayName) return false;
+
+  const userConflict = db
+    .prepare(
+      `
+      SELECT 1
+      FROM group_members gm
+      JOIN users u ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+        AND u.name = ? COLLATE NOCASE
+      LIMIT 1
+      `
+    )
+    .get(normalizedGroupId, normalizedDisplayName);
+  if (userConflict) return true;
+
+  const namedGuestConflict = db
+    .prepare(
+      `
+      SELECT 1
+      FROM named_guest_group_members ngm
+      WHERE ngm.group_id = ?
+        AND ngm.display_name = ? COLLATE NOCASE
+        AND (? = '' OR ngm.guest_id <> ?)
+      LIMIT 1
+      `
+    )
+    .get(
+      normalizedGroupId,
+      normalizedDisplayName,
+      normalizedExcludeGuestId,
+      normalizedExcludeGuestId
+    );
+  return !!namedGuestConflict;
+}
+
+function setNamedGuestAccess(req, { inviteCode, groupId, displayName }) {
+  if (!req?.session) return null;
+  const normalizedInviteCode = String(inviteCode || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  const normalizedDisplayName = normalizeDisplayName(displayName);
+  if (!normalizedInviteCode || !normalizedGroupId || !normalizedDisplayName) {
+    return null;
+  }
+  const guestId = getGuestIdFromSession(req, { create: true });
+  upsertNamedGuestProfile(guestId, normalizedDisplayName, normalizedGroupId);
+  upsertNamedGuestGroupMember(guestId, normalizedGroupId, normalizedDisplayName);
+  req.session.namedGuestAccess = {
+    inviteCode: normalizedInviteCode,
+    groupId: normalizedGroupId,
+    displayName: normalizedDisplayName,
+    grantedAt: new Date().toISOString()
+  };
+  return req.session.namedGuestAccess;
+}
+
 function getGuestResponsesByGroup(guestId, groupId) {
   const normalizedGuestId = String(guestId || "").trim();
   const normalizedGroupId = Number(groupId || 0);
@@ -1172,7 +1343,14 @@ function claimGuestResponsesForUser(req, userId) {
       "SELECT group_id, question_id, answer FROM guest_responses WHERE guest_id = ?"
     )
     .all(guestId);
-  if (rows.length === 0) return;
+  if (rows.length === 0) {
+    db.prepare("DELETE FROM named_guest_group_members WHERE guest_id = ?").run(guestId);
+    if (req?.session) {
+      req.session.guestId = null;
+      req.session.namedGuestAccess = null;
+    }
+    return;
+  }
 
   const grouped = new Map();
   for (const row of rows) {
@@ -1230,10 +1408,12 @@ function claimGuestResponsesForUser(req, userId) {
       }
     }
     db.prepare("DELETE FROM guest_responses WHERE guest_id = ?").run(guestId);
+    db.prepare("DELETE FROM named_guest_group_members WHERE guest_id = ?").run(guestId);
   });
   tx();
   if (req?.session) {
     req.session.guestId = null;
+    req.session.namedGuestAccess = null;
   }
 }
 
@@ -1755,50 +1935,96 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   return res.redirect(getGroupBasePath(group));
 });
 
-app.get(["/global", "/groups/:id"], requireAuth, (req, res) => {
-  const user = getCurrentUser(req);
+function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRules, isNamedGuest = false, error = null, success = null }) {
   const locale = res.locals.locale || DEFAULT_LOCALE;
-  const group = getGroupFromRequest(req);
-  if (!group) {
-    return sendError(req, res, 404, "Group not found.");
-  }
-  const groupId = Number(group.id);
+  const groupId = Number(group?.id || 0);
+  const includeNamedGuests =
+    Number(group?.is_global || 0) !== 1 && Number(group?.is_public || 0) !== 1;
   const membersPerPage = 25;
   const requestedMembersPage = Number(req.query.membersPage || 1);
   const currentMembersPage =
     Number.isFinite(requestedMembersPage) && requestedMembersPage > 0
       ? Math.floor(requestedMembersPage)
       : 1;
-  if (!isMember(user.id, groupId)) {
-    return sendError(req, res, 403, "Not a group member.");
-  }
-  const groupBasePath = getGroupBasePath(group);
   const membersTotal = Number(
-    db
-      .prepare("SELECT COUNT(*) AS count FROM group_members WHERE group_id = ?")
-      .get(groupId)?.count || 0
+    includeNamedGuests
+      ? (
+        db
+          .prepare(
+            `
+            SELECT
+              (
+                SELECT COUNT(*)
+                FROM group_members gm
+                WHERE gm.group_id = ?
+              ) + (
+                SELECT COUNT(*)
+                FROM named_guest_group_members ngm
+                WHERE ngm.group_id = ?
+              ) AS count
+            `
+          )
+          .get(groupId, groupId)?.count || 0
+      )
+      : (
+        db
+          .prepare("SELECT COUNT(*) AS count FROM group_members WHERE group_id = ?")
+          .get(groupId)?.count || 0
+      )
   );
   const totalMembersPages = Math.max(1, Math.ceil(membersTotal / membersPerPage));
   const safeMembersPage = Math.min(currentMembersPage, totalMembersPages);
   const membersOffset = (safeMembersPage - 1) * membersPerPage;
-  const members = db
-    .prepare(
-      `
-      SELECT u.id, u.name, u.email, gm.role, gm.joined_at
-      FROM group_members gm
-      JOIN users u ON u.id = gm.user_id
-      WHERE gm.group_id = ?
-      ORDER BY gm.joined_at ASC
-      LIMIT ? OFFSET ?
-      `
-    )
-    .all(groupId, membersPerPage, membersOffset);
-  const invite = ensureInviteForGroup(groupId);
+  const members = includeNamedGuests
+    ? db
+      .prepare(
+        `
+        SELECT id, name, email, role, joined_at, member_type
+        FROM (
+          SELECT
+            u.id AS id,
+            u.name AS name,
+            u.email AS email,
+            gm.role AS role,
+            gm.joined_at AS joined_at,
+            'user' AS member_type
+          FROM group_members gm
+          JOIN users u ON u.id = gm.user_id
+          WHERE gm.group_id = ?
 
-  const role = getMemberRole(user.id, groupId);
-  const canEditRules = role === "owner" || role === "admin";
+          UNION ALL
+
+          SELECT
+            NULL AS id,
+            ngm.display_name AS name,
+            NULL AS email,
+            'guest' AS role,
+            ngm.joined_at AS joined_at,
+            'named_guest' AS member_type
+          FROM named_guest_group_members ngm
+          WHERE ngm.group_id = ?
+        ) AS combined_members
+        ORDER BY joined_at ASC, name COLLATE NOCASE ASC
+        LIMIT ? OFFSET ?
+        `
+      )
+      .all(groupId, groupId, membersPerPage, membersOffset)
+    : db
+      .prepare(
+        `
+        SELECT u.id, u.name, u.email, gm.role, gm.joined_at, 'user' as member_type
+        FROM group_members gm
+        JOIN users u ON u.id = gm.user_id
+        WHERE gm.group_id = ?
+        ORDER BY gm.joined_at ASC
+        LIMIT ? OFFSET ?
+        `
+      )
+      .all(groupId, membersPerPage, membersOffset);
+  const invite = ensureInviteForGroup(groupId);
   const groupRules = getGroupRulesText(group, locale);
-  res.render("group", {
+
+  return res.render("group", {
     user,
     group,
     members,
@@ -1810,8 +2036,32 @@ app.get(["/global", "/groups/:id"], requireAuth, (req, res) => {
     currentMembersPage: safeMembersPage,
     totalMembersPages,
     groupBasePath,
-    error: null,
-    success: null
+    isNamedGuest,
+    error,
+    success
+  });
+}
+
+app.get(["/global", "/groups/:id"], requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const group = getGroupFromRequest(req);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  const groupId = Number(group.id);
+  if (!isMember(user.id, groupId)) {
+    return sendError(req, res, 403, "Not a group member.");
+  }
+  const groupBasePath = getGroupBasePath(group);
+  const role = getMemberRole(user.id, groupId);
+  const canEditRules = role === "owner" || role === "admin";
+  return renderGroupPage(req, res, {
+    user,
+    group,
+    role,
+    canEditRules,
+    groupBasePath,
+    isNamedGuest: false
   });
 });
 
@@ -1877,7 +2127,25 @@ app.get("/join/:code", (req, res) => {
     return sendError(req, res, 403, "Invite link is closed.");
   }
   if (!user) {
-    return res.redirect(`/join/${code}/questions`);
+    if (hasNamedGuestAccess(req, code, Number(group.id))) {
+      return renderGroupPage(req, res, {
+        user: null,
+        group,
+        role: "guest",
+        canEditRules: false,
+        groupBasePath: `/join/${code}`,
+        isNamedGuest: true
+      });
+    }
+    return res.render("join_guest", {
+      user: null,
+      group,
+      code,
+      requirePassword: !group.is_public && !!group.join_password_hash,
+      displayName: "",
+      error: null,
+      createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+    });
   }
   if (isMember(user.id, invite.group_id)) {
     return res.redirect(`${getGroupBasePath(group)}/questions`);
@@ -1890,6 +2158,153 @@ app.get("/join/:code", (req, res) => {
     syncFromGlobalIfCoupled(user.id, invite.group_id, now);
   }
   return res.redirect(`${getGroupBasePath(group)}/questions`);
+});
+
+app.get("/join/:code/responses", (req, res) => {
+  const code = req.params.code.trim();
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+
+  const user = getCurrentUser(req);
+  if (user) {
+    if (!isMember(user.id, invite.group_id)) {
+      const now = new Date().toISOString();
+      db.prepare(
+        "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
+      ).run(user.id, invite.group_id, "member", now);
+      syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+    }
+    return res.redirect(`${getGroupBasePath(group)}/responses`);
+  }
+
+  if (!hasNamedGuestAccess(req, code, Number(group.id))) {
+    return res.redirect(`/join/${code}`);
+  }
+
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const guestId = getGuestIdFromSession(req, { create: false });
+  const questions = getQuestions(locale);
+  const responses = db
+    .prepare(
+      `
+      SELECT r.user_id, u.name as user_name, r.question_id, r.answer, r.updated_at
+      FROM responses r
+      JOIN users u ON u.id = r.user_id
+      WHERE r.group_id = ?
+      ORDER BY u.name ASC, r.question_id ASC
+      `
+    )
+    .all(Number(group.id));
+  const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
+
+  return res.render("responses", {
+    user: null,
+    group,
+    questions,
+    responses,
+    groupBasePath: `/join/${code}`,
+    viewerGuestAnswers
+  });
+});
+
+app.post("/join/:code/guest", async (req, res) => {
+  const code = req.params.code.trim();
+  const user = getCurrentUser(req);
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  if (user) {
+    return res.redirect(`/join/${code}`);
+  }
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+
+  const displayName = normalizeDisplayName(req.body.guestName || "");
+  if (displayName.length < 2 || displayName.length > 40) {
+    return res.render("join_guest", {
+      user: null,
+      group,
+      code,
+      requirePassword: !group.is_public && !!group.join_password_hash,
+      displayName,
+      error: translate(locale, "join_guest.error_name_invalid"),
+      createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+    });
+  }
+
+  if (!group.is_public && group.join_password_hash) {
+    const password = String(req.body.password || "");
+    if (!password) {
+      return res.render("join_guest", {
+        user: null,
+        group,
+        code,
+        requirePassword: true,
+        displayName,
+        error: translate(locale, "join_guest.error_password_required"),
+        createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+      });
+    }
+    const ok = await bcrypt.compare(password, group.join_password_hash);
+    if (!ok) {
+      return res.render("join_guest", {
+        user: null,
+        group,
+        code,
+        requirePassword: true,
+        displayName,
+        error: translate(locale, "join_guest.error_password_invalid"),
+        createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+      });
+    }
+  }
+
+  const guestIdForJoin = getGuestIdFromSession(req, { create: true });
+  if (
+    Number(group.is_global || 0) !== 1
+    && isDisplayNameTakenInGroup(Number(group.id), displayName, { excludeGuestId: guestIdForJoin })
+  ) {
+    return res.render("join_guest", {
+      user: null,
+      group,
+      code,
+      requirePassword: !group.is_public && !!group.join_password_hash,
+      displayName,
+      error: translate(locale, "join_guest.error_name_taken"),
+      createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+    });
+  }
+
+  setNamedGuestAccess(req, {
+    inviteCode: code,
+    groupId: Number(group.id),
+    displayName
+  });
+  return res.redirect(`/join/${code}/questions`);
 });
 
 app.get("/join/:code/questions", (req, res) => {
@@ -1922,6 +2337,10 @@ app.get("/join/:code/questions", (req, res) => {
     return res.redirect(`${getGroupBasePath(group)}/questions`);
   }
 
+  if (!hasNamedGuestAccess(req, code, Number(group.id))) {
+    return res.redirect(`/join/${code}`);
+  }
+
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const guestId = getGuestIdFromSession(req, { create: true });
   const questions = getQuestions(locale);
@@ -1946,8 +2365,8 @@ app.get("/join/:code/questions", (req, res) => {
     coupledToGlobal: false,
     globalGroupName: "Global",
     groupBasePath: `/join/${code}`,
-    isGuestMode: true,
-    guestSaveButtonLabel: translate(locale, "questions.save_to_join_group")
+    isNamedGuestMode: true,
+    guestSignupRedirectPath: `/join/${code}`
   });
 });
 
@@ -1965,6 +2384,9 @@ app.post("/join/:code/questions", (req, res) => {
     .get(code);
   if (!invite) {
     return sendError(req, res, 404, "Invite not found.");
+  }
+  if (!hasNamedGuestAccess(req, code, Number(invite.group_id))) {
+    return sendError(req, res, 403, "Join as guest first.");
   }
   const group = db
     .prepare("SELECT * FROM groups WHERE id = ?")
@@ -2277,7 +2699,7 @@ app.get("/global/questions", (req, res, next) => {
     coupledToGlobal: false,
     globalGroupName: globalGroup.name || "Global",
     groupBasePath: getGroupBasePath(globalGroup),
-    isGuestMode: true
+    isVisitorMode: true
   });
 });
 

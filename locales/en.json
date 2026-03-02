@@ -30,7 +30,7 @@
   "signup": {
     "page_title": "Sign up",
     "heading": "Create your account",
-    "name_hint": "Pick a fun account name. It does not need to be your real name.",
+    "name_hint": "Pick a unique account name.",
     "verify_required": "Account verification required before login.",
     "confirm_password": "Confirm password",
     "create_account": "Create account",
@@ -147,6 +147,12 @@
     "guest_mode_notice": "Guest mode: create an account to join groups and view other responses.",
     "guest_mode_notice_html": "Guest mode: {create_account_link} to save your predictions, create and join groups, and see response insights!",
     "guest_cta_button": "Save predictions and create account",
+    "visitor_mode_notice_html": "Visitor mode: {create_account_link} to save your predictions, create and join groups, and see response insights!",
+    "visitor_cta_button": "Save predictions and create account",
+    "named_guest_account_notice_html": "Edits may be lost in guest mode. {create_account_link} to reliably save edits, join other groups, and appear in Global ranking.",
+    "named_guest_view_responses_button": "View group responses",
+    "named_guest_mode_notice_html": "Guest mode: {create_account_link} to save your predictions permanently, edit later, join other groups, and appear in Global ranking.",
+    "named_guest_save_hint_html": "Want to return later and keep editing? {create_account_link}.",
     "points_multi_select_penalty": "{points} {points_word} per correct {driver_word}, -{penalty} for each missing or incorrect {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} minus 1 per point off (winner must be correct). Tie + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, or {bonus} if all teams score a podium and you predict that",
@@ -156,6 +162,20 @@
     "tip_races_grand_prix_only": "Grand Prix races only.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
     "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+  },
+  "join_guest": {
+    "page_title": "Join as guest",
+    "title": "Join {group_name}",
+    "subtitle": "Use this invite as a guest, or create an account.",
+    "account_name_label": "Account name",
+    "account_name_placeholder": "Pick an account name",
+    "group_password_label": "Group password",
+    "join_as_guest": "Join as guest",
+    "note": "Guest answers cannot be restored later. Create a verified account to keep editing, join other groups, and appear in Global ranking.",
+    "error_name_invalid": "Account name must be 2 to 40 characters.",
+    "error_name_taken": "That account name is already used in this group.",
+    "error_password_required": "Group password is required.",
+    "error_password_invalid": "Group password is incorrect."
   },
   "leaderboard": {
     "page_title": "Leaderboard",

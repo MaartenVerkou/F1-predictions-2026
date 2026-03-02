@@ -1355,7 +1355,8 @@ function registerAdminRoutes(app, deps) {
     const adminSuccess = req.query.success ? String(req.query.success) : null;
     const groupsPerPage = 10;
     const usersPerPage = 10;
-    const guestProfilesPerPage = 10;
+    const namedGuestProfilesPerPage = 10;
+    const visitorProfilesPerPage = 10;
 
     const requestedGroupPage = Number(req.query.groupPage || 1);
     const currentGroupPage = Number.isFinite(requestedGroupPage) && requestedGroupPage > 0
@@ -1367,10 +1368,17 @@ function registerAdminRoutes(app, deps) {
       ? Math.floor(requestedUsersPage)
       : 1;
 
-    const requestedGuestProfilesPage = Number(req.query.guestPage || 1);
-    const currentGuestProfilesPage =
-      Number.isFinite(requestedGuestProfilesPage) && requestedGuestProfilesPage > 0
-        ? Math.floor(requestedGuestProfilesPage)
+    const requestedNamedGuestProfilesPage = Number(req.query.namedGuestPage || 1);
+    const currentNamedGuestProfilesPage =
+      Number.isFinite(requestedNamedGuestProfilesPage) && requestedNamedGuestProfilesPage > 0
+        ? Math.floor(requestedNamedGuestProfilesPage)
+        : 1;
+
+    const rawVisitorPage = req.query.visitorPage || req.query.guestPage || 1;
+    const requestedVisitorProfilesPage = Number(rawVisitorPage);
+    const currentVisitorProfilesPage =
+      Number.isFinite(requestedVisitorProfilesPage) && requestedVisitorProfilesPage > 0
+        ? Math.floor(requestedVisitorProfilesPage)
         : 1;
 
     const nowMs = Date.now();
@@ -1536,7 +1544,81 @@ function registerAdminRoutes(app, deps) {
       )
       .all(groupsPerPage, groupOffset);
 
-    const guestStats = db
+    const namedGuestStats = db
+      .prepare(
+        `
+        SELECT
+          COUNT(DISTINCT gr.guest_id) as guest_count,
+          COUNT(*) as response_count,
+          COUNT(DISTINCT gr.group_id) as group_count,
+          MAX(gr.updated_at) as last_activity_at
+        FROM guest_responses gr
+        JOIN named_guest_profiles ngp ON ngp.guest_id = gr.guest_id
+        JOIN groups g ON g.id = gr.group_id
+        WHERE COALESCE(g.is_simulated, 0) = 0
+        `
+      )
+      .get();
+
+    const namedGuestProfileCountRow = db
+      .prepare(
+        `
+        SELECT COUNT(*) as count
+        FROM (
+          SELECT gr.guest_id
+          FROM guest_responses gr
+          JOIN named_guest_profiles ngp ON ngp.guest_id = gr.guest_id
+          JOIN groups g ON g.id = gr.group_id
+          WHERE COALESCE(g.is_simulated, 0) = 0
+          GROUP BY gr.guest_id
+        ) as named_guests
+        `
+      )
+      .get();
+    const totalNamedGuestProfiles = Number(namedGuestProfileCountRow?.count || 0);
+    const totalNamedGuestProfilePages = Math.max(
+      1,
+      Math.ceil(totalNamedGuestProfiles / namedGuestProfilesPerPage)
+    );
+    const safeNamedGuestProfilesPage = Math.min(
+      currentNamedGuestProfilesPage,
+      totalNamedGuestProfilePages
+    );
+    const namedGuestProfilesOffset =
+      (safeNamedGuestProfilesPage - 1) * namedGuestProfilesPerPage;
+
+    const namedGuestProfiles = db
+      .prepare(
+        `
+        SELECT
+          gr.guest_id,
+          MAX(ngp.display_name) as display_name,
+          COUNT(*) as answers_count,
+          COUNT(DISTINCT gr.group_id) as groups_count,
+          COUNT(DISTINCT gr.question_id) as questions_count,
+          MIN(gr.created_at) as first_seen_at,
+          MAX(gr.updated_at) as last_seen_at,
+          (
+            SELECT g2.name
+            FROM guest_responses gr2
+            JOIN groups g2 ON g2.id = gr2.group_id
+            WHERE gr2.guest_id = gr.guest_id
+              AND COALESCE(g2.is_simulated, 0) = 0
+            ORDER BY gr2.updated_at DESC
+            LIMIT 1
+          ) as latest_group_name
+        FROM guest_responses gr
+        JOIN named_guest_profiles ngp ON ngp.guest_id = gr.guest_id
+        JOIN groups g ON g.id = gr.group_id
+        WHERE COALESCE(g.is_simulated, 0) = 0
+        GROUP BY gr.guest_id
+        ORDER BY last_seen_at DESC
+        LIMIT ? OFFSET ?
+        `
+      )
+      .all(namedGuestProfilesPerPage, namedGuestProfilesOffset);
+
+    const visitorStats = db
       .prepare(
         `
         SELECT
@@ -1547,11 +1629,16 @@ function registerAdminRoutes(app, deps) {
         FROM guest_responses gr
         JOIN groups g ON g.id = gr.group_id
         WHERE COALESCE(g.is_simulated, 0) = 0
+          AND NOT EXISTS (
+            SELECT 1
+            FROM named_guest_profiles ngp
+            WHERE ngp.guest_id = gr.guest_id
+          )
         `
       )
       .get();
 
-    const guestProfileCountRow = db
+    const visitorProfileCountRow = db
       .prepare(
         `
         SELECT COUNT(*) as count
@@ -1560,20 +1647,28 @@ function registerAdminRoutes(app, deps) {
           FROM guest_responses gr
           JOIN groups g ON g.id = gr.group_id
           WHERE COALESCE(g.is_simulated, 0) = 0
+            AND NOT EXISTS (
+              SELECT 1
+              FROM named_guest_profiles ngp
+              WHERE ngp.guest_id = gr.guest_id
+            )
           GROUP BY gr.guest_id
-        ) as guests
+        ) as visitors
         `
       )
       .get();
-    const totalGuestProfiles = Number(guestProfileCountRow?.count || 0);
-    const totalGuestProfilePages = Math.max(
+    const totalVisitorProfiles = Number(visitorProfileCountRow?.count || 0);
+    const totalVisitorProfilePages = Math.max(
       1,
-      Math.ceil(totalGuestProfiles / guestProfilesPerPage)
+      Math.ceil(totalVisitorProfiles / visitorProfilesPerPage)
     );
-    const safeGuestProfilesPage = Math.min(currentGuestProfilesPage, totalGuestProfilePages);
-    const guestProfilesOffset = (safeGuestProfilesPage - 1) * guestProfilesPerPage;
+    const safeVisitorProfilesPage = Math.min(
+      currentVisitorProfilesPage,
+      totalVisitorProfilePages
+    );
+    const visitorProfilesOffset = (safeVisitorProfilesPage - 1) * visitorProfilesPerPage;
 
-    const guestProfiles = db
+    const visitorProfiles = db
       .prepare(
         `
         SELECT
@@ -1595,12 +1690,17 @@ function registerAdminRoutes(app, deps) {
         FROM guest_responses gr
         JOIN groups g ON g.id = gr.group_id
         WHERE COALESCE(g.is_simulated, 0) = 0
+          AND NOT EXISTS (
+            SELECT 1
+            FROM named_guest_profiles ngp
+            WHERE ngp.guest_id = gr.guest_id
+          )
         GROUP BY gr.guest_id
         ORDER BY last_seen_at DESC
         LIMIT ? OFFSET ?
         `
       )
-      .all(guestProfilesPerPage, guestProfilesOffset);
+      .all(visitorProfilesPerPage, visitorProfilesOffset);
 
     res.render("admin_overview", {
       user,
@@ -1618,11 +1718,16 @@ function registerAdminRoutes(app, deps) {
       currentUserPage: safeUsersPage,
       totalUserPages,
       usersPerPage,
-      guestStats,
-      guestProfiles,
-      currentGuestPage: safeGuestProfilesPage,
-      totalGuestPages: totalGuestProfilePages,
-      guestProfilesPerPage
+      namedGuestStats,
+      namedGuestProfiles,
+      currentNamedGuestPage: safeNamedGuestProfilesPage,
+      totalNamedGuestPages: totalNamedGuestProfilePages,
+      namedGuestProfilesPerPage,
+      visitorStats,
+      visitorProfiles,
+      currentVisitorPage: safeVisitorProfilesPage,
+      totalVisitorPages: totalVisitorProfilePages,
+      visitorProfilesPerPage
     });
   });
 
@@ -1798,6 +1903,16 @@ function registerAdminRoutes(app, deps) {
       ? rawReturnTo
       : "/admin/overview";
 
+    const namedGuestProfile = db
+      .prepare(
+        `
+        SELECT guest_id, display_name, source_group_id, created_at, updated_at
+        FROM named_guest_profiles
+        WHERE guest_id = ?
+        `
+      )
+      .get(guestId);
+
     const guestStats = db
       .prepare(
         `
@@ -1864,6 +1979,7 @@ function registerAdminRoutes(app, deps) {
     return res.render("admin_guest_detail", {
       user,
       guestId,
+      namedGuestProfile,
       guestStats,
       groups,
       responses,
