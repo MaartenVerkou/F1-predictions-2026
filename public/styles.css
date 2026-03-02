@@ -649,6 +649,15 @@ button:disabled {
   color: var(--muted);
 }
 
+.form-helper-text {
+  display: block;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
 .field-status {
   min-height: 18px;
   font-size: 13px;
@@ -1007,6 +1016,52 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+.button-link.secondary {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.button-link.secondary:hover,
+.button-link.secondary:focus-visible {
+  background: rgba(214, 11, 34, 0.12);
+  color: var(--accent-hover);
+}
+
+.join-guest-card {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.join-guest-form {
+  margin-top: 14px;
+}
+
+.join-guest-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.join-guest-create-account {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.join-guest-create-account:hover,
+.join-guest-create-account:focus-visible {
+  background: rgba(214, 11, 34, 0.12);
+  color: var(--accent-hover);
+}
+
+.join-guest-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .hero-start-predicting {
   font-size: 17px;
   padding: 24px 22px;
@@ -1035,6 +1090,11 @@ button:disabled {
 :root[data-theme="dark"] .button-link:hover,
 :root[data-theme="dark"] .button-link:focus-visible {
   background: var(--accent-hover);
+}
+
+:root[data-theme="dark"] .button-link.secondary:hover,
+:root[data-theme="dark"] .button-link.secondary:focus-visible {
+  background: rgba(255, 45, 69, 0.18);
 }
 
 .table {
@@ -1383,6 +1443,10 @@ button:disabled {
   .responses-podium-item {
     border-left: none;
     padding-left: 0;
+  }
+
+  .join-guest-actions {
+    grid-template-columns: 1fr;
   }
 }
 

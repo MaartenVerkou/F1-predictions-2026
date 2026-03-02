@@ -14,6 +14,9 @@
   <% const tieText = t('questions.tie'); %>
   <% const naText = t('responses.na'); %>
   <% const currentUserId = Number(user?.id || 0); %>
+  <% const guestViewerAnswers = (typeof viewerGuestAnswers === 'object' && viewerGuestAnswers) ? viewerGuestAnswers : {}; %>
+  <% const focusedMemberData = (typeof focusedMember === 'object' && focusedMember) ? focusedMember : null; %>
+  <% const focusedMemberResponsesData = Array.isArray(focusedMemberResponses) ? focusedMemberResponses : []; %>
   <% const responsesByQuestion = responses.reduce((acc, row) => {
       if (!acc[row.question_id]) acc[row.question_id] = [];
       acc[row.question_id].push(row);
@@ -91,6 +94,10 @@
       }
       return answerText;
     }; %>
+  <% const focusedRowsByQuestion = focusedMemberResponsesData.reduce((acc, row) => {
+      if (row && row.question_id) acc[row.question_id] = row;
+      return acc;
+    }, {}); %>
   <% const summarizeAnswers = (rows) => {
       const counts = new Map();
       rows.forEach((row) => {
@@ -187,6 +194,30 @@
       return top.slice(0, limit - 1).concat([viewerItem]);
     }; %>
 
+  <% if (focusedMemberData) { %>
+    <div class="responses-section">
+      <div class="responses-question-head">
+        <h3 class="survey-question-title"><%= focusedMemberData.name %> (<%= focusedMemberData.role %>)</h3>
+        <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= t('responses.page_title') %></a>
+      </div>
+      <% if (focusedMemberResponsesData.length === 0) { %>
+        <p class="muted"><%= t('responses.no_responses') %></p>
+      <% } else { %>
+        <ul class="list">
+          <% questions.forEach((q) => { %>
+            <% const row = focusedRowsByQuestion[q.id]; %>
+            <% if (row) { %>
+              <li>
+                <strong><%= q.prompt %></strong>
+                <div class="muted"><%= formatAnswer(row) %></div>
+              </li>
+            <% } %>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  <% } %>
+
   <% if (responses.length === 0) { %>
     <div class="alert"><%= t('responses.no_responses') %></div>
   <% } else { %>
@@ -226,7 +257,11 @@
         <% if (rows.length === 0) { %>
           <p class="muted"><%= t('responses.no_responses') %></p>
         <% } else { %>
-          <% const viewerRow = rows.find((row) => Number(row.user_id) === currentUserId) || null; %>
+          <% const memberViewerRow = rows.find((row) => Number(row.user_id) === currentUserId) || null; %>
+          <% const guestViewerRawAnswer = String(guestViewerAnswers[q.id] || ''); %>
+          <% const viewerRow = memberViewerRow || (guestViewerRawAnswer
+            ? { user_id: 0, question_id: q.id, answer: guestViewerRawAnswer }
+            : null); %>
           <% const viewerAnswerLabel = viewerRow ? formatAnswer(viewerRow) : ''; %>
           <% const viewerBooleanChoice = q.type === 'boolean' && viewerRow ? String(viewerRow.answer || '') : ''; %>
           <% const viewerMultiSelectPicks = (q.type === 'multi_select' || q.type === 'multi_select_limited') && viewerRow ? parseArrayAnswer(viewerRow.answer) : []; %>

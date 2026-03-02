@@ -1,0 +1,41 @@
+<%- include('partials/header', { title: t('join_guest.page_title'), user }) %>
+
+<div class="card join-guest-card">
+  <h1><%= t('join_guest.title', { group_name: group.name }) %></h1>
+  <p class="muted"><%= t('join_guest.subtitle') %></p>
+
+  <% if (error) { %>
+    <div class="alert"><%= error %></div>
+  <% } %>
+
+  <form method="post" action="/join/<%= code %>/guest" class="join-guest-form">
+    <label>
+      <%= t('join_guest.account_name_label') %>
+      <input
+        type="text"
+        name="guestName"
+        maxlength="40"
+        required
+        value="<%= displayName || '' %>"
+        placeholder="<%= t('join_guest.account_name_placeholder') %>"
+        autocomplete="nickname"
+      />
+    </label>
+
+    <% if (requirePassword) { %>
+      <label>
+        <%= t('join_guest.group_password_label') %>
+        <input type="password" name="password" required autocomplete="current-password" />
+      </label>
+    <% } %>
+
+    <div class="join-guest-actions">
+      <button type="submit"><%= t('join_guest.join_as_guest') %></button>
+      <a class="button-link join-guest-create-account" href="<%= createAccountPath %>"><%= t('home.create_account') %></a>
+    </div>
+
+    <p class="muted join-guest-note"><%= t('join_guest.note') %></p>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

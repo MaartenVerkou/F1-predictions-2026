@@ -1333,6 +1333,86 @@ function getGuestResponsesByGroup(guestId, groupId) {
     }, {});
 }
 
+function getFocusedMemberResponses(groupId, { focusUserId, focusGuestId } = {}) {
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedGroupId) return null;
+
+  const normalizedFocusGuestId = String(focusGuestId || "").trim();
+  if (normalizedFocusGuestId) {
+    if (!/^[A-Za-z0-9_-]{4,128}$/.test(normalizedFocusGuestId)) return null;
+    const namedGuest = db
+      .prepare(
+        `
+        SELECT guest_id, display_name
+        FROM named_guest_group_members
+        WHERE group_id = ?
+          AND guest_id = ?
+        LIMIT 1
+        `
+      )
+      .get(normalizedGroupId, normalizedFocusGuestId);
+    if (!namedGuest) return null;
+
+    const rows = db
+      .prepare(
+        `
+        SELECT question_id, answer, updated_at
+        FROM guest_responses
+        WHERE group_id = ?
+          AND guest_id = ?
+        ORDER BY updated_at DESC, question_id ASC
+        `
+      )
+      .all(normalizedGroupId, normalizedFocusGuestId);
+    return {
+      member: {
+        type: "named_guest",
+        role: "guest",
+        name: String(namedGuest.display_name || "").trim(),
+        guest_id: normalizedFocusGuestId
+      },
+      responses: rows
+    };
+  }
+
+  const normalizedFocusUserId = Number(focusUserId || 0);
+  if (!normalizedFocusUserId) return null;
+  const member = db
+    .prepare(
+      `
+      SELECT u.id, u.name, gm.role
+      FROM group_members gm
+      JOIN users u ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+        AND gm.user_id = ?
+      LIMIT 1
+      `
+    )
+    .get(normalizedGroupId, normalizedFocusUserId);
+  if (!member) return null;
+
+  const rows = db
+    .prepare(
+      `
+      SELECT question_id, answer, updated_at
+      FROM responses
+      WHERE group_id = ?
+        AND user_id = ?
+      ORDER BY updated_at DESC, question_id ASC
+      `
+    )
+    .all(normalizedGroupId, normalizedFocusUserId);
+  return {
+    member: {
+      type: "user",
+      role: String(member.role || "member"),
+      name: String(member.name || "").trim(),
+      user_id: normalizedFocusUserId
+    },
+    responses: rows
+  };
+}
+
 function claimGuestResponsesForUser(req, userId) {
   const guestId = getGuestIdFromSession(req, { create: false });
   const normalizedUserId = Number(userId || 0);
@@ -1979,10 +2059,11 @@ function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRu
     ? db
       .prepare(
         `
-        SELECT id, name, email, role, joined_at, member_type
+        SELECT id, guest_id, name, email, role, joined_at, member_type
         FROM (
           SELECT
             u.id AS id,
+            NULL AS guest_id,
             u.name AS name,
             u.email AS email,
             gm.role AS role,
@@ -1996,6 +2077,7 @@ function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRu
 
           SELECT
             NULL AS id,
+            ngm.guest_id AS guest_id,
             ngm.display_name AS name,
             NULL AS email,
             'guest' AS role,
@@ -2012,7 +2094,7 @@ function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRu
     : db
       .prepare(
         `
-        SELECT u.id, u.name, u.email, gm.role, gm.joined_at, 'user' as member_type
+        SELECT u.id, NULL as guest_id, u.name, u.email, gm.role, gm.joined_at, 'user' as member_type
         FROM group_members gm
         JOIN users u ON u.id = gm.user_id
         WHERE gm.group_id = ?
@@ -2209,6 +2291,10 @@ app.get("/join/:code/responses", (req, res) => {
     )
     .all(Number(group.id));
   const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
+  const focused = getFocusedMemberResponses(Number(group.id), {
+    focusUserId: req.query.focusUserId,
+    focusGuestId: req.query.focusGuestId
+  });
 
   return res.render("responses", {
     user: null,
@@ -2216,7 +2302,9 @@ app.get("/join/:code/responses", (req, res) => {
     questions,
     responses,
     groupBasePath: `/join/${code}`,
-    viewerGuestAnswers
+    viewerGuestAnswers,
+    focusedMember: focused ? focused.member : null,
+    focusedMemberResponses: focused ? focused.responses : []
   });
 });
 
@@ -2928,13 +3016,19 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
       `
     )
     .all(groupId);
+  const focused = getFocusedMemberResponses(groupId, {
+    focusUserId: req.query.focusUserId,
+    focusGuestId: req.query.focusGuestId
+  });
 
   res.render("responses", {
     user,
     group,
     questions,
     responses,
-    groupBasePath: getGroupBasePath(group)
+    groupBasePath: getGroupBasePath(group),
+    focusedMember: focused ? focused.member : null,
+    focusedMemberResponses: focused ? focused.responses : []
   });
 });
 

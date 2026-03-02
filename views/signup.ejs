@@ -23,14 +23,14 @@
         data-name-check-msg-taken="Name already in use."
         data-name-check-msg-error="Could not check name right now."
       />
-      <span class="muted"><%= t('signup.name_hint') %></span>
+      <p class="form-helper-text"><%= t('signup.name_hint') %></p>
       <span class="field-status muted" data-name-check-feedback aria-live="polite"></span>
     </label>
     <label>
       <%= t('common.email') %>
       <input type="email" name="email" value="<%= form?.email || '' %>" placeholder="nico@audi.com" required />
+      <p class="form-helper-text"><%= t('signup.verify_required') %></p>
     </label>
-    <p class="muted" style="margin:-8px 0 0;"><%= t('signup.verify_required') %></p>
     <label>
       <%= t('common.password') %>
       <input type="password" name="password" required minlength="6" />

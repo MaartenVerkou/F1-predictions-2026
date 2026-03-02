@@ -98,9 +98,14 @@
     <ul class="list group-members-list">
       <% members.forEach(member => { %>
         <% const isNamedGuestMember = member.member_type === 'named_guest'; %>
+        <% const memberResponsesHref = isNamedGuestMember
+          ? (member.guest_id
+            ? `${currentGroupPath}/responses?focusGuestId=${encodeURIComponent(String(member.guest_id))}`
+            : `${currentGroupPath}/responses`)
+          : `${currentGroupPath}/responses?focusUserId=${member.id}`; %>
         <li class="group-member-item">
           <div class="group-member-main">
-            <strong><%= member.name %></strong>
+            <strong><a class="link" href="<%= memberResponsesHref %>"><%= member.name %></a></strong>
             <span class="muted">(<%= member.role %>)</span>
           </div>
           <% if ((role === 'owner' || role === 'admin') && !isNamedGuestMember) { %>

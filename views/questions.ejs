@@ -2,11 +2,18 @@
 
 <div class="card survey-page-card">
   <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
-  <% const guestMode = (typeof isGuestMode !== 'undefined') && Boolean(isGuestMode); %>
-  <% const guestSignupPath = `/signup?redirectTo=${encodeURIComponent(currentPath || currentGroupPath || '/global/questions')}`; %>
+  <% const visitorMode = (typeof isVisitorMode !== 'undefined') && Boolean(isVisitorMode); %>
+  <% const namedGuestMode = (typeof isNamedGuestMode !== 'undefined') && Boolean(isNamedGuestMode); %>
+  <% const legacyGuestMode = (typeof isGuestMode !== 'undefined') && Boolean(isGuestMode); %>
+  <% const guestMode = visitorMode || namedGuestMode || legacyGuestMode; %>
+  <% const guestSignupPath = `/signup?redirectTo=${encodeURIComponent(
+    (typeof guestSignupRedirectPath === 'string' && guestSignupRedirectPath)
+      ? guestSignupRedirectPath
+      : (currentPath || currentGroupPath || '/global/questions')
+  )}`; %>
   <div class="page-title-row">
     <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
-    <% if (!guestMode) { %>
+    <% if (!guestMode || namedGuestMode) { %>
       <a class="link page-back-link" href="<%= currentGroupPath %>">&lt; Back</a>
     <% } %>
   </div>
@@ -19,9 +26,13 @@
       <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
     </div>
   <% } %>
-  <% if (guestMode) { %>
+  <% if (visitorMode || (legacyGuestMode && !namedGuestMode)) { %>
     <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
-    <p class="muted" style="margin:0 0 12px;"><%- t('questions.guest_mode_notice_html', { create_account_link: guestAccountLink }) %></p>
+    <p class="muted" style="margin:0 0 12px;"><%- t('questions.visitor_mode_notice_html', { create_account_link: guestAccountLink }) %></p>
+  <% } %>
+  <% if (namedGuestMode) { %>
+    <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
+    <p class="muted" style="margin:0 0 12px;"><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
   <% } %>
 
   <% if (closed) { %>
@@ -443,22 +454,30 @@
     </fieldset>
 
     <div class="questions-save-row">
-      <% if (guestMode) { %>
-        <a class="button-link" href="<%= guestSignupPath %>"><%= t('questions.guest_cta_button') %></a>
+      <% if (visitorMode || (legacyGuestMode && !namedGuestMode)) { %>
+        <a class="button-link" href="<%= guestSignupPath %>"><%= t('questions.visitor_cta_button') %></a>
       <% } else { %>
         <% const saveButtonLabel = (typeof guestSaveButtonLabel === 'string' && guestSaveButtonLabel.trim()) ? guestSaveButtonLabel : t('questions.save_predictions'); %>
         <button type="submit" data-predictions-save-button <%= closed ? 'disabled' : '' %>><%= saveButtonLabel %></button>
-        <span
-          class="muted questions-autosave-status"
-          data-autosave-status
-          data-status-unsaved="<%= t('questions.autosave_unsaved') %>"
-          data-status-saving="<%= t('questions.autosave_saving') %>"
-          data-status-saved="<%= t('questions.autosave_saved') %>"
-          data-status-failed="<%= t('questions.autosave_failed') %>"
-          aria-live="polite"
-        ></span>
+        <% if (namedGuestMode) { %>
+          <a class="button-link secondary" href="<%= `${currentGroupPath}/responses` %>"><%= t('questions.named_guest_view_responses_button') %></a>
+        <% } else { %>
+          <span
+            class="muted questions-autosave-status"
+            data-autosave-status
+            data-status-unsaved="<%= t('questions.autosave_unsaved') %>"
+            data-status-saving="<%= t('questions.autosave_saving') %>"
+            data-status-saved="<%= t('questions.autosave_saved') %>"
+            data-status-failed="<%= t('questions.autosave_failed') %>"
+            aria-live="polite"
+          ></span>
+        <% } %>
       <% } %>
     </div>
+    <% if (namedGuestMode) { %>
+      <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
+      <p class="muted" style="margin:2px 0 0;"><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
+    <% } %>
     <div id="questions-form-end"></div>
   </form>
 </div>

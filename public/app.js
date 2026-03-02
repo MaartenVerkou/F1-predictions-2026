@@ -354,9 +354,10 @@ const initPredictionsAutosave = () => {
     queueSave();
   });
 
-  form.addEventListener('submit', () => {
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
     clearDebounce();
-    setStatus('saving');
+    await saveNow();
   });
 
   setStatus('saved');
