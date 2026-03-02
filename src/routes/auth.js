@@ -137,10 +137,20 @@ function registerAuthRoutes(app, deps) {
 
   app.get("/api/users/check-name", (req, res) => {
     const normalizedName = String(req.query.name || "").trim();
+    const normalizedEmail = String(req.query.email || "").trim().toLowerCase();
     if (!normalizedName) {
       return res.json({ available: false, reason: "empty" });
     }
-    const exists = db.prepare("SELECT id FROM users WHERE name = ?").get(normalizedName);
+    const existingByEmail = normalizedEmail
+      ? db
+        .prepare("SELECT id, is_verified FROM users WHERE email = ?")
+        .get(normalizedEmail)
+      : null;
+    const exists = existingByEmail && !existingByEmail.is_verified
+      ? db
+        .prepare("SELECT id FROM users WHERE name = ? AND id <> ?")
+        .get(normalizedName, existingByEmail.id)
+      : db.prepare("SELECT id FROM users WHERE name = ?").get(normalizedName);
     return res.json({ available: !exists });
   });
 
@@ -172,20 +182,21 @@ function registerAuthRoutes(app, deps) {
       });
     }
 
-    const nameTaken = db
-      .prepare("SELECT id FROM users WHERE name = ?")
-      .get(normalizedName);
+    const shouldBeAdmin = ADMIN_EMAILS.has(normalizedEmail);
+    const existing = db
+      .prepare("SELECT id, is_verified FROM users WHERE email = ?")
+      .get(normalizedEmail);
+    const nameTaken = existing && !existing.is_verified
+      ? db
+        .prepare("SELECT id FROM users WHERE name = ? AND id <> ?")
+        .get(normalizedName, existing.id)
+      : db.prepare("SELECT id FROM users WHERE name = ?").get(normalizedName);
     if (nameTaken) {
       return renderSignup(res, {
         error: "Name already in use.",
         form: signupForm
       });
     }
-
-    const shouldBeAdmin = ADMIN_EMAILS.has(normalizedEmail);
-    const existing = db
-      .prepare("SELECT id, is_verified FROM users WHERE email = ?")
-      .get(normalizedEmail);
     if (existing && existing.is_verified) {
       return renderSignup(res, {
         error: "Email already registered.",

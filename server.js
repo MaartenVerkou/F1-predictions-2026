@@ -2087,8 +2087,7 @@ app.post("/groups/join", requireAuth, async (req, res) => {
 function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRules, isNamedGuest = false, error = null, success = null }) {
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(group?.id || 0);
-  const includeNamedGuests =
-    Number(group?.is_global || 0) !== 1 && Number(group?.is_public || 0) !== 1;
+  const includeNamedGuests = Number(group?.is_global || 0) !== 1;
   const membersPerPage = 25;
   const requestedMembersPage = Number(req.query.membersPage || 1);
   const currentMembersPage =
@@ -2907,8 +2906,16 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
   const currentAnswers = getResponsesByGroup(user.id, groupId);
   const copyGroups = getCopySourceGroups(user.id, groupId);
   const globalGroup = getGlobalGroup();
-  const canCoupleToGlobal =
-    !!globalGroup && group.is_global !== 1 && globalGroup.id !== groupId;
+  const canCoupleToGlobalBase =
+    !!globalGroup && Number(group.is_global) !== 1 && Number(globalGroup.id) !== groupId;
+  const hasGlobalResponses = canCoupleToGlobalBase
+    ? !!db
+      .prepare(
+        "SELECT 1 FROM responses WHERE user_id = ? AND group_id = ? LIMIT 1"
+      )
+      .get(user.id, globalGroup.id)
+    : false;
+  const canCoupleToGlobal = canCoupleToGlobalBase && hasGlobalResponses;
   const coupledToGlobal = canCoupleToGlobal ? isCoupledToGlobal(user.id, groupId) : false;
   let prefillNotice = null;
   let answers = currentAnswers;
@@ -2967,8 +2974,16 @@ app.post(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res)
   const groupBasePath = getGroupBasePath(group);
 
   const globalGroup = getGlobalGroup();
-  const canCoupleToGlobal =
-    !!globalGroup && group.is_global !== 1 && globalGroup.id !== groupId;
+  const canCoupleToGlobalBase =
+    !!globalGroup && Number(group.is_global) !== 1 && Number(globalGroup.id) !== groupId;
+  const hasGlobalResponses = canCoupleToGlobalBase
+    ? !!db
+      .prepare(
+        "SELECT 1 FROM responses WHERE user_id = ? AND group_id = ? LIMIT 1"
+      )
+      .get(user.id, globalGroup.id)
+    : false;
+  const canCoupleToGlobal = canCoupleToGlobalBase && hasGlobalResponses;
   const coupledToGlobal = canCoupleToGlobal ? req.body.coupleToGlobal === "1" : false;
 
   if (predictionsClosed()) {
@@ -2977,6 +2992,10 @@ app.post(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res)
 
   const questions = getQuestions();
   const now = new Date().toISOString();
+
+  if (canCoupleToGlobalBase && !hasGlobalResponses) {
+    setCoupledToGlobal(user.id, groupId, false);
+  }
 
   if (canCoupleToGlobal) {
     setCoupledToGlobal(user.id, groupId, coupledToGlobal);

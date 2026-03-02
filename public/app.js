@@ -174,8 +174,14 @@ const initNameAvailabilityChecks = () => {
 
       try {
         const separator = url.includes('?') ? '&' : '?';
+        const emailValue = String(
+          input.form?.querySelector('input[name="email"]')?.value || ''
+        ).trim();
+        const emailParam = emailValue
+          ? `&email=${encodeURIComponent(emailValue.toLowerCase())}`
+          : '';
         const response = await fetch(
-          `${url}${separator}name=${encodeURIComponent(value)}`,
+          `${url}${separator}name=${encodeURIComponent(value)}${emailParam}`,
           { headers: { Accept: 'application/json' } }
         );
         if (requestId !== requestCounter) return;
