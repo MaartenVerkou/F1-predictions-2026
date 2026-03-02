@@ -42,7 +42,7 @@
         <tr>
           <td><%= row.name %></td>
           <td><%= row.owner_name %></td>
-          <td><%= new Date(row.created_at).toLocaleString() %></td>
+          <td><%= formatAdminDateTime(row.created_at) %></td>
           <td>
             <div class="table-actions">
               <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
@@ -73,7 +73,7 @@
     | Admin responses: <strong><%= Number(adminStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(adminStats?.groups_count || 0) %></strong>
     <% if (adminStats?.last_activity_at) { %>
-      | Last activity: <strong><%= new Date(adminStats.last_activity_at).toLocaleString() %></strong>
+      | Last activity: <strong><%= formatAdminDateTime(adminStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -107,7 +107,7 @@
                 </form>
               <% } %>
             </td>
-            <td><%= new Date(row.created_at).toLocaleString() %></td>
+            <td><%= formatAdminDateTime(row.created_at) %></td>
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/remove-admin">
@@ -132,7 +132,7 @@
     | User responses: <strong><%= Number(userStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(userStats?.groups_count || 0) %></strong>
     <% if (userStats?.last_activity_at) { %>
-      | Last activity: <strong><%= new Date(userStats.last_activity_at).toLocaleString() %></strong>
+      | Last activity: <strong><%= formatAdminDateTime(userStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -161,7 +161,7 @@
                 </form>
               <% } %>
             </td>
-            <td><%= new Date(row.created_at).toLocaleString() %></td>
+            <td><%= formatAdminDateTime(row.created_at) %></td>
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/make-admin">
@@ -195,7 +195,7 @@
     | Named guest responses: <strong><%= Number(namedGuestStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(namedGuestStats?.group_count || 0) %></strong>
     <% if (namedGuestStats?.last_activity_at) { %>
-      | Last activity: <strong><%= new Date(namedGuestStats.last_activity_at).toLocaleString() %></strong>
+      | Last activity: <strong><%= formatAdminDateTime(namedGuestStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -235,8 +235,8 @@
             <td><%= Number(row.questions_count || 0) %></td>
             <td><%= Number(row.groups_count || 0) %></td>
             <td><%= row.latest_group_name || '-' %></td>
-            <td><%= row.first_seen_at ? new Date(row.first_seen_at).toLocaleString() : '-' %></td>
-            <td><%= row.last_seen_at ? new Date(row.last_seen_at).toLocaleString() : '-' %></td>
+            <td><%= formatAdminDateTime(row.first_seen_at) %></td>
+            <td><%= formatAdminDateTime(row.last_seen_at) %></td>
           </tr>
         <% }) %>
       <% } %>
@@ -259,7 +259,7 @@
     | Visitor responses: <strong><%= Number(visitorStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(visitorStats?.group_count || 0) %></strong>
     <% if (visitorStats?.last_activity_at) { %>
-      | Last activity: <strong><%= new Date(visitorStats.last_activity_at).toLocaleString() %></strong>
+      | Last activity: <strong><%= formatAdminDateTime(visitorStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -293,8 +293,8 @@
             <td><%= Number(row.questions_count || 0) %></td>
             <td><%= Number(row.groups_count || 0) %></td>
             <td><%= row.latest_group_name || '-' %></td>
-            <td><%= row.first_seen_at ? new Date(row.first_seen_at).toLocaleString() : '-' %></td>
-            <td><%= row.last_seen_at ? new Date(row.last_seen_at).toLocaleString() : '-' %></td>
+            <td><%= formatAdminDateTime(row.first_seen_at) %></td>
+            <td><%= formatAdminDateTime(row.last_seen_at) %></td>
           </tr>
         <% }) %>
       <% } %>

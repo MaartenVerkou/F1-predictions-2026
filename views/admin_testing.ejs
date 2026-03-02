@@ -45,7 +45,7 @@
             <td><%= row.name %></td>
             <td><%= row.owner_name %></td>
             <td><%= Number(row.total_members || 0) %></td>
-            <td><%= new Date(row.created_at).toLocaleString() %></td>
+            <td><%= formatAdminDateTime(row.created_at) %></td>
             <td>
               <div class="table-actions">
                 <a class="link" href="/admin/analysis/<%= row.id %>?mode=actuals">Analyze actuals</a>

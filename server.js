@@ -188,6 +188,23 @@ function formatCloseDateForRules(locale = DEFAULT_LOCALE) {
   });
 }
 
+function formatAdminDateTime(value) {
+  if (!value) return "-";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date
+    .toLocaleString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    })
+    .replace(",", "");
+}
+
 function loadLocale(locale) {
   if (!SUPPORTED_LOCALES.includes(locale)) return {};
   if (localeCache.has(locale)) return localeCache.get(locale);
@@ -775,6 +792,7 @@ app.use((req, res, next) => {
   res.locals.baseUrl = BASE_URL;
   res.locals.companyName = COMPANY_NAME;
   res.locals.isDevelopment = IS_DEVELOPMENT;
+  res.locals.formatAdminDateTime = formatAdminDateTime;
   res.locals.groupPath = (group, suffix = "") => {
     const base = getGroupBasePath(group);
     const tail = String(suffix || "");
