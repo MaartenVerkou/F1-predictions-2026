@@ -14,7 +14,7 @@
   <div class="page-title-row">
     <h1><%= group.name %>: <%= t('questions.page_title') %></h1>
     <% if (!guestMode || namedGuestMode) { %>
-      <a class="link page-back-link" href="<%= currentGroupPath %>">&lt; Back</a>
+      <a class="link page-back-link" href="<%= currentGroupPath %>">&lt; <%= t('group.back_to_group') %></a>
     <% } %>
   </div>
   <div class="group-rules-box">
@@ -39,7 +39,11 @@
     <div class="alert"><%= t('questions.closed_message') %></div>
   <% } %>
 
-  <% if (prefillNotice) { %>
+  <% if (prefillNoticePrefix != null && prefillSourceGroupName && prefillSourceGroupPath) { %>
+    <p class="muted" style="margin:0 0 14px;">
+      <%= prefillNoticePrefix %><a class="link underlined-link" href="<%= prefillSourceGroupPath %>"><%= prefillSourceGroupName %></a><%= prefillNoticeSuffix || '' %>
+    </p>
+  <% } else if (prefillNotice) { %>
     <p class="muted" style="margin:0 0 14px;"><%= prefillNotice %></p>
   <% } %>
 
@@ -376,7 +380,17 @@
                 <% }) %>
                 <option value="tie" <%= saved.winner === 'tie' ? 'selected' : '' %>><%= t('questions.tie') %></option>
               </select>
-              <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= saved.diff ?? '' %>" />
+              <div class="number-spinner" data-number-spinner>
+                <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= saved.diff ?? '' %>" />
+                <div class="number-spinner-controls">
+                  <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
+                    <span aria-hidden="true">^</span>
+                  </button>
+                  <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="Decrease value" title="Decrease value">
+                    <span aria-hidden="true">^</span>
+                  </button>
+                </div>
+              </div>
             </div>
           <% } else if (type === 'boolean_with_optional_driver') { 
             let saved = {};

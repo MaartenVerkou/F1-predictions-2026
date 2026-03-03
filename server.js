@@ -366,6 +366,13 @@ db.exec(`
     created_at TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS pending_guest_claims (
+    user_id INTEGER PRIMARY KEY,
+    guest_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
 `);
 
 function ensureGroupColumns() {
@@ -1482,8 +1489,10 @@ function getResponsesForGroup(groupId, { includeNamedGuests = true } = {}) {
     .all(normalizedGroupId, normalizedGroupId);
 }
 
-function claimGuestResponsesForUser(req, userId) {
-  const guestId = getGuestIdFromSession(req, { create: false });
+function claimGuestResponsesForUser(req, userId, options = {}) {
+  const sessionGuestId = getGuestIdFromSession(req, { create: false });
+  const fallbackGuestId = String(options?.fallbackGuestId || "").trim();
+  const guestId = sessionGuestId || fallbackGuestId;
   const normalizedUserId = Number(userId || 0);
   if (!guestId || !normalizedUserId) return;
   const globalGroup = ensureGlobalGroup(normalizedUserId);
@@ -1560,7 +1569,7 @@ function claimGuestResponsesForUser(req, userId) {
     db.prepare("DELETE FROM named_guest_group_members WHERE guest_id = ?").run(guestId);
   });
   tx();
-  if (req?.session) {
+  if (req?.session && sessionGuestId) {
     req.session.guestId = null;
     req.session.namedGuestAccess = null;
   }
@@ -2918,24 +2927,41 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
   const canCoupleToGlobal = canCoupleToGlobalBase && hasGlobalResponses;
   const coupledToGlobal = canCoupleToGlobal ? isCoupledToGlobal(user.id, groupId) : false;
   let prefillNotice = null;
+  let prefillNoticePrefix = null;
+  let prefillNoticeSuffix = null;
+  let prefillSourceGroupName = null;
+  let prefillSourceGroupPath = null;
   let answers = currentAnswers;
+
+  const setPrefillNoticeWithLink = (groupName, groupQuestionsPath) => {
+    prefillNotice = translate(locale, "questions.prefilled_from_group", {
+      group_name: groupName
+    });
+    prefillSourceGroupName = String(groupName || "").trim();
+    prefillSourceGroupPath = String(groupQuestionsPath || "").trim();
+    const marker = "__GROUP_NAME__";
+    const template = translate(locale, "questions.prefilled_from_group", {
+      group_name: marker
+    });
+    const markerIndex = template.indexOf(marker);
+    if (markerIndex >= 0) {
+      prefillNoticePrefix = template.slice(0, markerIndex);
+      prefillNoticeSuffix = template.slice(markerIndex + marker.length);
+    }
+  };
 
   if (canCoupleToGlobal && coupledToGlobal) {
     syncFromGlobalIfCoupled(user.id, groupId);
     const globalAnswers = getResponsesByGroup(user.id, globalGroup.id);
     answers = globalAnswers;
-    prefillNotice = translate(locale, "questions.prefilled_from_group", {
-      group_name: globalGroup.name
-    });
+    setPrefillNoticeWithLink(globalGroup.name, `${getGroupBasePath(globalGroup)}/questions`);
   } else if (Object.keys(currentAnswers).length === 0) {
     const copyGlobalGroup = copyGroups.find((row) => row.is_global === 1);
     if (copyGlobalGroup) {
       const globalAnswers = getResponsesByGroup(user.id, copyGlobalGroup.id);
       if (Object.keys(globalAnswers).length > 0) {
         answers = globalAnswers;
-        prefillNotice = translate(locale, "questions.prefilled_from_group", {
-          group_name: copyGlobalGroup.name
-        });
+        setPrefillNoticeWithLink(copyGlobalGroup.name, "/global/questions");
       }
     }
   }
@@ -2949,6 +2975,10 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
     questions,
     answers,
     prefillNotice,
+    prefillNoticePrefix,
+    prefillNoticeSuffix,
+    prefillSourceGroupName,
+    prefillSourceGroupPath,
     roster,
     races,
     closed,

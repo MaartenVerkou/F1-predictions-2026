@@ -30,7 +30,7 @@
   "signup": {
     "page_title": "Registrieren",
     "heading": "Konto erstellen",
-    "name_hint": "Waehle einen lustigen Kontonamen. Es muss nicht dein echter Name sein.",
+    "name_hint": "Waehle einen eindeutigen Benutzernamen.",
     "verify_required": "Kontobestätigung vor dem Login erforderlich.",
     "confirm_password": "Passwort bestätigen",
     "create_account": "Konto erstellen",
@@ -72,6 +72,7 @@
     "view_group_responses": "Gruppenantworten ansehen",
     "view_global_responses": "Globale Antworten ansehen",
     "back_to_group": "Zurueck zur Gruppe",
+    "back_to_dashboard": "Zurueck zum Dashboard",
     "leave_group": "Gruppe verlassen",
     "leave_confirm": "Diese Gruppe verlassen?",
     "edit_rules": "Gruppenregeln bearbeiten",
@@ -161,19 +162,19 @@
     "tip_race_gp_wins_only": "Nur Grand-Prix-Siege.",
     "tip_races_grand_prix_only": "Nur Grand-Prix-Rennen.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+    "tip_damage_source": "Bestimmt durch https://www.racingstatisticsf1.com/f1-destructors-championship"
   },
   "join_guest": {
     "page_title": "Als Gast beitreten",
     "title": "{group_name} beitreten",
     "subtitle": "Nutze diesen Einladungslink als Gast oder erstelle ein Konto.",
-    "account_name_label": "Account-Name",
-    "account_name_placeholder": "Waehle einen Account-Namen",
+    "account_name_label": "Benutzername",
+    "account_name_placeholder": "Waehle einen Benutzernamen",
     "group_password_label": "Gruppenpasswort",
     "join_as_guest": "Als Gast beitreten",
     "note": "Gast-Antworten koennen spaeter nicht wiederhergestellt werden. Erstelle ein verifiziertes Konto, um spaeter zu bearbeiten, weiteren Gruppen beizutreten und im Global-Ranking zu erscheinen.",
-    "error_name_invalid": "Der Account-Name muss 2 bis 40 Zeichen lang sein.",
-    "error_name_taken": "Dieser Account-Name wird in dieser Gruppe bereits verwendet.",
+    "error_name_invalid": "Der Benutzername muss 2 bis 40 Zeichen lang sein.",
+    "error_name_taken": "Dieser Benutzername wird in dieser Gruppe bereits verwendet.",
     "error_password_required": "Gruppenpasswort ist erforderlich.",
     "error_password_invalid": "Gruppenpasswort ist falsch."
   },

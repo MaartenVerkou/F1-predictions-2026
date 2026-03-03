@@ -1,10 +1,16 @@
 <%- include('partials/header', { title: `Admin user: ${targetUser.name}`, user }) %>
 <%- include('partials/admin_nav', { active: 'overview' }) %>
+<% const formatAdminDate = (value) => {
+  if (!value) return '-';
+  if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+}; %>
 
 <div class="card">
   <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
     <h1 style="margin:0;">User overview</h1>
-    <a class="link" href="<%= returnTo %>">&lt; Back</a>
+    <a class="link" href="<%= returnTo %>">&lt; Back to admin overview</a>
   </div>
 
   <h2 style="margin-top:0;"><%= targetUser.name %></h2>
@@ -28,11 +34,11 @@
       </tr>
       <tr>
         <th>Created</th>
-        <td><%= formatAdminDateTime(targetUser.created_at) %></td>
+        <td><%= formatAdminDate(targetUser.created_at) %></td>
       </tr>
       <tr>
         <th>Verified at</th>
-        <td><%= formatAdminDateTime(targetUser.verified_at) %></td>
+        <td><%= formatAdminDate(targetUser.verified_at) %></td>
       </tr>
       <tr>
         <th>Total responses</th>
@@ -48,7 +54,7 @@
       </tr>
       <tr>
         <th>Last response</th>
-        <td><%= formatAdminDateTime(responseStats?.last_updated_at) %></td>
+        <td><%= formatAdminDate(responseStats?.last_updated_at) %></td>
       </tr>
     </tbody>
   </table>
@@ -73,7 +79,7 @@
           <tr>
             <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
             <td><%= row.role %></td>
-            <td><%= formatAdminDateTime(row.joined_at) %></td>
+            <td><%= formatAdminDate(row.joined_at) %></td>
           </tr>
         <% }) %>
       <% } %>
@@ -102,7 +108,7 @@
             <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
             <td><code class="admin-question-code"><%= row.question_id %></code></td>
             <td><code class="admin-question-code"><%= row.answer %></code></td>
-            <td><%= formatAdminDateTime(row.updated_at) %></td>
+            <td><%= formatAdminDate(row.updated_at) %></td>
           </tr>
         <% }) %>
       <% } %>

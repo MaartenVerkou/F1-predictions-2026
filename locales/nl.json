@@ -30,7 +30,7 @@
   "signup": {
     "page_title": "Registreren",
     "heading": "Maak je account aan",
-    "name_hint": "Kies een leuke accountnaam. Dat hoeft niet je echte naam te zijn.",
+    "name_hint": "Kies een unieke gebruikersnaam.",
     "verify_required": "Accountverificatie is vereist voor inloggen.",
     "confirm_password": "Bevestig wachtwoord",
     "create_account": "Account aanmaken",
@@ -72,6 +72,7 @@
     "view_group_responses": "Bekijk groepsreacties",
     "view_global_responses": "Bekijk Global-reacties",
     "back_to_group": "Terug naar groep",
+    "back_to_dashboard": "Terug naar dashboard",
     "leave_group": "Groep verlaten",
     "leave_confirm": "Deze groep verlaten?",
     "edit_rules": "Groepsregels bewerken",
@@ -161,19 +162,19 @@
     "tip_race_gp_wins_only": "Alleen Grand Prix-zeges.",
     "tip_races_grand_prix_only": "Alleen Grand Prix-races.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+    "tip_damage_source": "Zoals bepaald door https://www.racingstatisticsf1.com/f1-destructors-championship"
   },
   "join_guest": {
     "page_title": "Joinen als gast",
     "title": "Join {group_name}",
     "subtitle": "Gebruik deze invite als gast, of maak een account.",
-    "account_name_label": "Accountnaam",
-    "account_name_placeholder": "Kies een accountnaam",
+    "account_name_label": "Gebruikersnaam",
+    "account_name_placeholder": "Kies een gebruikersnaam",
     "group_password_label": "Groepswachtwoord",
     "join_as_guest": "Join as guest",
     "note": "Gastantwoorden kunnen later niet worden hersteld. Maak een geverifieerd account om te blijven aanpassen, andere groepen te joinen en mee te doen in de Global-ranking.",
-    "error_name_invalid": "Accountnaam moet tussen 2 en 40 tekens zijn.",
-    "error_name_taken": "Die accountnaam is al in gebruik in deze groep.",
+    "error_name_invalid": "Gebruikersnaam moet tussen 2 en 40 tekens zijn.",
+    "error_name_taken": "Die gebruikersnaam is al in gebruik in deze groep.",
     "error_password_required": "Groepswachtwoord is verplicht.",
     "error_password_invalid": "Groepswachtwoord is onjuist."
   },

@@ -1,10 +1,16 @@
 <%- include('partials/header', { title: `Admin guest: ${namedGuestProfile?.display_name || guestId}`, user }) %>
 <%- include('partials/admin_nav', { active: 'overview' }) %>
+<% const formatAdminDate = (value) => {
+  if (!value) return '-';
+  if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+}; %>
 
 <div class="card">
   <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
     <h1 style="margin:0;">Guest overview</h1>
-    <a class="link" href="<%= returnTo %>">&lt; Back</a>
+    <a class="link" href="<%= returnTo %>">&lt; Back to admin overview</a>
   </div>
 
   <h2 style="margin-top:0;"><%= namedGuestProfile ? "Named guest" : "Guest ID" %></h2>
@@ -29,11 +35,11 @@
       </tr>
       <tr>
         <th>First seen</th>
-        <td><%= formatAdminDateTime(guestStats?.first_seen_at) %></td>
+        <td><%= formatAdminDate(guestStats?.first_seen_at) %></td>
       </tr>
       <tr>
         <th>Last response</th>
-        <td><%= formatAdminDateTime(guestStats?.last_seen_at) %></td>
+        <td><%= formatAdminDate(guestStats?.last_seen_at) %></td>
       </tr>
     </tbody>
   </table>
@@ -60,7 +66,7 @@
             <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
             <td><%= Number(row.responses_count || 0) %></td>
             <td><%= Number(row.questions_count || 0) %></td>
-            <td><%= formatAdminDateTime(row.last_updated_at) %></td>
+            <td><%= formatAdminDate(row.last_updated_at) %></td>
           </tr>
         <% }) %>
       <% } %>
@@ -89,7 +95,7 @@
             <td><a class="link" href="<%= groupPath %>"><%= row.group_name %></a></td>
             <td><code class="admin-question-code"><%= row.question_id %></code></td>
             <td><code class="admin-question-code"><%= row.answer %></code></td>
-            <td><%= formatAdminDateTime(row.updated_at) %></td>
+            <td><%= formatAdminDate(row.updated_at) %></td>
           </tr>
         <% }) %>
       <% } %>

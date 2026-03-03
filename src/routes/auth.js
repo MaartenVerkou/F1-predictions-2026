@@ -127,9 +127,47 @@ function registerAuthRoutes(app, deps) {
     });
   };
 
+  const normalizeSuggestedUserName = (rawValue) =>
+    String(rawValue || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const buildAvailableUserNameSuggestion = (rawBaseName) => {
+    const baseName = normalizeSuggestedUserName(rawBaseName);
+    if (!baseName) return "";
+
+    const existingBase = db
+      .prepare("SELECT id FROM users WHERE name = ?")
+      .get(baseName);
+    if (!existingBase) return baseName;
+
+    const randomTwoDigits = () => String(Math.floor(Math.random() * 90) + 10);
+    for (let i = 0; i < 80; i += 1) {
+      const candidate = `${baseName}_${randomTwoDigits()}`;
+      const exists = db
+        .prepare("SELECT id FROM users WHERE name = ?")
+        .get(candidate);
+      if (!exists) return candidate;
+    }
+
+    // Fallback if random retries collide unusually often.
+    for (let n = 100; n < 1000; n += 1) {
+      const candidate = `${baseName}_${n}`;
+      const exists = db
+        .prepare("SELECT id FROM users WHERE name = ?")
+        .get(candidate);
+      if (!exists) return candidate;
+    }
+
+    return baseName;
+  };
+
   app.get(["/signup", "/register"], (req, res) => {
+    const namedGuestDisplayName = String(req.session?.namedGuestAccess?.displayName || "");
+    const suggestedName = buildAvailableUserNameSuggestion(namedGuestDisplayName);
     renderSignup(res, {
       form: {
+        name: suggestedName,
         redirectTo: sanitizeRedirectPath(req.query.redirectTo || "/")
       }
     });
@@ -161,6 +199,11 @@ function registerAuthRoutes(app, deps) {
     const redirectTo = sanitizeRedirectPath(req.body.redirectTo || "/");
     const normalizedName = rawName.trim();
     const normalizedEmail = rawEmail.trim().toLowerCase();
+    const isDevVerifyShortcut =
+      NODE_ENV !== "production" && normalizedEmail === "verify@account.com";
+    const effectiveEmail = isDevVerifyShortcut
+      ? `verify-${Date.now()}-${String(generateToken()).slice(0, 8)}@example.local`
+      : normalizedEmail;
     const signupForm = { name: normalizedName, email: normalizedEmail, redirectTo };
 
     if (!normalizedName || !normalizedEmail || !password || !passwordConfirm) {
@@ -182,10 +225,10 @@ function registerAuthRoutes(app, deps) {
       });
     }
 
-    const shouldBeAdmin = ADMIN_EMAILS.has(normalizedEmail);
+    const shouldBeAdmin = ADMIN_EMAILS.has(effectiveEmail);
     const existing = db
       .prepare("SELECT id, is_verified FROM users WHERE email = ?")
-      .get(normalizedEmail);
+      .get(effectiveEmail);
     const nameTaken = existing && !existing.is_verified
       ? db
         .prepare("SELECT id FROM users WHERE name = ? AND id <> ?")
@@ -217,7 +260,7 @@ function registerAuthRoutes(app, deps) {
       );
       const info = stmt.run(
         normalizedName,
-        normalizedEmail,
+        effectiveEmail,
         passwordHash,
         now,
         shouldBeAdmin ? 1 : 0
@@ -225,17 +268,51 @@ function registerAuthRoutes(app, deps) {
       userId = info.lastInsertRowid;
     }
     ensureUserInGlobalGroup(userId);
+    const pendingGuestId = String(req.session?.guestId || "").trim();
+    if (pendingGuestId) {
+      db.prepare(
+        `
+        INSERT INTO pending_guest_claims (user_id, guest_id, created_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id)
+        DO UPDATE SET
+          guest_id = excluded.guest_id,
+          created_at = excluded.created_at
+        `
+      ).run(userId, pendingGuestId, now);
+    } else {
+      db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(userId);
+    }
+    if (isDevVerifyShortcut) {
+      db.prepare(
+        "UPDATE users SET is_verified = 1, verified_at = COALESCE(verified_at, ?) WHERE id = ?"
+      ).run(now, userId);
+      req.session.userId = userId;
+      const pendingGuestClaim = db
+        .prepare("SELECT guest_id FROM pending_guest_claims WHERE user_id = ?")
+        .get(userId);
+      const fallbackGuestId = String(pendingGuestClaim?.guest_id || "").trim();
+      if (typeof claimGuestResponsesForUser === "function") {
+        claimGuestResponsesForUser(req, userId, { fallbackGuestId });
+      }
+      db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(userId);
+      if (req.session) {
+        req.session.postVerifyRedirect = null;
+      }
+      return res.redirect(redirectTo && redirectTo !== "/" ? redirectTo : "/");
+    }
+
     req.session.postVerifyRedirect = redirectTo;
 
     const result = await issueAndSendVerificationEmail(
       userId,
-      normalizedEmail,
+      effectiveEmail,
       normalizedName,
       { redirectTo }
     );
     if (!result.ok && result.reason === "smtp_missing") {
       return res.render("verify_notice", {
-        email: normalizedEmail,
+        email: effectiveEmail,
         message: "SMTP is not configured. Use the link below to verify.",
         verifyUrl: result.verifyUrl,
         redirectTo,
@@ -244,7 +321,7 @@ function registerAuthRoutes(app, deps) {
     }
     if (!result.ok && result.reason === "send_failed") {
       return res.render("verify_notice", {
-        email: normalizedEmail,
+        email: effectiveEmail,
         message: "Email failed to send. Use the link below to verify.",
         verifyUrl: result.verifyUrl,
         redirectTo,
@@ -253,7 +330,7 @@ function registerAuthRoutes(app, deps) {
     }
 
     return res.render("verify_notice", {
-      email: normalizedEmail,
+      email: effectiveEmail,
       message: "Verification email sent. Please check your inbox and spam/junk folder.",
       verifyUrl: null,
       redirectTo,
@@ -315,6 +392,7 @@ function registerAuthRoutes(app, deps) {
     if (typeof claimGuestResponsesForUser === "function") {
       claimGuestResponsesForUser(req, user.id);
     }
+    db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(user.id);
     return res.redirect("/dashboard");
   });
 
@@ -584,9 +662,18 @@ function registerAuthRoutes(app, deps) {
       verification.user_id
     );
     req.session.userId = verification.user_id;
+    const pendingGuestClaim = db
+      .prepare("SELECT guest_id FROM pending_guest_claims WHERE user_id = ?")
+      .get(verification.user_id);
+    const fallbackGuestId = String(pendingGuestClaim?.guest_id || "").trim();
     if (typeof claimGuestResponsesForUser === "function") {
-      claimGuestResponsesForUser(req, verification.user_id);
+      claimGuestResponsesForUser(req, verification.user_id, {
+        fallbackGuestId
+      });
     }
+    db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(
+      verification.user_id
+    );
     const queryRedirect = sanitizeRedirectPath(req.query.redirect || "/");
     const sessionRedirect = sanitizeRedirectPath(req.session?.postVerifyRedirect || "/");
     const target = queryRedirect && queryRedirect !== "/" ? queryRedirect : sessionRedirect;

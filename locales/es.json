@@ -30,7 +30,7 @@
   "signup": {
     "page_title": "Registro",
     "heading": "Crea tu cuenta",
-    "name_hint": "Elige un nombre de cuenta divertido. No tiene que ser tu nombre real.",
+    "name_hint": "Elige un nombre de usuario unico.",
     "verify_required": "Se requiere verificación de cuenta antes de iniciar sesión.",
     "confirm_password": "Confirmar contraseña",
     "create_account": "Crear cuenta",
@@ -72,6 +72,7 @@
     "view_group_responses": "Ver respuestas del grupo",
     "view_global_responses": "Ver respuestas globales",
     "back_to_group": "Volver al grupo",
+    "back_to_dashboard": "Volver al panel",
     "leave_group": "Salir del grupo",
     "leave_confirm": "Salir de este grupo?",
     "edit_rules": "Editar reglas del grupo",
@@ -161,19 +162,19 @@
     "tip_race_gp_wins_only": "Solo victorias en Grandes Premios.",
     "tip_races_grand_prix_only": "Solo carreras de Gran Premio.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+    "tip_damage_source": "Segun lo determinado por https://www.racingstatisticsf1.com/f1-destructors-championship"
   },
   "join_guest": {
     "page_title": "Unirse como invitado",
     "title": "Unirse a {group_name}",
     "subtitle": "Usa este enlace de invitacion como invitado, o crea una cuenta.",
-    "account_name_label": "Nombre de cuenta",
-    "account_name_placeholder": "Elige un nombre de cuenta",
+    "account_name_label": "Nombre de usuario",
+    "account_name_placeholder": "Elige un nombre de usuario",
     "group_password_label": "Contrasena del grupo",
     "join_as_guest": "Unirse como invitado",
     "note": "Las respuestas de invitado no se pueden recuperar despues. Crea una cuenta verificada para seguir editando, unirte a otros grupos y aparecer en el ranking Global.",
-    "error_name_invalid": "El nombre de cuenta debe tener entre 2 y 40 caracteres.",
-    "error_name_taken": "Ese nombre de cuenta ya esta en uso en este grupo.",
+    "error_name_invalid": "El nombre de usuario debe tener entre 2 y 40 caracteres.",
+    "error_name_taken": "Ese nombre de usuario ya esta en uso en este grupo.",
     "error_password_required": "La contrasena del grupo es obligatoria.",
     "error_password_invalid": "La contrasena del grupo es incorrecta."
   },

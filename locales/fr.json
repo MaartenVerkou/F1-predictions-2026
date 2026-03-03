@@ -30,7 +30,7 @@
   "signup": {
     "page_title": "Inscription",
     "heading": "Creer votre compte",
-    "name_hint": "Choisis un nom de compte fun. Ce n'est pas oblige d'etre ton vrai nom.",
+    "name_hint": "Choisis un nom d'utilisateur unique.",
     "verify_required": "La verification du compte est requise avant la connexion.",
     "confirm_password": "Confirmer le mot de passe",
     "create_account": "Creer le compte",
@@ -72,6 +72,7 @@
     "view_group_responses": "Voir les reponses du groupe",
     "view_global_responses": "Voir les reponses globales",
     "back_to_group": "Retour au groupe",
+    "back_to_dashboard": "Retour au tableau de bord",
     "leave_group": "Quitter le groupe",
     "leave_confirm": "Quitter ce groupe ?",
     "edit_rules": "Modifier les regles du groupe",
@@ -161,19 +162,19 @@
     "tip_race_gp_wins_only": "Victoires en Grand Prix uniquement.",
     "tip_races_grand_prix_only": "Courses de Grand Prix uniquement.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "As determined by https://www.racingstatisticsf1.com/f1-destructors-championship"
+    "tip_damage_source": "Determine par https://www.racingstatisticsf1.com/f1-destructors-championship"
   },
   "join_guest": {
     "page_title": "Rejoindre en invite",
     "title": "Rejoindre {group_name}",
     "subtitle": "Utilise ce lien d invitation en mode invite, ou cree un compte.",
-    "account_name_label": "Nom de compte",
-    "account_name_placeholder": "Choisis un nom de compte",
+    "account_name_label": "Nom d'utilisateur",
+    "account_name_placeholder": "Choisis un nom d'utilisateur",
     "group_password_label": "Mot de passe du groupe",
     "join_as_guest": "Rejoindre en invite",
     "note": "Les reponses invite ne peuvent pas etre recuperees plus tard. Cree un compte verifie pour continuer a modifier, rejoindre d autres groupes et apparaitre dans le classement Global.",
-    "error_name_invalid": "Le nom de compte doit contenir entre 2 et 40 caracteres.",
-    "error_name_taken": "Ce nom de compte est deja utilise dans ce groupe.",
+    "error_name_invalid": "Le nom d'utilisateur doit contenir entre 2 et 40 caracteres.",
+    "error_name_taken": "Ce nom d'utilisateur est deja utilise dans ce groupe.",
     "error_password_required": "Le mot de passe du groupe est requis.",
     "error_password_invalid": "Le mot de passe du groupe est incorrect."
   },

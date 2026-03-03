@@ -1,5 +1,11 @@
 <%- include('partials/header', { title: 'Admin overview', user }) %>
 <%- include('partials/admin_nav', { active: 'overview' }) %>
+<% const formatAdminDate = (value) => {
+  if (!value) return '-';
+  if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+}; %>
 
 <div class="card">
   <% const overviewReturn = `/admin/overview?groupPage=${currentGroupPage}&usersPage=${currentUserPage}&namedGuestPage=${currentNamedGuestPage}&visitorPage=${currentVisitorPage}`; %>
@@ -42,7 +48,7 @@
         <tr>
           <td><%= row.name %></td>
           <td><%= row.owner_name %></td>
-          <td><%= formatAdminDateTime(row.created_at) %></td>
+          <td><%= formatAdminDate(row.created_at) %></td>
           <td>
             <div class="table-actions">
               <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
@@ -73,7 +79,7 @@
     | Admin responses: <strong><%= Number(adminStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(adminStats?.groups_count || 0) %></strong>
     <% if (adminStats?.last_activity_at) { %>
-      | Last activity: <strong><%= formatAdminDateTime(adminStats.last_activity_at) %></strong>
+      | Last activity: <strong><%= formatAdminDate(adminStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -107,7 +113,7 @@
                 </form>
               <% } %>
             </td>
-            <td><%= formatAdminDateTime(row.created_at) %></td>
+            <td><%= formatAdminDate(row.created_at) %></td>
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/remove-admin">
@@ -132,7 +138,7 @@
     | User responses: <strong><%= Number(userStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(userStats?.groups_count || 0) %></strong>
     <% if (userStats?.last_activity_at) { %>
-      | Last activity: <strong><%= formatAdminDateTime(userStats.last_activity_at) %></strong>
+      | Last activity: <strong><%= formatAdminDate(userStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -161,7 +167,7 @@
                 </form>
               <% } %>
             </td>
-            <td><%= formatAdminDateTime(row.created_at) %></td>
+            <td><%= formatAdminDate(row.created_at) %></td>
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/make-admin">
@@ -195,7 +201,7 @@
     | Named guest responses: <strong><%= Number(namedGuestStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(namedGuestStats?.group_count || 0) %></strong>
     <% if (namedGuestStats?.last_activity_at) { %>
-      | Last activity: <strong><%= formatAdminDateTime(namedGuestStats.last_activity_at) %></strong>
+      | Last activity: <strong><%= formatAdminDate(namedGuestStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -235,8 +241,8 @@
             <td><%= Number(row.questions_count || 0) %></td>
             <td><%= Number(row.groups_count || 0) %></td>
             <td><%= row.latest_group_name || '-' %></td>
-            <td><%= formatAdminDateTime(row.first_seen_at) %></td>
-            <td><%= formatAdminDateTime(row.last_seen_at) %></td>
+            <td><%= formatAdminDate(row.first_seen_at) %></td>
+            <td><%= formatAdminDate(row.last_seen_at) %></td>
           </tr>
         <% }) %>
       <% } %>
@@ -259,7 +265,7 @@
     | Visitor responses: <strong><%= Number(visitorStats?.response_count || 0) %></strong>
     | Groups touched: <strong><%= Number(visitorStats?.group_count || 0) %></strong>
     <% if (visitorStats?.last_activity_at) { %>
-      | Last activity: <strong><%= formatAdminDateTime(visitorStats.last_activity_at) %></strong>
+      | Last activity: <strong><%= formatAdminDate(visitorStats.last_activity_at) %></strong>
     <% } %>
   </p>
   <table class="table compact">
@@ -293,8 +299,8 @@
             <td><%= Number(row.questions_count || 0) %></td>
             <td><%= Number(row.groups_count || 0) %></td>
             <td><%= row.latest_group_name || '-' %></td>
-            <td><%= formatAdminDateTime(row.first_seen_at) %></td>
-            <td><%= formatAdminDateTime(row.last_seen_at) %></td>
+            <td><%= formatAdminDate(row.first_seen_at) %></td>
+            <td><%= formatAdminDate(row.last_seen_at) %></td>
           </tr>
         <% }) %>
       <% } %>

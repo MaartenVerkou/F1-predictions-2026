@@ -151,6 +151,45 @@ const initCopyButtons = () => {
   });
 };
 
+const initNumberSpinners = () => {
+  document.querySelectorAll('[data-number-spinner]').forEach(spinner => {
+    const input = spinner.querySelector('input[type="number"]');
+    if (!input) return;
+
+    const toStep = () => {
+      const parsed = Number(input.step);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    };
+    const toMin = () => {
+      const parsed = Number(input.min);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+    const toMax = () => {
+      const parsed = Number(input.max);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    spinner.querySelectorAll('[data-spinner-step]').forEach(button => {
+      button.addEventListener('click', () => {
+        if (input.disabled || input.readOnly) return;
+        const direction = button.dataset.spinnerStep === 'down' ? -1 : 1;
+        const step = toStep();
+        const min = toMin();
+        const max = toMax();
+        const current = input.value === '' ? (min != null ? min : 0) : Number(input.value);
+        const safeCurrent = Number.isFinite(current) ? current : (min != null ? min : 0);
+        let next = safeCurrent + direction * step;
+        if (min != null) next = Math.max(min, next);
+        if (max != null) next = Math.min(max, next);
+        input.value = String(next);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.focus({ preventScroll: true });
+      });
+    });
+  });
+};
+
 const initNameAvailabilityChecks = () => {
   document.querySelectorAll('input[data-name-check-url]').forEach(input => {
     const feedback = input.parentElement?.querySelector('[data-name-check-feedback]');
@@ -677,6 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDriverToggles();
   initTeammateDiffToggles();
   initNumberClamps();
+  initNumberSpinners();
   initCountdown();
   initCopyButtons();
   initNameAvailabilityChecks();

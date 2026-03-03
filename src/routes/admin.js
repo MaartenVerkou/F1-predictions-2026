@@ -1988,302 +1988,331 @@ function registerAdminRoutes(app, deps) {
   });
 
   app.get(["/admin/analysis", "/admin/testing"], requireAdmin, (req, res) => {
-    const user = getCurrentUser(req);
-    const adminError = req.query.error ? String(req.query.error) : null;
-    const adminSuccess = req.query.success ? String(req.query.success) : null;
-    const groupsPerPage = 10;
-    const requestedPage = Number(req.query.page || 1);
-    const currentPage =
-      Number.isFinite(requestedPage) && requestedPage > 0
-        ? Math.floor(requestedPage)
-        : 1;
+    try {
+      const user = getCurrentUser(req);
+      const adminError = req.query.error ? String(req.query.error) : null;
+      const adminSuccess = req.query.success ? String(req.query.success) : null;
+      const groupsPerPage = 10;
+      const requestedPage = Number(req.query.page || 1);
+      const currentPage =
+        Number.isFinite(requestedPage) && requestedPage > 0
+          ? Math.floor(requestedPage)
+          : 1;
 
-    const countRow = db
-      .prepare(
-        `
-        SELECT COUNT(*) as count
-        FROM groups g
-        WHERE COALESCE(g.is_simulated, 0) = 1
-          AND COALESCE(g.is_global, 0) = 0
-        `
-      )
-      .get();
-    const totalGroups = Number(countRow?.count || 0);
-    const totalPages = Math.max(1, Math.ceil(totalGroups / groupsPerPage));
-    const safePage = Math.min(currentPage, totalPages);
-    const offset = (safePage - 1) * groupsPerPage;
+      const countRow = db
+        .prepare(
+          `
+          SELECT COUNT(*) as count
+          FROM groups g
+          WHERE COALESCE(g.is_simulated, 0) = 1
+            AND COALESCE(g.is_global, 0) = 0
+          `
+        )
+        .get();
+      const totalGroups = Number(countRow?.count || 0);
+      const totalPages = Math.max(1, Math.ceil(totalGroups / groupsPerPage));
+      const safePage = Math.min(currentPage, totalPages);
+      const offset = (safePage - 1) * groupsPerPage;
 
-    const groups = db
-      .prepare(
-        `
-        SELECT
-          g.id,
-          g.name,
-          g.created_at,
-          owner.name as owner_name,
-          COUNT(gm.user_id) as total_members
-        FROM groups g
-        JOIN users owner ON owner.id = g.owner_id
-        LEFT JOIN group_members gm ON gm.group_id = g.id
-        WHERE COALESCE(g.is_simulated, 0) = 1
-          AND COALESCE(g.is_global, 0) = 0
-        GROUP BY g.id, g.name, g.created_at, owner.name
-        ORDER BY g.created_at DESC
-        LIMIT ? OFFSET ?
-        `
-      )
-      .all(groupsPerPage, offset);
+      const groups = db
+        .prepare(
+          `
+          SELECT
+            g.id,
+            g.name,
+            g.created_at,
+            owner.name as owner_name,
+            COUNT(gm.user_id) as total_members
+          FROM groups g
+          JOIN users owner ON owner.id = g.owner_id
+          LEFT JOIN group_members gm ON gm.group_id = g.id
+          WHERE COALESCE(g.is_simulated, 0) = 1
+            AND COALESCE(g.is_global, 0) = 0
+          GROUP BY g.id, g.name, g.created_at, owner.name
+          ORDER BY g.created_at DESC
+          LIMIT ? OFFSET ?
+          `
+        )
+        .all(groupsPerPage, offset);
 
-    return res.render("admin_testing", {
-      user,
-      adminError,
-      adminSuccess,
-      groups,
-      groupsPerPage,
-      currentPage: safePage,
-      totalPages
-    });
+      return res.render("admin_testing", {
+        user,
+        adminError,
+        adminSuccess,
+        groups,
+        groupsPerPage,
+        currentPage: safePage,
+        totalPages
+      });
+    } catch (err) {
+      console.error("Admin analysis list failed:", err);
+      return res.redirect(
+        `/admin/analysis?error=${encodeURIComponent(`Admin analysis failed: ${err.message}`)}`
+      );
+    }
   });
 
   app.get(
     ["/admin/analysis/:groupId", "/admin/testing/:groupId/analysis"],
     requireAdmin,
     (req, res) => {
-    const user = getCurrentUser(req);
-    const groupId = Number(req.params.groupId);
-    const mode = String(req.query.mode || "actuals").trim().toLowerCase();
-    const analysisMode = mode === "sim200" ? "sim200" : "actuals";
-    if (!groupId) {
-      return res.redirect(
-        `/admin/analysis?error=${encodeURIComponent("Invalid test group id.")}`
-      );
+      try {
+        const user = getCurrentUser(req);
+        const groupId = Number(req.params.groupId);
+        const mode = String(req.query.mode || "actuals").trim().toLowerCase();
+        const analysisMode = mode === "sim200" ? "sim200" : "actuals";
+        if (!groupId) {
+          return res.redirect(
+            `/admin/analysis?error=${encodeURIComponent("Invalid test group id.")}`
+          );
+        }
+
+        const group = db
+          .prepare(
+            `
+            SELECT id, name, created_at
+            FROM groups
+            WHERE id = ?
+              AND COALESCE(is_simulated, 0) = 1
+              AND COALESCE(is_global, 0) = 0
+            `
+          )
+          .get(groupId);
+        if (!group) {
+          return res.redirect(
+            `/admin/analysis?error=${encodeURIComponent("Test group not found.")}`
+          );
+        }
+
+        const simulatedMembers = db
+          .prepare(
+            `
+            SELECT u.id as user_id, u.name as user_name
+            FROM group_members gm
+            JOIN users u ON u.id = gm.user_id
+            WHERE gm.group_id = ?
+              AND COALESCE(u.is_simulated, 0) = 1
+            ORDER BY u.id ASC
+            `
+          )
+          .all(groupId);
+        if (simulatedMembers.length === 0) {
+          return res.redirect(
+            `/admin/analysis?error=${encodeURIComponent(
+              "This test group has no simulated players."
+            )}`
+          );
+        }
+
+        const responses = db
+          .prepare(
+            `
+            SELECT r.user_id, r.question_id, r.answer
+            FROM responses r
+            JOIN users u ON u.id = r.user_id
+            WHERE r.group_id = ?
+              AND COALESCE(u.is_simulated, 0) = 1
+            `
+          )
+          .all(groupId);
+
+        const questions = getQuestions("en");
+        const roster = getRoster();
+        const races = getRaces();
+        let analysis;
+        if (analysisMode === "sim200") {
+          const originalPlayerCount = Math.max(2, simulatedMembers.length);
+          const monteCarloPlayerCount = Math.min(originalPlayerCount, 1000);
+          analysis = buildMonteCarloAnalysis({
+            questions,
+            roster,
+            races,
+            playerCount: monteCarloPlayerCount,
+            seasons: 200,
+            originalPlayerCount
+          });
+        } else {
+          const actualRows = db.prepare("SELECT * FROM actuals").all();
+          const actualsMap = actualRows.reduce((acc, row) => {
+            acc[row.question_id] = row.value;
+            return acc;
+          }, {});
+          analysis = buildGroupAnalysis(
+            groupId,
+            questions,
+            actualsMap,
+            simulatedMembers,
+            responses
+          );
+        }
+
+        return res.render("admin_test_group_analysis", {
+          user,
+          group,
+          analysis,
+          analysisMode,
+          questions
+        });
+      } catch (err) {
+        console.error("Admin analysis detail failed:", err);
+        return res.redirect(
+          `/admin/analysis?error=${encodeURIComponent(`Analysis failed: ${err.message}`)}`
+        );
+      }
     }
-
-    const group = db
-      .prepare(
-        `
-        SELECT id, name, created_at
-        FROM groups
-        WHERE id = ?
-          AND COALESCE(is_simulated, 0) = 1
-          AND COALESCE(is_global, 0) = 0
-        `
-      )
-      .get(groupId);
-    if (!group) {
-      return res.redirect(
-        `/admin/analysis?error=${encodeURIComponent("Test group not found.")}`
-      );
-    }
-
-    const simulatedMembers = db
-      .prepare(
-        `
-        SELECT u.id as user_id, u.name as user_name
-        FROM group_members gm
-        JOIN users u ON u.id = gm.user_id
-        WHERE gm.group_id = ?
-          AND COALESCE(u.is_simulated, 0) = 1
-        ORDER BY u.id ASC
-        `
-      )
-      .all(groupId);
-    if (simulatedMembers.length === 0) {
-      return res.redirect(
-        `/admin/analysis?error=${encodeURIComponent(
-          "This test group has no simulated players."
-        )}`
-      );
-    }
-
-    const responses = db
-      .prepare(
-        `
-        SELECT r.user_id, r.question_id, r.answer
-        FROM responses r
-        JOIN users u ON u.id = r.user_id
-        WHERE r.group_id = ?
-          AND COALESCE(u.is_simulated, 0) = 1
-        `
-      )
-      .all(groupId);
-
-    const questions = getQuestions("en");
-    const roster = getRoster();
-    const races = getRaces();
-    let analysis;
-    if (analysisMode === "sim200") {
-      const originalPlayerCount = Math.max(2, simulatedMembers.length);
-      const monteCarloPlayerCount = Math.min(originalPlayerCount, 1000);
-      analysis = buildMonteCarloAnalysis({
-        questions,
-        roster,
-        races,
-        playerCount: monteCarloPlayerCount,
-        seasons: 200,
-        originalPlayerCount
-      });
-    } else {
-      const actualRows = db.prepare("SELECT * FROM actuals").all();
-      const actualsMap = actualRows.reduce((acc, row) => {
-        acc[row.question_id] = row.value;
-        return acc;
-      }, {});
-      analysis = buildGroupAnalysis(
-        groupId,
-        questions,
-        actualsMap,
-        simulatedMembers,
-        responses
-      );
-    }
-
-    return res.render("admin_test_group_analysis", {
-      user,
-      group,
-      analysis,
-      analysisMode,
-      questions
-    });
-  }
   );
 
   app.get(
     ["/admin/analysis/:groupId/leaderboard", "/admin/testing/:groupId/leaderboard"],
     requireAdmin,
     (req, res) => {
-      const user = getCurrentUser(req);
-      const locale = res.locals.locale || "en";
-      const groupId = Number(req.params.groupId);
-      const mode = String(req.query.mode || "actuals").trim().toLowerCase();
-      const leaderboardMode = mode === "sim200" ? "sim200" : "actuals";
+      try {
+        const user = getCurrentUser(req);
+        const locale = res.locals.locale || "en";
+        const groupId = Number(req.params.groupId);
+        const mode = String(req.query.mode || "actuals").trim().toLowerCase();
+        const leaderboardMode = mode === "sim200" ? "sim200" : "actuals";
 
-      if (!groupId) {
-        return res.redirect(
-          `/admin/analysis?error=${encodeURIComponent("Invalid test group id.")}`
-        );
-      }
-      if (leaderboardMode === "actuals") {
-        return res.redirect(`/groups/${groupId}/leaderboard`);
-      }
-
-      const group = db
-        .prepare(
-          `
-          SELECT id, name, created_at
-          FROM groups
-          WHERE id = ?
-            AND COALESCE(is_simulated, 0) = 1
-            AND COALESCE(is_global, 0) = 0
-          `
-        )
-        .get(groupId);
-      if (!group) {
-        return res.redirect(
-          `/admin/analysis?error=${encodeURIComponent("Test group not found.")}`
-        );
-      }
-
-      const members = db
-        .prepare(
-          `
-          SELECT u.id as user_id, u.name as user_name
-          FROM group_members gm
-          JOIN users u ON u.id = gm.user_id
-          WHERE gm.group_id = ?
-          ORDER BY u.name ASC
-          `
-        )
-        .all(groupId);
-
-      const responses = db
-        .prepare(
-          `
-          SELECT r.user_id, r.question_id, r.answer
-          FROM responses r
-          WHERE r.group_id = ?
-          `
-        )
-        .all(groupId);
-
-      const questions = getQuestions(locale);
-      const roster = getRoster();
-      const races = getRaces();
-      const model = buildPredictionModel(roster);
-      const syntheticActuals = buildSyntheticSeasonActuals(
-        questions,
-        roster,
-        races,
-        model
-      );
-      const actualsMap = {};
-      for (const question of questions) {
-        const value = syntheticActuals[question.id];
-        const raw = serializeAnswerForStorage(question, value);
-        if (raw != null && raw !== "") {
-          actualsMap[question.id] = raw;
+        if (!groupId) {
+          return res.redirect(
+            `/admin/analysis?error=${encodeURIComponent("Invalid test group id.")}`
+          );
         }
+        if (leaderboardMode === "actuals") {
+          return res.redirect(`/groups/${groupId}/leaderboard`);
+        }
+
+        const group = db
+          .prepare(
+            `
+            SELECT id, name, created_at
+            FROM groups
+            WHERE id = ?
+              AND COALESCE(is_simulated, 0) = 1
+              AND COALESCE(is_global, 0) = 0
+            `
+          )
+          .get(groupId);
+        if (!group) {
+          return res.redirect(
+            `/admin/analysis?error=${encodeURIComponent("Test group not found.")}`
+          );
+        }
+
+        const members = db
+          .prepare(
+            `
+            SELECT u.id as user_id, u.name as user_name
+            FROM group_members gm
+            JOIN users u ON u.id = gm.user_id
+            WHERE gm.group_id = ?
+            ORDER BY u.name ASC
+            `
+          )
+          .all(groupId);
+
+        const responses = db
+          .prepare(
+            `
+            SELECT r.user_id, r.question_id, r.answer
+            FROM responses r
+            WHERE r.group_id = ?
+            `
+          )
+          .all(groupId);
+
+        const questions = getQuestions(locale);
+        const roster = getRoster();
+        const races = getRaces();
+        const model = buildPredictionModel(roster);
+        const syntheticActuals = buildSyntheticSeasonActuals(
+          questions,
+          roster,
+          races,
+          model
+        );
+        const actualsMap = {};
+        for (const question of questions) {
+          const value = syntheticActuals[question.id];
+          const raw = serializeAnswerForStorage(question, value);
+          if (raw != null && raw !== "") {
+            actualsMap[question.id] = raw;
+          }
+        }
+
+        const fullLeaderboard = buildLeaderboardRows({
+          questions,
+          actualsMap,
+          members,
+          responses
+        });
+
+        const leaderboardPerPage = 25;
+        const requestedLeaderboardPage = Number(req.query.page || 1);
+        const currentLeaderboardPage =
+          Number.isFinite(requestedLeaderboardPage) && requestedLeaderboardPage > 0
+            ? Math.floor(requestedLeaderboardPage)
+            : 1;
+        const totalLeaderboardPages = Math.max(
+          1,
+          Math.ceil(fullLeaderboard.length / leaderboardPerPage)
+        );
+        const safeLeaderboardPage = Math.min(
+          currentLeaderboardPage,
+          totalLeaderboardPages
+        );
+        const leaderboardOffset = (safeLeaderboardPage - 1) * leaderboardPerPage;
+        const pagedLeaderboard = fullLeaderboard
+          .slice(leaderboardOffset, leaderboardOffset + leaderboardPerPage)
+          .map((row, index) => ({
+            ...row,
+            rank: leaderboardOffset + index + 1
+          }));
+
+        return res.render("leaderboard", {
+          user,
+          group: {
+            ...group,
+            name: `${group.name} (Simulated season preview)`
+          },
+          questions,
+          leaderboard: pagedLeaderboard,
+          actuals: actualsMap,
+          leaderboardTotal: fullLeaderboard.length,
+          leaderboardPerPage,
+          currentLeaderboardPage: safeLeaderboardPage,
+          totalLeaderboardPages,
+          leaderboardBasePath: `/admin/analysis/${groupId}/leaderboard`,
+          leaderboardQuery: "mode=sim200"
+        });
+      } catch (err) {
+        console.error("Admin analysis leaderboard failed:", err);
+        return res.redirect(
+          `/admin/analysis?error=${encodeURIComponent(`Leaderboard failed: ${err.message}`)}`
+        );
       }
-
-      const fullLeaderboard = buildLeaderboardRows({
-        questions,
-        actualsMap,
-        members,
-        responses
-      });
-
-      const leaderboardPerPage = 25;
-      const requestedLeaderboardPage = Number(req.query.page || 1);
-      const currentLeaderboardPage =
-        Number.isFinite(requestedLeaderboardPage) && requestedLeaderboardPage > 0
-          ? Math.floor(requestedLeaderboardPage)
-          : 1;
-      const totalLeaderboardPages = Math.max(
-        1,
-        Math.ceil(fullLeaderboard.length / leaderboardPerPage)
-      );
-      const safeLeaderboardPage = Math.min(
-        currentLeaderboardPage,
-        totalLeaderboardPages
-      );
-      const leaderboardOffset = (safeLeaderboardPage - 1) * leaderboardPerPage;
-      const pagedLeaderboard = fullLeaderboard
-        .slice(leaderboardOffset, leaderboardOffset + leaderboardPerPage)
-        .map((row, index) => ({
-          ...row,
-          rank: leaderboardOffset + index + 1
-        }));
-
-      return res.render("leaderboard", {
-        user,
-        group: {
-          ...group,
-          name: `${group.name} (Simulated season preview)`
-        },
-        questions,
-        leaderboard: pagedLeaderboard,
-        actuals: actualsMap,
-        leaderboardTotal: fullLeaderboard.length,
-        leaderboardPerPage,
-        currentLeaderboardPage: safeLeaderboardPage,
-        totalLeaderboardPages,
-        leaderboardBasePath: `/admin/analysis/${groupId}/leaderboard`,
-        leaderboardQuery: "mode=sim200"
-      });
     }
   );
 
   app.post("/admin/test-group", requireAdmin, (req, res) => {
     const adminUser = getCurrentUser(req);
     if (!adminUser) return res.redirect("/login");
+    const MAX_FAKE_PLAYERS = 1000;
 
     const now = new Date().toISOString();
     const requestedName = String(req.body.groupName || "").trim();
     const groupName =
       requestedName || `Test Group ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
     const rawCount = Number(req.body.fakePlayerCount || 0);
+    if (Number.isFinite(rawCount) && rawCount > MAX_FAKE_PLAYERS) {
+      return res.redirect(
+        `/admin/analysis?error=${encodeURIComponent(
+          `Max fake players is ${MAX_FAKE_PLAYERS} to keep analysis stable.`
+        )}`
+      );
+    }
     const fakePlayerCount = Number.isFinite(rawCount)
-      ? Math.max(1, Math.min(5000, Math.floor(rawCount)))
+      ? Math.max(1, Math.min(MAX_FAKE_PLAYERS, Math.floor(rawCount)))
       : 200;
 
     const questions = getQuestions("en");

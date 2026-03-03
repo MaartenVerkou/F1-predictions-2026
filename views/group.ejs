@@ -6,7 +6,7 @@
     <div class="page-title-row">
       <h1><%= group.name %></h1>
       <% if (!isNamedGuest) { %>
-        <a class="link page-back-link" href="/dashboard">&lt; Back</a>
+        <a class="link page-back-link" href="/dashboard">&lt; <%= t('group.back_to_dashboard') %></a>
       <% } %>
     </div>
     <% if (!group.is_global) { %>

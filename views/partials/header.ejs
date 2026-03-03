@@ -97,7 +97,10 @@
                   <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
                 </span>
               <% } else { %>
-                <a class="link" href="/login"><%= t('header.login') %></a>
+                <a class="link" href="/login">
+                  <span class="header-nav-icon header-nav-icon-login" aria-hidden="true"></span>
+                  <span class="header-link-label"><%= t('header.login') %></span>
+                </a>
               <% } %>
               <% if (isDevelopment) { %>
                 <% const devMode = user ? (user.is_admin ? 'admin' : 'member') : 'guest'; %>
