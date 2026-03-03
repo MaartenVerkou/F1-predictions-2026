@@ -103,7 +103,10 @@
                 </a>
               <% } %>
               <% if (isDevelopment) { %>
-                <% const devMode = user ? (user.is_admin ? 'admin' : 'member') : 'guest'; %>
+                <% const devSessionMode = String(typeof devIdentityMode === 'string' ? devIdentityMode : '').trim().toLowerCase(); %>
+                <% const devMode = user
+                  ? (user.is_admin ? 'admin' : 'member')
+                  : (devSessionMode === 'named_guest' ? 'guest' : 'visitor'); %>
                 <div class="dev-switcher" aria-label="Development quick switch">
                   <form method="post" action="/dev/switch-user">
                     <input type="hidden" name="mode" value="admin" />
@@ -123,6 +126,16 @@
                       class="secondary dev-switch-btn <%= devMode === 'member' ? 'is-active' : '' %>"
                     >
                       Member
+                    </button>
+                  </form>
+                  <form method="post" action="/dev/switch-user">
+                    <input type="hidden" name="mode" value="visitor" />
+                    <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+                    <button
+                      type="submit"
+                      class="secondary dev-switch-btn <%= devMode === 'visitor' ? 'is-active' : '' %>"
+                    >
+                      Visitor
                     </button>
                   </form>
                   <form method="post" action="/dev/switch-user">

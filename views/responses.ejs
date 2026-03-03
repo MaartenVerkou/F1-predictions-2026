@@ -48,9 +48,21 @@
         if (!text) return;
         parts.push(text);
       };
-      addValue(entry.result);
-      addValue(entry.results);
-      const unique = Array.from(new Set(parts));
+
+      const hasExplicitResults = Array.isArray(entry.results) && entry.results.length > 0;
+      if (hasExplicitResults) {
+        addValue(entry.results);
+      } else {
+        addValue(entry.result);
+      }
+
+      const seen = new Set();
+      const unique = parts.filter((value) => {
+        const key = value.toLocaleLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       if (unique.length === 0) return t('questions.last_season_default_result');
       return unique.join(' / ');
     }; %>

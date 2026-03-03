@@ -742,6 +742,49 @@ function createVerifiedDevMemberUser() {
   return Number(info.lastInsertRowid);
 }
 
+function createDevNamedGuestSession(req) {
+  const ownerId = ensureDevAdminUser();
+  const now = new Date().toISOString();
+  const suffix = `${Date.now().toString(36)}${crypto.randomBytes(2).toString("hex")}`;
+  const groupName = `Dev Guest Group ${suffix}`;
+  const guestDisplayName = `Dev Guest ${suffix}`;
+  const rulesText =
+    "Development-only named guest sandbox. Auto-created from header dev switch.";
+  const groupId = generateUniqueGroupId();
+
+  db.prepare(
+    `
+    INSERT INTO groups (
+      id, name, owner_id, created_at, is_public, join_code, join_password_hash, rules_text, is_global, is_simulated, invite_link_open
+    )
+    VALUES (?, ?, ?, ?, 1, NULL, NULL, ?, 0, 0, 1)
+    `
+  ).run(groupId, groupName, ownerId, now, rulesText);
+  db.prepare(
+    "INSERT OR IGNORE INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, 'owner', ?)"
+  ).run(ownerId, groupId, now);
+
+  const invite = createInviteForGroup(groupId, ownerId);
+  if (!invite || !invite.code) {
+    throw new Error("Failed to create development invite link.");
+  }
+
+  req.session.userId = null;
+  req.session.devIdentityMode = "named_guest";
+  req.session.devAutoLoginSkipOnce = false;
+  req.session.guestId = crypto.randomBytes(12).toString("hex");
+  req.session.namedGuestAccess = null;
+  setNamedGuestAccess(req, {
+    inviteCode: String(invite.code),
+    groupId: Number(groupId),
+    displayName: guestDisplayName
+  });
+
+  return {
+    code: String(invite.code)
+  };
+}
+
 function sanitizeRedirectPath(rawValue) {
   const redirectToRaw = String(rawValue || "/").trim();
   if (redirectToRaw.startsWith("/")) {
@@ -799,6 +842,9 @@ app.use((req, res, next) => {
   res.locals.baseUrl = BASE_URL;
   res.locals.companyName = COMPANY_NAME;
   res.locals.isDevelopment = IS_DEVELOPMENT;
+  res.locals.devIdentityMode = String(req.session?.devIdentityMode || "")
+    .trim()
+    .toLowerCase();
   res.locals.formatAdminDateTime = formatAdminDateTime;
   res.locals.groupPath = (group, suffix = "") => {
     const base = getGroupBasePath(group);
@@ -828,13 +874,25 @@ app.post("/dev/switch-user", (req, res) => {
     return res.redirect(redirectTo);
   }
 
-  if (mode === "guest") {
+  if (mode === "visitor") {
     req.session.userId = null;
-    req.session.devIdentityMode = "guest";
+    req.session.devIdentityMode = "visitor";
     req.session.devAutoLoginSkipOnce = false;
     req.session.guestId = crypto.randomBytes(12).toString("hex");
     req.session.namedGuestAccess = null;
     return req.session.save(() => res.redirect(redirectTo));
+  }
+
+  if (mode === "guest") {
+    try {
+      const namedGuest = createDevNamedGuestSession(req);
+      return req.session.save(() =>
+        res.redirect(`/join/${encodeURIComponent(namedGuest.code)}/questions`)
+      );
+    } catch (err) {
+      console.error("Failed to create dev named guest session:", err);
+      return sendError(req, res, 500, "Failed to create dev named guest session.");
+    }
   }
 
   if (mode === "member") {
@@ -861,7 +919,7 @@ app.use((req, res, next) => {
   const identityMode = String(req.session?.devIdentityMode || "")
     .trim()
     .toLowerCase();
-  if (identityMode === "guest") {
+  if (identityMode === "visitor" || identityMode === "guest" || identityMode === "named_guest") {
     req.session.userId = null;
     return next();
   }
@@ -2539,7 +2597,9 @@ app.get("/join/:code/questions", (req, res) => {
     globalGroupName: "Global",
     groupBasePath: `/join/${code}`,
     isNamedGuestMode: true,
-    guestSignupRedirectPath: `/join/${code}`
+    guestSignupRedirectPath: `/join/${code}`,
+    namedGuestDisplayName: String(getNamedGuestAccessFromSession(req)?.displayName || "").trim(),
+    namedGuestShowBottomHint: req.query.saved === "1"
   });
 });
 
@@ -2604,7 +2664,7 @@ app.post("/join/:code/questions", (req, res) => {
     }
   });
   tx();
-  return res.redirect(`/join/${code}/questions`);
+  return res.redirect(`/join/${code}/questions?saved=1`);
 });
 
 app.post("/join/:code", requireAuth, async (req, res) => {

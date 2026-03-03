@@ -37,7 +37,12 @@
   <% } %>
   <% if (namedGuestMode) { %>
     <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
-    <p class="muted" style="margin:0 0 12px;"><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
+    <% const namedGuestName = (typeof namedGuestDisplayName === 'string' && namedGuestDisplayName.trim()) ? namedGuestDisplayName.trim() : t('questions.named_guest_fallback_name'); %>
+    <p class="muted named-guest-inline">
+      <button type="button" class="named-guest-toggle" data-named-guest-toggle aria-expanded="false" aria-controls="named-guest-inline-note"><%= t('questions.named_guest_label') %></button>
+      : <span class="named-guest-inline-name"><%= namedGuestName %></span>
+    </p>
+    <p class="muted named-guest-inline-note" id="named-guest-inline-note" data-named-guest-note hidden><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
   <% } %>
 
   <% if (closed) { %>
@@ -53,6 +58,7 @@
   <% } %>
 
   <form id="predictions-form" method="post" action="<%= `${currentGroupPath}/questions` %>">
+    <% const showNamedGuestBottomHint = namedGuestMode && (typeof namedGuestShowBottomHint !== 'undefined') && Boolean(namedGuestShowBottomHint); %>
     <% if (canCoupleToGlobal) { %>
       <div class="questions-couple-toggle">
         <label class="muted" style="display:inline-flex; align-items:center; gap:8px; font-weight:600;">
@@ -273,9 +279,21 @@
           if (!text) return;
           parts.push(text);
         };
-        addValue(entry.result);
-        addValue(entry.results);
-        const unique = Array.from(new Set(parts));
+
+        const hasExplicitResults = Array.isArray(entry.results) && entry.results.length > 0;
+        if (hasExplicitResults) {
+          addValue(entry.results);
+        } else {
+          addValue(entry.result);
+        }
+
+        const seen = new Set();
+        const unique = parts.filter((value) => {
+          const key = value.toLocaleLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
         if (unique.length === 0) return t('questions.last_season_default_result');
         return unique.join(' / ');
       }; %>
@@ -389,10 +407,14 @@
                 <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= saved.diff ?? '' %>" />
                 <div class="number-spinner-controls">
                   <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
-                    <span aria-hidden="true">^</span>
+                    <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                      <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
                   </button>
                   <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="Decrease value" title="Decrease value">
-                    <span aria-hidden="true">^</span>
+                    <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                      <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -477,25 +499,25 @@
         <a class="button-link" href="<%= guestSignupPath %>"><%= t('questions.visitor_cta_button') %></a>
       <% } else { %>
         <% const saveButtonLabel = (typeof guestSaveButtonLabel === 'string' && guestSaveButtonLabel.trim()) ? guestSaveButtonLabel : t('questions.save_predictions'); %>
-        <button type="submit" data-predictions-save-button <%= closed ? 'disabled' : '' %>><%= saveButtonLabel %></button>
-        <% if (namedGuestMode) { %>
-          <a class="button-link secondary" href="<%= `${currentGroupPath}/responses` %>"><%= t('questions.named_guest_view_responses_button') %></a>
-        <% } else { %>
-          <span
-            class="muted questions-autosave-status"
-            data-autosave-status
-            data-status-unsaved="<%= t('questions.autosave_unsaved') %>"
-            data-status-saving="<%= t('questions.autosave_saving') %>"
-            data-status-saved="<%= t('questions.autosave_saved') %>"
-            data-status-failed="<%= t('questions.autosave_failed') %>"
-            aria-live="polite"
-          ></span>
-        <% } %>
+        <button
+          type="submit"
+          data-predictions-save-button
+          <%= namedGuestMode ? 'data-named-guest-save-button' : '' %>
+          data-saving-label="<%= t('questions.autosave_saving') %>"
+          data-saved-label="<%= t('questions.autosave_saved') %>"
+          data-failed-label="<%= t('questions.autosave_failed') %>"
+          <%= closed ? 'disabled' : '' %>
+        ><%= saveButtonLabel %></button>
+        <a class="link underlined-link questions-responses-link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
       <% } %>
     </div>
     <% if (namedGuestMode) { %>
       <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
-      <p class="muted" style="margin:2px 0 0;"><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
+      <p
+        class="muted named-guest-save-feedback"
+        data-named-guest-save-feedback
+        <%= showNamedGuestBottomHint ? '' : 'hidden' %>
+      ><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
     <% } %>
     <div id="questions-form-end"></div>
   </form>

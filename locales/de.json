@@ -150,6 +150,8 @@
     "guest_cta_button": "Tipps speichern und Konto erstellen",
     "visitor_mode_notice_html": "Besuchermodus: {create_account_link}, um deine Tipps zu speichern, Gruppen zu erstellen/beitreten und Antwort-Einblicke zu sehen.",
     "visitor_cta_button": "Tipps speichern und Konto erstellen",
+    "named_guest_label": "Gast",
+    "named_guest_fallback_name": "Gast",
     "named_guest_account_notice_html": "Aenderungen koennen im Gastmodus verloren gehen. {create_account_link}, um Aenderungen zuverlaessig zu speichern, weiteren Gruppen beizutreten und im Global-Ranking zu erscheinen.",
     "named_guest_view_responses_button": "Gruppenantworten ansehen",
     "named_guest_mode_notice_html": "Gastmodus: {create_account_link}, um Tipps dauerhaft zu speichern, spaeter zu bearbeiten, weiteren Gruppen beizutreten und im Global-Ranking zu erscheinen.",

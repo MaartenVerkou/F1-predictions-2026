@@ -150,6 +150,8 @@
     "guest_cta_button": "Guardar predicciones y crear una cuenta",
     "visitor_mode_notice_html": "Modo visitante: {create_account_link} para guardar tus predicciones, crear/unirte a grupos y ver insights de respuestas.",
     "visitor_cta_button": "Guardar predicciones y crear una cuenta",
+    "named_guest_label": "Invitado",
+    "named_guest_fallback_name": "Invitado",
     "named_guest_account_notice_html": "Los cambios pueden perderse en modo invitado. {create_account_link} para guardar cambios de forma fiable, unirte a otros grupos y aparecer en el ranking Global.",
     "named_guest_view_responses_button": "Ver respuestas del grupo",
     "named_guest_mode_notice_html": "Modo invitado: {create_account_link} para guardar tus predicciones de forma permanente, editar despues, unirte a otros grupos y aparecer en el ranking Global.",

@@ -322,26 +322,124 @@ const initQuestionsCouplingToggle = () => {
   sync();
 };
 
+const initNamedGuestSaveFeedback = () => {
+  const form = document.querySelector('form#predictions-form');
+  if (!form) return;
+  const saveButton = form.querySelector('[data-named-guest-save-button]');
+  if (!saveButton) return;
+  const bottomHint = form.querySelector('[data-named-guest-save-feedback]');
+  const defaultLabel = saveButton.textContent.trim();
+  const savingLabel = saveButton.dataset.savingLabel || 'Saving...';
+  const savedLabel = saveButton.dataset.savedLabel || 'Saved';
+  const failedLabel = saveButton.dataset.failedLabel || 'Autosave failed';
+  let inFlight = false;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (inFlight) return;
+
+    if (bottomHint) {
+      bottomHint.removeAttribute('hidden');
+    }
+    if (saveButton.disabled) return;
+
+    inFlight = true;
+    saveButton.textContent = savingLabel;
+    saveButton.disabled = true;
+
+    try {
+      const payload = new URLSearchParams(new FormData(form)).toString();
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          Accept: 'text/html'
+        },
+        body: payload,
+        credentials: 'same-origin'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Named guest save failed with status ${response.status}`);
+      }
+
+      saveButton.textContent = savedLabel;
+      setTimeout(() => {
+        saveButton.textContent = defaultLabel;
+        saveButton.disabled = false;
+      }, 900);
+    } catch (err) {
+      saveButton.textContent = failedLabel;
+      setTimeout(() => {
+        saveButton.textContent = defaultLabel;
+        saveButton.disabled = false;
+      }, 1200);
+    } finally {
+      inFlight = false;
+    }
+  });
+};
+
+const initNamedGuestInlineNotice = () => {
+  const toggle = document.querySelector('[data-named-guest-toggle]');
+  const note = document.querySelector('[data-named-guest-note]');
+  if (!toggle || !note) return;
+
+  const sync = () => {
+    const expanded = !note.hasAttribute('hidden');
+    toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  };
+
+  toggle.addEventListener('click', () => {
+    if (note.hasAttribute('hidden')) {
+      note.removeAttribute('hidden');
+    } else {
+      note.setAttribute('hidden', '');
+    }
+    sync();
+  });
+
+  sync();
+};
+
 const initPredictionsAutosave = () => {
   const form = document.getElementById('predictions-form');
   if (!form) return;
+  if (form.querySelector('[data-named-guest-save-button]')) return;
 
   const saveButton = form.querySelector('[data-predictions-save-button]');
-  if (saveButton && saveButton.disabled) return;
+  if (!saveButton || saveButton.disabled) return;
 
-  const statusEl = form.querySelector('[data-autosave-status]');
+  const defaultLabel = saveButton.textContent.trim() || 'Save predictions';
   const messages = {
-    unsaved: statusEl?.dataset.statusUnsaved || 'Unsaved changes',
-    saving: statusEl?.dataset.statusSaving || 'Saving...',
-    saved: statusEl?.dataset.statusSaved || 'Saved',
-    failed: statusEl?.dataset.statusFailed || 'Autosave failed'
+    saving: saveButton.dataset.savingLabel || 'Saving...',
+    saved: saveButton.dataset.savedLabel || 'Saved',
+    failed: saveButton.dataset.failedLabel || 'Autosave failed'
   };
 
   const serializeForm = () => new URLSearchParams(new FormData(form)).toString();
-  const setStatus = (state) => {
-    if (!statusEl) return;
-    statusEl.dataset.state = state || '';
-    statusEl.textContent = messages[state] || '';
+  const setButtonState = (label, state = '', disabled = false) => {
+    saveButton.textContent = label;
+    if (state) saveButton.dataset.state = state;
+    else delete saveButton.dataset.state;
+    saveButton.disabled = disabled;
+  };
+  const setIdleButton = () => setButtonState(defaultLabel, '', false);
+  let restoreTimer = null;
+  const clearRestoreTimer = () => {
+    if (!restoreTimer) return;
+    clearTimeout(restoreTimer);
+    restoreTimer = null;
+  };
+  const showTransientButtonState = (label, state, durationMs = 900) => {
+    clearRestoreTimer();
+    setButtonState(label, state, false);
+    restoreTimer = setTimeout(() => {
+      restoreTimer = null;
+      if (inFlight) return;
+      if (serializeForm() !== lastSavedPayload) return;
+      setIdleButton();
+    }, durationMs);
   };
 
   let debounceTimer = null;
@@ -358,7 +456,7 @@ const initPredictionsAutosave = () => {
   const saveNow = async () => {
     const payload = serializeForm();
     if (payload === lastSavedPayload) {
-      setStatus('saved');
+      showTransientButtonState(messages.saved, 'saved', 700);
       return;
     }
     if (inFlight) {
@@ -368,7 +466,8 @@ const initPredictionsAutosave = () => {
 
     inFlight = true;
     pendingSave = false;
-    setStatus('saving');
+    clearRestoreTimer();
+    setButtonState(messages.saving, 'saving', true);
 
     try {
       const response = await fetch(form.action, {
@@ -384,9 +483,10 @@ const initPredictionsAutosave = () => {
         throw new Error(`Autosave failed with status ${response.status}`);
       }
       lastSavedPayload = payload;
-      setStatus('saved');
+      showTransientButtonState(messages.saved, 'saved', 900);
     } catch (err) {
-      setStatus('failed');
+      clearRestoreTimer();
+      setButtonState(messages.failed, 'failed', false);
       return;
     } finally {
       inFlight = false;
@@ -400,7 +500,7 @@ const initPredictionsAutosave = () => {
 
   const queueSave = () => {
     clearDebounce();
-    setStatus('unsaved');
+    setIdleButton();
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
       saveNow();
@@ -425,7 +525,7 @@ const initPredictionsAutosave = () => {
     await saveNow();
   });
 
-  setStatus('saved');
+  setIdleButton();
 };
 
 const initSignupPasswordMatch = () => {
@@ -722,6 +822,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initQuestionsCouplingToggle();
+  initNamedGuestInlineNotice();
+  initNamedGuestSaveFeedback();
   initPredictionsAutosave();
   initSignupPasswordMatch();
   initScrollToEndButton();
