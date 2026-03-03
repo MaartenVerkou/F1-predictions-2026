@@ -380,28 +380,6 @@ const initNamedGuestSaveFeedback = () => {
   });
 };
 
-const initNamedGuestInlineNotice = () => {
-  const toggle = document.querySelector('[data-named-guest-toggle]');
-  const note = document.querySelector('[data-named-guest-note]');
-  if (!toggle || !note) return;
-
-  const sync = () => {
-    const expanded = !note.hasAttribute('hidden');
-    toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-  };
-
-  toggle.addEventListener('click', () => {
-    if (note.hasAttribute('hidden')) {
-      note.removeAttribute('hidden');
-    } else {
-      note.setAttribute('hidden', '');
-    }
-    sync();
-  });
-
-  sync();
-};
-
 const initPredictionsAutosave = () => {
   const form = document.getElementById('predictions-form');
   if (!form) return;
@@ -822,7 +800,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initQuestionsCouplingToggle();
-  initNamedGuestInlineNotice();
   initNamedGuestSaveFeedback();
   initPredictionsAutosave();
   initSignupPasswordMatch();

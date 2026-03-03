@@ -39,10 +39,10 @@
     <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
     <% const namedGuestName = (typeof namedGuestDisplayName === 'string' && namedGuestDisplayName.trim()) ? namedGuestDisplayName.trim() : t('questions.named_guest_fallback_name'); %>
     <p class="muted named-guest-inline">
-      <button type="button" class="named-guest-toggle" data-named-guest-toggle aria-expanded="false" aria-controls="named-guest-inline-note"><%= t('questions.named_guest_label') %></button>
+      <span class="named-guest-inline-label"><%= t('questions.named_guest_label') %></span>
       : <span class="named-guest-inline-name"><%= namedGuestName %></span>
     </p>
-    <p class="muted named-guest-inline-note" id="named-guest-inline-note" data-named-guest-note hidden><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
+    <p class="muted named-guest-inline-note"><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
   <% } %>
 
   <% if (closed) { %>

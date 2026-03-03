@@ -842,59 +842,8 @@ button:disabled {
   line-height: 1.25;
 }
 
-.named-guest-toggle {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  margin: 0;
-  color: inherit;
-  font: inherit;
+.named-guest-inline-label {
   font-weight: 700;
-  text-decoration: none;
-  border-bottom: 1.5px dotted rgba(64, 82, 120, 0.95);
-  border-radius: 0;
-  padding-bottom: 1px;
-  line-height: 1;
-  cursor: pointer;
-  transition: color 0.12s ease, border-bottom-color 0.12s ease, border-bottom-style 0.12s ease;
-}
-
-.named-guest-toggle:hover:not(:disabled),
-.named-guest-toggle:active:not(:disabled) {
-  background: transparent;
-  color: color-mix(in srgb, var(--accent) 92%, var(--text));
-  transform: none;
-  box-shadow: none;
-  border-bottom-color: currentColor;
-  border-bottom-style: solid;
-}
-
-.named-guest-toggle:focus-visible {
-  background: transparent;
-  color: color-mix(in srgb, var(--accent) 92%, var(--text));
-  transform: none;
-  box-shadow: none;
-  border-bottom-color: currentColor;
-  border-bottom-style: solid;
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 2px;
-  border-radius: 0;
-}
-
-:root[data-theme="dark"] .named-guest-toggle {
-  border-bottom-color: rgba(169, 188, 224, 0.96);
-}
-
-:root[data-theme="dark"] .named-guest-toggle:hover:not(:disabled),
-:root[data-theme="dark"] .named-guest-toggle:active:not(:disabled),
-:root[data-theme="dark"] .named-guest-toggle:focus-visible {
-  background: transparent;
-  color: #ff9aa7;
-  transform: none;
-  box-shadow: none;
-  border-bottom-color: currentColor;
-  border-bottom-style: solid;
 }
 
 .named-guest-inline-name {
@@ -904,13 +853,6 @@ button:disabled {
 
 .named-guest-inline-note {
   margin: 2px 0 12px;
-}
-
-.named-guest-inline-note[hidden] {
-  display: block;
-  height: 0;
-  margin: 0 0 12px;
-  overflow: hidden;
 }
 
 .named-guest-save-feedback {
