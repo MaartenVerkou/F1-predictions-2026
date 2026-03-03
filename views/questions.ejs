@@ -508,7 +508,7 @@
           data-failed-label="<%= t('questions.autosave_failed') %>"
           <%= closed ? 'disabled' : '' %>
         ><%= saveButtonLabel %></button>
-        <a class="link underlined-link questions-responses-link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
+        <a class="link questions-responses-link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
       <% } %>
     </div>
     <% if (namedGuestMode) { %>
