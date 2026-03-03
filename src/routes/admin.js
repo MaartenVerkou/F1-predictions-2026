@@ -2021,14 +2021,12 @@ function registerAdminRoutes(app, deps) {
             g.id,
             g.name,
             g.created_at,
-            owner.name as owner_name,
             COUNT(gm.user_id) as total_members
           FROM groups g
-          JOIN users owner ON owner.id = g.owner_id
           LEFT JOIN group_members gm ON gm.group_id = g.id
           WHERE COALESCE(g.is_simulated, 0) = 1
             AND COALESCE(g.is_global, 0) = 0
-          GROUP BY g.id, g.name, g.created_at, owner.name
+          GROUP BY g.id, g.name, g.created_at
           ORDER BY g.created_at DESC
           LIMIT ? OFFSET ?
           `

@@ -115,7 +115,7 @@
     "autosave_saved": "Guardado",
     "autosave_failed": "Error al guardar automaticamente",
     "no_questions": "Aun no hay preguntas cargadas. Agregalas en data/questions.json.",
-    "prefilled_from_group": "Precargado desde {group_name}. Guarda para aplicar estas predicciones a este grupo.",
+    "prefilled_from_group": "Precargado desde {group_name}.",
     "no_saved_predictions": "{group_name} aun no tiene predicciones guardadas.",
     "no_options_loaded": "No hay opciones cargadas para esta pregunta. Revisa roster/races JSON.",
     "select_position": "Elegir posicion",

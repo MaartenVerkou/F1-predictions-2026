@@ -1618,6 +1618,31 @@ button:disabled {
   width: 1%;
 }
 
+.admin-analysis-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-analysis-groups-table {
+  min-width: 680px;
+}
+
+.admin-analysis-results-table {
+  min-width: 760px;
+}
+
+.admin-analysis-results-table td:first-child,
+.admin-analysis-results-table th:first-child {
+  min-width: 320px;
+}
+
+.admin-analysis-results-table code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .admin-toggle-btn {
   width: 132px;
   text-align: center;
@@ -2473,6 +2498,12 @@ header.is-collapsed .lang-popover {
   .group-member-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .admin-analysis-table-scroll .table.compact th,
+  .admin-analysis-table-scroll .table.compact td {
+    padding: 6px;
+    font-size: 12px;
   }
 }
 

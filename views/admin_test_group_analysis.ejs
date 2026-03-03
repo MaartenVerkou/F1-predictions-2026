@@ -76,33 +76,35 @@ const questionLabel = (questionId) => {
       No analyzable rows yet. Set season actuals first in Admin -> Actuals.
     </p>
   <% } else { %>
-    <table class="table compact">
-      <thead>
-        <tr>
-          <th>Question</th>
-          <th>Impact</th>
-          <th>Winner flips</th>
-          <th>Winner score share %</th>
-          <th>Winner points</th>
-          <th>Avg/player</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% analysis.rows.forEach((row) => { %>
+    <div class="admin-analysis-table-scroll" role="region" aria-label="Analysis results table" tabindex="0">
+      <table class="table compact admin-analysis-results-table">
+        <thead>
           <tr>
-            <td>
-              <div><%= questionLabel(row.id) %></div>
-              <code class="muted"><%= row.id %></code>
-            </td>
-            <td><%= row.impact %></td>
-            <td><%= row.flipPercent.toFixed(1) %>%</td>
-            <td><%= formatSig4(row.winnerShare) %>%</td>
-            <td><%= formatSig4(row.avgWinner) %></td>
-            <td><%= row.avgPlayer.toFixed(2) %></td>
+            <th>Question</th>
+            <th>Impact</th>
+            <th>Winner flips</th>
+            <th>Winner score share %</th>
+            <th>Winner points</th>
+            <th>Avg/player</th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% analysis.rows.forEach((row) => { %>
+            <tr>
+              <td>
+                <div><%= questionLabel(row.id) %></div>
+                <code class="muted"><%= row.id %></code>
+              </td>
+              <td><%= row.impact %></td>
+              <td><%= row.flipPercent.toFixed(1) %>%</td>
+              <td><%= formatSig4(row.winnerShare) %>%</td>
+              <td><%= formatSig4(row.avgWinner) %></td>
+              <td><%= row.avgPlayer.toFixed(2) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
 
     <p class="muted" style="margin-top: 12px;">
       Tip: if one row consistently dominates, lower its points or add nearby/partial scoring where possible.

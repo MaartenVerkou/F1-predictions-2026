@@ -6,6 +6,11 @@
   <% const namedGuestMode = (typeof isNamedGuestMode !== 'undefined') && Boolean(isNamedGuestMode); %>
   <% const legacyGuestMode = (typeof isGuestMode !== 'undefined') && Boolean(isGuestMode); %>
   <% const guestMode = visitorMode || namedGuestMode || legacyGuestMode; %>
+  <% const safePrefillNotice = (typeof prefillNotice === 'undefined') ? null : prefillNotice; %>
+  <% const safePrefillNoticePrefix = (typeof prefillNoticePrefix === 'undefined') ? null : prefillNoticePrefix; %>
+  <% const safePrefillNoticeSuffix = (typeof prefillNoticeSuffix === 'undefined') ? '' : prefillNoticeSuffix; %>
+  <% const safePrefillSourceGroupName = (typeof prefillSourceGroupName === 'undefined') ? '' : prefillSourceGroupName; %>
+  <% const safePrefillSourceGroupPath = (typeof prefillSourceGroupPath === 'undefined') ? '' : prefillSourceGroupPath; %>
   <% const guestSignupPath = `/signup?redirectTo=${encodeURIComponent(
     (typeof guestSignupRedirectPath === 'string' && guestSignupRedirectPath)
       ? guestSignupRedirectPath
@@ -39,12 +44,12 @@
     <div class="alert"><%= t('questions.closed_message') %></div>
   <% } %>
 
-  <% if (prefillNoticePrefix != null && prefillSourceGroupName && prefillSourceGroupPath) { %>
+  <% if (safePrefillNoticePrefix != null && safePrefillSourceGroupName && safePrefillSourceGroupPath) { %>
     <p class="muted" style="margin:0 0 14px;">
-      <%= prefillNoticePrefix %><a class="link underlined-link" href="<%= prefillSourceGroupPath %>"><%= prefillSourceGroupName %></a><%= prefillNoticeSuffix || '' %>
+      <%= safePrefillNoticePrefix %><a class="link underlined-link" href="<%= safePrefillSourceGroupPath %>"><%= safePrefillSourceGroupName %></a><%= safePrefillNoticeSuffix || '' %>
     </p>
-  <% } else if (prefillNotice) { %>
-    <p class="muted" style="margin:0 0 14px;"><%= prefillNotice %></p>
+  <% } else if (safePrefillNotice) { %>
+    <p class="muted" style="margin:0 0 14px;"><%= safePrefillNotice %></p>
   <% } %>
 
   <form id="predictions-form" method="post" action="<%= `${currentGroupPath}/questions` %>">

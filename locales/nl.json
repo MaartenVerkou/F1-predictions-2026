@@ -115,7 +115,7 @@
     "autosave_saved": "Opgeslagen",
     "autosave_failed": "Automatisch opslaan mislukt",
     "no_questions": "Nog geen vragen geladen. Voeg ze toe in data/questions.json.",
-    "prefilled_from_group": "Vooraf ingevuld vanuit {group_name}. Sla op om dit voor deze groep toe te passen.",
+    "prefilled_from_group": "Vooraf ingevuld vanuit {group_name}.",
     "no_saved_predictions": "{group_name} heeft nog geen opgeslagen voorspellingen.",
     "no_options_loaded": "Geen opties geladen voor deze vraag. Controleer roster/races JSON.",
     "select_position": "Kies positie",

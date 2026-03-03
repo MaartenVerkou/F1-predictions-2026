@@ -115,7 +115,7 @@
     "autosave_saved": "Saved",
     "autosave_failed": "Autosave failed",
     "no_questions": "No questions loaded yet. Add them to data/questions.json.",
-    "prefilled_from_group": "Prefilled from {group_name}. Save predictions to apply them to this group.",
+    "prefilled_from_group": "Prefilled from {group_name}.",
     "no_saved_predictions": "{group_name} has no saved predictions yet.",
     "no_options_loaded": "No options loaded for this question. Check roster/races JSON.",
     "select_position": "Select position",

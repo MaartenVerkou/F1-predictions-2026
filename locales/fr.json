@@ -115,7 +115,7 @@
     "autosave_saved": "Enregistre",
     "autosave_failed": "Echec de l'enregistrement automatique",
     "no_questions": "Aucune question chargee pour le moment. Ajoutez-les dans data/questions.json.",
-    "prefilled_from_group": "Pre-rempli depuis {group_name}. Enregistrez pour appliquer ces pronostics a ce groupe.",
+    "prefilled_from_group": "Pre-rempli depuis {group_name}.",
     "no_saved_predictions": "{group_name} n'a pas encore de pronostics enregistres.",
     "no_options_loaded": "Aucune option chargee pour cette question. Verifiez roster/races JSON.",
     "select_position": "Choisir position",

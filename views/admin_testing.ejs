@@ -34,39 +34,39 @@
   <% if (groups.length === 0) { %>
     <p class="muted">No test groups yet.</p>
   <% } else { %>
-    <table class="table compact admin-analysis-groups-table">
-      <thead>
-        <tr>
-          <th>Group</th>
-          <th>Owner</th>
-          <th>Total members</th>
-          <th>Created</th>
-          <th>Actions</th>
-          <th>Delete</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% groups.forEach(row => { %>
+    <div class="admin-analysis-table-scroll" role="region" aria-label="Test groups table" tabindex="0">
+      <table class="table compact admin-analysis-groups-table">
+        <thead>
           <tr>
-            <td><%= row.name %></td>
-            <td><%= row.owner_name %></td>
-            <td><%= Number(row.total_members || 0) %></td>
-            <td><%= formatAdminDate(row.created_at) %></td>
-            <td>
-              <div class="table-actions">
-                <a class="link" href="/admin/analysis/<%= row.id %>?mode=actuals">Analyze actuals</a>
-                <a class="link" href="/admin/analysis/<%= row.id %>?mode=sim200">Analyze 200 seasons</a>
-              </div>
-            </td>
-            <td>
-              <form method="post" action="/admin/groups/<%= row.id %>/delete?from=analysis" onsubmit="return confirm('Delete this test group and all related data?')">
-                <button class="secondary no-wrap-btn" type="submit">Delete group</button>
-              </form>
-            </td>
+            <th>Group</th>
+            <th>Total members</th>
+            <th>Created</th>
+            <th>Actions</th>
+            <th>Delete</th>
           </tr>
-        <% }) %>
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          <% groups.forEach(row => { %>
+            <tr>
+              <td><%= row.name %></td>
+              <td><%= Number(row.total_members || 0) %></td>
+              <td><%= formatAdminDate(row.created_at) %></td>
+              <td>
+                <div class="table-actions">
+                  <a class="link" href="/admin/analysis/<%= row.id %>?mode=actuals">Analyze actuals</a>
+                  <a class="link" href="/admin/analysis/<%= row.id %>?mode=sim200">Analyze 200 seasons</a>
+                </div>
+              </td>
+              <td>
+                <form method="post" action="/admin/groups/<%= row.id %>/delete?from=analysis" onsubmit="return confirm('Delete this test group and all related data?')">
+                  <button class="secondary no-wrap-btn" type="submit">Delete group</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   <% } %>
 
   <%- include('partials/admin_pagination', {
