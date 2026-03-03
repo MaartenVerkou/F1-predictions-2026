@@ -1,12 +1,24 @@
 <%
-  const current = Math.max(1, Number(currentPage || 1));
-  const total = Math.max(1, Number(totalPages || 1));
-  const param = String(pageParamName || "page");
-  const path = String(basePath || "");
-  const params = (extraParams && typeof extraParams === "object") ? extraParams : {};
-  const fragment = String(anchorId || "").trim();
-  const sectionLabel = String(label || "Page");
-  const pageSize = Number(perPage || 0);
+  const safeCurrentPage = typeof currentPage === "undefined" ? 1 : currentPage;
+  const safeTotalPages = typeof totalPages === "undefined" ? 1 : totalPages;
+  const safePageParamName =
+    typeof pageParamName === "undefined" ? "page" : pageParamName;
+  const safeBasePath = typeof basePath === "undefined" ? "" : basePath;
+  const safeExtraParams =
+    typeof extraParams === "undefined" ? {} : extraParams;
+  const safeAnchorId = typeof anchorId === "undefined" ? "" : anchorId;
+  const safeLabel = typeof label === "undefined" ? "Page" : label;
+  const safePerPage = typeof perPage === "undefined" ? 0 : perPage;
+
+  const current = Math.max(1, Number(safeCurrentPage || 1));
+  const total = Math.max(1, Number(safeTotalPages || 1));
+  const param = String(safePageParamName || "page");
+  const path = String(safeBasePath || "");
+  const params =
+    safeExtraParams && typeof safeExtraParams === "object" ? safeExtraParams : {};
+  const fragment = String(safeAnchorId || "").trim();
+  const sectionLabel = String(safeLabel || "Page");
+  const pageSize = Number(safePerPage || 0);
 
   const buildHref = (pageNumber) => {
     const qp = new URLSearchParams();
