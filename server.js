@@ -1236,10 +1236,28 @@ function getNamedGuestAccessFromSession(req) {
 function hasNamedGuestAccess(req, inviteCode, groupId) {
   const access = getNamedGuestAccessFromSession(req);
   if (!access) return false;
-  return (
-    String(access.inviteCode || "") === String(inviteCode || "")
-    && Number(access.groupId || 0) === Number(groupId || 0)
-  );
+  const normalizedInviteCode = String(inviteCode || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  if (
+    String(access.inviteCode || "") !== normalizedInviteCode
+    || Number(access.groupId || 0) !== normalizedGroupId
+  ) {
+    return false;
+  }
+  const guestId = String(req?.session?.guestId || "").trim();
+  if (!guestId) return false;
+  const member = db
+    .prepare(
+      `
+      SELECT 1
+      FROM named_guest_group_members
+      WHERE group_id = ?
+        AND guest_id = ?
+      LIMIT 1
+      `
+    )
+    .get(normalizedGroupId, guestId);
+  return !!member;
 }
 
 function upsertNamedGuestProfile(guestId, displayName, groupId) {
@@ -2730,6 +2748,60 @@ app.post("/groups/:id/members/:userId/kick", requireAuth, (req, res) => {
     "DELETE FROM group_members WHERE user_id = ? AND group_id = ?"
   ).run(targetUserId, groupId);
   res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/named-guests/:guestId/kick", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const guestId = String(req.params.guestId || "").trim();
+  if (!isGroupAdmin(user.id, groupId)) {
+    return sendError(req, res, 403, "Admin access only.");
+  }
+  if (!guestId || !/^[A-Za-z0-9_-]{4,128}$/.test(guestId)) {
+    return sendError(req, res, 400, "Invalid guest id.");
+  }
+  const group = db.prepare("SELECT id, is_global FROM groups WHERE id = ?").get(groupId);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.is_global) === 1) {
+    return sendError(req, res, 400, "Named guests are not managed in the Global group.");
+  }
+  const target = db
+    .prepare(
+      `
+      SELECT guest_id
+      FROM named_guest_group_members
+      WHERE group_id = ?
+        AND guest_id = ?
+      `
+    )
+    .get(groupId, guestId);
+  if (!target) {
+    return res.redirect(`/groups/${groupId}`);
+  }
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      "DELETE FROM guest_responses WHERE group_id = ? AND guest_id = ?"
+    ).run(groupId, guestId);
+    db.prepare(
+      "DELETE FROM named_guest_group_members WHERE group_id = ? AND guest_id = ?"
+    ).run(groupId, guestId);
+
+    const hasAnyResponses = db
+      .prepare("SELECT 1 FROM guest_responses WHERE guest_id = ? LIMIT 1")
+      .get(guestId);
+    const hasAnyMemberships = db
+      .prepare("SELECT 1 FROM named_guest_group_members WHERE guest_id = ? LIMIT 1")
+      .get(guestId);
+    if (!hasAnyResponses && !hasAnyMemberships) {
+      db.prepare("DELETE FROM named_guest_profiles WHERE guest_id = ?").run(guestId);
+      db.prepare("DELETE FROM pending_guest_claims WHERE guest_id = ?").run(guestId);
+    }
+  });
+  tx();
+  return res.redirect(`/groups/${groupId}`);
 });
 
 app.post("/groups/:id/members/:userId/promote", requireAuth, (req, res) => {

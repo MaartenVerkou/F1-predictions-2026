@@ -215,12 +215,13 @@
         <th>Latest group</th>
         <th>First seen</th>
         <th>Last seen</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
       <% if (!namedGuestProfiles || namedGuestProfiles.length === 0) { %>
         <tr>
-          <td colspan="8" class="muted">No named guest data yet.</td>
+          <td colspan="9" class="muted">No named guest data yet.</td>
         </tr>
       <% } else { %>
         <% namedGuestProfiles.forEach(row => { %>
@@ -243,6 +244,12 @@
             <td><%= row.latest_group_name || '-' %></td>
             <td><%= formatAdminDate(row.first_seen_at) %></td>
             <td><%= formatAdminDate(row.last_seen_at) %></td>
+            <td>
+              <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
+                <input type="hidden" name="returnTo" value="<%= namedGuestsReturn %>">
+                <button class="secondary" type="submit">Delete guest</button>
+              </form>
+            </td>
           </tr>
         <% }) %>
       <% } %>
@@ -278,12 +285,13 @@
         <th>Latest group</th>
         <th>First seen</th>
         <th>Last seen</th>
+        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
       <% if (!visitorProfiles || visitorProfiles.length === 0) { %>
         <tr>
-          <td colspan="7" class="muted">No visitor data yet.</td>
+          <td colspan="8" class="muted">No visitor data yet.</td>
         </tr>
       <% } else { %>
         <% visitorProfiles.forEach(row => { %>
@@ -301,6 +309,12 @@
             <td><%= row.latest_group_name || '-' %></td>
             <td><%= formatAdminDate(row.first_seen_at) %></td>
             <td><%= formatAdminDate(row.last_seen_at) %></td>
+            <td>
+              <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
+                <input type="hidden" name="returnTo" value="<%= visitorsReturn %>">
+                <button class="secondary" type="submit">Delete guest</button>
+              </form>
+            </td>
           </tr>
         <% }) %>
       <% } %>

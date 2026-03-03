@@ -118,22 +118,28 @@
             <strong><a class="link" href="<%= memberResponsesHref %>"><%= member.name %></a></strong>
             <span class="muted">(<%= member.role %>)</span>
           </div>
-          <% if ((role === 'owner' || role === 'admin') && !isNamedGuestMember) { %>
+          <% if (role === 'owner' || role === 'admin') { %>
             <div class="group-member-actions">
-              <% if (member.role !== 'owner') { %>
-                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick">
+              <% if (isNamedGuestMember && member.guest_id) { %>
+                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/named-guests/<%= encodeURIComponent(String(member.guest_id)) %>/kick">
                   <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
                 </form>
-              <% } %>
-              <% if (member.role === 'member') { %>
-                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote">
-                  <button class="secondary group-member-action-btn" type="submit"><%= t('group.make_admin') %></button>
-                </form>
-              <% } %>
-              <% if (member.role === 'admin') { %>
-                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote">
-                  <button class="secondary group-member-action-btn" type="submit"><%= t('group.remove_admin') %></button>
-                </form>
+              <% } else { %>
+                <% if (member.role !== 'owner') { %>
+                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick">
+                    <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
+                  </form>
+                <% } %>
+                <% if (member.role === 'member') { %>
+                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote">
+                    <button class="secondary group-member-action-btn" type="submit"><%= t('group.make_admin') %></button>
+                  </form>
+                <% } %>
+                <% if (member.role === 'admin') { %>
+                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote">
+                    <button class="secondary group-member-action-btn" type="submit"><%= t('group.remove_admin') %></button>
+                  </form>
+                <% } %>
               <% } %>
             </div>
           <% } %>

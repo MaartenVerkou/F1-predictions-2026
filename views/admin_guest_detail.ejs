@@ -10,7 +10,13 @@
 <div class="card">
   <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
     <h1 style="margin:0;">Guest overview</h1>
-    <a class="link" href="<%= returnTo %>">&lt; Back to admin overview</a>
+    <div class="inline-actions">
+      <a class="link" href="<%= returnTo %>">&lt; Back to admin overview</a>
+      <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
+        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+        <button class="secondary" type="submit">Delete guest</button>
+      </form>
+    </div>
   </div>
 
   <h2 style="margin-top:0;"><%= namedGuestProfile ? "Named guest" : "Guest ID" %></h2>

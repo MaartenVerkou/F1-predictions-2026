@@ -2551,6 +2551,49 @@ function registerAdminRoutes(app, deps) {
     return res.redirect(withQueryParam(returnTo, "success", `User "${target.name}" deleted.`));
   });
 
+  app.post("/admin/guests/:guestId/delete", requireAdmin, (req, res) => {
+    const guestId = String(req.params.guestId || "").trim();
+    const rawReturnTo = String(req.body.returnTo || "/admin/overview").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview";
+    if (!guestId || !/^[A-Za-z0-9_-]{4,128}$/.test(guestId)) {
+      return res.redirect(withQueryParam(returnTo, "error", "Invalid guest id."));
+    }
+
+    const namedGuest = db
+      .prepare(
+        `
+        SELECT guest_id, display_name
+        FROM named_guest_profiles
+        WHERE guest_id = ?
+        `
+      )
+      .get(guestId);
+    const hasResponses = db
+      .prepare("SELECT 1 FROM guest_responses WHERE guest_id = ? LIMIT 1")
+      .get(guestId);
+    const hasMemberships = db
+      .prepare("SELECT 1 FROM named_guest_group_members WHERE guest_id = ? LIMIT 1")
+      .get(guestId);
+    if (!namedGuest && !hasResponses && !hasMemberships) {
+      return res.redirect(withQueryParam(returnTo, "error", "Guest not found."));
+    }
+
+    const tx = db.transaction(() => {
+      db.prepare("DELETE FROM guest_responses WHERE guest_id = ?").run(guestId);
+      db.prepare("DELETE FROM named_guest_group_members WHERE guest_id = ?").run(guestId);
+      db.prepare("DELETE FROM named_guest_profiles WHERE guest_id = ?").run(guestId);
+      db.prepare("DELETE FROM pending_guest_claims WHERE guest_id = ?").run(guestId);
+    });
+    tx();
+
+    const deletedLabel = namedGuest?.display_name
+      ? `Guest "${namedGuest.display_name}" deleted.`
+      : "Guest deleted.";
+    return res.redirect(withQueryParam(returnTo, "success", deletedLabel));
+  });
+
   app.post("/admin/groups/:groupId/delete", requireAdmin, (req, res) => {
     const source = String(req.query.from || "").trim().toLowerCase();
     const fallbackRedirectPath =
