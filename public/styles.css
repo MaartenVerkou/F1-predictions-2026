@@ -657,6 +657,22 @@ textarea:focus-visible {
   transform: none;
 }
 
+.number-spinner-minimal .number-spinner-btn {
+  width: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.number-spinner-minimal .number-spinner-btn:hover:not(:disabled),
+.number-spinner-minimal .number-spinner-btn:focus-visible {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+}
+
 .number-spinner-btn svg {
   width: 11px;
   height: 11px;

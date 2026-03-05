@@ -403,7 +403,7 @@
                 <% }) %>
                 <option value="tie" <%= saved.winner === 'tie' ? 'selected' : '' %>><%= t('questions.tie') %></option>
               </select>
-              <div class="number-spinner" data-number-spinner>
+              <div class="number-spinner number-spinner-minimal" data-number-spinner>
                 <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= saved.diff ?? '' %>" />
                 <div class="number-spinner-controls">
                   <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
@@ -484,7 +484,25 @@
               </label>
             </div>
           <% } else if (type === 'numeric') { %>
-            <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= answers[question.id] || '' %>" />
+            <% if (question.id === 'races_before_title_decided') { %>
+              <div class="number-spinner number-spinner-minimal" data-number-spinner>
+                <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= answers[question.id] || '' %>" />
+                <div class="number-spinner-controls">
+                  <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
+                    <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                      <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                  </button>
+                  <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="Decrease value" title="Decrease value">
+                    <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                      <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            <% } else { %>
+              <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= answers[question.id] || '' %>" />
+            <% } %>
           <% } else if (type === 'textarea') { %>
             <textarea name="<%= question.id %>" rows="3"><%= answers[question.id] || '' %></textarea>
           <% } else { %>
