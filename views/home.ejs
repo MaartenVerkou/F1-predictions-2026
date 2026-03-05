@@ -6,12 +6,23 @@
     <h1><%= t('home.headline') %></h1>
     <p class="muted"><%= t('home.subtitle') %></p>
     <div class="inline-actions">
-      <% if (!user) { %>
-        <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
-        <a class="link" href="/login"><%= t('home.or_login') %></a>
+      <% if (predictionsClosed) { %>
+        <% if (!user) { %>
+          <a class="button-link hero-start-predicting" href="/signup"><%= t('home.signup_next_year_notify') %></a>
+        <% } else { %>
+          <div class="home-closed-callout alert" role="status" aria-live="polite">
+            <strong><%= t('header.countdown_closed') %></strong>
+          </div>
+          <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
+        <% } %>
       <% } else { %>
-        <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
-        <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
+        <% if (!user) { %>
+          <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
+          <a class="link" href="/login"><%= t('home.or_login') %></a>
+        <% } else { %>
+          <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
+          <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
+        <% } %>
       <% } %>
     </div>
   </div>

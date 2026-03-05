@@ -84,30 +84,70 @@ const initCountdown = () => {
   if (!el) return;
   const valueEl = el.querySelector('.countdown-value');
   if (!valueEl) return;
+  const prefixEl = el.querySelector('.muted');
+  const prefixText = el.dataset.countdownPrefix || prefixEl?.textContent || '';
+  const closedText = el.dataset.countdownClosed || 'Predictions are closed!';
   const brandTimerEls = Array.from(document.querySelectorAll('[data-brand-mobile-timer-value]'));
+  const brandPrefixEls = Array.from(document.querySelectorAll('.brand-mobile-timer-prefix'));
   const rawDate = el.dataset.closeDate;
   const target = new Date(rawDate);
   if (Number.isNaN(target.getTime())) return;
+  const setPrefixText = (text) => {
+    if (prefixEl) prefixEl.textContent = text;
+    brandPrefixEls.forEach(timerPrefixEl => {
+      timerPrefixEl.textContent = text;
+    });
+  };
   const setTimerText = (text) => {
     valueEl.textContent = text;
     brandTimerEls.forEach(timerEl => {
       timerEl.textContent = text;
     });
   };
+  const setTimerMarkup = (html) => {
+    valueEl.innerHTML = html;
+    brandTimerEls.forEach(timerEl => {
+      timerEl.innerHTML = html;
+    });
+  };
+  const formatHmsMarkup = (totalSeconds) => {
+    const safe = Math.max(0, Number(totalSeconds) || 0);
+    const hours = Math.floor(safe / 3600);
+    const minutes = Math.floor((safe % 3600) / 60);
+    const seconds = safe % 60;
+    const parts = [
+      { value: hours, unit: 'H' },
+      { value: String(minutes).padStart(2, '0'), unit: 'M' },
+      { value: String(seconds).padStart(2, '0'), unit: 'S' }
+    ];
+    return parts
+      .map(({ value, unit }) =>
+        `<span class="countdown-segment"><span class="countdown-number">${value}</span><span class="countdown-unit">${unit}</span></span>`
+      )
+      .join(' ');
+  };
 
   const tick = () => {
     const now = new Date();
     let diff = target - now;
     if (diff <= 0) {
-      setTimerText('Closed');
+      setPrefixText('');
+      setTimerText(closedText);
       return;
     }
-    const totalMinutes = Math.floor(diff / 60000);
+    setPrefixText(prefixText);
+    const totalSeconds = Math.floor(diff / 1000);
+    if (totalSeconds < 24 * 60 * 60) {
+      setTimerMarkup(formatHmsMarkup(totalSeconds));
+      setTimeout(tick, 1000);
+      return;
+    }
+    const totalMinutes = Math.floor(totalSeconds / 60);
     const days = Math.floor(totalMinutes / (60 * 24));
     const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
     const minutes = totalMinutes % 60;
     setTimerText(`${days}d ${hours}h ${minutes}m`);
-    requestAnimationFrame(() => setTimeout(tick, 30000));
+    setTimeout(tick, 30000);
   };
   tick();
 };

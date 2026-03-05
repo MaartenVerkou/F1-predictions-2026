@@ -2,6 +2,7 @@
   "header": {
     "site_title": "{company_name}",
     "countdown_prefix": "Cloture des pronostics dans",
+    "countdown_closed": "Les pronostics sont fermes !",
     "language": "Langue",
     "signed_in_as": "Compte",
     "dashboard": "Tableau de bord",
@@ -213,6 +214,7 @@
     "create_account": "Creer un compte",
     "or_login": "ou se connecter",
     "start_predicting": "Commencer les pronostics",
+    "signup_next_year_notify": "Inscris-toi pour etre notifie l'an prochain",
     "go_dashboard": "Aller au tableau de bord",
     "about_link": "A propos de {company_name}",
     "flow_title": "Trois etapes rapides",
@@ -362,3 +364,4 @@
     }
   }
 }
+

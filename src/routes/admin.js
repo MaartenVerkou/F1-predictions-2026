@@ -1598,14 +1598,26 @@ function registerAdminRoutes(app, deps) {
           COUNT(DISTINCT gr.question_id) as questions_count,
           MIN(gr.created_at) as first_seen_at,
           MAX(gr.updated_at) as last_seen_at,
-          (
-            SELECT g2.name
-            FROM guest_responses gr2
-            JOIN groups g2 ON g2.id = gr2.group_id
-            WHERE gr2.guest_id = gr.guest_id
-              AND COALESCE(g2.is_simulated, 0) = 0
-            ORDER BY gr2.updated_at DESC
-            LIMIT 1
+          COALESCE(
+            (
+              SELECT g2.name
+              FROM guest_responses gr2
+              JOIN groups g2 ON g2.id = gr2.group_id
+              WHERE gr2.guest_id = gr.guest_id
+                AND COALESCE(g2.is_simulated, 0) = 0
+                AND COALESCE(g2.is_global, 0) = 0
+              ORDER BY gr2.updated_at DESC
+              LIMIT 1
+            ),
+            (
+              SELECT g2.name
+              FROM guest_responses gr2
+              JOIN groups g2 ON g2.id = gr2.group_id
+              WHERE gr2.guest_id = gr.guest_id
+                AND COALESCE(g2.is_simulated, 0) = 0
+              ORDER BY gr2.updated_at DESC
+              LIMIT 1
+            )
           ) as latest_group_name
         FROM guest_responses gr
         JOIN named_guest_profiles ngp ON ngp.guest_id = gr.guest_id
@@ -1731,11 +1743,169 @@ function registerAdminRoutes(app, deps) {
     });
   });
 
+  app.get("/admin/groups/:id", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const groupId = Number(req.params.id);
+    if (!groupId) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("Invalid group id.")}`
+      );
+    }
+
+    const rawReturnTo = String(req.query.returnTo || "/admin/overview#admin-groups").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview#admin-groups";
+
+    const group = db
+      .prepare(
+        `
+        SELECT
+          g.id,
+          g.name,
+          g.owner_id,
+          g.created_at,
+          COALESCE(g.is_global, 0) as is_global,
+          COALESCE(g.is_public, 0) as is_public,
+          COALESCE(g.is_simulated, 0) as is_simulated,
+          u.name as owner_name
+        FROM groups g
+        JOIN users u ON u.id = g.owner_id
+        WHERE g.id = ?
+          AND COALESCE(g.is_simulated, 0) = 0
+        LIMIT 1
+        `
+      )
+      .get(groupId);
+    if (!group) {
+      return res.redirect(
+        `/admin/overview?error=${encodeURIComponent("Group not found.")}`
+      );
+    }
+
+    const groupStats = db
+      .prepare(
+        `
+        SELECT
+          (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = ?) as member_count,
+          (SELECT COUNT(*) FROM named_guest_group_members ngm WHERE ngm.group_id = ?) as named_guest_count,
+          (SELECT COUNT(*) FROM responses r WHERE r.group_id = ?) as member_responses,
+          (SELECT COUNT(*) FROM guest_responses gr WHERE gr.group_id = ?) as guest_responses,
+          (
+            SELECT COUNT(DISTINCT question_id)
+            FROM (
+              SELECT r.question_id as question_id
+              FROM responses r
+              WHERE r.group_id = ?
+              UNION
+              SELECT gr.question_id as question_id
+              FROM guest_responses gr
+              WHERE gr.group_id = ?
+            ) q
+          ) as questions_answered,
+          (
+            SELECT MAX(updated_at)
+            FROM (
+              SELECT r.updated_at as updated_at
+              FROM responses r
+              WHERE r.group_id = ?
+              UNION ALL
+              SELECT gr.updated_at as updated_at
+              FROM guest_responses gr
+              WHERE gr.group_id = ?
+            ) updates
+          ) as last_activity_at
+        `
+      )
+      .get(groupId, groupId, groupId, groupId, groupId, groupId, groupId, groupId);
+
+    const members = db
+      .prepare(
+        `
+        SELECT id, guest_id, name, role, member_type, joined_at
+        FROM (
+          SELECT
+            u.id AS id,
+            NULL AS guest_id,
+            u.name AS name,
+            gm.role AS role,
+            'user' AS member_type,
+            gm.joined_at AS joined_at
+          FROM group_members gm
+          JOIN users u ON u.id = gm.user_id
+          WHERE gm.group_id = ?
+
+          UNION ALL
+
+          SELECT
+            NULL AS id,
+            ngm.guest_id AS guest_id,
+            ngm.display_name AS name,
+            'guest' AS role,
+            'named_guest' AS member_type,
+            ngm.joined_at AS joined_at
+          FROM named_guest_group_members ngm
+          WHERE ngm.group_id = ?
+        ) combined_members
+        ORDER BY joined_at ASC, name COLLATE NOCASE ASC
+        `
+      )
+      .all(groupId, groupId);
+
+    const responses = db
+      .prepare(
+        `
+        SELECT group_id, group_name, is_global, question_id, answer, updated_at, member_type
+        FROM (
+          SELECT
+            r.group_id as group_id,
+            g.name as group_name,
+            g.is_global as is_global,
+            r.question_id as question_id,
+            r.answer as answer,
+            r.updated_at as updated_at,
+            'user' as member_type
+          FROM responses r
+          JOIN groups g ON g.id = r.group_id
+          WHERE r.group_id = ?
+
+          UNION ALL
+
+          SELECT
+            gr.group_id as group_id,
+            g.name as group_name,
+            g.is_global as is_global,
+            gr.question_id as question_id,
+            gr.answer as answer,
+            gr.updated_at as updated_at,
+            'named_guest_or_visitor' as member_type
+          FROM guest_responses gr
+          JOIN groups g ON g.id = gr.group_id
+          WHERE gr.group_id = ?
+        ) combined_responses
+        ORDER BY updated_at DESC
+        LIMIT 500
+        `
+      )
+      .all(groupId, groupId);
+
+    return res.render("admin_group_detail", {
+      user,
+      group,
+      groupStats,
+      members,
+      responses,
+      returnTo
+    });
+  });
+
   app.post("/admin/users/:id/reveal-email", requireAdmin, (req, res) => {
     const targetUserId = Number(req.params.id);
     const rawReturnTo = String(req.body.returnTo || "/admin/overview").trim();
     const returnTo =
-      rawReturnTo.startsWith("/admin/overview") || rawReturnTo.startsWith("/admin/users/")
+      rawReturnTo.startsWith("/admin/overview")
+      || rawReturnTo.startsWith("/admin/users/")
+      || rawReturnTo.startsWith("/admin/groups/")
         ? rawReturnTo
         : "/admin/overview";
 
@@ -1805,6 +1975,7 @@ function registerAdminRoutes(app, deps) {
 
     const rawReturnTo = String(req.query.returnTo || "/admin/overview").trim();
     const returnTo = rawReturnTo.startsWith("/admin/overview")
+      || rawReturnTo.startsWith("/admin/groups/")
       ? rawReturnTo
       : "/admin/overview";
 
@@ -1900,6 +2071,7 @@ function registerAdminRoutes(app, deps) {
 
     const rawReturnTo = String(req.query.returnTo || "/admin/overview").trim();
     const returnTo = rawReturnTo.startsWith("/admin/overview")
+      || rawReturnTo.startsWith("/admin/groups/")
       ? rawReturnTo
       : "/admin/overview";
 
@@ -2602,7 +2774,9 @@ function registerAdminRoutes(app, deps) {
         : "/admin/overview";
     const rawReturnTo = String(req.body.returnTo || "").trim();
     const redirectPath =
-      rawReturnTo.startsWith("/admin/overview") || rawReturnTo.startsWith("/admin/analysis")
+      rawReturnTo.startsWith("/admin/overview")
+      || rawReturnTo.startsWith("/admin/analysis")
+      || rawReturnTo.startsWith("/admin/groups/")
         ? rawReturnTo
         : fallbackRedirectPath;
     const groupId = Number(req.params.groupId);

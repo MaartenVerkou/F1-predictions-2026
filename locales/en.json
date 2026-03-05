@@ -2,6 +2,7 @@
   "header": {
     "site_title": "{company_name}",
     "countdown_prefix": "Predictions close in",
+    "countdown_closed": "Predictions are closed!",
     "language": "Language",
     "signed_in_as": "Signed in as",
     "dashboard": "Dashboard",
@@ -213,6 +214,7 @@
     "create_account": "Create an account",
     "or_login": "or log in",
     "start_predicting": "Start predicting",
+    "signup_next_year_notify": "Sign up to be notified for next year",
     "go_dashboard": "Go to your dashboard",
     "about_link": "About {company_name}",
     "flow_title": "Three quick steps",

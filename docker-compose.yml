@@ -22,6 +22,7 @@ services:
       - RACES_PATH=/app/config/races.json
       - LAST_SEASON_RESULTS_PATH=${LAST_SEASON_RESULTS_PATH:-/app/config/last-season-results.json}
       - SESSION_SECRET=${SESSION_SECRET:-change-me}
+      - PREDICTIONS_CLOSE_AT=${PREDICTIONS_CLOSE_AT:-2026-03-05T23:59:59}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_HOST=${SMTP_HOST:-}

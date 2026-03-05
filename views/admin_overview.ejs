@@ -46,7 +46,12 @@
     <tbody>
       <% groups.forEach(row => { %>
         <tr>
-          <td><%= row.name %></td>
+          <td>
+            <a
+              class="link"
+              href="/admin/groups/<%= row.id %>?returnTo=<%= encodeURIComponent(groupsReturn) %>"
+            ><%= row.name %></a>
+          </td>
           <td><%= row.owner_name %></td>
           <td><%= formatAdminDate(row.created_at) %></td>
           <td>

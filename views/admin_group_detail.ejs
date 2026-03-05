@@ -1,0 +1,139 @@
+<%- include('partials/header', { title: `Admin group: ${group.name}`, user }) %>
+<%- include('partials/admin_nav', { active: 'overview' }) %>
+<% const formatAdminDate = (value) => {
+  if (!value) return '-';
+  if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+}; %>
+
+<div class="card">
+  <% const groupDetailReturnTo = `/admin/groups/${group.id}?returnTo=${encodeURIComponent(returnTo)}`; %>
+  <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+    <h1 style="margin:0;">Group overview</h1>
+    <div class="inline-actions">
+      <a class="link" href="<%= returnTo %>">&lt; Back to admin overview</a>
+      <a class="link" href="<%= Number(group.is_global) === 1 ? '/global' : `/groups/${group.id}` %>">Open group page</a>
+      <a class="link" href="<%= Number(group.is_global) === 1 ? '/global/leaderboard' : `/groups/${group.id}/leaderboard` %>">Leaderboard</a>
+      <form method="post" action="/admin/groups/<%= group.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+        <button class="secondary" type="submit">Delete group</button>
+      </form>
+    </div>
+  </div>
+
+  <h2 style="margin-top:0;"><%= group.name %></h2>
+  <table class="table compact">
+    <tbody>
+      <tr>
+        <th style="width: 220px;">Group ID</th>
+        <td><%= group.id %></td>
+      </tr>
+      <tr>
+        <th>Owner</th>
+        <td><%= group.owner_name %> (ID: <%= group.owner_id %>)</td>
+      </tr>
+      <tr>
+        <th>Type</th>
+        <td><%= Number(group.is_global) === 1 ? 'Global' : (Number(group.is_public) === 1 ? 'Public' : 'Private') %></td>
+      </tr>
+      <tr>
+        <th>Created</th>
+        <td><%= formatAdminDate(group.created_at) %></td>
+      </tr>
+      <tr>
+        <th>Members</th>
+        <td><%= Number(groupStats?.member_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>Named guests</th>
+        <td><%= Number(groupStats?.named_guest_count || 0) %></td>
+      </tr>
+      <tr>
+        <th>Member responses</th>
+        <td><%= Number(groupStats?.member_responses || 0) %></td>
+      </tr>
+      <tr>
+        <th>Named guest/visitor responses</th>
+        <td><%= Number(groupStats?.guest_responses || 0) %></td>
+      </tr>
+      <tr>
+        <th>Questions answered</th>
+        <td><%= Number(groupStats?.questions_answered || 0) %></td>
+      </tr>
+      <tr>
+        <th>Last activity</th>
+        <td><%= formatAdminDate(groupStats?.last_activity_at) %></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:24px;">Members and named guests</h2>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Role</th>
+        <th>Joined</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!members || members.length === 0) { %>
+        <tr>
+          <td colspan="4" class="muted">No members found for this group.</td>
+        </tr>
+      <% } else { %>
+        <% members.forEach(row => { %>
+          <% const isNamedGuest = row.member_type === 'named_guest'; %>
+          <% const memberName = row.name || (isNamedGuest ? 'Unnamed guest' : 'Unnamed user'); %>
+          <tr>
+            <td>
+              <% if (isNamedGuest && row.guest_id) { %>
+                <a class="link" href="/admin/guests/<%= encodeURIComponent(String(row.guest_id)) %>?returnTo=<%= encodeURIComponent(groupDetailReturnTo) %>"><%= memberName %></a>
+              <% } else if (!isNamedGuest && row.id) { %>
+                <a class="link" href="/admin/users/<%= row.id %>?returnTo=<%= encodeURIComponent(groupDetailReturnTo) %>"><%= memberName %></a>
+              <% } else { %>
+                <%= memberName %>
+              <% } %>
+            </td>
+            <td><%= isNamedGuest ? 'named_guest' : 'user' %></td>
+            <td><%= row.role || '-' %></td>
+            <td><%= formatAdminDate(row.joined_at) %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:24px;">Latest responses</h2>
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Question</th>
+        <th>Answer</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!responses || responses.length === 0) { %>
+        <tr>
+          <td colspan="4" class="muted">No responses yet.</td>
+        </tr>
+      <% } else { %>
+        <% responses.forEach(row => { %>
+          <tr>
+            <td><%= row.member_type %></td>
+            <td><code class="admin-question-code"><%= row.question_id %></code></td>
+            <td><code class="admin-question-code"><%= row.answer %></code></td>
+            <td><%= formatAdminDate(row.updated_at) %></td>
+          </tr>
+        <% }) %>
+      <% } %>
+    </tbody>
+  </table>
+  <p class="muted" style="margin-top:8px;">Showing latest <%= responses.length %> rows (max 500).</p>
+</div>
+
+<%- include('partials/footer') %>

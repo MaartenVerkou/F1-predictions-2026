@@ -226,6 +226,10 @@ header {
   color: var(--countdown-text);
   font-family: var(--font-heading);
   font-weight: 700;
+  display: inline-block;
+  min-width: 8ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 :root[data-theme="dark"] .brand-line-top,
@@ -364,7 +368,27 @@ header.is-time-compact .countdown .muted {
 .countdown-value {
   color: var(--countdown-text);
   font-family: var(--font-heading);
+  font-weight: 600;
   letter-spacing: 0.02em;
+  display: inline-block;
+  min-width: 11ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-segment {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+}
+
+.countdown-number {
+  font-weight: 700;
+}
+
+.countdown-unit {
+  font-weight: 500;
+  color: var(--muted);
 }
 
 header a {
@@ -717,6 +741,13 @@ button:disabled {
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+}
+
+.home-closed-callout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
 }
 
 .muted {

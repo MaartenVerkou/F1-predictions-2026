@@ -841,6 +841,7 @@ app.use((req, res, next) => {
   res.locals.contactEmail = CONTACT_EMAIL;
   res.locals.baseUrl = BASE_URL;
   res.locals.companyName = COMPANY_NAME;
+  res.locals.closeAt = PREDICTIONS_CLOSE_AT;
   res.locals.isDevelopment = IS_DEVELOPMENT;
   res.locals.devIdentityMode = String(req.session?.devIdentityMode || "")
     .trim()
@@ -1939,7 +1940,8 @@ registerAuthRoutes(app, {
   requireAuth,
   DEV_AUTO_LOGIN,
   NODE_ENV: process.env.NODE_ENV || "development",
-  claimGuestResponsesForUser
+  claimGuestResponsesForUser,
+  predictionsClosed
 });
 
 app.get("/api/groups/check-name", requireAuth, (req, res) => {
@@ -2172,6 +2174,7 @@ app.post("/groups/join", requireAuth, async (req, res) => {
 function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRules, isNamedGuest = false, error = null, success = null }) {
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(group?.id || 0);
+  const closed = predictionsClosed();
   const includeNamedGuests = Number(group?.is_global || 0) !== 1;
   const membersPerPage = 25;
   const requestedMembersPage = Number(req.query.membersPage || 1);
@@ -2271,6 +2274,7 @@ function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRu
     currentMembersPage: safeMembersPage,
     totalMembersPages,
     groupBasePath,
+    closed,
     isNamedGuest,
     error,
     success
@@ -2565,10 +2569,17 @@ app.get("/join/:code/questions", (req, res) => {
       ).run(user.id, invite.group_id, "member", now);
       syncFromGlobalIfCoupled(user.id, invite.group_id, now);
     }
-    return res.redirect(`${getGroupBasePath(group)}/questions`);
+    const groupBasePath = getGroupBasePath(group);
+    if (predictionsClosed()) {
+      return res.redirect(groupBasePath);
+    }
+    return res.redirect(`${groupBasePath}/questions`);
   }
 
   if (!hasNamedGuestAccess(req, code, Number(group.id))) {
+    return res.redirect(`/join/${code}`);
+  }
+  if (predictionsClosed()) {
     return res.redirect(`/join/${code}`);
   }
 
@@ -2959,6 +2970,9 @@ app.post("/groups/:id/leave", requireAuth, (req, res) => {
 app.get("/global/questions", (req, res, next) => {
   const user = getCurrentUser(req);
   if (user) return next();
+  if (predictionsClosed()) {
+    return res.redirect("/");
+  }
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const globalGroup = ensureGlobalGroup();
   if (!globalGroup) {
@@ -3041,6 +3055,9 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
     return sendError(req, res, 403, "Not a group member.");
   }
   const groupBasePath = getGroupBasePath(group);
+  if (predictionsClosed()) {
+    return res.redirect(groupBasePath);
+  }
   const questions = getQuestions(locale);
   const roster = getRoster();
   const races = getRaces();

@@ -2,6 +2,7 @@
   "header": {
     "site_title": "{company_name}",
     "countdown_prefix": "Tippschluss in",
+    "countdown_closed": "Tipps sind geschlossen!",
     "language": "Sprache",
     "signed_in_as": "Angemeldet als",
     "dashboard": "Dashboard",
@@ -213,6 +214,7 @@
     "create_account": "Konto erstellen",
     "or_login": "oder einloggen",
     "start_predicting": "Jetzt tippen",
+    "signup_next_year_notify": "Registriere dich fuer eine Benachrichtigung naechstes Jahr",
     "go_dashboard": "Zum Dashboard",
     "about_link": "Ueber {company_name}",
     "flow_title": "Drei schnelle Schritte",
@@ -362,3 +364,4 @@
     }
   }
 }
+

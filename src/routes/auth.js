@@ -17,7 +17,8 @@ function registerAuthRoutes(app, deps) {
     requireAuth,
     DEV_AUTO_LOGIN,
     NODE_ENV,
-    claimGuestResponsesForUser
+    claimGuestResponsesForUser,
+    predictionsClosed
   } = deps;
 
   const BRAND_NAME = String(COMPANY_NAME || "Wheel of Knowledge").trim() || "Wheel of Knowledge";
@@ -106,7 +107,10 @@ function registerAuthRoutes(app, deps) {
 
   app.get("/", (req, res) => {
     const user = getCurrentUser(req);
-    res.render("home", { user });
+    res.render("home", {
+      user,
+      predictionsClosed: typeof predictionsClosed === "function" ? predictionsClosed() : false
+    });
   });
 
   app.get("/about", (req, res) => {
@@ -828,6 +832,10 @@ function registerAuthRoutes(app, deps) {
 
   app.get("/start-predicting", (req, res) => {
     const user = getCurrentUser(req);
+    const isClosed = typeof predictionsClosed === "function" && predictionsClosed();
+    if (isClosed) {
+      return res.redirect(user ? "/dashboard" : "/");
+    }
     if (!user) return res.redirect("/global/questions");
 
     const globalGroup = ensureUserInGlobalGroup(user.id);

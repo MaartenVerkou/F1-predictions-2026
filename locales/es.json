@@ -2,6 +2,7 @@
   "header": {
     "site_title": "{company_name}",
     "countdown_prefix": "Las predicciones cierran en",
+    "countdown_closed": "Las predicciones estan cerradas!",
     "language": "Idioma",
     "signed_in_as": "Conectado como",
     "dashboard": "Panel",
@@ -213,6 +214,7 @@
     "create_account": "Crear una cuenta",
     "or_login": "o iniciar sesion",
     "start_predicting": "Empezar a predecir",
+    "signup_next_year_notify": "Registrate para recibir aviso el proximo ano",
     "go_dashboard": "Ir al panel",
     "about_link": "Acerca de {company_name}",
     "flow_title": "Tres pasos rapidos",
@@ -362,3 +364,4 @@
     }
   }
 }
+
