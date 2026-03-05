@@ -39,6 +39,7 @@
       <tr>
         <th>Group</th>
         <th>Owner</th>
+        <th>Total users</th>
         <th>Created</th>
         <th>Actions</th>
       </tr>
@@ -53,6 +54,7 @@
             ><%= row.name %></a>
           </td>
           <td><%= row.owner_name %></td>
+          <td><%= Number(row.users_count || 0) %></td>
           <td><%= formatAdminDate(row.created_at) %></td>
           <td>
             <div class="table-actions">

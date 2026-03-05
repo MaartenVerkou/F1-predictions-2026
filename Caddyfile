@@ -1,3 +1,5 @@
-{$APP_DOMAIN:localhost} {
+{$APP_DOMAIN:localhost}, www.{$APP_DOMAIN:localhost} {
+  @www host www.{$APP_DOMAIN:localhost}
+  redir @www https://{$APP_DOMAIN:localhost}{uri} 308
   reverse_proxy app:3000
 }

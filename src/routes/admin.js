@@ -1534,7 +1534,23 @@ function registerAdminRoutes(app, deps) {
     const groups = db
       .prepare(
         `
-        SELECT g.id, g.name, g.owner_id, u.name as owner_name, g.created_at
+        SELECT
+          g.id,
+          g.name,
+          g.owner_id,
+          u.name as owner_name,
+          g.created_at,
+          (
+            SELECT COUNT(*)
+            FROM group_members gm
+            JOIN users um ON um.id = gm.user_id
+            WHERE gm.group_id = g.id
+              AND COALESCE(um.is_simulated, 0) = 0
+          ) + (
+            SELECT COUNT(*)
+            FROM named_guest_group_members ngm
+            WHERE ngm.group_id = g.id
+          ) as users_count
         FROM groups g
         JOIN users u ON u.id = g.owner_id
         WHERE COALESCE(g.is_simulated, 0) = 0
