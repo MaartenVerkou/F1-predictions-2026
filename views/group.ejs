@@ -107,6 +107,7 @@
     <h2><%= t('group.members') %></h2>
     <ul class="list group-members-list">
       <% members.forEach(member => { %>
+        <% if (group.is_global && member.role === 'owner') { return; } %>
         <% const isNamedGuestMember = member.member_type === 'named_guest'; %>
         <% const memberResponsesHref = isNamedGuestMember
           ? (member.guest_id

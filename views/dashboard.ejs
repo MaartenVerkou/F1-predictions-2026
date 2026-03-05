@@ -49,7 +49,9 @@
             <div class="inline-actions" style="justify-content: space-between;">
               <div>
                 <strong><%= group.name %></strong>
-                <span class="muted">(<%= t('dashboard.owner') %>: <%= group.owner_name %>)</span>
+                <% if (!group.is_global) { %>
+                  <span class="muted">(<%= t('dashboard.owner') %>: <%= group.owner_name %>)</span>
+                <% } %>
                 <% if (group.is_global) { %>
                   <span class="muted"> - <%= t('dashboard.global_group_free') %></span>
                 <% } %>
