@@ -2637,7 +2637,7 @@ header.is-collapsed .lang-popover {
   }
 }
 
-@media (max-width: 400px) {
+@media (max-width: 350px) {
   .brand-tagline {
     display: none;
   }
