@@ -1420,6 +1420,30 @@ function setNamedGuestAccess(req, { inviteCode, groupId, displayName }) {
   return req.session.namedGuestAccess;
 }
 
+function resumeNamedGuestAccess(req, { inviteCode, groupId, displayName, guestId }) {
+  if (!req?.session) return null;
+  const normalizedInviteCode = String(inviteCode || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  const normalizedDisplayName = normalizeDisplayName(displayName);
+  const normalizedGuestId = String(guestId || "").trim();
+  if (
+    !normalizedInviteCode
+    || !normalizedGroupId
+    || !normalizedDisplayName
+    || !normalizedGuestId
+  ) {
+    return null;
+  }
+  req.session.guestId = normalizedGuestId;
+  req.session.namedGuestAccess = {
+    inviteCode: normalizedInviteCode,
+    groupId: normalizedGroupId,
+    displayName: normalizedDisplayName,
+    grantedAt: new Date().toISOString()
+  };
+  return req.session.namedGuestAccess;
+}
+
 function getGuestResponsesByGroup(guestId, groupId) {
   const normalizedGuestId = String(guestId || "").trim();
   const normalizedGroupId = Number(groupId || 0);
@@ -2347,6 +2371,60 @@ app.post("/groups/:id/invite-link/toggle", requireAuth, (req, res) => {
   res.redirect(`/groups/${groupId}`);
 });
 
+function renderJoinGuestPage(req, res, { group, code, displayName = "", returnName = "", error = null, activeMode = "new" }) {
+  const mode = String(activeMode || "").toLowerCase() === "returning" ? "returning" : "new";
+  return res.render("join_guest", {
+    user: null,
+    group,
+    code,
+    requirePassword: !group.is_public && !!group.join_password_hash,
+    displayName,
+    returnName,
+    error,
+    activeMode: mode,
+    createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+  });
+}
+
+function isJoinGuestAjaxRequest(req) {
+  return String(req.get("x-join-ajax") || "").trim() === "1";
+}
+
+function respondJoinGuestError(req, res, {
+  group,
+  code,
+  displayName = "",
+  returnName = "",
+  error,
+  activeMode = "new",
+  status = 400
+}) {
+  if (isJoinGuestAjaxRequest(req)) {
+    return res.status(status).json({
+      ok: false,
+      error: String(error || "Something went wrong.")
+    });
+  }
+  return renderJoinGuestPage(req, res, {
+    group,
+    code,
+    displayName,
+    returnName,
+    error,
+    activeMode
+  });
+}
+
+function respondJoinGuestRedirect(req, res, redirectPath) {
+  if (isJoinGuestAjaxRequest(req)) {
+    return res.json({
+      ok: true,
+      redirect: redirectPath
+    });
+  }
+  return res.redirect(redirectPath);
+}
+
 app.get("/join/:code", (req, res) => {
   const code = req.params.code.trim();
   const user = getCurrentUser(req);
@@ -2376,14 +2454,11 @@ app.get("/join/:code", (req, res) => {
         isNamedGuest: true
       });
     }
-    return res.render("join_guest", {
-      user: null,
+    const activeMode = String(req.query.mode || "").toLowerCase() === "returning" ? "returning" : "new";
+    return renderJoinGuestPage(req, res, {
       group,
       code,
-      requirePassword: !group.is_public && !!group.join_password_hash,
-      displayName: "",
-      error: null,
-      createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+      activeMode
     });
   }
   if (isMember(user.id, invite.group_id)) {
@@ -2462,7 +2537,7 @@ app.post("/join/:code/guest", async (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
   if (user) {
-    return res.redirect(`/join/${code}`);
+    return respondJoinGuestRedirect(req, res, `/join/${code}`);
   }
   const invite = db
     .prepare("SELECT * FROM invites WHERE code = ?")
@@ -2482,40 +2557,34 @@ app.post("/join/:code/guest", async (req, res) => {
 
   const displayName = normalizeDisplayName(req.body.guestName || "");
   if (displayName.length < 2 || displayName.length > 40) {
-    return res.render("join_guest", {
-      user: null,
+    return respondJoinGuestError(req, res, {
       group,
       code,
-      requirePassword: !group.is_public && !!group.join_password_hash,
       displayName,
       error: translate(locale, "join_guest.error_name_invalid"),
-      createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+      activeMode: "new"
     });
   }
 
   if (!group.is_public && group.join_password_hash) {
     const password = String(req.body.password || "");
     if (!password) {
-      return res.render("join_guest", {
-        user: null,
+      return respondJoinGuestError(req, res, {
         group,
         code,
-        requirePassword: true,
         displayName,
         error: translate(locale, "join_guest.error_password_required"),
-        createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+        activeMode: "new"
       });
     }
     const ok = await bcrypt.compare(password, group.join_password_hash);
     if (!ok) {
-      return res.render("join_guest", {
-        user: null,
+      return respondJoinGuestError(req, res, {
         group,
         code,
-        requirePassword: true,
         displayName,
         error: translate(locale, "join_guest.error_password_invalid"),
-        createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+        activeMode: "new"
       });
     }
   }
@@ -2525,14 +2594,12 @@ app.post("/join/:code/guest", async (req, res) => {
     Number(group.is_global || 0) !== 1
     && isDisplayNameTakenInGroup(Number(group.id), displayName, { excludeGuestId: guestIdForJoin })
   ) {
-    return res.render("join_guest", {
-      user: null,
+    return respondJoinGuestError(req, res, {
       group,
       code,
-      requirePassword: !group.is_public && !!group.join_password_hash,
       displayName,
       error: translate(locale, "join_guest.error_name_taken"),
-      createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+      activeMode: "new"
     });
   }
 
@@ -2541,7 +2608,95 @@ app.post("/join/:code/guest", async (req, res) => {
     groupId: Number(group.id),
     displayName
   });
-  return res.redirect(`/join/${code}/questions`);
+  return respondJoinGuestRedirect(req, res, `/join/${code}/questions`);
+});
+
+app.post("/join/:code/guest/return", async (req, res) => {
+  const code = req.params.code.trim();
+  const user = getCurrentUser(req);
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  if (user) {
+    return respondJoinGuestRedirect(req, res, `/join/${code}`);
+  }
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+
+  const returnName = normalizeDisplayName(req.body.returnGuestName || "");
+  if (returnName.length < 2 || returnName.length > 40) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      returnName,
+      error: translate(locale, "join_guest.error_name_invalid"),
+      activeMode: "returning"
+    });
+  }
+
+  if (!group.is_public && group.join_password_hash) {
+    const password = String(req.body.password || "");
+    if (!password) {
+      return respondJoinGuestError(req, res, {
+        group,
+        code,
+        returnName,
+        error: translate(locale, "join_guest.error_password_required"),
+        activeMode: "returning"
+      });
+    }
+    const ok = await bcrypt.compare(password, group.join_password_hash);
+    if (!ok) {
+      return respondJoinGuestError(req, res, {
+        group,
+        code,
+        returnName,
+        error: translate(locale, "join_guest.error_password_invalid"),
+        activeMode: "returning"
+      });
+    }
+  }
+
+  const existingNamedGuest = db
+    .prepare(
+      `
+      SELECT guest_id, display_name
+      FROM named_guest_group_members
+      WHERE group_id = ?
+        AND display_name = ? COLLATE NOCASE
+      LIMIT 1
+      `
+    )
+    .get(Number(group.id), returnName);
+
+  if (!existingNamedGuest) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      returnName,
+      error: translate(locale, "join_guest.error_name_not_found"),
+      activeMode: "returning"
+    });
+  }
+
+  resumeNamedGuestAccess(req, {
+    inviteCode: code,
+    groupId: Number(group.id),
+    displayName: String(existingNamedGuest.display_name || returnName).trim(),
+    guestId: String(existingNamedGuest.guest_id || "").trim()
+  });
+  return respondJoinGuestRedirect(req, res, `/join/${code}`);
 });
 
 app.get("/join/:code/questions", (req, res) => {

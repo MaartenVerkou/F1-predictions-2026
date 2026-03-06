@@ -4,11 +4,14 @@
   <h1><%= t('join_guest.title', { group_name: group.name }) %></h1>
   <p class="muted"><%= t('join_guest.subtitle') %></p>
 
-  <% if (error) { %>
-    <div class="alert"><%= error %></div>
-  <% } %>
+  <div class="alert join-guest-error <%= error ? '' : 'is-hidden' %>" data-join-error><%= error || '' %></div>
 
-  <form method="post" action="/join/<%= code %>/guest" class="join-guest-form">
+  <form
+    method="post"
+    action="/join/<%= code %>/guest"
+    class="join-guest-form <%= activeMode === 'returning' ? 'is-hidden' : '' %>"
+    data-join-mode="new"
+  >
     <label>
       <%= t('join_guest.account_name_label') %>
       <input
@@ -34,8 +37,168 @@
       <a class="button-link join-guest-create-account" href="<%= createAccountPath %>"><%= t('home.create_account') %></a>
     </div>
 
-    <p class="muted join-guest-note"><%= t('join_guest.note') %></p>
+    <p class="muted join-guest-mode-row">
+      <a class="join-guest-mode-link" href="/join/<%= code %>?mode=returning" data-join-mode-trigger="returning"><%= t('join_guest.already_submitted') %></a>
+    </p>
   </form>
+
+  <form
+    method="post"
+    action="/join/<%= code %>/guest/return"
+    class="join-guest-form <%= activeMode === 'returning' ? '' : 'is-hidden' %>"
+    data-join-mode="returning"
+  >
+    <label>
+      <%= t('join_guest.returning_name_label') %>
+      <input
+        type="text"
+        name="returnGuestName"
+        maxlength="40"
+        required
+        value="<%= returnName || '' %>"
+        placeholder="<%= t('join_guest.returning_name_placeholder') %>"
+        autocomplete="nickname"
+      />
+    </label>
+
+    <% if (requirePassword) { %>
+      <label>
+        <%= t('join_guest.group_password_label') %>
+        <input type="password" name="password" required autocomplete="current-password" />
+      </label>
+    <% } %>
+
+    <div class="join-guest-actions">
+      <button type="submit"><%= t('join_guest.continue_as_guest') %></button>
+      <a class="button-link join-guest-create-account" href="<%= createAccountPath %>"><%= t('home.create_account') %></a>
+    </div>
+
+    <p class="muted join-guest-mode-row">
+      <a class="join-guest-mode-link" href="/join/<%= code %>" data-join-mode-trigger="new"><%= t('join_guest.join_as_new_guest') %></a>
+    </p>
+  </form>
+
+  <p class="muted join-guest-note"><%= t('join_guest.note') %></p>
 </div>
+
+<script>
+  (() => {
+    const newForm = document.querySelector('[data-join-mode="new"]');
+    const returningForm = document.querySelector('[data-join-mode="returning"]');
+    if (!newForm || !returningForm) return;
+    const newNameInput = newForm.querySelector('input[name="guestName"]');
+    const returningNameInput = returningForm.querySelector('input[name="returnGuestName"]');
+    const newPasswordInput = newForm.querySelector('input[name="password"]');
+    const returningPasswordInput = returningForm.querySelector('input[name="password"]');
+    const modeLinks = document.querySelectorAll("[data-join-mode-trigger]");
+    const errorBox = document.querySelector("[data-join-error]");
+    const fallbackError = "Something went wrong. Please try again.";
+
+    const clearError = () => {
+      if (!errorBox) return;
+      errorBox.textContent = "";
+      errorBox.classList.add("is-hidden");
+    };
+
+    const showError = (message) => {
+      if (!errorBox) return;
+      errorBox.textContent = String(message || fallbackError);
+      errorBox.classList.remove("is-hidden");
+    };
+
+    const showMode = (mode) => {
+      const showReturning = mode === "returning";
+      newForm.classList.toggle("is-hidden", showReturning);
+      returningForm.classList.toggle("is-hidden", !showReturning);
+    };
+
+    const copyIfEmpty = (fromInput, toInput) => {
+      const fromValue = String(fromInput?.value || "").trim();
+      const toValue = String(toInput?.value || "").trim();
+      if (fromValue && !toValue) {
+        toInput.value = fromValue;
+      }
+    };
+
+    const mirrorValue = (fromInput, toInput) => {
+      if (!fromInput || !toInput) return;
+      toInput.value = String(fromInput.value || "");
+    };
+
+    modeLinks.forEach((link) => {
+      link.addEventListener("click", (event) => {
+        const nextMode = String(link.getAttribute("data-join-mode-trigger") || "").trim();
+        if (!nextMode) return;
+        event.preventDefault();
+        if (nextMode === "returning") {
+          copyIfEmpty(newNameInput, returningNameInput);
+          mirrorValue(newPasswordInput, returningPasswordInput);
+        } else if (nextMode === "new") {
+          copyIfEmpty(returningNameInput, newNameInput);
+          mirrorValue(returningPasswordInput, newPasswordInput);
+        }
+        clearError();
+        showMode(nextMode);
+      });
+    });
+
+    if (newPasswordInput && returningPasswordInput) {
+      newPasswordInput.addEventListener("input", () => {
+        mirrorValue(newPasswordInput, returningPasswordInput);
+      });
+      returningPasswordInput.addEventListener("input", () => {
+        mirrorValue(returningPasswordInput, newPasswordInput);
+      });
+    }
+
+    if (newNameInput && returningNameInput) {
+      newNameInput.addEventListener("input", () => {
+        mirrorValue(newNameInput, returningNameInput);
+      });
+      returningNameInput.addEventListener("input", () => {
+        mirrorValue(returningNameInput, newNameInput);
+      });
+    }
+
+    [newForm, returningForm].forEach((form) => {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        clearError();
+        if (form === newForm) {
+          copyIfEmpty(returningNameInput, newNameInput);
+          mirrorValue(returningPasswordInput, newPasswordInput);
+        } else if (form === returningForm) {
+          copyIfEmpty(newNameInput, returningNameInput);
+          mirrorValue(newPasswordInput, returningPasswordInput);
+        }
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) submitButton.disabled = true;
+        try {
+          const payload = new URLSearchParams(new FormData(form));
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: payload,
+            credentials: "same-origin",
+            headers: {
+              "x-join-ajax": "1",
+              "accept": "application/json"
+            }
+          });
+          const contentType = String(response.headers.get("content-type") || "");
+          const data = contentType.includes("application/json") ? await response.json() : null;
+          if (response.ok && data && data.redirect) {
+            window.location.assign(data.redirect);
+            return;
+          }
+          showError(data && data.error ? data.error : fallbackError);
+        } catch (error) {
+          showError(fallbackError);
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+    });
+  })();
+</script>
 
 <%- include('partials/footer') %>
