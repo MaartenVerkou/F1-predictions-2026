@@ -3250,6 +3250,33 @@ app.post(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res)
   res.redirect(`${groupBasePath}/questions`);
 });
 
+app.get("/global/responses", (req, res, next) => {
+  const user = getCurrentUser(req);
+  if (user) return next();
+
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const group = ensureGlobalGroup();
+  if (!group) {
+    return sendError(req, res, 500, "Global group is not available.");
+  }
+
+  const guestId = getGuestIdFromSession(req, { create: true });
+  const questions = getQuestions(locale);
+  const responses = getResponsesForGroup(Number(group.id), { includeNamedGuests: false });
+  const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
+
+  return res.render("responses", {
+    user: null,
+    group,
+    questions,
+    responses,
+    groupBasePath: "/",
+    viewerGuestAnswers,
+    focusedMember: null,
+    focusedMemberResponses: []
+  });
+});
+
 app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;

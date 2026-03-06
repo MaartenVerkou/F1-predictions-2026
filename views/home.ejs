@@ -9,10 +9,12 @@
       <% if (predictionsClosed) { %>
         <% if (!user) { %>
           <a class="button-link hero-start-predicting" href="/signup"><%= t('home.signup_next_year_notify') %></a>
+          <a class="link" href="/global/responses"><%= t('home.view_predictions') %></a>
         <% } else { %>
           <div class="home-closed-callout alert" role="status" aria-live="polite">
             <strong><%= t('header.countdown_closed') %></strong>
           </div>
+          <a class="button-link hero-start-predicting" href="/global/responses"><%= t('home.view_predictions') %></a>
           <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
         <% } %>
       <% } else { %>
