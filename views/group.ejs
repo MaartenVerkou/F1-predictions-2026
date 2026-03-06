@@ -56,6 +56,9 @@
     <div class="inline-actions">
       <% if (closed) { %>
         <a class="button-link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
+        <% if (!isNamedGuest) { %>
+          <a class="link" href="<%= `${currentGroupPath}/responses?mine=1` %>"><%= t('group.view_my_responses') %></a>
+        <% } %>
       <% } else { %>
         <a class="button-link" href="<%= `${currentGroupPath}/questions` %>"><%= t('group.answer_questions') %></a>
         <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>

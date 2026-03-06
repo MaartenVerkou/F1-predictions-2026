@@ -301,6 +301,15 @@ header.is-time-compact .countdown .muted {
   display: none;
 }
 
+header.is-time-compact .countdown.is-closed {
+  gap: 0;
+}
+
+header.is-time-compact .countdown.is-closed .countdown-value {
+  min-width: 0;
+  text-align: left;
+}
+
 .header-main-links {
   display: flex;
   flex-wrap: nowrap;
@@ -1303,6 +1312,24 @@ button:disabled {
 .responses-summary-title {
   font-size: 13px;
   font-weight: 700;
+}
+
+.responses-mine-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  user-select: none;
+  cursor: pointer;
+}
+
+.responses-mine-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .responses-question-head {

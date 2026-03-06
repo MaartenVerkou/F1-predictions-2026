@@ -87,11 +87,20 @@ const initCountdown = () => {
   const prefixEl = el.querySelector('.muted');
   const prefixText = el.dataset.countdownPrefix || prefixEl?.textContent || '';
   const closedText = el.dataset.countdownClosed || 'Predictions are closed!';
+  const compactClosedText = el.dataset.countdownClosedCompact || 'Closed!';
   const brandTimerEls = Array.from(document.querySelectorAll('[data-brand-mobile-timer-value]'));
   const brandPrefixEls = Array.from(document.querySelectorAll('.brand-mobile-timer-prefix'));
+  const headerEl = document.querySelector('header');
   const rawDate = el.dataset.closeDate;
   const target = new Date(rawDate);
   if (Number.isNaN(target.getTime())) return;
+  let isClosed = false;
+
+  const isCompactMode = () => Boolean(headerEl?.classList.contains('is-time-compact'));
+  const getClosedDisplayText = () => (isCompactMode() ? compactClosedText : closedText);
+  const syncClosedClass = () => {
+    el.classList.toggle('is-closed', isClosed);
+  };
   const setPrefixText = (text) => {
     if (prefixEl) prefixEl.textContent = text;
     brandPrefixEls.forEach(timerPrefixEl => {
@@ -109,6 +118,11 @@ const initCountdown = () => {
     brandTimerEls.forEach(timerEl => {
       timerEl.innerHTML = html;
     });
+  };
+  const applyClosedState = () => {
+    syncClosedClass();
+    setPrefixText('');
+    setTimerText(getClosedDisplayText());
   };
   const formatHmsMarkup = (totalSeconds) => {
     const safe = Math.max(0, Number(totalSeconds) || 0);
@@ -131,10 +145,12 @@ const initCountdown = () => {
     const now = new Date();
     let diff = target - now;
     if (diff <= 0) {
-      setPrefixText('');
-      setTimerText(closedText);
+      isClosed = true;
+      applyClosedState();
       return;
     }
+    isClosed = false;
+    syncClosedClass();
     setPrefixText(prefixText);
     const totalSeconds = Math.floor(diff / 1000);
     if (totalSeconds < 24 * 60 * 60) {
@@ -149,6 +165,11 @@ const initCountdown = () => {
     setTimerText(`${days}d ${hours}h ${minutes}m`);
     setTimeout(tick, 30000);
   };
+  window.addEventListener('resize', () => {
+    if (isClosed) {
+      applyClosedState();
+    }
+  });
   tick();
 };
 

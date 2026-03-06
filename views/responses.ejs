@@ -2,11 +2,18 @@
 
 <div class="card survey-page-card">
   <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
+  <% const enableMineToggle = Boolean(user); %>
   <div class="page-title-row">
     <h1><%= group.name %>: <%= t('responses.page_title') %></h1>
     <a class="link page-back-link" href="<%= currentGroupPath %>">&lt; <%= t('group.back_to_group') %></a>
   </div>
   <p class="muted"><%= t('responses.subtitle') %></p>
+  <% if (enableMineToggle) { %>
+    <label class="responses-mine-toggle">
+      <input type="checkbox" data-responses-mine-toggle <%= showMineOnly ? 'checked' : '' %> />
+      <span><%= t('responses.only_my_responses') %></span>
+    </label>
+  <% } %>
 
   <% const questionMap = questions.reduce((acc, q) => { acc[q.id] = q; return acc; }, {}); %>
   <% const yesText = t('questions.yes'); %>
@@ -15,6 +22,7 @@
   <% const naText = t('responses.na'); %>
   <% const currentUserId = Number(user?.id || 0); %>
   <% const guestViewerAnswers = (typeof viewerGuestAnswers === 'object' && viewerGuestAnswers) ? viewerGuestAnswers : {}; %>
+  <% const showMine = Boolean(showMineOnly && enableMineToggle); %>
   <% const focusedMemberData = (typeof focusedMember === 'object' && focusedMember) ? focusedMember : null; %>
   <% const focusedMemberResponsesData = Array.isArray(focusedMemberResponses) ? focusedMemberResponses : []; %>
   <% const responsesByQuestion = responses.reduce((acc, row) => {
@@ -22,6 +30,18 @@
       acc[row.question_id].push(row);
       return acc;
     }, {}); %>
+  <% const mineQuestionIds = new Set(); %>
+  <% if (currentUserId > 0) { %>
+    <% Object.entries(responsesByQuestion).forEach(([questionId, rowsForQuestion]) => {
+      if (Array.isArray(rowsForQuestion) && rowsForQuestion.some((row) => Number(row.user_id) === currentUserId)) {
+        mineQuestionIds.add(String(questionId));
+      }
+    }); %>
+  <% } %>
+  <% Object.entries(guestViewerAnswers).forEach(([questionId, answer]) => {
+    if (String(answer || '').trim() !== '') mineQuestionIds.add(String(questionId));
+  }); %>
+  <% const displayQuestions = showMine ? questions.filter((q) => mineQuestionIds.has(String(q.id))) : questions; %>
   <% const formatPercent = (value) => {
       const rounded = Math.round(Number(value || 0) * 10) / 10;
       return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
@@ -206,10 +226,10 @@
       return top.slice(0, limit - 1).concat([viewerItem]);
     }; %>
 
-  <% if (responses.length === 0) { %>
+  <% if (responses.length === 0 || displayQuestions.length === 0) { %>
     <div class="alert"><%= t('responses.no_responses') %></div>
   <% } else { %>
-    <% questions.forEach(q => { %>
+    <% displayQuestions.forEach(q => { %>
       <% const lastSeason = q.last_season || null; %>
       <% const hasLastSeasonReference = Boolean(lastSeason); %>
       <% const lastSeasonResult = hasLastSeasonReference ? formatLastSeasonResult(lastSeason) : ''; %>
@@ -251,7 +271,7 @@
             ? { user_id: 0, question_id: q.id, answer: guestViewerRawAnswer }
             : null); %>
           <% const focusedRow = focusedRowsByQuestion[q.id] || null; %>
-          <% const hasFocusedMember = Boolean(focusedMemberData); %>
+          <% const hasFocusedMember = !showMine && Boolean(focusedMemberData); %>
           <% const viewerAnswerLabel = viewerRow ? formatAnswer(viewerRow) : ''; %>
           <% const focusedAnswerLabel = focusedRow ? formatAnswer(focusedRow) : ''; %>
           <% const viewerBooleanChoice = q.type === 'boolean' && viewerRow ? String(viewerRow.answer || '') : ''; %>
@@ -268,14 +288,20 @@
           <% const isFullMultiColumnSummary = q.id === 'all_podium_finishers' || q.id === 'select_three_races_dnfs'; %>
           <% const summary = isFullMultiColumnSummary ? summarizeMultiSelectOptions(rows) : summarizeAnswers(rows); %>
           <% const summaryDisplayRows = isFullMultiColumnSummary
-            ? limitRowsWithViewerSet(summary, activeMultiSelectPicks, 5)
+            ? (showMine
+              ? summary.filter((item) => activeMultiSelectPicks.includes(item.label))
+              : limitRowsWithViewerSet(summary, activeMultiSelectPicks, 5))
             : (q.type === 'boolean' || q.type === 'ranking'
               ? summary
-              : limitRowsWithViewer(summary, activeAnswerLabel, 5)); %>
+              : (showMine
+                ? summary.filter((item) => activeAnswerLabel && item.label === activeAnswerLabel)
+                : limitRowsWithViewer(summary, activeAnswerLabel, 5))); %>
           <% const yesCount = q.type === 'boolean' ? rows.filter((row) => row.answer === 'yes').length : 0; %>
           <% const noCount = q.type === 'boolean' ? rows.filter((row) => row.answer === 'no').length : 0; %>
           <% const yesPercent = rows.length > 0 ? (yesCount * 100) / rows.length : 0; %>
           <% const noPercent = rows.length > 0 ? (noCount * 100) / rows.length : 0; %>
+          <% const showYesRow = !showMine || activeBooleanChoice === 'yes'; %>
+          <% const showNoRow = !showMine || activeBooleanChoice === 'no'; %>
           <% const rankingByPlace = q.type === 'ranking' ? summarizeRankingByPlace(rows, q) : []; %>
           <div class="responses-summary">
             <div class="muted responses-summary-title">
@@ -283,19 +309,29 @@
             </div>
             <% if (q.type === 'boolean') { %>
               <div class="responses-yesno-head">
-                <span class="<%= activeBooleanChoice === 'yes' ? activeChoiceClass : '' %>"><%= yesText %> &middot; <%= formatPercent(yesPercent) %>% (<%= yesCount %>)</span>
-                <span class="<%= activeBooleanChoice === 'no' ? activeChoiceClass : '' %>"><%= noText %> &middot; <%= formatPercent(noPercent) %>% (<%= noCount %>)</span>
+                <% if (showYesRow) { %>
+                  <span class="<%= activeBooleanChoice === 'yes' ? activeChoiceClass : '' %>"><%= yesText %> &middot; <%= formatPercent(yesPercent) %>% (<%= yesCount %>)</span>
+                <% } %>
+                <% if (showNoRow) { %>
+                  <span class="<%= activeBooleanChoice === 'no' ? activeChoiceClass : '' %>"><%= noText %> &middot; <%= formatPercent(noPercent) %>% (<%= noCount %>)</span>
+                <% } %>
               </div>
               <div class="responses-yesno-track" aria-hidden="true">
-                <span class="responses-yesno-yes <%= activeBooleanChoice === 'yes' ? activeChoiceClass : '' %>" style="width:<%= yesPercent %>%;"></span>
-                <span class="responses-yesno-no <%= activeBooleanChoice === 'no' ? activeChoiceClass : '' %>" style="width:<%= noPercent %>%;"></span>
+                <% if (showYesRow) { %>
+                  <span class="responses-yesno-yes <%= activeBooleanChoice === 'yes' ? activeChoiceClass : '' %>" style="width:<%= yesPercent %>%;"></span>
+                <% } %>
+                <% if (showNoRow) { %>
+                  <span class="responses-yesno-no <%= activeBooleanChoice === 'no' ? activeChoiceClass : '' %>" style="width:<%= noPercent %>%;"></span>
+                <% } %>
               </div>
             <% } else if (q.type === 'ranking') { %>
               <div class="responses-ranking-splits">
                 <% rankingByPlace.forEach((placeRows, index) => { %>
                   <% if (placeRows.length > 0) { %>
                     <% const viewerPlacePick = activeRankingPicks[index]; %>
-                    <% const placeDisplayRows = limitRowsWithViewer(placeRows, viewerPlacePick, 5); %>
+                    <% const placeDisplayRows = showMine
+                      ? placeRows.filter((item) => viewerPlacePick && item.label === viewerPlacePick)
+                      : limitRowsWithViewer(placeRows, viewerPlacePick, 5); %>
                     <div class="responses-ranking-place">
                       <div class="muted responses-ranking-place-title"><%= t('responses.position_label', { n: index + 1 }) %></div>
                       <ul class="responses-bars">
@@ -315,7 +351,7 @@
               </div>
             <% } else if (isFullMultiColumnSummary) { %>
               <ul class="responses-podium-columns">
-                <% summary.forEach(item => { %>
+                <% summaryDisplayRows.forEach(item => { %>
                   <% const isViewerChoice = activeMultiSelectPicks.includes(item.label); %>
                   <li class="responses-podium-item <%= isViewerChoice ? activeChoiceClass : '' %>">
                     <span class="responses-podium-label"><%= item.label %></span>
@@ -343,5 +379,23 @@
     <% }) %>
   <% } %>
 </div>
+
+<script>
+  (function () {
+    const toggle = document.querySelector('[data-responses-mine-toggle]');
+    if (!toggle) return;
+    toggle.addEventListener('change', () => {
+      const url = new URL(window.location.href);
+      if (toggle.checked) {
+        url.searchParams.set('mine', '1');
+        url.searchParams.delete('focusUserId');
+        url.searchParams.delete('focusGuestId');
+      } else {
+        url.searchParams.delete('mine');
+      }
+      window.location.assign(url.toString());
+    });
+  })();
+</script>
 
 <%- include('partials/footer') %>

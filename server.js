@@ -2438,6 +2438,7 @@ app.get("/join/:code/responses", (req, res) => {
   const questions = getQuestions(locale);
   const responses = getResponsesForGroup(Number(group.id), { includeNamedGuests: true });
   const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
+  const showMineOnly = req.query.mine === "1";
   const focused = getFocusedMemberResponses(Number(group.id), {
     focusUserId: req.query.focusUserId,
     focusGuestId: req.query.focusGuestId
@@ -2450,6 +2451,7 @@ app.get("/join/:code/responses", (req, res) => {
     responses,
     groupBasePath: `/join/${code}`,
     viewerGuestAnswers,
+    showMineOnly,
     focusedMember: focused ? focused.member : null,
     focusedMemberResponses: focused ? focused.responses : []
   });
@@ -3264,6 +3266,7 @@ app.get("/global/responses", (req, res, next) => {
   const questions = getQuestions(locale);
   const responses = getResponsesForGroup(Number(group.id), { includeNamedGuests: false });
   const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
+  const showMineOnly = req.query.mine === "1";
 
   return res.render("responses", {
     user: null,
@@ -3272,6 +3275,7 @@ app.get("/global/responses", (req, res, next) => {
     responses,
     groupBasePath: "/",
     viewerGuestAnswers,
+    showMineOnly,
     focusedMember: null,
     focusedMemberResponses: []
   });
@@ -3290,6 +3294,7 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
   }
   const questions = getQuestions(locale);
   const responses = getResponsesForGroup(groupId, { includeNamedGuests: true });
+  const showMineOnly = req.query.mine === "1";
   const focused = getFocusedMemberResponses(groupId, {
     focusUserId: req.query.focusUserId,
     focusGuestId: req.query.focusGuestId
@@ -3301,6 +3306,7 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
     questions,
     responses,
     groupBasePath: getGroupBasePath(group),
+    showMineOnly,
     focusedMember: focused ? focused.member : null,
     focusedMemberResponses: focused ? focused.responses : []
   });
