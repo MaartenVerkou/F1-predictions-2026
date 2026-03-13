@@ -764,7 +764,6 @@ const initLeaderboardPanels = () => {
     const activators = Array.from(scope.querySelectorAll('[data-member-activate]'));
     const panels = Array.from(scope.querySelectorAll('.leaderboard-member-panel[id]'));
     const mainCard = scope.querySelector('.leaderboard-main-card');
-    const mainTable = mainCard?.querySelector('.table');
     if (activators.length === 0 || panels.length === 0) return;
 
     const activatePanel = (targetId) => {
@@ -782,13 +781,28 @@ const initLeaderboardPanels = () => {
     };
 
     const syncPanelHeight = () => {
-      const heightSource = mainTable || mainCard;
-      if (!heightSource) return;
+      if (!mainCard) return;
       if (window.matchMedia('(max-width: 980px)').matches) {
         scope.style.removeProperty('--leaderboard-panel-height');
+        panels.forEach(panel => {
+          panel.style.removeProperty('height');
+        });
         return;
       }
-      scope.style.setProperty('--leaderboard-panel-height', `${heightSource.offsetHeight}px`);
+      const samplePanel = panels.find(panel => !panel.hidden) || panels[0];
+      const headerHeight = samplePanel?.querySelector('thead')?.offsetHeight || 42;
+      const rowHeight = samplePanel?.querySelector('tbody tr')?.offsetHeight || 52;
+      const chromeHeight = 36;
+      const minPanelHeight = chromeHeight + headerHeight + rowHeight * 10;
+      const maxPanelHeight = chromeHeight + headerHeight + rowHeight * 12;
+      const targetHeight = Math.min(
+        Math.max(mainCard.offsetHeight, minPanelHeight),
+        maxPanelHeight
+      );
+      scope.style.setProperty('--leaderboard-panel-height', `${targetHeight}px`);
+      panels.forEach(panel => {
+        panel.style.height = `${targetHeight}px`;
+      });
     };
 
     activators.forEach(activator => {
@@ -811,9 +825,9 @@ const initLeaderboardPanels = () => {
     activatePanel(initialTargetId);
     syncPanelHeight();
     window.addEventListener('resize', syncPanelHeight);
-    if (typeof ResizeObserver !== 'undefined' && (mainTable || mainCard)) {
+    if (typeof ResizeObserver !== 'undefined' && mainCard) {
       const observer = new ResizeObserver(() => syncPanelHeight());
-      observer.observe(mainTable || mainCard);
+      observer.observe(mainCard);
     }
   });
 };

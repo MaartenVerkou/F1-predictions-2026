@@ -3391,7 +3391,11 @@ function registerAdminRoutes(app, deps) {
       return res.redirect(withQueryParam(returnTo, "error", "Only admins can be hidden from global."));
     }
 
-    const hideFromGlobal = req.body.hideFromGlobal === "1" ? 1 : 0;
+    const hideFromGlobalRaw = req.body.hideFromGlobal;
+    const hideFromGlobalValue = Array.isArray(hideFromGlobalRaw)
+      ? hideFromGlobalRaw[hideFromGlobalRaw.length - 1]
+      : hideFromGlobalRaw;
+    const hideFromGlobal = hideFromGlobalValue === "1" ? 1 : 0;
     db.prepare("UPDATE users SET hide_from_global = ? WHERE id = ?").run(hideFromGlobal, userId);
     return res.redirect(
       withQueryParam(
