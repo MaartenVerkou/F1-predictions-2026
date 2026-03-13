@@ -1,10 +1,109 @@
 <%- include('partials/header', { title: t('leaderboard.page_title'), user }) %>
 
-<div class="card">
-  <% const formatAnswer = (question, raw) => {
+<div class="card survey-page-card">
+  <% const driverShortCodeMap = {
+    "Alexander Albon": "ALB",
+    "Arvid Lindblad": "LIN",
+    "Carlos Sainz Jr.": "SAI",
+    "Charles Leclerc": "LEC",
+    "Esteban Ocon": "OCO",
+    "Fernando Alonso": "ALO",
+    "Franco Colapinto": "COL",
+    "Gabriel Bortoleto": "BOR",
+    "George Russell": "RUS",
+    "Isack Hadjar": "HAD",
+    "Kimi Antonelli": "ANT",
+    "Lance Stroll": "STR",
+    "Lando Norris": "NOR",
+    "Lewis Hamilton": "HAM",
+    "Liam Lawson": "LAW",
+    "Max Verstappen": "VER",
+    "Nico Hulkenberg": "HUL",
+    "Oliver Bearman": "BEA",
+    "Oscar Piastri": "PIA",
+    "Pierre Gasly": "GAS",
+    "Sergio Perez": "PER",
+    "Valtteri Bottas": "BOT"
+  }; %>
+  <% const teamShortCodeMap = {
+    "Alpine": "ALP",
+    "Aston Martin": "AST",
+    "Audi": "AUD",
+    "Cadillac": "CAD",
+    "Ferrari": "FER",
+    "Haas F1 Team": "HAA",
+    "McLaren": "MCL",
+    "Mercedes": "MER",
+    "Racing Bulls": "RBT",
+    "Red Bull Racing": "RBR",
+    "Williams": "WIL"
+  }; %>
+  <% const raceShortCodeMap = {
+    "Australian Grand Prix": "AUS",
+    "Chinese Grand Prix": "CHN",
+    "Japanese Grand Prix": "JPN",
+    "Bahrain Grand Prix": "BHR",
+    "Saudi Arabian Grand Prix": "SAU",
+    "Miami Grand Prix": "MIA",
+    "Canadian Grand Prix": "CAN",
+    "Monaco Grand Prix": "MON",
+    "Barcelona-Catalunya Grand Prix": "CAT",
+    "Austrian Grand Prix": "AUT",
+    "British Grand Prix": "GBR",
+    "Belgian Grand Prix": "BEL",
+    "Hungarian Grand Prix": "HUN",
+    "Dutch Grand Prix": "NED",
+    "Italian Grand Prix": "ITA",
+    "Spanish Grand Prix": "ESP",
+    "Azerbaijan Grand Prix": "AZE",
+    "Singapore Grand Prix": "SIN",
+    "United States Grand Prix": "USA",
+    "Mexico City Grand Prix": "MEX",
+    "Sao Paulo Grand Prix": "BRA",
+    "Las Vegas Grand Prix": "LVG",
+    "Qatar Grand Prix": "QAT",
+    "Abu Dhabi Grand Prix": "ABD"
+  }; %>
+  <% const escapeRegExp = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); %>
+  <% const shortRaceCode = (race) => raceShortCodeMap[String(race || "").trim()] || String(race || ""); %>
+  <% const abbreviateEntities = (text) => {
+    let output = String(text || "");
+    const entries = Object.entries({ ...teamShortCodeMap, ...driverShortCodeMap })
+      .sort((a, b) => b[0].length - a[0].length);
+    entries.forEach(([label, code]) => {
+      output = output.replace(new RegExp(escapeRegExp(label), "g"), code);
+    });
+    return output;
+  }; %>
+  <% const shouldPreferCompactValue = (question, raw, display) => {
+    if (!question || raw == null || raw === "" || !display || display === "-") return false;
+    if (question.id === "select_three_races_dnfs") return true;
+
+    const text = String(raw).trim();
+    if (text.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) && parsed.length > 1;
+      } catch (err) {}
+    }
+
+    return false;
+  }; %>
+  <% const formatInlineValue = (value) => {
+    if (value == null || value === "") return "-";
+    if (Array.isArray(value)) return value.join(" | ");
+    if (typeof value === "object") {
+      return Object.entries(value)
+        .map(([key, inner]) => `${key}: ${formatInlineValue(inner)}`)
+        .join("; ");
+    }
+    return String(value);
+  }; %>
+  <% const formatValue = (question, raw) => {
     if (raw == null || raw === "") return "-";
     const text = String(raw);
     const type = question?.type || "text";
+    const looksJson = text.startsWith("[") || text.startsWith("{");
     if (
       type === "ranking" ||
       type === "multi_select" ||
@@ -12,10 +111,23 @@
       type === "teammate_battle" ||
       type === "boolean_with_optional_driver" ||
       type === "numeric_with_driver" ||
-      type === "single_choice_with_driver"
+      type === "single_choice_with_driver" ||
+      looksJson
     ) {
       try {
         const parsed = JSON.parse(text);
+        if (question?.id === "select_three_races_dnfs") {
+          if (Array.isArray(parsed)) {
+            return parsed.map(shortRaceCode).join(" | ") || "-";
+          }
+          const dnfByRace = parsed?.dnf_by_race;
+          if (dnfByRace && typeof dnfByRace === "object") {
+            const parts = Object.entries(dnfByRace)
+              .filter(([, count]) => Number(count) > 0)
+              .map(([race, count]) => `${shortRaceCode(race)}: ${count}`);
+            return parts.join(" | ") || "-";
+          }
+        }
         if (Array.isArray(parsed)) return parsed.join(" | ");
         if (parsed && typeof parsed === "object") {
           if (type === "teammate_battle") {
@@ -36,9 +148,7 @@
             const value = parsed.value == null ? "-" : String(parsed.value);
             return parsed.driver ? `${value} - ${parsed.driver}` : value;
           }
-          return Object.entries(parsed)
-            .map(([key, value]) => `${key}: ${value == null ? "-" : value}`)
-            .join("; ");
+          return formatInlineValue(parsed);
         }
         return parsed == null ? "-" : String(parsed);
       } catch (err) {
@@ -51,17 +161,27 @@
     typeof leaderboardBasePath === "string" && leaderboardBasePath
       ? leaderboardBasePath
       : groupPath(group, "/leaderboard"); %>
+  <% const currentGroupPath =
+    typeof groupBasePath === "string" && groupBasePath
+      ? groupBasePath
+      : (leaderboardBaseHref.endsWith("/leaderboard")
+          ? leaderboardBaseHref.replace(/\/leaderboard$/, "")
+          : groupPath(group)); %>
   <% const leaderboardQueryPart =
     typeof leaderboardQuery === "string" && leaderboardQuery.trim()
       ? leaderboardQuery.trim()
       : ""; %>
-  <% const pageHref = (pageNumber) =>
-    leaderboardQueryPart
-      ? `${leaderboardBaseHref}?${leaderboardQueryPart}&page=${pageNumber}#leaderboard-details`
-      : `${leaderboardBaseHref}?page=${pageNumber}#leaderboard-details`; %>
+  <% const leaderboardExtraParams = {}; %>
+  <% if (leaderboardQueryPart) { %>
+    <% for (const [key, value] of new URLSearchParams(leaderboardQueryPart).entries()) { %>
+      <% leaderboardExtraParams[key] = value; %>
+    <% } %>
+  <% } %>
 
-  <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
-  <p class="muted"><%= t('leaderboard.subtitle') %></p>
+  <div class="page-title-row">
+    <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
+    <a class="link page-back-link" href="<%= currentGroupPath %>">&lt; <%= t('group.back_to_group') %></a>
+  </div>
 
   <% if (Object.keys(actuals || {}).length === 0) { %>
     <div class="alert"><%= t('leaderboard.no_actuals') %></div>
@@ -70,116 +190,109 @@
   <% if (leaderboard.length === 0) { %>
     <div class="alert"><%= t('leaderboard.no_scored_responses') %></div>
   <% } else { %>
-    <p class="muted">
-      <% const startRank = (currentLeaderboardPage - 1) * leaderboardPerPage + 1; %>
-      <% const endRank = startRank + leaderboard.length - 1; %>
-      Showing <%= startRank %>-<%= endRank %> of <%= leaderboardTotal %>
-    </p>
+    <% const startRank = (currentLeaderboardPage - 1) * leaderboardPerPage + 1; %>
+    <% const endRank = startRank + leaderboard.length - 1; %>
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th><%= t('leaderboard.member') %></th>
-          <th><%= t('leaderboard.total_points') %></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% leaderboard.forEach(row => { %>
-          <tr>
-            <td><%= row.rank %></td>
-            <td><%= row.name %></td>
-            <td><strong><%= row.total %></strong></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
-    <div class="inline-actions" style="margin-top: 10px;">
-      <% if (currentLeaderboardPage > 1) { %>
-        <a class="link" href="<%= pageHref(currentLeaderboardPage - 1) %>">Previous <%= leaderboardPerPage %></a>
-      <% } %>
-      <span class="muted">Page <%= currentLeaderboardPage %> of <%= totalLeaderboardPages %></span>
-      <% if (currentLeaderboardPage < totalLeaderboardPages) { %>
-        <a class="link" href="<%= pageHref(currentLeaderboardPage + 1) %>">Next <%= leaderboardPerPage %></a>
-      <% } %>
-    </div>
-
-    <h2 id="leaderboard-details" style="margin-top:24px;"><%= t('leaderboard.details') %></h2>
-    <div class="leaderboard-member-switcher" data-member-switcher>
-      <button
-        type="button"
-        class="secondary leaderboard-strip-arrow"
-        data-member-scroll="prev"
-        aria-label="Scroll members left"
-      >
-        &#8249;
-      </button>
-
-      <div class="leaderboard-member-strip" data-member-strip role="tablist" aria-label="Members">
-        <% leaderboard.forEach((row, index) => { %>
-          <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
-          <% const tabId = `leaderboard-member-tab-${row.userId}`; %>
-          <button
-            type="button"
-            id="<%= tabId %>"
-            role="tab"
-            aria-controls="<%= panelId %>"
-            aria-selected="<%= index === 0 ? 'true' : 'false' %>"
-            tabindex="<%= index === 0 ? '0' : '-1' %>"
-            class="leaderboard-member-tab <%= index === 0 ? 'is-active' : '' %>"
-            data-member-tab
-            data-target="<%= panelId %>"
-          >
-            <span class="leaderboard-member-rank">#<%= row.rank %></span>
-            <span><%= row.name %></span>
-          </button>
-        <% }) %>
-      </div>
-
-      <button
-        type="button"
-        class="secondary leaderboard-strip-arrow"
-        data-member-scroll="next"
-        aria-label="Scroll members right"
-      >
-        &#8250;
-      </button>
-    </div>
-
-    <% leaderboard.forEach((row, index) => { %>
-      <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
-      <% const tabId = `leaderboard-member-tab-${row.userId}`; %>
-      <section
-        id="<%= panelId %>"
-        role="tabpanel"
-        aria-labelledby="<%= tabId %>"
-        class="card leaderboard-member-panel <%= index === 0 ? 'is-active' : '' %>"
-        <%= index === 0 ? '' : 'hidden' %>
-      >
-        <div class="leaderboard-member-heading">
-          <strong><%= row.name %></strong>
-          <span class="muted"><%= row.total %> <%= t('leaderboard.points_short') %></span>
-        </div>
-        <table class="table compact" style="margin-top:8px;">
+    <div id="leaderboard-overview" class="leaderboard-layout">
+      <section class="leaderboard-main-card">
+        <table class="table">
           <thead>
             <tr>
-              <th>Question</th>
-              <th>Answer</th>
-              <th>Points</th>
+              <th>#</th>
+              <th><%= t('leaderboard.member') %></th>
+              <th><%= t('leaderboard.total_points') %></th>
             </tr>
           </thead>
           <tbody>
-          <% questions.forEach(q => { %>
-            <tr>
-              <td><%= q.prompt %></td>
-              <td><%= formatAnswer(q, row.answersByQuestion?.[q.id]) %></td>
-              <td><%= row.byQuestion[q.id] ?? 0 %> <%= t('leaderboard.points_short') %></td>
-            </tr>
-          <% }) %>
+            <% leaderboard.forEach((row, index) => { %>
+              <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
+              <tr
+                class="leaderboard-rank-row <%= index === 0 ? 'is-active' : '' %>"
+                data-member-activate="<%= panelId %>"
+                tabindex="0"
+                role="button"
+                aria-controls="<%= panelId %>"
+                aria-pressed="<%= index === 0 ? 'true' : 'false' %>"
+              >
+                <td><%= row.rank %></td>
+                <td><strong><%= row.name %></strong></td>
+                <td><strong><%= row.total %></strong></td>
+              </tr>
+            <% }) %>
           </tbody>
         </table>
+        <p class="muted" style="margin: 10px 0 0;">
+          Showing <%= startRank %>-<%= endRank %> of <%= leaderboardTotal %>
+        </p>
+        <div class="leaderboard-pagination">
+          <%- include('partials/admin_pagination', {
+            currentPage: currentLeaderboardPage,
+            totalPages: totalLeaderboardPages,
+            pageParamName: 'page',
+            basePath: leaderboardBaseHref,
+            extraParams: leaderboardExtraParams,
+            anchorId: 'leaderboard-overview',
+            label: 'Leaderboard',
+            perPage: leaderboardPerPage,
+            showSummary: false,
+            maxVisiblePages: 3,
+            firstLabel: '<<',
+            prevLabel: '<',
+            nextLabel: '>',
+            lastLabel: '>>'
+          }) %>
+        </div>
       </section>
-    <% }) %>
+
+      <section class="leaderboard-detail-card">
+        <% leaderboard.forEach((row, index) => { %>
+          <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
+          <section
+            id="<%= panelId %>"
+            class="leaderboard-member-panel <%= index === 0 ? 'is-active' : '' %>"
+            <%= index === 0 ? '' : 'hidden' %>
+          >
+            <table class="table compact leaderboard-breakdown-table">
+              <thead>
+                <tr>
+                  <th>Q</th>
+                  <th>Actual</th>
+                  <th>Answer</th>
+                  <th>Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+              <% questions.forEach((q, questionIndex) => { %>
+                <tr>
+                  <td>
+                    <span class="leaderboard-question-chip" tabindex="0">
+                      <span class="leaderboard-question-code">Q<%= questionIndex + 1 %></span>
+                      <span class="leaderboard-question-tooltip"><%= q.prompt %></span>
+                    </span>
+                  </td>
+                  <% const actualDisplay = formatValue(q, actuals?.[q.id]); %>
+                  <% const answerDisplay = formatValue(q, row.answersByQuestion?.[q.id]); %>
+                  <td>
+                    <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, actuals?.[q.id], actualDisplay) ? 'has-short' : '' %>">
+                      <span class="leaderboard-value-full"><%= actualDisplay %></span>
+                      <span class="leaderboard-value-short"><%= abbreviateEntities(actualDisplay) %></span>
+                    </span>
+                  </td>
+                  <td>
+                    <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, row.answersByQuestion?.[q.id], answerDisplay) ? 'has-short' : '' %>">
+                      <span class="leaderboard-value-full"><%= answerDisplay %></span>
+                      <span class="leaderboard-value-short"><%= abbreviateEntities(answerDisplay) %></span>
+                    </span>
+                  </td>
+                  <td><strong><%= row.byQuestion[q.id] ?? 0 %></strong></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </section>
+        <% }) %>
+      </section>
+    </div>
   <% } %>
 </div>
 

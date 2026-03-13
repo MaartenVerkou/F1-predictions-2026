@@ -46,6 +46,136 @@
       const rounded = Math.round(Number(value || 0) * 10) / 10;
       return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
     }; %>
+  <% const escapeHtml = (value) =>
+      String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'); %>
+  <% const buildPromptTooltipHtml = (questionObj) => {
+      const text = String(questionObj?.prompt || '');
+      if (!text) return '';
+      const questionId = String(questionObj?.id || '');
+
+      const termDefs = [
+        {
+          tip: t('questions.tip_dnf'),
+          patterns: [/\bDNF(?:'s|s)?\b/gi]
+        },
+        {
+          tip: t('questions.tip_dns'),
+          patterns: [/\bDNS\b/gi]
+        },
+        {
+          tip: t('questions.tip_dq'),
+          patterns: [/\bDSQ\b/gi]
+        },
+        {
+          tip: t('questions.tip_grand_prix'),
+          patterns: [/\bGrand Prix\b/gi]
+        }
+      ];
+
+      if (questionId === 'drivers_championship_last') {
+        termDefs.push({
+          tip: t('questions.tip_initial_lineup'),
+          patterns: [/\bdriver\b/gi, /\bcoureur\b/gi, /\bfahrer\b/gi, /\bpiloto\b/gi, /\bpilote\b/gi]
+        });
+      }
+      if (
+        questionId === 'all_podium_finishers' ||
+        questionId === 'mini_q3_ferrari_podium' ||
+        questionId === 'most_points_no_podium'
+      ) {
+        termDefs.push({
+          tip: t('questions.tip_podium_gp_only'),
+          patterns: [/\bpodium(?:s)?\b/gi, /\bpodiumfinishers?\b/gi, /\bpodiumsfahrer\b/gi, /\bpodio(?:s)?\b/gi]
+        });
+      }
+      if (questionId === 'lowest_grid_win_position') {
+        termDefs.push({
+          tip: t('questions.tip_race_gp_wins_only'),
+          patterns: [/\brace(?:s)?\b/gi, /\brennen\b/gi, /\bcarrera(?:s)?\b/gi, /\bcourse(?:s)?\b/gi]
+        });
+      }
+      if (questionId === 'select_three_races_dnfs' || questionId === 'races_before_title_decided') {
+        termDefs.push({
+          tip: t('questions.tip_races_grand_prix_only'),
+          patterns: [/\braces\b/gi, /\brennen\b/gi, /\bcarreras\b/gi, /\bcourses\b/gi]
+        });
+      }
+      if (questionId === 'mini_q2_mercedes_engines_top5') {
+        termDefs.push({
+          tip: t('questions.tip_mercedes_engine_teams'),
+          patterns: [
+            /\bteams with Mercedes engines\b/gi,
+            /\bteams met Mercedes-motoren\b/gi,
+            /\bteams mit Mercedes-Motor\b/gi,
+            /\bequipos con motor Mercedes\b/gi,
+            /\bequipes a moteur Mercedes\b/gi
+          ]
+        });
+      }
+      if (questionId === 'destructors_driver' || questionId === 'destructors_team') {
+        termDefs.push({
+          tip: t('questions.tip_damage_source'),
+          patterns: [/\bdamage\b/gi, /\bschade\b/gi, /\bschaden\b/gi, /\bdanos\b/gi, /\bdegats\b/gi]
+        });
+      }
+
+      const matches = [];
+      termDefs.forEach((def, defIndex) => {
+        def.patterns.forEach((regex) => {
+          const flags = regex.flags.includes('g') ? regex.flags : `${regex.flags}g`;
+          const re = new RegExp(regex.source, flags);
+          let match = re.exec(text);
+          while (match) {
+            if (match[0]) {
+              matches.push({
+                start: match.index,
+                end: match.index + match[0].length,
+                label: match[0],
+                tip: def.tip,
+                defIndex
+              });
+            }
+            if (re.lastIndex === match.index) {
+              re.lastIndex += 1;
+            }
+            match = re.exec(text);
+          }
+        });
+      });
+
+      if (!matches.length) return escapeHtml(text);
+
+      matches.sort((a, b) => {
+        if (a.start !== b.start) return a.start - b.start;
+        const aLen = a.end - a.start;
+        const bLen = b.end - b.start;
+        if (aLen !== bLen) return bLen - aLen;
+        return a.defIndex - b.defIndex;
+      });
+
+      const selected = [];
+      let lastEnd = -1;
+      matches.forEach((match) => {
+        if (match.start < lastEnd) return;
+        selected.push(match);
+        lastEnd = match.end;
+      });
+
+      let out = '';
+      let cursor = 0;
+      selected.forEach((match) => {
+        out += escapeHtml(text.slice(cursor, match.start));
+        out += `<span class="question-term" tabindex="0"><span class="question-term-label">${escapeHtml(match.label)}</span><span class="question-term-tooltip">${escapeHtml(match.tip)}</span></span>`;
+        cursor = match.end;
+      });
+      out += escapeHtml(text.slice(cursor));
+      return out;
+    }; %>
   <% const isHumanReadableSourceUrl = (url) => {
       if (!url || typeof url !== 'string') return false;
       const value = url.trim();
@@ -239,7 +369,7 @@
       <% const hasLastSeasonDetails = hasLastSeasonReference && Boolean(lastSeasonResult || lastSeasonSourceUrl); %>
       <div class="responses-section">
         <div class="responses-question-head">
-          <h3 class="survey-question-title"><%= q.prompt %></h3>
+          <h3 class="survey-question-title"><%- buildPromptTooltipHtml(q) %></h3>
           <% if (hasLastSeasonDetails) { %>
             <div class="question-last-season-peek" tabindex="0">
               <span class="question-last-season-toggle"><%= t('questions.last_season_link') %></span>
@@ -381,6 +511,53 @@
 </div>
 
 <script>
+  (function () {
+    const terms = Array.from(document.querySelectorAll(".question-term"));
+    if (terms.length === 0) return;
+
+    const setShift = (term, shiftPx) => {
+      const tip = term.querySelector(".question-term-tooltip");
+      if (!tip) return;
+      tip.style.setProperty("--tooltip-shift", `${Math.round(shiftPx)}px`);
+    };
+
+    const clearShift = (term) => setShift(term, 0);
+
+    const adjustShift = (term) => {
+      const tip = term.querySelector(".question-term-tooltip");
+      if (!tip) return;
+      clearShift(term);
+      const margin = 8;
+      const rect = tip.getBoundingClientRect();
+      let shift = 0;
+      if (rect.right > window.innerWidth - margin) {
+        shift -= rect.right - (window.innerWidth - margin);
+      }
+      if (rect.left < margin) {
+        shift += margin - rect.left;
+      }
+      setShift(term, shift);
+    };
+
+    terms.forEach((term) => {
+      term.addEventListener("mouseenter", () => adjustShift(term));
+      term.addEventListener("focusin", () => adjustShift(term));
+      term.addEventListener("mouseleave", () => clearShift(term));
+      term.addEventListener("focusout", (event) => {
+        if (event.relatedTarget && term.contains(event.relatedTarget)) return;
+        clearShift(term);
+      });
+    });
+
+    window.addEventListener("resize", () => {
+      terms.forEach((term) => {
+        if (term.matches(":hover") || term.contains(document.activeElement)) {
+          adjustShift(term);
+        }
+      });
+    });
+  })();
+
   (function () {
     const toggle = document.querySelector('[data-responses-mine-toggle]');
     if (!toggle) return;

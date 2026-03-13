@@ -9,6 +9,14 @@
   const safeAnchorId = typeof anchorId === "undefined" ? "" : anchorId;
   const safeLabel = typeof label === "undefined" ? "Page" : label;
   const safePerPage = typeof perPage === "undefined" ? 0 : perPage;
+  const safeShowSummary =
+    typeof showSummary === "undefined" ? true : Boolean(showSummary);
+  const safeMaxVisiblePages =
+    typeof maxVisiblePages === "undefined" ? 9 : Number(maxVisiblePages);
+  const safeFirstLabel = typeof firstLabel === "undefined" ? "First" : String(firstLabel);
+  const safePrevLabel = typeof prevLabel === "undefined" ? "Prev" : String(prevLabel);
+  const safeNextLabel = typeof nextLabel === "undefined" ? "Next" : String(nextLabel);
+  const safeLastLabel = typeof lastLabel === "undefined" ? "Last" : String(lastLabel);
 
   const current = Math.max(1, Number(safeCurrentPage || 1));
   const total = Math.max(1, Number(safeTotalPages || 1));
@@ -19,6 +27,10 @@
   const fragment = String(safeAnchorId || "").trim();
   const sectionLabel = String(safeLabel || "Page");
   const pageSize = Number(safePerPage || 0);
+  const visiblePageCount =
+    Number.isFinite(safeMaxVisiblePages) && safeMaxVisiblePages >= 3
+      ? Math.floor(safeMaxVisiblePages)
+      : 9;
 
   const buildHref = (pageNumber) => {
     const qp = new URLSearchParams();
@@ -33,7 +45,7 @@
   };
 
   const buildPageItems = () => {
-    if (total <= 9) {
+    if (total <= visiblePageCount) {
       return Array.from({ length: total }, (_, i) => i + 1);
     }
     const items = [];
@@ -43,16 +55,11 @@
     };
     add(1);
 
-    let start = Math.max(2, current - 2);
-    let end = Math.min(total - 1, current + 2);
-
-    if (current <= 4) {
-      start = 2;
-      end = Math.min(total - 1, 6);
-    } else if (current >= total - 3) {
-      start = Math.max(2, total - 5);
-      end = total - 1;
-    }
+    const innerWindow = Math.max(1, visiblePageCount - 2);
+    const sideWindow = Math.floor(innerWindow / 2);
+    let start = Math.max(2, current - sideWindow);
+    let end = Math.min(total - 1, start + innerWindow - 1);
+    start = Math.max(2, end - innerWindow + 1);
 
     if (start > 2) add("...");
     for (let page = start; page <= end; page += 1) add(page);
@@ -66,11 +73,11 @@
 %>
 <div class="admin-pagination">
   <% if (current > 1) { %>
-    <a class="admin-page-link" href="<%= buildHref(1) %>">First</a>
-    <a class="admin-page-link" href="<%= buildHref(current - 1) %>">Prev</a>
+    <a class="admin-page-link" href="<%= buildHref(1) %>"><%= safeFirstLabel %></a>
+    <a class="admin-page-link" href="<%= buildHref(current - 1) %>"><%= safePrevLabel %></a>
   <% } else { %>
-    <span class="admin-page-link is-disabled">First</span>
-    <span class="admin-page-link is-disabled">Prev</span>
+    <span class="admin-page-link is-disabled"><%= safeFirstLabel %></span>
+    <span class="admin-page-link is-disabled"><%= safePrevLabel %></span>
   <% } %>
 
   <% pageItems.forEach((item) => { %>
@@ -84,14 +91,16 @@
   <% }) %>
 
   <% if (current < total) { %>
-    <a class="admin-page-link" href="<%= buildHref(current + 1) %>">Next</a>
-    <a class="admin-page-link" href="<%= buildHref(total) %>">Last</a>
+    <a class="admin-page-link" href="<%= buildHref(current + 1) %>"><%= safeNextLabel %></a>
+    <a class="admin-page-link" href="<%= buildHref(total) %>"><%= safeLastLabel %></a>
   <% } else { %>
-    <span class="admin-page-link is-disabled">Next</span>
-    <span class="admin-page-link is-disabled">Last</span>
+    <span class="admin-page-link is-disabled"><%= safeNextLabel %></span>
+    <span class="admin-page-link is-disabled"><%= safeLastLabel %></span>
   <% } %>
 
-  <span class="muted admin-pagination-summary">
-    <%= sectionLabel %> page <%= current %> of <%= total %><%= pageSize > 0 ? ` (${pageSize}/page)` : "" %>
-  </span>
+  <% if (safeShowSummary) { %>
+    <span class="muted admin-pagination-summary">
+      <%= sectionLabel %> page <%= current %> of <%= total %><%= pageSize > 0 ? ` (${pageSize}/page)` : "" %>
+    </span>
+  <% } %>
 </div>

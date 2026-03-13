@@ -3,7 +3,21 @@
 
 <div class="card">
   <h1>Season actuals</h1>
-  <p class="muted">Enter the real outcomes once the season is complete. These will power the leaderboard when it is enabled.</p>
+  <p class="muted">Enter the real outcomes once the season is complete. These power the leaderboard immediately once actuals exist.</p>
+
+  <% if (saveError) { %>
+    <div class="alert"><%= saveError %></div>
+  <% } %>
+  <% if (saveSuccess) { %>
+    <div class="alert" style="background: rgba(32, 140, 90, 0.12); border-color: rgba(32, 140, 90, 0.28); color: inherit;"><%= saveSuccess %></div>
+  <% } %>
+
+  <div class="inline-actions" style="margin: 12px 0 18px;">
+    <form method="post" action="/admin/actuals/autofill-current-season">
+      <button type="submit" class="secondary">Autofill From Current 2026 Standings</button>
+    </form>
+    <span class="muted">Uses current completed-race data to fill the questions that can be derived safely now, including ties where multiple answers should score.</span>
+  </div>
 
   <form method="post" action="/admin/actuals">
     <% const sourceOptionsFor = (question) => {
@@ -12,6 +26,15 @@
       if (question.options_source === 'races') return races;
       return [];
     }; %>
+    <% const multiActualSingleChoiceIds = new Set([
+      'most_driver_of_the_day',
+      'most_dnfs_driver',
+      'destructors_driver',
+      'destructors_team',
+      'most_points_no_podium',
+      'closest_qualifying_teammates'
+    ]); %>
+    <% const multiActualDriverFieldIds = new Set(['lowest_grid_win_position']); %>
 
     <% questions.forEach(question => { 
       const sourceOptions = sourceOptionsFor(question);
@@ -44,6 +67,17 @@
               </select>
             <% } %>
           </div>
+        <% } else if (type === 'single_choice' && multiActualSingleChoiceIds.has(question.id)) { %>
+          const selections = Array.isArray(saved) ? saved : (saved ? [saved] : []);
+        %>
+          <div class="checkbox-grid">
+            <% options.forEach(option => { %>
+              <label class="muted">
+                <input type="checkbox" name="<%= question.id %>" value="<%= option %>" <%= selections.includes(option) ? 'checked' : '' %> />
+                <%= option %>
+              </label>
+            <% }) %>
+          </div>
         <% } else if (type === 'single_choice') { %>
           <select name="<%= question.id %>">
             <option value="">Select one</option>
@@ -67,11 +101,25 @@
         %>
           <div class="card" style="padding:12px;">
             <div class="muted">Enter total DNFs per race.</div>
-            <div class="checkbox-grid">
+            <div class="actuals-dnf-grid">
               <% races.forEach((race, idx) => { %>
-                <label class="muted">
-                  <span><%= race %></span>
-                  <input type="number" min="0" max="999" name="<%= question.id %>_dnf_<%= idx %>" value="<%= dnfByRace[race] ?? '' %>" />
+                <label class="muted actuals-dnf-row">
+                  <span class="actuals-dnf-race"><%= race %></span>
+                  <div class="number-spinner number-spinner-minimal actuals-dnf-spinner" data-number-spinner>
+                    <input type="number" min="0" max="99" name="<%= question.id %>_dnf_<%= idx %>" value="<%= dnfByRace[race] ?? '' %>" />
+                    <div class="number-spinner-controls">
+                      <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
+                        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                          <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                      </button>
+                      <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="Decrease value" title="Decrease value">
+                        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                          <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </label>
               <% }) %>
             </div>
@@ -87,7 +135,21 @@
               <% }) %>
               <option value="tie" <%= savedObj.winner === 'tie' ? 'selected' : '' %>>Tie</option>
             </select>
-            <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
+            <div class="number-spinner number-spinner-minimal" data-number-spinner>
+              <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
+              <div class="number-spinner-controls">
+                <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
+                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+                <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="Decrease value" title="Decrease value">
+                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
         <% } else if (type === 'boolean_with_optional_driver') { 
           const savedObj = saved || {};
@@ -112,7 +174,21 @@
           const savedObj = saved || {};
         %>
           <div class="inline-actions">
-            <input type="number" name="<%= question.id %>_value" placeholder="Number" min="0" max="999" value="<%= savedObj.value ?? '' %>" />
+            <div class="number-spinner number-spinner-minimal" data-number-spinner>
+              <input type="number" name="<%= question.id %>_value" placeholder="Number" min="0" max="999" value="<%= savedObj.value ?? '' %>" />
+              <div class="number-spinner-controls">
+                <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
+                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+                <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="Decrease value" title="Decrease value">
+                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
             <select name="<%= question.id %>_driver">
               <option value="">Select driver</option>
               <% roster.drivers.forEach(option => { %>
@@ -123,21 +199,41 @@
         <% } else if (type === 'single_choice_with_driver') { 
           const savedObj = saved || {};
           const positionOptions = question.options || [];
+          const driverSelections = Array.isArray(savedObj.driver) ? savedObj.driver : (savedObj.driver ? [savedObj.driver] : []);
         %>
-          <div class="inline-actions">
-            <select name="<%= question.id %>_value">
-              <option value="">Select position</option>
-              <% positionOptions.forEach(option => { %>
-                <option value="<%= option %>" <%= savedObj.value === option ? 'selected' : '' %>><%= option %></option>
-              <% }) %>
-            </select>
-            <select name="<%= question.id %>_driver">
-              <option value="">Select driver</option>
-              <% roster.drivers.forEach(option => { %>
-                <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
-              <% }) %>
-            </select>
-          </div>
+          <% if (multiActualDriverFieldIds.has(question.id)) { %>
+            <div>
+              <select name="<%= question.id %>_value">
+                <option value="">Select position</option>
+                <% positionOptions.forEach(option => { %>
+                  <option value="<%= option %>" <%= savedObj.value === option ? 'selected' : '' %>><%= option %></option>
+                <% }) %>
+              </select>
+              <div class="checkbox-grid">
+                <% roster.drivers.forEach(option => { %>
+                  <label class="muted">
+                    <input type="checkbox" name="<%= question.id %>_driver" value="<%= option %>" <%= driverSelections.includes(option) ? 'checked' : '' %> />
+                    <%= option %>
+                  </label>
+                <% }) %>
+              </div>
+            </div>
+          <% } else { %>
+            <div class="inline-actions">
+              <select name="<%= question.id %>_value">
+                <option value="">Select position</option>
+                <% positionOptions.forEach(option => { %>
+                  <option value="<%= option %>" <%= savedObj.value === option ? 'selected' : '' %>><%= option %></option>
+                <% }) %>
+              </select>
+              <select name="<%= question.id %>_driver">
+                <option value="">Select driver</option>
+                <% roster.drivers.forEach(option => { %>
+                  <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
+                <% }) %>
+              </select>
+            </div>
+          <% } %>
         <% } else if (type === 'boolean') { %>
           <div class="inline-actions">
             <label class="muted">
@@ -150,7 +246,21 @@
             </label>
           </div>
         <% } else if (type === 'numeric') { %>
-          <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= saved ?? '' %>" />
+          <div class="number-spinner number-spinner-minimal" data-number-spinner>
+            <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= saved ?? '' %>" />
+            <div class="number-spinner-controls">
+              <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="Increase value" title="Increase value">
+                <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                  <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
+              <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="Decrease value" title="Decrease value">
+                <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+                  <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
         <% } else if (type === 'textarea') { %>
           <textarea name="<%= question.id %>" rows="3"><%= saved || '' %></textarea>
         <% } else { %>

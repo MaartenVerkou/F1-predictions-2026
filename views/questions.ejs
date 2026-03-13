@@ -382,12 +382,19 @@
             let saved = [];
             try { saved = JSON.parse(answers[question.id] || '[]'); } catch (err) { saved = []; }
             const limit = type === 'multi_select_limited' ? (Number(question.count) || 0) : 0;
+            const useRaceTileGrid = question.id === 'select_three_races_dnfs';
           %>
-          <div class="checkbox-grid" data-limit="<%= limit %>">
+          <div class="checkbox-grid <%= useRaceTileGrid ? 'checkbox-grid-race-picks' : '' %>" data-limit="<%= limit %>">
             <% options.forEach(option => { %>
-              <label class="muted">
+              <label class="muted <%= useRaceTileGrid ? 'checkbox-tile' : '' %>">
                 <input type="checkbox" name="<%= question.id %>" value="<%= option %>" <%= saved.includes(option) ? 'checked' : '' %> />
-                <%= getOptionLabel(option) %>
+                <% if (useRaceTileGrid) { %>
+                  <span class="checkbox-tile-body">
+                    <span class="checkbox-tile-title"><%= getOptionLabel(option) %></span>
+                  </span>
+                <% } else { %>
+                  <%= getOptionLabel(option) %>
+                <% } %>
               </label>
             <% }) %>
           </div>

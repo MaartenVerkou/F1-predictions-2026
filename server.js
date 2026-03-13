@@ -1877,6 +1877,11 @@ function predictionsClosed() {
   return new Date() > closeDate;
 }
 
+function isLeaderboardAvailable() {
+  if (LEADERBOARD_ENABLED) return true;
+  return !!db.prepare("SELECT 1 FROM actuals LIMIT 1").get();
+}
+
 function clampNumber(value, min, max) {
   if (value == null) return null;
   const num = Number(value);
@@ -2199,6 +2204,7 @@ function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRu
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(group?.id || 0);
   const closed = predictionsClosed();
+  const leaderboardAvailable = isLeaderboardAvailable();
   const includeNamedGuests = Number(group?.is_global || 0) !== 1;
   const membersPerPage = 25;
   const requestedMembersPage = Number(req.query.membersPage || 1);
@@ -2299,6 +2305,7 @@ function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRu
     totalMembersPages,
     groupBasePath,
     closed,
+    leaderboardAvailable,
     isNamedGuest,
     error,
     success
@@ -3471,7 +3478,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const adminAccess = isAdmin(req);
-  if (!LEADERBOARD_ENABLED && !adminAccess) {
+  if (!isLeaderboardAvailable() && !adminAccess) {
     return sendError(
       req,
       res,
@@ -3497,13 +3504,33 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   const responses = db
     .prepare(
       `
-      SELECT u.id as user_id, u.name as user_name, r.question_id, r.answer
-      FROM responses r
-      JOIN users u ON u.id = r.user_id
-      WHERE r.group_id = ?
+      SELECT participant_id, user_name, question_id, answer
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          u.name as user_name,
+          r.question_id,
+          r.answer
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+
+        UNION ALL
+
+        SELECT
+          gr.guest_id as participant_id,
+          ngm.display_name as user_name,
+          gr.question_id,
+          gr.answer
+        FROM guest_responses gr
+        JOIN named_guest_group_members ngm
+          ON ngm.group_id = gr.group_id
+         AND ngm.guest_id = gr.guest_id
+        WHERE gr.group_id = ?
+      ) combined_responses
       `
     )
-    .all(groupId);
+    .all(groupId, groupId);
 
   const questionMap = questions.reduce((acc, q) => {
     acc[q.id] = q;
@@ -3514,17 +3541,30 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   const members = db
     .prepare(
       `
-      SELECT u.id as user_id, u.name as user_name
-      FROM group_members gm
-      JOIN users u ON u.id = gm.user_id
-      WHERE gm.group_id = ?
+      SELECT participant_id, user_name
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          u.name as user_name
+        FROM group_members gm
+        JOIN users u ON u.id = gm.user_id
+        WHERE gm.group_id = ?
+
+        UNION ALL
+
+        SELECT
+          ngm.guest_id as participant_id,
+          ngm.display_name as user_name
+        FROM named_guest_group_members ngm
+        WHERE ngm.group_id = ?
+      ) combined_members
       `
     )
-    .all(groupId);
+    .all(groupId, groupId);
 
   members.forEach((member) => {
-    scoreByUser[member.user_id] = {
-      userId: member.user_id,
+    scoreByUser[member.participant_id] = {
+      userId: member.participant_id,
       name: member.user_name,
       total: 0,
       byQuestion: {},
@@ -3534,6 +3574,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
 
   function parseStoredValue(question, raw) {
     if (!raw) return null;
+    const text = String(raw).trim();
     const type = question.type || "text";
     if (
       type === "ranking" ||
@@ -3549,6 +3590,11 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
       } catch (err) {
         return null;
       }
+    }
+    if (text.startsWith("[") || text.startsWith("{")) {
+      try {
+        return JSON.parse(text);
+      } catch (err) {}
     }
     return raw;
   }
@@ -3668,7 +3714,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
       const predictedDriver = predictedRaw?.driver;
       let score = 0;
       if (actualValue != null && predictedValue != null) {
-        if (String(actualValue) === String(predictedValue)) {
+        if (isMatch(actualValue, predictedValue)) {
           score += Number(points.position || 0);
         } else if (
           type === "single_choice_with_driver" &&
@@ -3695,7 +3741,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
           }
         }
       }
-      if (actualDriver && predictedDriver && actualDriver === predictedDriver) {
+      if (actualDriver && predictedDriver && isMatch(actualDriver, predictedDriver)) {
         score += Number(points.driver || 0);
       }
       return score;
@@ -3722,13 +3768,14 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     const actual = getActual(question);
     const predicted = parseStoredValue(question, row.answer);
     const points = scoreQuestion(question, predicted, actual);
-    scoreByUser[row.user_id].total += points;
-    scoreByUser[row.user_id].byQuestion[row.question_id] = points;
-    scoreByUser[row.user_id].answersByQuestion[row.question_id] = row.answer;
+    if (!scoreByUser[row.participant_id]) return;
+    scoreByUser[row.participant_id].total += points;
+    scoreByUser[row.participant_id].byQuestion[row.question_id] = points;
+    scoreByUser[row.participant_id].answersByQuestion[row.question_id] = row.answer;
   });
 
   const leaderboard = Object.values(scoreByUser).sort((a, b) => b.total - a.total);
-  const leaderboardPerPage = 25;
+  const leaderboardPerPage = 10;
   const requestedLeaderboardPage = Number(req.query.page || 1);
   const currentLeaderboardPage =
     Number.isFinite(requestedLeaderboardPage) && requestedLeaderboardPage > 0

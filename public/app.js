@@ -759,91 +759,62 @@ const initScrollToEndButton = () => {
   updateVisibility();
 };
 
-const initLeaderboardMemberSwitcher = () => {
-  document.querySelectorAll('[data-member-switcher]').forEach(switcher => {
-    const strip = switcher.querySelector('[data-member-strip]');
-    const prevButton = switcher.querySelector('[data-member-scroll="prev"]');
-    const nextButton = switcher.querySelector('[data-member-scroll="next"]');
-    const tabs = Array.from(switcher.querySelectorAll('[data-member-tab]'));
-    if (!strip || !prevButton || !nextButton || tabs.length === 0) return;
+const initLeaderboardPanels = () => {
+  document.querySelectorAll('.leaderboard-layout').forEach(scope => {
+    const activators = Array.from(scope.querySelectorAll('[data-member-activate]'));
+    const panels = Array.from(scope.querySelectorAll('.leaderboard-member-panel[id]'));
+    const mainCard = scope.querySelector('.leaderboard-main-card');
+    const mainTable = mainCard?.querySelector('.table');
+    if (activators.length === 0 || panels.length === 0) return;
 
-    const getActiveIndex = () => {
-      const idx = tabs.findIndex(tab => tab.classList.contains('is-active'));
-      return idx >= 0 ? idx : 0;
-    };
-
-    const updateArrowState = () => {
-      const canScroll = strip.scrollWidth > strip.clientWidth + 1;
-      prevButton.classList.toggle('is-hidden', !canScroll);
-      nextButton.classList.toggle('is-hidden', !canScroll);
-      if (!canScroll) {
-        prevButton.disabled = true;
-        nextButton.disabled = true;
-        return;
-      }
-      const activeIndex = getActiveIndex();
-      prevButton.disabled = activeIndex <= 0;
-      nextButton.disabled = activeIndex >= tabs.length - 1;
-    };
-
-    const activateTab = (targetTab, options = {}) => {
-      const { moveFocus = false, ensureVisible = true } = options;
-      const targetId = targetTab.dataset.target || '';
-      tabs.forEach(tab => {
-        const isActive = tab === targetTab;
-        tab.classList.toggle('is-active', isActive);
-        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
-        tab.setAttribute('tabindex', isActive ? '0' : '-1');
-        if (moveFocus && isActive) {
-          try {
-            tab.focus({ preventScroll: true });
-          } catch (err) {
-            tab.focus();
-          }
-        }
-        const panelId = tab.dataset.target || '';
-        if (!panelId) return;
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
+    const activatePanel = (targetId) => {
+      if (!targetId) return;
+      activators.forEach(activator => {
+        const isActive = activator.dataset.memberActivate === targetId;
+        activator.classList.toggle('is-active', isActive);
+        activator.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+      panels.forEach(panel => {
+        const isActive = panel.id === targetId;
         panel.classList.toggle('is-active', isActive);
         panel.hidden = !isActive;
       });
-      if (ensureVisible) {
-        targetTab.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-          inline: 'center'
-        });
-      }
     };
 
-    tabs.forEach((tab, index) => {
-      tab.addEventListener('click', () => activateTab(tab));
-      tab.addEventListener('keydown', (event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    const syncPanelHeight = () => {
+      const heightSource = mainTable || mainCard;
+      if (!heightSource) return;
+      if (window.matchMedia('(max-width: 980px)').matches) {
+        scope.style.removeProperty('--leaderboard-panel-height');
+        return;
+      }
+      scope.style.setProperty('--leaderboard-panel-height', `${heightSource.offsetHeight}px`);
+    };
+
+    activators.forEach(activator => {
+      const targetId = activator.dataset.memberActivate || '';
+      if (!targetId) return;
+      const activate = () => activatePanel(targetId);
+      activator.addEventListener('click', activate);
+      activator.addEventListener('keydown', event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        const step = event.key === 'ArrowRight' ? 1 : -1;
-        const nextIndex = (index + step + tabs.length) % tabs.length;
-        activateTab(tabs[nextIndex], { moveFocus: true });
+        activate();
       });
     });
 
-    prevButton.addEventListener('click', () => {
-      const activeIndex = getActiveIndex();
-      if (activeIndex <= 0) return;
-      activateTab(tabs[activeIndex - 1], { moveFocus: false });
-      updateArrowState();
-    });
-    nextButton.addEventListener('click', () => {
-      const activeIndex = getActiveIndex();
-      if (activeIndex >= tabs.length - 1) return;
-      activateTab(tabs[activeIndex + 1], { moveFocus: false });
-      updateArrowState();
-    });
-
-    strip.addEventListener('scroll', updateArrowState, { passive: true });
-    window.addEventListener('resize', updateArrowState);
-    updateArrowState();
+    const initialTargetId =
+      activators.find(activator => activator.classList.contains('is-active'))?.dataset.memberActivate ||
+      panels.find(panel => !panel.hidden)?.id ||
+      activators[0]?.dataset.memberActivate ||
+      '';
+    activatePanel(initialTargetId);
+    syncPanelHeight();
+    window.addEventListener('resize', syncPanelHeight);
+    if (typeof ResizeObserver !== 'undefined' && (mainTable || mainCard)) {
+      const observer = new ResizeObserver(() => syncPanelHeight());
+      observer.observe(mainTable || mainCard);
+    }
   });
 };
 
@@ -865,5 +836,5 @@ document.addEventListener('DOMContentLoaded', () => {
   initPredictionsAutosave();
   initSignupPasswordMatch();
   initScrollToEndButton();
-  initLeaderboardMemberSwitcher();
+  initLeaderboardPanels();
 });
