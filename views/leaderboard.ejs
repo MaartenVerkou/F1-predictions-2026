@@ -224,24 +224,17 @@
         <p class="muted" style="margin: 10px 0 0;">
           Showing <%= startRank %>-<%= endRank %> of <%= leaderboardTotal %>
         </p>
-        <div class="leaderboard-pagination">
-          <%- include('partials/admin_pagination', {
-            currentPage: currentLeaderboardPage,
-            totalPages: totalLeaderboardPages,
-            pageParamName: 'page',
-            basePath: leaderboardBaseHref,
-            extraParams: leaderboardExtraParams,
-            anchorId: 'leaderboard-overview',
-            label: 'Leaderboard',
-            perPage: leaderboardPerPage,
-            showSummary: false,
-            maxVisiblePages: 3,
-            firstLabel: '<<',
-            prevLabel: '<',
-            nextLabel: '>',
-            lastLabel: '>>'
-          }) %>
-        </div>
+        <%- include('partials/admin_pagination', {
+          currentPage: currentLeaderboardPage,
+          totalPages: totalLeaderboardPages,
+          pageParamName: 'page',
+          basePath: leaderboardBaseHref,
+          extraParams: leaderboardExtraParams,
+          anchorId: 'leaderboard-overview',
+          label: 'Leaderboard',
+          perPage: leaderboardPerPage,
+          showSummary: false
+        }) %>
       </section>
 
       <section class="leaderboard-detail-card">

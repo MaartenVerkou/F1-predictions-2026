@@ -2162,7 +2162,7 @@ function registerAdminRoutes(app, deps) {
     const admins = db
       .prepare(
         `
-        SELECT id, name, email, created_at, is_admin
+        SELECT id, name, email, created_at, is_admin, COALESCE(hide_from_global, 0) as hide_from_global
         FROM users
         WHERE is_simulated = 0
           AND is_admin = 1
@@ -3369,8 +3369,39 @@ function registerAdminRoutes(app, deps) {
     if (target.is_admin !== 1) {
       return res.redirect(withQueryParam(returnTo, "success", "User is not an admin."));
     }
-    db.prepare("UPDATE users SET is_admin = 0 WHERE id = ?").run(userId);
+    db.prepare("UPDATE users SET is_admin = 0, hide_from_global = 0 WHERE id = ?").run(userId);
     return res.redirect(withQueryParam(returnTo, "success", "Admin rights removed."));
+  });
+
+  app.post("/admin/users/:userId/hide-from-global", requireAdmin, (req, res) => {
+    const userId = Number(req.params.userId);
+    const rawReturnTo = String(req.body.returnTo || "/admin/overview").trim();
+    const returnTo = rawReturnTo.startsWith("/admin/overview")
+      ? rawReturnTo
+      : "/admin/overview";
+    if (!userId) return res.redirect(withQueryParam(returnTo, "error", "Invalid user id."));
+
+    const target = db
+      .prepare("SELECT id, is_admin FROM users WHERE id = ? AND is_simulated = 0")
+      .get(userId);
+    if (!target) {
+      return res.redirect(withQueryParam(returnTo, "error", "User not found."));
+    }
+    if (Number(target.is_admin) !== 1) {
+      return res.redirect(withQueryParam(returnTo, "error", "Only admins can be hidden from global."));
+    }
+
+    const hideFromGlobal = req.body.hideFromGlobal === "1" ? 1 : 0;
+    db.prepare("UPDATE users SET hide_from_global = ? WHERE id = ?").run(hideFromGlobal, userId);
+    return res.redirect(
+      withQueryParam(
+        returnTo,
+        "success",
+        hideFromGlobal === 1
+          ? "Admin hidden from global responses and leaderboard."
+          : "Admin shown in global responses and leaderboard."
+      )
+    );
   });
 
   app.post("/admin/users/:userId/delete", requireAdmin, (req, res) => {

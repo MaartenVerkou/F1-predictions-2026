@@ -434,6 +434,12 @@ function ensureUserColumns() {
   if (!names.has("is_simulated")) {
     db.exec("ALTER TABLE users ADD COLUMN is_simulated INTEGER DEFAULT 0;");
   }
+  if (!names.has("hide_from_global")) {
+    db.exec("ALTER TABLE users ADD COLUMN hide_from_global INTEGER DEFAULT 0;");
+  }
+  db.prepare(
+    "UPDATE users SET hide_from_global = 0 WHERE hide_from_global IS NULL"
+  ).run();
 }
 
 ensureUserColumns();
@@ -1459,7 +1465,7 @@ function getGuestResponsesByGroup(guestId, groupId) {
     }, {});
 }
 
-function getFocusedMemberResponses(groupId, { focusUserId, focusGuestId } = {}) {
+function getFocusedMemberResponses(groupId, { focusUserId, focusGuestId, excludeHiddenAdmins = false } = {}) {
   const normalizedGroupId = Number(groupId || 0);
   if (!normalizedGroupId) return null;
 
@@ -1511,6 +1517,7 @@ function getFocusedMemberResponses(groupId, { focusUserId, focusGuestId } = {}) 
       JOIN users u ON u.id = gm.user_id
       WHERE gm.group_id = ?
         AND gm.user_id = ?
+        ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
       LIMIT 1
       `
     )
@@ -1539,7 +1546,7 @@ function getFocusedMemberResponses(groupId, { focusUserId, focusGuestId } = {}) 
   };
 }
 
-function getResponsesForGroup(groupId, { includeNamedGuests = true } = {}) {
+function getResponsesForGroup(groupId, { includeNamedGuests = true, excludeHiddenAdmins = false } = {}) {
   const normalizedGroupId = Number(groupId || 0);
   if (!normalizedGroupId) return [];
   if (!includeNamedGuests) {
@@ -1550,6 +1557,7 @@ function getResponsesForGroup(groupId, { includeNamedGuests = true } = {}) {
         FROM responses r
         JOIN users u ON u.id = r.user_id
         WHERE r.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
         ORDER BY u.name ASC, r.question_id ASC
         `
       )
@@ -1569,6 +1577,7 @@ function getResponsesForGroup(groupId, { includeNamedGuests = true } = {}) {
         FROM responses r
         JOIN users u ON u.id = r.user_id
         WHERE r.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
 
         UNION ALL
 
@@ -3455,11 +3464,16 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
     return sendError(req, res, 403, "Not a group member.");
   }
   const questions = getQuestions(locale);
-  const responses = getResponsesForGroup(groupId, { includeNamedGuests: true });
+  const excludeHiddenAdmins = isGlobalGroup(group);
+  const responses = getResponsesForGroup(groupId, {
+    includeNamedGuests: true,
+    excludeHiddenAdmins
+  });
   const showMineOnly = req.query.mine === "1";
   const focused = getFocusedMemberResponses(groupId, {
     focusUserId: req.query.focusUserId,
-    focusGuestId: req.query.focusGuestId
+    focusGuestId: req.query.focusGuestId,
+    excludeHiddenAdmins
   });
 
   res.render("responses", {
@@ -3491,6 +3505,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     return sendError(req, res, 404, "Group not found.");
   }
   const groupId = Number(group.id);
+  const excludeHiddenAdmins = isGlobalGroup(group);
   if (!adminAccess && !isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
@@ -3514,6 +3529,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
         FROM responses r
         JOIN users u ON u.id = r.user_id
         WHERE r.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
 
         UNION ALL
 
@@ -3549,6 +3565,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
         FROM group_members gm
         JOIN users u ON u.id = gm.user_id
         WHERE gm.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
 
         UNION ALL
 

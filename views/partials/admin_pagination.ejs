@@ -12,11 +12,11 @@
   const safeShowSummary =
     typeof showSummary === "undefined" ? true : Boolean(showSummary);
   const safeMaxVisiblePages =
-    typeof maxVisiblePages === "undefined" ? 9 : Number(maxVisiblePages);
-  const safeFirstLabel = typeof firstLabel === "undefined" ? "First" : String(firstLabel);
-  const safePrevLabel = typeof prevLabel === "undefined" ? "Prev" : String(prevLabel);
-  const safeNextLabel = typeof nextLabel === "undefined" ? "Next" : String(nextLabel);
-  const safeLastLabel = typeof lastLabel === "undefined" ? "Last" : String(lastLabel);
+    typeof maxVisiblePages === "undefined" ? 3 : Number(maxVisiblePages);
+  const safeFirstLabel = typeof firstLabel === "undefined" ? "<<" : String(firstLabel);
+  const safePrevLabel = typeof prevLabel === "undefined" ? "<" : String(prevLabel);
+  const safeNextLabel = typeof nextLabel === "undefined" ? ">" : String(nextLabel);
+  const safeLastLabel = typeof lastLabel === "undefined" ? ">>" : String(lastLabel);
 
   const current = Math.max(1, Number(safeCurrentPage || 1));
   const total = Math.max(1, Number(safeTotalPages || 1));

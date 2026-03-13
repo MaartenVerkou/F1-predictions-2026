@@ -94,6 +94,7 @@
       <tr>
         <th>Name</th>
         <th>Email</th>
+        <th>Hide from global</th>
         <th>Created</th>
         <th>Actions</th>
       </tr>
@@ -101,7 +102,7 @@
     <tbody>
       <% if (!admins || admins.length === 0) { %>
         <tr>
-          <td colspan="4" class="muted">No admins found.</td>
+          <td colspan="5" class="muted">No admins found.</td>
         </tr>
       <% } else { %>
         <% admins.forEach(row => { %>
@@ -119,6 +120,21 @@
                   <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-admin-<%= row.id %>')">View</button>
                 </form>
               <% } %>
+            </td>
+            <td>
+              <form method="post" action="/admin/users/<%= row.id %>/hide-from-global">
+                <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
+                <input type="hidden" name="hideFromGlobal" value="0">
+                <label class="muted admin-inline-checkbox">
+                  <input
+                    type="checkbox"
+                    name="hideFromGlobal"
+                    value="1"
+                    <%= Number(row.hide_from_global || 0) === 1 ? 'checked' : '' %>
+                    onchange="this.form.submit()"
+                  />
+                </label>
+              </form>
             </td>
             <td><%= formatAdminDate(row.created_at) %></td>
             <td>

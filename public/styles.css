@@ -1935,22 +1935,22 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .admin-page-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 10px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--card);
   color: var(--text);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1972,7 +1972,9 @@ button:disabled {
 }
 
 .admin-page-ellipsis {
-  padding: 0 2px;
+  padding: 0;
+  min-width: 14px;
+  text-align: center;
   color: var(--muted);
   font-size: 14px;
 }
@@ -2124,6 +2126,12 @@ button:disabled {
 
 .admin-question-override {
   max-width: 0;
+}
+
+.admin-inline-checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .leaderboard-member-switcher {
@@ -2317,23 +2325,6 @@ button:disabled {
 
 .leaderboard-value-short {
   display: none;
-}
-
-.leaderboard-pagination .admin-pagination {
-  gap: 4px;
-}
-
-.leaderboard-pagination .admin-page-link {
-  min-width: 28px;
-  height: 28px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-.leaderboard-pagination .admin-page-ellipsis {
-  padding: 0;
-  min-width: 14px;
-  text-align: center;
 }
 
 :root[data-theme="dark"] .leaderboard-member-tab.is-active {
