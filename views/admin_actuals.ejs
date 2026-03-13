@@ -67,7 +67,7 @@
               </select>
             <% } %>
           </div>
-        <% } else if (type === 'single_choice' && multiActualSingleChoiceIds.has(question.id)) { %>
+        <% } else if (type === 'single_choice' && multiActualSingleChoiceIds.has(question.id)) {
           const selections = Array.isArray(saved) ? saved : (saved ? [saved] : []);
         %>
           <div class="checkbox-grid">
