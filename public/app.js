@@ -567,6 +567,54 @@ const initPredictionsAutosave = () => {
   setIdleButton();
 };
 
+const initAdminActualsUnsavedState = () => {
+  const form = document.querySelector('[data-admin-actuals-form]');
+  if (!form) return;
+  const note = form.querySelector('[data-admin-actuals-unsaved-note]');
+  if (!note) return;
+
+  const unsavedLabel = note.dataset.unsavedLabel || 'Unsaved changes';
+  const savingLabel = note.dataset.savingLabel || 'Saving...';
+  const initialDirty = form.dataset.initialDirty === 'true';
+
+  const serializeForm = () => {
+    const formData = new FormData(form);
+    const entries = [];
+    for (const [key, value] of formData.entries()) {
+      entries.push(`${key}=${value}`);
+    }
+    return entries.join('&');
+  };
+
+  const initialSnapshot = serializeForm();
+
+  const renderState = (state) => {
+    note.classList.remove('is-visible', 'is-unsaved', 'is-saving');
+    if (state === 'hidden') {
+      note.textContent = '';
+      return;
+    }
+    note.classList.add('is-visible');
+    if (state === 'saving') {
+      note.classList.add('is-saving');
+      note.textContent = savingLabel;
+      return;
+    }
+    note.classList.add('is-unsaved');
+    note.textContent = unsavedLabel;
+  };
+
+  const syncState = () => {
+    const isDirty = initialDirty || serializeForm() !== initialSnapshot;
+    renderState(isDirty ? 'unsaved' : 'hidden');
+  };
+
+  form.addEventListener('input', syncState);
+  form.addEventListener('change', syncState);
+  form.addEventListener('submit', () => renderState('saving'));
+  syncState();
+};
+
 const initSignupPasswordMatch = () => {
   const form = document.querySelector('form[data-signup-form]');
   if (!form) return;
@@ -848,6 +896,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initQuestionsCouplingToggle();
   initNamedGuestSaveFeedback();
   initPredictionsAutosave();
+  initAdminActualsUnsavedState();
   initSignupPasswordMatch();
   initScrollToEndButton();
   initLeaderboardPanels();

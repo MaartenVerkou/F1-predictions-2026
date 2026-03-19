@@ -19,7 +19,7 @@
     <span class="muted">Uses current completed-race data to fill the questions that can be derived safely now, including ties where multiple answers should score.</span>
   </div>
 
-  <form method="post" action="/admin/actuals">
+  <form method="post" action="/admin/actuals" data-admin-actuals-form data-initial-dirty="<%= hasDraft ? 'true' : 'false' %>">
     <% const sourceOptionsFor = (question) => {
       if (question.options_source === 'drivers') return roster.drivers;
       if (question.options_source === 'teams') return roster.teams;
@@ -269,7 +269,15 @@
       </div>
     <% }) %>
 
-    <button type="submit">Save actuals</button>
+    <div class="questions-save-row admin-actuals-save-row">
+      <button type="submit">Save actuals</button>
+      <span
+        class="muted admin-actuals-save-feedback <%= hasDraft ? 'is-visible is-unsaved' : '' %>"
+        data-admin-actuals-unsaved-note
+        data-unsaved-label="Unsaved changes"
+        data-saving-label="Saving..."
+      ><%= hasDraft ? 'Unsaved changes' : '' %></span>
+    </div>
   </form>
 </div>
 

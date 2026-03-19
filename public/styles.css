@@ -2149,6 +2149,22 @@ button:disabled {
   margin-top: 12px;
 }
 
+.leaderboard-snapshot-form {
+  margin: 4px 0 10px;
+  align-items: center;
+  gap: 10px;
+}
+
+.leaderboard-snapshot-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.leaderboard-snapshot-form select {
+  min-width: 260px;
+  max-width: min(100%, 520px);
+}
+
 .leaderboard-main-card,
 .leaderboard-detail-card {
   min-width: 0;
@@ -2382,6 +2398,19 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .leaderboard-snapshot-form {
+    align-items: stretch;
+  }
+
+  .leaderboard-snapshot-label {
+    white-space: normal;
+  }
+
+  .leaderboard-snapshot-form select {
+    min-width: 0;
+    width: 100%;
+  }
+
   .leaderboard-detail-card {
     min-height: 0;
   }
@@ -2610,6 +2639,28 @@ button:disabled {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+.admin-actuals-save-row {
+  margin-top: 12px;
+}
+
+.admin-actuals-save-feedback {
+  min-height: 1.2em;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.admin-actuals-save-feedback.is-visible {
+  opacity: 1;
+}
+
+.admin-actuals-save-feedback.is-unsaved {
+  color: color-mix(in srgb, var(--text) 76%, #b16a00);
+}
+
+.admin-actuals-save-feedback.is-saving {
+  color: var(--muted);
 }
 
 .questions-responses-link {

@@ -16,6 +16,8 @@ function registerAdminRoutes(app, deps) {
   const CURRENT_SEASON_API_BASE = "https://api.jolpi.ca/ergast/f1";
   const CURRENT_SEASON_DOTD_RESULTS_URL = (season) =>
     `https://www.formula1.com/en/results/${Number(season)}/awards/driver-of-the-day`;
+  const CURRENT_SEASON_RESULTS_URL = (season) =>
+    `https://www.formula1.com/en/results/${Number(season)}/races`;
   const CURRENT_SEASON_USER_AGENT = "f1-predictions-current-actuals";
   const DRIVER_NAME_ALIASES = {
     andreakimiantonelli: "Kimi Antonelli",
@@ -32,6 +34,32 @@ function registerAdminRoutes(app, deps) {
     cadillacf1team: "Cadillac",
     alpinef1team: "Alpine",
     astonmartinf1team: "Aston Martin"
+  };
+  const FORMULA1_RACE_SLUG_ALIASES = {
+    australiangrandprix: "australia",
+    chinesegrandprix: "china",
+    japanesegrandprix: "japan",
+    bahraingrandprix: "bahrain",
+    saudiarabiangrandprix: "saudi-arabia",
+    miamigrandprix: "miami",
+    canadiangrandprix: "canada",
+    monacograndprix: "monaco",
+    barcelonacatalunyagrandprix: "barcelona-catalunya",
+    austriangrandprix: "austria",
+    britishgrandprix: "great-britain",
+    belgiangrandprix: "belgium",
+    hungariangrandprix: "hungary",
+    dutchgrandprix: "netherlands",
+    italiangrandprix: "italy",
+    spanishgrandprix: "spain",
+    azerbaijangrandprix: "azerbaijan",
+    singaporegrandprix: "singapore",
+    unitedstatesgrandprix: "united-states",
+    mexicocitygrandprix: "mexico",
+    saopaulograndprix: "brazil",
+    lasvegasgrandprix: "las-vegas",
+    qatargrandprix: "qatar",
+    abudhabigrandprix: "abu-dhabi"
   };
   const MERCEDES_ENGINE_TEAMS_2026 = new Set([
     "Mercedes",
@@ -109,6 +137,23 @@ function registerAdminRoutes(app, deps) {
       .replace(/[^a-z0-9]+/g, "");
   }
 
+  function decodeHtmlEntities(value) {
+    return String(value || "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;|&#39;/g, "'")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">");
+  }
+
+  function stripHtml(value) {
+    return decodeHtmlEntities(String(value || ""))
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
   function resolveCanonicalName(raw, allowedValues, aliasMap = {}) {
     const key = normalizeLookupKey(raw);
     if (!key) return null;
@@ -157,6 +202,70 @@ function registerAdminRoutes(app, deps) {
       return false;
     }
     return true;
+  }
+
+  function isOfficialRaceDnfStatus(statusRaw) {
+    const status = String(statusRaw || "").trim().toLowerCase();
+    if (!status) return false;
+    return status === "dnf" || status === "retired";
+  }
+
+  function cleanOfficialDriverName(raw) {
+    return String(raw || "")
+      .replace(/\s+[A-Z]{3}$/, "")
+      .trim();
+  }
+
+  function getFormula1RaceSlug(raceName) {
+    const key = normalizeLookupKey(raceName);
+    if (!key) return "";
+    const aliased = FORMULA1_RACE_SLUG_ALIASES[key];
+    if (aliased) return aliased;
+    return key.replace(/grandprix$/, "");
+  }
+
+  function extractFormula1SeasonRaceResultUrls(html, season) {
+    const hrefMatches = String(html || "").match(
+      new RegExp(`/en/results/${Number(season)}/races/\\d+/[^"'\\\\\\s]+/race-result`, "g")
+    ) || [];
+    const bySlug = new Map();
+    hrefMatches.forEach((href) => {
+      const parts = href.split("/");
+      const slug = String(parts[parts.length - 2] || "").trim().toLowerCase();
+      if (!slug || bySlug.has(slug)) return;
+      bySlug.set(slug, `https://www.formula1.com${href}`);
+    });
+    return bySlug;
+  }
+
+  function parseOfficialRaceResultRows(html, roster) {
+    const tbodyMatch = String(html || "").match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
+    if (!tbodyMatch) return [];
+    const rows = [];
+    const trMatches = tbodyMatch[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
+    for (const match of trMatches) {
+      const cells = Array.from(
+        match[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi),
+        (cellMatch) => stripHtml(cellMatch[1])
+      );
+      if (cells.length < 7) continue;
+      const driver = resolveCanonicalName(
+        cleanOfficialDriverName(cells[2]),
+        roster.drivers || [],
+        DRIVER_NAME_ALIASES
+      );
+      const team = resolveCanonicalName(cells[3], roster.teams || [], TEAM_NAME_ALIASES);
+      rows.push({
+        positionText: cells[0],
+        carNumber: cells[1],
+        driver,
+        team,
+        laps: parseNum(cells[4], 0),
+        status: cells[5],
+        points: parseNum(cells[6], 0)
+      });
+    }
+    return rows;
   }
 
   function pickUniqueTopRow(rows, getScore) {
@@ -323,14 +432,16 @@ function registerAdminRoutes(app, deps) {
       resultsJson,
       qualifyingJson,
       sprintJson,
-      driverOfTheDayResultsHtml
+      driverOfTheDayResultsHtml,
+      officialSeasonResultsHtml
     ] = await Promise.all([
       fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/driverStandings.json`),
       fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/constructorStandings.json`),
       fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/results.json`),
       fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/qualifying.json`),
       fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/sprint.json`),
-      fetchText(CURRENT_SEASON_DOTD_RESULTS_URL(safeSeason)).catch(() => null)
+      fetchText(CURRENT_SEASON_DOTD_RESULTS_URL(safeSeason)).catch(() => null),
+      fetchText(CURRENT_SEASON_RESULTS_URL(safeSeason)).catch(() => null)
     ]);
 
     const driverStandings =
@@ -362,32 +473,72 @@ function registerAdminRoutes(app, deps) {
     const qualStats = new Map();
     const sprintPointsByDriver = new Map();
     const sprintRoundSet = new Set();
+    const officialRaceUrlsBySlug = extractFormula1SeasonRaceResultUrls(
+      officialSeasonResultsHtml,
+      safeSeason
+    );
+    const officialRaceRowsByName = new Map(
+      await Promise.all(
+        completedRaces.map(async (race) => {
+          const raceName =
+            resolveCanonicalName(race.raceName, races || []) || String(race.raceName || "");
+          const slug = getFormula1RaceSlug(raceName);
+          const url = officialRaceUrlsBySlug.get(slug);
+          if (!raceName || !url) return [raceName, null];
+          try {
+            const html = await fetchText(url);
+            const rows = parseOfficialRaceResultRows(html, roster);
+            return [raceName, rows.length > 0 ? rows : null];
+          } catch (err) {
+            return [raceName, null];
+          }
+        })
+      )
+    );
 
     completedRaces.forEach((race) => {
       const raceName = resolveCanonicalName(race.raceName, races || []) || String(race.raceName || "");
-      const results = Array.isArray(race.Results) ? race.Results : [];
+      const officialRows = officialRaceRowsByName.get(raceName);
+      const apiResults = Array.isArray(race.Results) ? race.Results : [];
       let dnfCountThisRace = 0;
 
-      results.forEach((row) => {
+      if (Array.isArray(officialRows) && officialRows.length > 0) {
+        officialRows.forEach((row) => {
+          const position = parseNum(row.positionText, 0);
+
+          if (position >= 1 && position <= 3 && row.driver) podiumDrivers.add(row.driver);
+          if (position >= 1 && position <= 3 && row.team) podiumTeams.add(row.team);
+
+          if (row.driver && isOfficialRaceDnfStatus(row.status)) {
+            dnfCountThisRace += 1;
+            dnfCountsByDriver.set(row.driver, (dnfCountsByDriver.get(row.driver) || 0) + 1);
+          }
+        });
+      } else {
+        apiResults.forEach((row) => {
+          const driver = driverNameFromApi(row.Driver, roster.drivers || []);
+          const team = teamNameFromApi(row.Constructor, roster.teams || []);
+          const position = parseNum(row.position, 0);
+
+          if (position >= 1 && position <= 3 && driver) podiumDrivers.add(driver);
+          if (position >= 1 && position <= 3 && team) podiumTeams.add(team);
+
+          if (driver && isDnfStatus(row.status)) {
+            dnfCountThisRace += 1;
+            dnfCountsByDriver.set(driver, (dnfCountsByDriver.get(driver) || 0) + 1);
+          }
+        });
+      }
+
+      apiResults.forEach((row) => {
         const driver = driverNameFromApi(row.Driver, roster.drivers || []);
-        const team = teamNameFromApi(row.Constructor, roster.teams || []);
-        const position = parseNum(row.position, 0);
-
-        if (position >= 1 && position <= 3 && driver) podiumDrivers.add(driver);
-        if (position >= 1 && position <= 3 && team) podiumTeams.add(team);
-
-        if (position === 1 && driver) {
+        if (parseNum(row.position, 0) === 1 && driver) {
           const grid = parseNum(row.grid, 0);
           winnerGridRows.push({
             raceName,
             driver,
             grid: grid > 22 ? 23 : grid
           });
-        }
-
-        if (driver && isDnfStatus(row.status)) {
-          dnfCountThisRace += 1;
-          dnfCountsByDriver.set(driver, (dnfCountsByDriver.get(driver) || 0) + 1);
         }
       });
 
@@ -459,6 +610,15 @@ function registerAdminRoutes(app, deps) {
       .map((race) => Number(race.round))
       .filter((round) => Number.isFinite(round) && round > 0)
       .sort((a, b) => a - b);
+    const latestCompletedRace = completedRaces
+      .slice()
+      .sort((a, b) => parseNum(a?.round) - parseNum(b?.round))
+      .pop() || null;
+    const latestRaceRound = latestCompletedRace ? parseNum(latestCompletedRace.round, 0) : 0;
+    const latestRaceName = latestCompletedRace
+      ? (resolveCanonicalName(latestCompletedRace.raceName, races || []) ||
+        String(latestCompletedRace.raceName || "").trim())
+      : "";
 
     const standingsByRoundJson = await Promise.all(
       completedRounds.map((round) =>
@@ -636,7 +796,8 @@ function registerAdminRoutes(app, deps) {
     return {
       season: safeSeason,
       completedRounds: completedRounds.length,
-      latestRaceName: String(completedRaces[completedRaces.length - 1]?.raceName || "").trim(),
+      latestRaceRound: latestRaceRound > 0 ? latestRaceRound : null,
+      latestRaceName,
       supportedQuestionIds,
       actualsByQuestion: autofillableActuals
     };
@@ -674,6 +835,95 @@ function registerAdminRoutes(app, deps) {
     const hash = hashIndex >= 0 ? fullPath.slice(hashIndex) : "";
     const separator = basePath.includes("?") ? "&" : "?";
     return `${basePath}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
+  }
+
+  function findLatestRoundSnapshotForSeason(season) {
+    return db
+      .prepare(
+        `
+        SELECT round_number, round_name
+        FROM actual_snapshots
+        WHERE season = ?
+          AND round_number IS NOT NULL
+        ORDER BY round_number DESC, created_at DESC, id DESC
+        LIMIT 1
+        `
+      )
+      .get(season);
+  }
+
+  function createActualsSnapshot({
+    season,
+    roundNumber = null,
+    roundName = "",
+    sourceType = "manual",
+    sourceNote = "",
+    createdByUserId = null,
+    label = ""
+  }) {
+    const now = new Date().toISOString();
+    const actualRows = db
+      .prepare("SELECT question_id, value FROM actuals ORDER BY question_id ASC")
+      .all();
+    if (actualRows.length === 0) return null;
+
+    const safeSeason = Number.isFinite(Number(season)) ? Number(season) : CURRENT_SEASON;
+    const parsedRound = Number(roundNumber);
+    const safeRoundNumber =
+      Number.isFinite(parsedRound) && parsedRound > 0 ? Math.floor(parsedRound) : null;
+    const safeRoundName = String(roundName || "").trim();
+    const safeLabel = String(label || "").trim() || (
+      safeRoundNumber
+        ? `R${safeRoundNumber} - ${safeRoundName || "Snapshot"}`
+        : `Manual snapshot ${now.slice(0, 10)}`
+    );
+    const safeSourceType = String(sourceType || "").trim() || "manual";
+    const safeSourceNote = String(sourceNote || "").trim() || null;
+    const safeUserId = Number.isFinite(Number(createdByUserId))
+      ? Number(createdByUserId)
+      : null;
+
+    const insertSnapshot = db.prepare(
+      `
+      INSERT INTO actual_snapshots (
+        season,
+        round_number,
+        round_name,
+        label,
+        source_type,
+        source_note,
+        created_at,
+        created_by_user_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    );
+    const insertValue = db.prepare(
+      `
+      INSERT INTO actual_snapshot_values (snapshot_id, question_id, value)
+      VALUES (?, ?, ?)
+      `
+    );
+
+    const tx = db.transaction(() => {
+      const snapshotInfo = insertSnapshot.run(
+        safeSeason,
+        safeRoundNumber,
+        safeRoundName || null,
+        safeLabel,
+        safeSourceType,
+        safeSourceNote,
+        now,
+        safeUserId
+      );
+      const snapshotId = Number(snapshotInfo.lastInsertRowid);
+      actualRows.forEach((row) => {
+        insertValue.run(snapshotId, row.question_id, row.value);
+      });
+      return snapshotId;
+    });
+
+    return tx();
   }
 
   function validatePointsOverrideType(question, parsedOverride) {
@@ -1881,10 +2131,19 @@ function registerAdminRoutes(app, deps) {
     const roster = getRoster();
     const races = getRaces();
     const actualRows = db.prepare("SELECT * FROM actuals").all();
-    const actuals = actualRows.reduce((acc, row) => {
+    const persistedActuals = actualRows.reduce((acc, row) => {
       acc[row.question_id] = row.value;
       return acc;
     }, {});
+    const draftActuals =
+      req.session &&
+      req.session.adminActualsDraft &&
+      typeof req.session.adminActualsDraft === "object" &&
+      req.session.adminActualsDraft.values &&
+      typeof req.session.adminActualsDraft.values === "object"
+        ? req.session.adminActualsDraft.values
+        : null;
+    const actuals = draftActuals || persistedActuals;
 
     res.render("admin_actuals", {
       user,
@@ -1892,6 +2151,7 @@ function registerAdminRoutes(app, deps) {
       roster,
       races,
       actuals,
+      hasDraft: Boolean(draftActuals),
       saveError,
       saveSuccess
     });
@@ -1908,41 +2168,43 @@ function registerAdminRoutes(app, deps) {
         races,
         season: CURRENT_SEASON
       });
-      const now = new Date().toISOString();
-      const upsert = db.prepare(
-        `
-        INSERT INTO actuals (question_id, value, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(question_id)
-        DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-        `
-      );
-      const clear = db.prepare("DELETE FROM actuals WHERE question_id = ?");
+      const existingActuals = db
+        .prepare("SELECT question_id, value FROM actuals")
+        .all()
+        .reduce((acc, row) => {
+          acc[row.question_id] = row.value;
+          return acc;
+        }, {});
+      const draftActuals = { ...existingActuals };
 
       let filledCount = 0;
       let clearedCount = 0;
-      const tx = db.transaction(() => {
-        for (const question of questions) {
-          if (!snapshot.supportedQuestionIds.has(question.id)) continue;
-          const value = snapshot.actualsByQuestion[question.id];
-          const serialized = serializeAnswerForStorage(question, value);
-          if (serialized == null || serialized === "") {
-            clear.run(question.id);
-            clearedCount += 1;
-            continue;
-          }
-          upsert.run(question.id, serialized, now);
-          filledCount += 1;
+      for (const question of questions) {
+        if (!snapshot.supportedQuestionIds.has(question.id)) continue;
+        const value = snapshot.actualsByQuestion[question.id];
+        const serialized = serializeAnswerForStorage(question, value);
+        if (serialized == null || serialized === "") {
+          delete draftActuals[question.id];
+          clearedCount += 1;
+          continue;
         }
-      });
-      tx();
+        draftActuals[question.id] = serialized;
+        filledCount += 1;
+      }
+
+      if (req.session) {
+        req.session.adminActualsDraft = {
+          values: draftActuals,
+          updatedAt: new Date().toISOString()
+        };
+      }
 
       const summary = [
-        `Autofilled ${filledCount} question${filledCount === 1 ? "" : "s"}`
+        `Autofilled ${filledCount} question${filledCount === 1 ? "" : "s"} into the form`
       ];
       if (clearedCount > 0) {
         summary.push(
-          `cleared ${clearedCount} unresolved field${clearedCount === 1 ? "" : "s"}`
+          `cleared ${clearedCount} unresolved field${clearedCount === 1 ? "" : "s"} in the draft`
         );
       }
       summary.push(
@@ -1951,10 +2213,13 @@ function registerAdminRoutes(app, deps) {
       if (snapshot.latestRaceName) {
         summary.push(`latest race: ${snapshot.latestRaceName}`);
       }
+      summary.push("unsaved until you click Save actuals");
 
-      return res.redirect(
-        `/admin/actuals?success=${encodeURIComponent(summary.join(" | "))}`
-      );
+      const redirectTo = `/admin/actuals?success=${encodeURIComponent(summary.join(" | "))}`;
+      if (req.session) {
+        return req.session.save(() => res.redirect(redirectTo));
+      }
+      return res.redirect(redirectTo);
     } catch (err) {
       return res.redirect(
         `/admin/actuals?error=${encodeURIComponent(`Autofill failed: ${err.message}`)}`
@@ -1963,9 +2228,11 @@ function registerAdminRoutes(app, deps) {
   });
 
   app.post("/admin/actuals", requireAdmin, (req, res) => {
+    const adminUser = getCurrentUser(req);
     const questions = getQuestions();
     const races = getRaces();
     const now = new Date().toISOString();
+    const clearAll = db.prepare("DELETE FROM actuals");
     const upsert = db.prepare(
       `
       INSERT INTO actuals (question_id, value, updated_at)
@@ -1976,6 +2243,7 @@ function registerAdminRoutes(app, deps) {
     );
 
     const tx = db.transaction(() => {
+      clearAll.run();
       for (const question of questions) {
         const type = question.type || "text";
         if (type === "ranking") {
@@ -2072,9 +2340,36 @@ function registerAdminRoutes(app, deps) {
     });
     tx();
 
-    res.redirect(
-      `/admin/actuals?success=${encodeURIComponent("Actuals saved.")}`
-    );
+    if (req.session) {
+      delete req.session.adminActualsDraft;
+    }
+
+    let successMessage = "Actuals saved.";
+    try {
+      const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
+      const archivedSnapshotId = createActualsSnapshot({
+        season: CURRENT_SEASON,
+        roundNumber: latestRoundSnapshot?.round_number || null,
+        roundName: String(latestRoundSnapshot?.round_name || "").trim(),
+        sourceType: "manual",
+        sourceNote: "Manual save from admin actuals",
+        createdByUserId: adminUser?.id,
+        label: latestRoundSnapshot?.round_number
+          ? `R${latestRoundSnapshot.round_number} - ${String(latestRoundSnapshot?.round_name || "Manual update").trim() || "Manual update"}`
+          : `Manual save ${now.slice(0, 10)}`
+      });
+      if (archivedSnapshotId) {
+        successMessage = `Actuals saved. Snapshot #${archivedSnapshotId} saved.`;
+      }
+    } catch (archiveErr) {
+      successMessage = `Actuals saved. Snapshot archive skipped: ${archiveErr.message}`;
+    }
+
+    const redirectTo = `/admin/actuals?success=${encodeURIComponent(successMessage)}`;
+    if (req.session) {
+      return req.session.save(() => res.redirect(redirectTo));
+    }
+    return res.redirect(redirectTo);
   });
 
   app.get("/admin/overview", requireAdmin, (req, res) => {
@@ -3192,6 +3487,8 @@ function registerAdminRoutes(app, deps) {
           questions,
           leaderboard: pagedLeaderboard,
           actuals: actualsMap,
+          actualSnapshots: [],
+          selectedActualSnapshotId: null,
           leaderboardTotal: fullLeaderboard.length,
           leaderboardPerPage,
           currentLeaderboardPage: safeLeaderboardPage,
