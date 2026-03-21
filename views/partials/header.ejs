@@ -1,5 +1,9 @@
 ﻿<!DOCTYPE html>
 <% const brandTagline = "Predict the Formula 1 Season"; %>
+<% const devSessionMode = String(typeof devIdentityMode === 'string' ? devIdentityMode : '').trim().toLowerCase(); %>
+<% const devMode = user
+  ? (user.is_admin ? 'admin' : 'member')
+  : (devSessionMode === 'named_guest' ? 'guest' : 'visitor'); %>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -31,7 +35,36 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
     <script src="/app.js" defer></script>
   </head>
-  <body>
+  <body class="<%= isDevelopment ? 'has-dev-toolbar' : '' %>">
+    <% if (isDevelopment) { %>
+      <div class="dev-toolbar" aria-label="Development quick switch">
+        <div class="dev-toolbar-inner">
+          <span class="dev-toolbar-label">Dev</span>
+          <div class="dev-switcher">
+            <form method="post" action="/dev/switch-user">
+              <input type="hidden" name="mode" value="admin" />
+              <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+              <button type="submit" class="secondary dev-switch-btn <%= devMode === 'admin' ? 'is-active' : '' %>">Admin</button>
+            </form>
+            <form method="post" action="/dev/switch-user">
+              <input type="hidden" name="mode" value="member" />
+              <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+              <button type="submit" class="secondary dev-switch-btn <%= devMode === 'member' ? 'is-active' : '' %>">Member</button>
+            </form>
+            <form method="post" action="/dev/switch-user">
+              <input type="hidden" name="mode" value="visitor" />
+              <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+              <button type="submit" class="secondary dev-switch-btn <%= devMode === 'visitor' ? 'is-active' : '' %>">Visitor</button>
+            </form>
+            <form method="post" action="/dev/switch-user">
+              <input type="hidden" name="mode" value="guest" />
+              <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
+              <button type="submit" class="secondary dev-switch-btn <%= devMode === 'guest' ? 'is-active' : '' %>">Guest</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    <% } %>
     <header>
       <div class="header-inner">
         <div class="header-left">
@@ -51,10 +84,6 @@
                 <span class="brand-line brand-line-knowledge">KNOWLEDGE</span>
                 <span class="brand-divider" aria-hidden="true"></span>
                 <span class="brand-tagline"><%= brandTagline %></span>
-                <span class="brand-mobile-timer">
-                  <span class="brand-mobile-timer-prefix"><%= t('header.countdown_prefix') %></span>
-                  <strong class="brand-mobile-timer-value" data-brand-mobile-timer-value>--</strong>
-                </span>
               </span>
             </span>
           </a>
@@ -107,54 +136,6 @@
                   <span class="header-nav-icon header-nav-icon-login" aria-hidden="true"></span>
                   <span class="header-link-label"><%= t('header.login') %></span>
                 </a>
-              <% } %>
-              <% if (isDevelopment) { %>
-                <% const devSessionMode = String(typeof devIdentityMode === 'string' ? devIdentityMode : '').trim().toLowerCase(); %>
-                <% const devMode = user
-                  ? (user.is_admin ? 'admin' : 'member')
-                  : (devSessionMode === 'named_guest' ? 'guest' : 'visitor'); %>
-                <div class="dev-switcher" aria-label="Development quick switch">
-                  <form method="post" action="/dev/switch-user">
-                    <input type="hidden" name="mode" value="admin" />
-                    <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
-                    <button
-                      type="submit"
-                      class="secondary dev-switch-btn <%= devMode === 'admin' ? 'is-active' : '' %>"
-                    >
-                      Admin
-                    </button>
-                  </form>
-                  <form method="post" action="/dev/switch-user">
-                    <input type="hidden" name="mode" value="member" />
-                    <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
-                    <button
-                      type="submit"
-                      class="secondary dev-switch-btn <%= devMode === 'member' ? 'is-active' : '' %>"
-                    >
-                      Member
-                    </button>
-                  </form>
-                  <form method="post" action="/dev/switch-user">
-                    <input type="hidden" name="mode" value="visitor" />
-                    <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
-                    <button
-                      type="submit"
-                      class="secondary dev-switch-btn <%= devMode === 'visitor' ? 'is-active' : '' %>"
-                    >
-                      Visitor
-                    </button>
-                  </form>
-                  <form method="post" action="/dev/switch-user">
-                    <input type="hidden" name="mode" value="guest" />
-                    <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
-                    <button
-                      type="submit"
-                      class="secondary dev-switch-btn <%= devMode === 'guest' ? 'is-active' : '' %>"
-                    >
-                      Guest
-                    </button>
-                  </form>
-                </div>
               <% } %>
             </div>
             <div class="header-icon-actions">

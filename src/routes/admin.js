@@ -852,6 +852,38 @@ function registerAdminRoutes(app, deps) {
       .get(season);
   }
 
+  function findLatestSnapshotForRound(season, roundNumber) {
+    return db
+      .prepare(
+        `
+        SELECT id, season, round_number, round_name, label, created_at
+        FROM actual_snapshots
+        WHERE season = ?
+          AND round_number = ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT 1
+        `
+      )
+      .get(season, roundNumber);
+  }
+
+  function fetchSnapshotValues(snapshotId) {
+    const rows = db
+      .prepare(
+        `
+        SELECT question_id, value
+        FROM actual_snapshot_values
+        WHERE snapshot_id = ?
+        ORDER BY question_id ASC
+        `
+      )
+      .all(snapshotId);
+    return rows.reduce((acc, row) => {
+      acc[row.question_id] = row.value;
+      return acc;
+    }, {});
+  }
+
   function createActualsSnapshot({
     season,
     roundNumber = null,
@@ -924,6 +956,213 @@ function registerAdminRoutes(app, deps) {
     });
 
     return tx();
+  }
+
+  function upsertActualsSnapshot({
+    season,
+    roundNumber,
+    roundName = "",
+    valuesByQuestion,
+    sourceType = "manual",
+    sourceNote = "",
+    createdByUserId = null,
+    label = ""
+  }) {
+    const now = new Date().toISOString();
+    const entries = Object.entries(valuesByQuestion || {}).filter(([, value]) => value != null && value !== "");
+    if (entries.length === 0) return null;
+
+    const safeSeason = Number.isFinite(Number(season)) ? Number(season) : CURRENT_SEASON;
+    const parsedRound = Number(roundNumber);
+    const safeRoundNumber =
+      Number.isFinite(parsedRound) && parsedRound > 0 ? Math.floor(parsedRound) : null;
+    const safeRoundName = String(roundName || "").trim();
+    const safeLabel = String(label || "").trim() || (
+      safeRoundNumber
+        ? `R${safeRoundNumber} - ${safeRoundName || "Snapshot"}`
+        : `Manual snapshot ${now.slice(0, 10)}`
+    );
+    const safeSourceType = String(sourceType || "").trim() || "manual";
+    const safeSourceNote = String(sourceNote || "").trim() || null;
+    const safeUserId = Number.isFinite(Number(createdByUserId))
+      ? Number(createdByUserId)
+      : null;
+
+    const existing = safeRoundNumber
+      ? findLatestSnapshotForRound(safeSeason, safeRoundNumber)
+      : null;
+
+    const insertSnapshot = db.prepare(
+      `
+      INSERT INTO actual_snapshots (
+        season,
+        round_number,
+        round_name,
+        label,
+        source_type,
+        source_note,
+        created_at,
+        created_by_user_id
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    );
+    const updateSnapshot = db.prepare(
+      `
+      UPDATE actual_snapshots
+      SET round_name = ?,
+          label = ?,
+          source_type = ?,
+          source_note = ?,
+          created_at = ?,
+          created_by_user_id = ?
+      WHERE id = ?
+      `
+    );
+    const clearValues = db.prepare(
+      `
+      DELETE FROM actual_snapshot_values
+      WHERE snapshot_id = ?
+      `
+    );
+    const insertValue = db.prepare(
+      `
+      INSERT INTO actual_snapshot_values (snapshot_id, question_id, value)
+      VALUES (?, ?, ?)
+      `
+    );
+
+    const tx = db.transaction(() => {
+      let snapshotId = existing ? Number(existing.id) : null;
+      if (snapshotId) {
+        updateSnapshot.run(
+          safeRoundName || null,
+          safeLabel,
+          safeSourceType,
+          safeSourceNote,
+          now,
+          safeUserId,
+          snapshotId
+        );
+        clearValues.run(snapshotId);
+      } else {
+        const snapshotInfo = insertSnapshot.run(
+          safeSeason,
+          safeRoundNumber,
+          safeRoundName || null,
+          safeLabel,
+          safeSourceType,
+          safeSourceNote,
+          now,
+          safeUserId
+        );
+        snapshotId = Number(snapshotInfo.lastInsertRowid);
+      }
+      entries.forEach(([questionId, value]) => {
+        insertValue.run(snapshotId, questionId, value);
+      });
+      return snapshotId;
+    });
+
+    return tx();
+  }
+
+  function buildStoredActualsFromBody(body, questions, races, now) {
+    const valuesByQuestion = {};
+    for (const question of questions) {
+      const type = question.type || "text";
+      if (type === "ranking") {
+        const count = Number(question.count) || 3;
+        const selections = [];
+        for (let i = 1; i <= count; i += 1) {
+          const value = body[`${question.id}_${i}`];
+          if (!value) continue;
+          selections.push(value);
+        }
+        if (selections.length === 0) continue;
+        valuesByQuestion[question.id] = JSON.stringify(selections);
+        continue;
+      }
+      if (type === "multi_select") {
+        const selected = body[question.id];
+        if (!selected) continue;
+        const selections = Array.isArray(selected) ? selected : [selected];
+        valuesByQuestion[question.id] = JSON.stringify(selections);
+        continue;
+      }
+      if (type === "multi_select_limited") {
+        const dnfByRace = {};
+        races.forEach((race, index) => {
+          const value = body[`${question.id}_dnf_${index}`];
+          const countValue = clampNumber(value, 0, 999);
+          if (countValue != null) {
+            dnfByRace[race] = countValue;
+          }
+        });
+        valuesByQuestion[question.id] = JSON.stringify({ dnf_by_race: dnfByRace });
+        continue;
+      }
+      if (type === "teammate_battle") {
+        const winner = body[`${question.id}_winner`];
+        const diffRaw = body[`${question.id}_diff`];
+        if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
+          continue;
+        }
+        const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
+        valuesByQuestion[question.id] = JSON.stringify({ winner, diff });
+        continue;
+      }
+      if (type === "boolean_with_optional_driver") {
+        const choice = body[question.id];
+        const driver = body[`${question.id}_driver`];
+        if (!choice) continue;
+        valuesByQuestion[question.id] = JSON.stringify({ choice, driver });
+        continue;
+      }
+      if (type === "numeric_with_driver") {
+        const valueRaw = body[`${question.id}_value`];
+        const driver = body[`${question.id}_driver`];
+        if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
+          continue;
+        }
+        const value = clampNumber(valueRaw, 0, 999);
+        valuesByQuestion[question.id] = JSON.stringify({ value, driver });
+        continue;
+      }
+      if (type === "single_choice_with_driver") {
+        const value = body[`${question.id}_value`];
+        const driverRaw = body[`${question.id}_driver`];
+        const driverSelections = Array.isArray(driverRaw)
+          ? driverRaw.filter(Boolean)
+          : (driverRaw ? [driverRaw] : []);
+        const driver = MULTI_ACTUAL_DRIVER_FIELD_IDS.has(question.id)
+          ? (driverSelections.length <= 1 ? (driverSelections[0] || null) : driverSelections)
+          : (driverSelections[0] || "");
+        if ((!value || value === "") && (!driver || driver === "")) {
+          continue;
+        }
+        valuesByQuestion[question.id] = JSON.stringify({ value, driver });
+        continue;
+      }
+
+      const answer = body[question.id];
+      if (type === "single_choice" && MULTI_ACTUAL_SINGLE_CHOICE_IDS.has(question.id)) {
+        if (!answer) continue;
+        const selections = Array.isArray(answer) ? answer.filter(Boolean) : [answer];
+        if (selections.length === 0) continue;
+        valuesByQuestion[question.id] = JSON.stringify(selections);
+        continue;
+      }
+      if (answer === undefined || answer === "") continue;
+      if (type === "numeric") {
+        const value = clampNumber(answer, 0, 999);
+        if (value == null) continue;
+        valuesByQuestion[question.id] = String(value);
+        continue;
+      }
+      valuesByQuestion[question.id] = String(answer).trim();
+    }
+    return valuesByQuestion;
   }
 
   function validatePointsOverrideType(question, parsedOverride) {
@@ -2139,11 +2378,53 @@ function registerAdminRoutes(app, deps) {
       req.session &&
       req.session.adminActualsDraft &&
       typeof req.session.adminActualsDraft === "object" &&
+      req.session.adminActualsDraft.target === "current" &&
       req.session.adminActualsDraft.values &&
       typeof req.session.adminActualsDraft.values === "object"
         ? req.session.adminActualsDraft.values
         : null;
-    const actuals = draftActuals || persistedActuals;
+    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
+    const selectedTarget = String(req.query.target || "current").trim() || "current";
+    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
+    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
+    const racesWithTargets = races.map((raceName, index) => {
+      const roundNumber = index + 1;
+      const snapshotMeta = findLatestSnapshotForRound(CURRENT_SEASON, roundNumber);
+      const latestRoundNumber =
+        Number.isFinite(Number(latestRoundSnapshot?.round_number))
+          ? Number(latestRoundSnapshot.round_number)
+          : null;
+      let timing = "future";
+      if (latestRoundNumber != null) {
+        if (roundNumber < latestRoundNumber) timing = "past";
+        else if (roundNumber === latestRoundNumber) timing = "current";
+      }
+      return {
+        key: `round:${roundNumber}`,
+        roundNumber,
+        raceName,
+        timing,
+        snapshotId: snapshotMeta ? Number(snapshotMeta.id) : null,
+        snapshotLabel: snapshotMeta ? String(snapshotMeta.label || "").trim() : ""
+      };
+    });
+
+    const selectedRaceTarget =
+      selectedRoundNumber != null
+        ? racesWithTargets.find((race) => race.roundNumber === selectedRoundNumber) || null
+        : null;
+    const selectedSnapshotValues =
+      selectedRaceTarget && selectedRaceTarget.snapshotId
+        ? fetchSnapshotValues(selectedRaceTarget.snapshotId)
+        : null;
+    const actuals =
+      selectedTarget === "current"
+        ? (draftActuals || persistedActuals)
+        : (draftActuals || selectedSnapshotValues || persistedActuals);
+    const isPastRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "past");
+    const isFutureRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "future");
+    const allowPastEdit = String(req.query.unlockPast || "").trim() === "1";
+    const requiresPastUnlock = isPastRaceTarget && !allowPastEdit;
 
     res.render("admin_actuals", {
       user,
@@ -2151,6 +2432,11 @@ function registerAdminRoutes(app, deps) {
       roster,
       races,
       actuals,
+      actualsTarget: selectedTarget,
+      raceTargets: racesWithTargets,
+      selectedRaceTarget,
+      requiresPastUnlock,
+      isFutureRaceTarget,
       hasDraft: Boolean(draftActuals),
       saveError,
       saveSuccess
@@ -2192,12 +2478,13 @@ function registerAdminRoutes(app, deps) {
         filledCount += 1;
       }
 
-      if (req.session) {
-        req.session.adminActualsDraft = {
-          values: draftActuals,
-          updatedAt: new Date().toISOString()
-        };
-      }
+        if (req.session) {
+          req.session.adminActualsDraft = {
+            target: "current",
+            values: draftActuals,
+            updatedAt: new Date().toISOString()
+          };
+        }
 
       const summary = [
         `Autofilled ${filledCount} question${filledCount === 1 ? "" : "s"} into the form`
@@ -2232,6 +2519,60 @@ function registerAdminRoutes(app, deps) {
     const questions = getQuestions();
     const races = getRaces();
     const now = new Date().toISOString();
+    const selectedTarget = String(req.body.actualsTarget || "current").trim() || "current";
+    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
+    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
+    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
+    const latestRoundNumber =
+      Number.isFinite(Number(latestRoundSnapshot?.round_number))
+        ? Number(latestRoundSnapshot.round_number)
+        : null;
+    const isPastRaceTarget =
+      selectedRoundNumber != null &&
+      latestRoundNumber != null &&
+      selectedRoundNumber < latestRoundNumber;
+    const allowPastEdit = String(req.body.unlockPast || "").trim() === "1";
+
+    if (isPastRaceTarget && !allowPastEdit) {
+      return res.redirect(
+        `/admin/actuals?target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent("Unlock past-race editing before saving changes.")}`
+      );
+    }
+
+    const valuesByQuestion = buildStoredActualsFromBody(req.body, questions, races, now);
+
+    if (selectedRoundNumber != null) {
+      const roundName = races[selectedRoundNumber - 1] || `Round ${selectedRoundNumber}`;
+      let successMessage;
+      try {
+        const snapshotId = upsertActualsSnapshot({
+          season: CURRENT_SEASON,
+          roundNumber: selectedRoundNumber,
+          roundName,
+          valuesByQuestion,
+          sourceType: "manual",
+          sourceNote: "Manual save from admin actuals race selector",
+          createdByUserId: adminUser?.id,
+          label: `R${selectedRoundNumber} - ${roundName}`
+        });
+        successMessage = snapshotId
+          ? `Snapshot saved for R${selectedRoundNumber} - ${roundName}.`
+          : `No values saved for R${selectedRoundNumber} - ${roundName}.`;
+      } catch (err) {
+        return res.redirect(
+          `/admin/actuals?target=${encodeURIComponent(selectedTarget)}&unlockPast=${allowPastEdit ? "1" : "0"}&error=${encodeURIComponent(err.message)}`
+        );
+      }
+      if (req.session) {
+        delete req.session.adminActualsDraft;
+      }
+      const redirectTo = `/admin/actuals?target=${encodeURIComponent(selectedTarget)}${allowPastEdit ? "&unlockPast=1" : ""}&success=${encodeURIComponent(successMessage)}`;
+      if (req.session) {
+        return req.session.save(() => res.redirect(redirectTo));
+      }
+      return res.redirect(redirectTo);
+    }
+
     const clearAll = db.prepare("DELETE FROM actuals");
     const upsert = db.prepare(
       `
@@ -2244,99 +2585,9 @@ function registerAdminRoutes(app, deps) {
 
     const tx = db.transaction(() => {
       clearAll.run();
-      for (const question of questions) {
-        const type = question.type || "text";
-        if (type === "ranking") {
-          const count = Number(question.count) || 3;
-          const selections = [];
-          for (let i = 1; i <= count; i += 1) {
-            const value = req.body[`${question.id}_${i}`];
-            if (!value) continue;
-            selections.push(value);
-          }
-          if (selections.length === 0) continue;
-          upsert.run(question.id, JSON.stringify(selections), now);
-          continue;
-        }
-        if (type === "multi_select") {
-          const selected = req.body[question.id];
-          if (!selected) continue;
-          const selections = Array.isArray(selected) ? selected : [selected];
-          upsert.run(question.id, JSON.stringify(selections), now);
-          continue;
-        }
-        if (type === "multi_select_limited") {
-          const dnfByRace = {};
-          races.forEach((race, index) => {
-            const value = req.body[`${question.id}_dnf_${index}`];
-            const countValue = clampNumber(value, 0, 999);
-            if (countValue != null) {
-              dnfByRace[race] = countValue;
-            }
-          });
-          upsert.run(question.id, JSON.stringify({ dnf_by_race: dnfByRace }), now);
-          continue;
-        }
-        if (type === "teammate_battle") {
-          const winner = req.body[`${question.id}_winner`];
-          const diffRaw = req.body[`${question.id}_diff`];
-          if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
-            continue;
-          }
-          const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
-          upsert.run(question.id, JSON.stringify({ winner, diff }), now);
-          continue;
-        }
-        if (type === "boolean_with_optional_driver") {
-          const choice = req.body[question.id];
-          const driver = req.body[`${question.id}_driver`];
-          if (!choice) continue;
-          upsert.run(question.id, JSON.stringify({ choice, driver }), now);
-          continue;
-        }
-        if (type === "numeric_with_driver") {
-          const valueRaw = req.body[`${question.id}_value`];
-          const driver = req.body[`${question.id}_driver`];
-          if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
-            continue;
-          }
-          const value = clampNumber(valueRaw, 0, 999);
-          upsert.run(question.id, JSON.stringify({ value, driver }), now);
-          continue;
-        }
-        if (type === "single_choice_with_driver") {
-          const value = req.body[`${question.id}_value`];
-          const driverRaw = req.body[`${question.id}_driver`];
-          const driverSelections = Array.isArray(driverRaw)
-            ? driverRaw.filter(Boolean)
-            : (driverRaw ? [driverRaw] : []);
-          const driver = MULTI_ACTUAL_DRIVER_FIELD_IDS.has(question.id)
-            ? (driverSelections.length <= 1 ? (driverSelections[0] || null) : driverSelections)
-            : (driverSelections[0] || "");
-          if ((!value || value === "") && (!driver || driver === "")) {
-            continue;
-          }
-          upsert.run(question.id, JSON.stringify({ value, driver }), now);
-          continue;
-        }
-
-        const answer = req.body[question.id];
-        if (type === "single_choice" && MULTI_ACTUAL_SINGLE_CHOICE_IDS.has(question.id)) {
-          if (!answer) continue;
-          const selections = Array.isArray(answer) ? answer.filter(Boolean) : [answer];
-          if (selections.length === 0) continue;
-          upsert.run(question.id, JSON.stringify(selections), now);
-          continue;
-        }
-        if (answer === undefined || answer === "") continue;
-        if (type === "numeric") {
-          const value = clampNumber(answer, 0, 999);
-          if (value == null) continue;
-          upsert.run(question.id, String(value), now);
-          continue;
-        }
-        upsert.run(question.id, String(answer).trim(), now);
-      }
+      Object.entries(valuesByQuestion).forEach(([questionId, value]) => {
+        upsert.run(questionId, value, now);
+      });
     });
     tx();
 

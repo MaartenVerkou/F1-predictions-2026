@@ -177,6 +177,13 @@
       <% leaderboardExtraParams[key] = value; %>
     <% } %>
   <% } %>
+  <% const snapshotFilterParams = {}; %>
+  <% for (const [key, value] of Object.entries(leaderboardExtraParams)) { %>
+    <% if (key === "page" || key === "snapshot") continue; %>
+    <% snapshotFilterParams[key] = value; %>
+  <% } %>
+  <% const selectedSnapshotKey =
+    selectedActualSnapshotId == null ? "" : String(selectedActualSnapshotId); %>
 
   <div class="page-title-row">
     <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
@@ -194,48 +201,78 @@
     <% const endRank = startRank + leaderboard.length - 1; %>
 
     <div id="leaderboard-overview" class="leaderboard-layout">
-      <section class="leaderboard-main-card">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th><%= t('leaderboard.member') %></th>
-              <th><%= t('leaderboard.total_points') %></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% leaderboard.forEach((row, index) => { %>
-              <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
-              <tr
-                class="leaderboard-rank-row <%= index === 0 ? 'is-active' : '' %>"
-                data-member-activate="<%= panelId %>"
-                tabindex="0"
-                role="button"
-                aria-controls="<%= panelId %>"
-                aria-pressed="<%= index === 0 ? 'true' : 'false' %>"
-              >
-                <td><%= row.rank %></td>
-                <td><strong><%= row.name %></strong></td>
-                <td><strong><%= row.total %></strong></td>
-              </tr>
+      <div class="leaderboard-main-column">
+        <% if ((actualSnapshots || []).length > 0) { %>
+          <form method="get" action="<%= leaderboardBaseHref %>" class="leaderboard-snapshot-form inline-actions">
+            <% Object.entries(snapshotFilterParams).forEach(([key, value]) => { %>
+              <input type="hidden" name="<%= key %>" value="<%= value %>" />
             <% }) %>
-          </tbody>
-        </table>
-        <p class="muted" style="margin: 10px 0 0;">
-          Showing <%= startRank %>-<%= endRank %> of <%= leaderboardTotal %>
-        </p>
-        <%- include('partials/admin_pagination', {
-          currentPage: currentLeaderboardPage,
-          totalPages: totalLeaderboardPages,
-          pageParamName: 'page',
-          basePath: leaderboardBaseHref,
-          extraParams: leaderboardExtraParams,
-          anchorId: 'leaderboard-overview',
-          label: 'Leaderboard',
-          perPage: leaderboardPerPage,
-          showSummary: false
-        }) %>
-      </section>
+            <select
+              id="snapshot-select"
+              name="snapshot"
+              aria-label="<%= t('leaderboard.snapshot_label') %>"
+              onchange="this.form.submit()"
+            >
+              <option value="" <%= selectedSnapshotKey === "" ? "selected" : "" %>><%= t('leaderboard.current_snapshot') %></option>
+              <% actualSnapshots.forEach((snapshot) => { %>
+                <option value="<%= snapshot.id %>" <%= selectedSnapshotKey === String(snapshot.id) ? "selected" : "" %>>
+                  <%= snapshot.label %>
+                </option>
+              <% }) %>
+            </select>
+            <noscript><button type="submit" class="secondary"><%= t('leaderboard.apply_snapshot') %></button></noscript>
+          </form>
+        <% } %>
+
+        <section class="leaderboard-main-card">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>
+                  <span class="leaderboard-header-long">POSITION</span>
+                  <span class="leaderboard-header-short">POS.</span>
+                </th>
+                <th>NAME</th>
+                <th>
+                  <span class="leaderboard-header-long">POINTS</span>
+                  <span class="leaderboard-header-short">PTS</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <% leaderboard.forEach((row, index) => { %>
+                <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
+                <tr
+                  class="leaderboard-rank-row <%= index === 0 ? 'is-active' : '' %>"
+                  data-member-activate="<%= panelId %>"
+                  tabindex="0"
+                  role="button"
+                  aria-controls="<%= panelId %>"
+                  aria-pressed="<%= index === 0 ? 'true' : 'false' %>"
+                >
+                  <td><%= row.rank %></td>
+                  <td><strong><%= row.name %></strong></td>
+                  <td><strong><%= row.total %></strong></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+          <p class="muted" style="margin: 10px 0 0;">
+            <%= t('leaderboard.showing_range', { start: startRank, end: endRank, total: leaderboardTotal }) %>
+          </p>
+          <%- include('partials/admin_pagination', {
+            currentPage: currentLeaderboardPage,
+            totalPages: totalLeaderboardPages,
+            pageParamName: 'page',
+            basePath: leaderboardBaseHref,
+            extraParams: leaderboardExtraParams,
+            anchorId: 'leaderboard-overview',
+            label: t('leaderboard.page_title'),
+            perPage: leaderboardPerPage,
+            showSummary: false
+          }) %>
+        </section>
+      </div>
 
       <section class="leaderboard-detail-card">
         <% leaderboard.forEach((row, index) => { %>
@@ -249,9 +286,9 @@
               <thead>
                 <tr>
                   <th>Q</th>
-                  <th>Actual</th>
-                  <th>Answer</th>
-                  <th>Pts</th>
+                  <th><%= t('leaderboard.prediction') %></th>
+                  <th><%= t('leaderboard.actual') %></th>
+                  <th><%= t('leaderboard.points_short_caps') %></th>
                 </tr>
               </thead>
               <tbody>
@@ -266,15 +303,15 @@
                   <% const actualDisplay = formatValue(q, actuals?.[q.id]); %>
                   <% const answerDisplay = formatValue(q, row.answersByQuestion?.[q.id]); %>
                   <td>
-                    <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, actuals?.[q.id], actualDisplay) ? 'has-short' : '' %>">
-                      <span class="leaderboard-value-full"><%= actualDisplay %></span>
-                      <span class="leaderboard-value-short"><%= abbreviateEntities(actualDisplay) %></span>
-                    </span>
-                  </td>
-                  <td>
                     <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, row.answersByQuestion?.[q.id], answerDisplay) ? 'has-short' : '' %>">
                       <span class="leaderboard-value-full"><%= answerDisplay %></span>
                       <span class="leaderboard-value-short"><%= abbreviateEntities(answerDisplay) %></span>
+                    </span>
+                  </td>
+                  <td>
+                    <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, actuals?.[q.id], actualDisplay) ? 'has-short' : '' %>">
+                      <span class="leaderboard-value-full"><%= actualDisplay %></span>
+                      <span class="leaderboard-value-short"><%= abbreviateEntities(actualDisplay) %></span>
                     </span>
                   </td>
                   <td><strong><%= row.byQuestion[q.id] ?? 0 %></strong></td>

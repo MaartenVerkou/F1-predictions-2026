@@ -1,35 +1,65 @@
 <%- include('partials/header', { title: companyName, user }) %>
 
-<section class="hero">
-  <div class="card">
-    <span class="badge home-how-it-works-badge"><%= t('home.badge_how_it_works') %></span>
-    <h1><%= t('home.headline') %></h1>
-    <p class="muted"><%= t('home.subtitle') %></p>
-    <div class="inline-actions">
-      <% if (predictionsClosed) { %>
-        <% if (!user) { %>
-          <a class="button-link hero-start-predicting" href="/signup"><%= t('home.signup_next_year_notify') %></a>
-          <a class="link" href="/global/responses"><%= t('home.view_predictions') %></a>
+<section class="hero home-page">
+  <div class="hero-main-column">
+    <div class="card home-intro-card">
+      <span class="badge home-how-it-works-badge"><%= t('home.badge_how_it_works') %></span>
+      <h1><%= t('home.headline') %></h1>
+      <p class="muted"><%= t('home.subtitle') %></p>
+      <div class="inline-actions">
+        <% if (predictionsClosed) { %>
+          <% if (!user) { %>
+            <a class="button-link hero-start-predicting" href="/signup"><%= t('home.signup_next_year_notify') %></a>
+            <a class="link" href="/global/responses"><%= t('home.view_predictions') %></a>
+          <% } else { %>
+            <div class="home-closed-callout alert" role="status" aria-live="polite">
+              <strong><%= t('header.countdown_closed') %></strong>
+            </div>
+            <a class="button-link hero-start-predicting" href="/global/responses"><%= t('home.view_predictions') %></a>
+            <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
+          <% } %>
         <% } else { %>
-          <div class="home-closed-callout alert" role="status" aria-live="polite">
-            <strong><%= t('header.countdown_closed') %></strong>
-          </div>
-          <a class="button-link hero-start-predicting" href="/global/responses"><%= t('home.view_predictions') %></a>
-          <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
+          <% if (!user) { %>
+            <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
+            <a class="link" href="/login"><%= t('home.or_login') %></a>
+          <% } else { %>
+            <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
+            <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
+          <% } %>
         <% } %>
-      <% } else { %>
-        <% if (!user) { %>
-          <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
-          <a class="link" href="/login"><%= t('home.or_login') %></a>
-        <% } else { %>
-          <a class="button-link hero-start-predicting" href="/start-predicting"><%= t('home.start_predicting') %></a>
-          <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
-        <% } %>
-      <% } %>
+      </div>
+    </div>
+
+    <div class="card home-flow-card">
+      <h2><%= t('home.flow_title') %></h2>
+      <ol>
+        <li><%= t('home.flow_step_1') %></li>
+        <li><%= t('home.flow_step_2') %></li>
+        <li><%= t('home.flow_step_3') %></li>
+      </ol>
+      <p style="margin:10px 0 0;">
+        <a class="link" href="/about"><%= t('home.about_link', { company_name: companyName }) %></a>
+      </p>
     </div>
   </div>
 
-  <div class="card">
+  <div class="home-leaderboard-card">
+    <%- include('partials/leaderboard_preview', {
+      leaderboardCard: globalLeaderboard && Array.isArray(globalLeaderboard.rows) && globalLeaderboard.rows.length > 0
+        ? {
+            badge: t('home.global_leaderboard_badge'),
+            cta: t('leaderboard.full_cta'),
+            href: globalLeaderboardHref,
+            ariaLabel: t('home.global_leaderboard_badge'),
+            rows: globalLeaderboard.rows,
+            className: 'home-leaderboard-preview',
+            ctaPlacement: 'mobile-bottom'
+          }
+        : null
+    }) %>
+  </div>
+
+  <div class="card home-flow-card home-flow-card-mobile">
     <h2><%= t('home.flow_title') %></h2>
     <ol>
       <li><%= t('home.flow_step_1') %></li>

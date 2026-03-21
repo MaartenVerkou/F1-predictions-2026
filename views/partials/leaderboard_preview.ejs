@@ -1,0 +1,27 @@
+<% if (leaderboardCard && Array.isArray(leaderboardCard.rows) && leaderboardCard.rows.length > 0) { %>
+  <div class="card leaderboard-preview-card <%= leaderboardCard.className || '' %>">
+    <div class="leaderboard-preview-header">
+      <span class="badge leaderboard-preview-badge"><%= leaderboardCard.badge %></span>
+      <% if (leaderboardCard.href && leaderboardCard.cta) { %>
+        <a class="link leaderboard-preview-link <%= leaderboardCard.ctaPlacement === 'mobile-bottom' ? 'leaderboard-preview-link-mobile-top' : '' %>" href="<%= leaderboardCard.href %>"><%= leaderboardCard.cta %></a>
+      <% } %>
+    </div>
+
+    <div class="leaderboard-preview-list" role="list" aria-label="<%= leaderboardCard.ariaLabel || leaderboardCard.badge %>">
+      <% leaderboardCard.rows.forEach((row) => { %>
+        <div
+          class="leaderboard-preview-row <%= row.rank <= 3 ? `is-top-${row.rank}` : '' %>"
+          role="listitem"
+        >
+          <div class="leaderboard-preview-rank"><%= row.rank %></div>
+          <div class="leaderboard-preview-name"><strong><%= row.name %></strong></div>
+          <div class="leaderboard-preview-points"><strong><%= row.total %></strong></div>
+        </div>
+      <% }) %>
+    </div>
+
+    <% if (leaderboardCard.href && leaderboardCard.cta && leaderboardCard.ctaPlacement === 'mobile-bottom') { %>
+      <a class="link leaderboard-preview-link leaderboard-preview-link-bottom" href="<%= leaderboardCard.href %>"><%= leaderboardCard.cta %></a>
+    <% } %>
+  </div>
+<% } %>

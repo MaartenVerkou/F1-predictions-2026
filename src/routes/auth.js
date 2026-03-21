@@ -18,7 +18,8 @@ function registerAuthRoutes(app, deps) {
     DEV_AUTO_LOGIN,
     NODE_ENV,
     claimGuestResponsesForUser,
-    predictionsClosed
+    predictionsClosed,
+    getQuestions
   } = deps;
 
   const BRAND_NAME = String(COMPANY_NAME || "Wheel of Knowledge").trim() || "Wheel of Knowledge";
@@ -105,11 +106,313 @@ function registerAuthRoutes(app, deps) {
     }
   }
 
+  const buildLeaderboardPreviewRows = (leaderboard, currentParticipantId, limit = 5) => {
+    const safeLimit = Math.max(1, Number(limit) || 5);
+    const rankedRows = leaderboard.map((row, index) => ({
+      rank: index + 1,
+      ...row
+    }));
+    if (rankedRows.length <= safeLimit) {
+      return rankedRows;
+    }
+    const currentId = String(currentParticipantId || "");
+    const currentIndex = currentId
+      ? rankedRows.findIndex((row) => String(row.userId) === currentId)
+      : -1;
+    if (currentIndex < 0 || currentIndex < safeLimit) {
+      return rankedRows.slice(0, safeLimit);
+    }
+    return [...rankedRows.slice(0, safeLimit - 1), rankedRows[currentIndex]];
+  };
+
+  function getHomeGlobalLeaderboard(locale, currentUserId) {
+    const globalGroup = db.prepare("SELECT id, name FROM groups WHERE is_global = 1 LIMIT 1").get();
+    if (!globalGroup) return null;
+
+    const questions = typeof getQuestions === "function" ? getQuestions(locale) : [];
+    if (!Array.isArray(questions) || questions.length === 0) return null;
+
+    const actualRows = db.prepare("SELECT question_id, value FROM actuals").all();
+    if (actualRows.length === 0) return null;
+    const actuals = actualRows.reduce((acc, row) => {
+      acc[row.question_id] = row.value;
+      return acc;
+    }, {});
+
+    const questionMap = questions.reduce((acc, question) => {
+      acc[question.id] = question;
+      return acc;
+    }, {});
+
+    const parseStoredValue = (question, raw) => {
+      if (!raw) return null;
+      const text = String(raw).trim();
+      const type = question.type || "text";
+      if (
+        type === "ranking" ||
+        type === "multi_select" ||
+        type === "multi_select_limited" ||
+        type === "teammate_battle" ||
+        type === "boolean_with_optional_driver" ||
+        type === "numeric_with_driver" ||
+        type === "single_choice_with_driver"
+      ) {
+        try {
+          return JSON.parse(raw);
+        } catch (err) {
+          return null;
+        }
+      }
+      if (text.startsWith("[") || text.startsWith("{")) {
+        try {
+          return JSON.parse(text);
+        } catch (err) {}
+      }
+      return raw;
+    };
+
+    const isMatch = (actualValue, predictedValue) => {
+      if (actualValue == null || predictedValue == null) return false;
+      if (Array.isArray(actualValue)) return actualValue.includes(predictedValue);
+      return String(actualValue) === String(predictedValue);
+    };
+
+    const scoreQuestion = (question, predictedRaw, actualRaw) => {
+      if (actualRaw == null || predictedRaw == null) return 0;
+      const type = question.type || "text";
+      if (type === "ranking") {
+        const points = question.points || {};
+        let score = 0;
+        const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
+        const count = Number(question.count) || 3;
+        for (let i = 0; i < count; i += 1) {
+          const actual = actualRaw[i];
+          const predicted = predictedRaw[i];
+          const key = positionLabels[i] || String(i + 1);
+          const value = Number(points[key] || 0);
+          if (actual == null || predicted == null) continue;
+          if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
+            score += value;
+          }
+        }
+        return score;
+      }
+      if (type === "single_choice" || type === "text" || type === "boolean") {
+        if (
+          type === "single_choice" &&
+          question.special_case === "all_podiums_bonus" &&
+          String(actualRaw) === String(question.bonus_value)
+        ) {
+          return String(predictedRaw) === String(question.bonus_value)
+            ? Number(question.bonus_points || 0)
+            : 0;
+        }
+        return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
+      }
+      if (type === "multi_select") {
+        const points = Number(question.points || 0);
+        const penalty = Number(question.penalty ?? points);
+        const minimum = Number(question.minimum ?? 0);
+        const actualSet = new Set(actualRaw || []);
+        const predictedSet = new Set(predictedRaw || []);
+        let correct = 0;
+        let wrong = 0;
+        let missing = 0;
+        predictedSet.forEach((item) => {
+          if (actualSet.has(item)) correct += 1;
+          else wrong += 1;
+        });
+        actualSet.forEach((item) => {
+          if (!predictedSet.has(item)) missing += 1;
+        });
+        return Math.max(minimum, correct * points - (wrong + missing) * penalty);
+      }
+      if (type === "teammate_battle") {
+        const base = Number(question.points || 0);
+        const tieBonus = Number(question.tie_bonus || 0);
+        const actualWinner = actualRaw?.winner;
+        const actualDiff = Number(actualRaw?.diff);
+        const predictedWinner = predictedRaw?.winner;
+        const predictedDiff = Number(predictedRaw?.diff);
+        if (!actualWinner) return 0;
+        if (actualWinner === "tie") return predictedWinner === "tie" ? tieBonus : 0;
+        if (predictedWinner !== actualWinner) return 0;
+        if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
+        return Math.max(0, base - Math.abs(predictedDiff - actualDiff));
+      }
+      if (type === "boolean_with_optional_driver") {
+        const base = Number(question.points || 0);
+        const bonus = Number(question.bonus_points || 0);
+        const actualChoice = actualRaw?.choice;
+        const actualDriver = actualRaw?.driver;
+        const predictedChoice = predictedRaw?.choice;
+        const predictedDriver = predictedRaw?.driver;
+        if (actualChoice == null || predictedChoice == null) return 0;
+        let score = 0;
+        if (String(actualChoice) === String(predictedChoice)) {
+          score += base;
+          if (
+            String(actualChoice) === "yes" &&
+            actualDriver &&
+            String(actualDriver) === String(predictedDriver)
+          ) {
+            score += bonus;
+          }
+        }
+        return score;
+      }
+      if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
+        const points = question.points || {};
+        const actualValue = actualRaw?.value;
+        const predictedValue = predictedRaw?.value;
+        const actualDriver = actualRaw?.driver;
+        const predictedDriver = predictedRaw?.driver;
+        let score = 0;
+        if (actualValue != null && predictedValue != null) {
+          if (isMatch(actualValue, predictedValue)) {
+            score += Number(points.position || 0);
+          } else if (
+            type === "single_choice_with_driver" &&
+            question.position_nearby_points &&
+            typeof question.position_nearby_points === "object"
+          ) {
+            const toGridNumber = (value) => {
+              if (value == null) return null;
+              const raw = String(value).trim().toLowerCase();
+              if (!raw) return null;
+              if (raw === "pitlane" || raw === "pit lane") return 23;
+              const numeric = Number(raw);
+              return Number.isFinite(numeric) ? numeric : null;
+            };
+            const actualGrid = toGridNumber(actualValue);
+            const predictedGrid = toGridNumber(predictedValue);
+            if (actualGrid != null && predictedGrid != null) {
+              const diff = Math.abs(actualGrid - predictedGrid);
+              score += Number(question.position_nearby_points[String(diff)] || 0);
+            }
+          }
+        }
+        if (actualDriver && predictedDriver && isMatch(actualDriver, predictedDriver)) {
+          score += Number(points.driver || 0);
+        }
+        return score;
+      }
+      if (type === "multi_select_limited") {
+        const points = Number(question.points || 0);
+        const dnfByRace = actualRaw?.dnf_by_race || {};
+        let total = 0;
+        (predictedRaw || []).forEach((race) => {
+          total += Number(dnfByRace[race] || 0) * points;
+        });
+        return total;
+      }
+      if (type === "numeric") {
+        return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
+      }
+      return 0;
+    };
+
+    const globalGroupId = Number(globalGroup.id);
+    const members = db.prepare(
+      `
+      SELECT participant_id, user_name
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          u.name as user_name
+        FROM group_members gm
+        JOIN users u ON u.id = gm.user_id
+        WHERE gm.group_id = ?
+          AND COALESCE(u.hide_from_global, 0) = 0
+
+        UNION ALL
+
+        SELECT
+          ngm.guest_id as participant_id,
+          ngm.display_name as user_name
+        FROM named_guest_group_members ngm
+        WHERE ngm.group_id = ?
+      ) combined_members
+      `
+    ).all(globalGroupId, globalGroupId);
+    if (members.length === 0) return null;
+
+    const scoreByUser = {};
+    members.forEach((member) => {
+      scoreByUser[member.participant_id] = {
+        userId: member.participant_id,
+        name: member.user_name,
+        total: 0
+      };
+    });
+
+    const responses = db.prepare(
+      `
+      SELECT participant_id, question_id, answer
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          r.question_id,
+          r.answer
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+          AND COALESCE(u.hide_from_global, 0) = 0
+
+        UNION ALL
+
+        SELECT
+          gr.guest_id as participant_id,
+          gr.question_id,
+          gr.answer
+        FROM guest_responses gr
+        JOIN named_guest_group_members ngm
+          ON ngm.group_id = gr.group_id
+         AND ngm.guest_id = gr.guest_id
+        WHERE gr.group_id = ?
+      ) combined_responses
+      `
+    ).all(globalGroupId, globalGroupId);
+
+    responses.forEach((row) => {
+      const question = questionMap[row.question_id];
+      const scoreRow = scoreByUser[row.participant_id];
+      if (!question || !scoreRow) return;
+      const actual = parseStoredValue(question, actuals[question.id]);
+      const predicted = parseStoredValue(question, row.answer);
+      scoreRow.total += scoreQuestion(question, predicted, actual);
+    });
+
+    const rows = buildLeaderboardPreviewRows(
+      Object.values(scoreByUser).sort(
+        (a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name))
+      ),
+      currentUserId,
+      10
+    ).map((row) => ({
+      rank: row.rank,
+      name: row.name,
+      total: row.total
+    }));
+
+    if (rows.length === 0) return null;
+
+    return {
+      groupName: String(globalGroup.name || "Global"),
+      rows
+    };
+  }
+
   app.get("/", (req, res) => {
     const user = getCurrentUser(req);
+    const locale = res.locals.locale || "en";
     res.render("home", {
       user,
-      predictionsClosed: typeof predictionsClosed === "function" ? predictionsClosed() : false
+      predictionsClosed: typeof predictionsClosed === "function" ? predictionsClosed() : false,
+      globalLeaderboard: getHomeGlobalLeaderboard(locale, user ? user.id : null),
+      globalLeaderboardHref: user
+        ? "/global/leaderboard"
+        : `/login?redirectTo=${encodeURIComponent("/global/leaderboard")}`
     });
   });
 
@@ -135,6 +438,285 @@ function registerAuthRoutes(app, deps) {
     String(rawValue || "")
       .replace(/\s+/g, " ")
       .trim();
+
+  const parseStoredValue = (question, raw) => {
+    if (!raw) return null;
+    const text = String(raw).trim();
+    const type = question.type || "text";
+    if (
+      type === "ranking" ||
+      type === "multi_select" ||
+      type === "multi_select_limited" ||
+      type === "teammate_battle" ||
+      type === "boolean_with_optional_driver" ||
+      type === "numeric_with_driver" ||
+      type === "single_choice_with_driver"
+    ) {
+      try {
+        return JSON.parse(raw);
+      } catch (err) {
+        return null;
+      }
+    }
+    if (text.startsWith("[") || text.startsWith("{")) {
+      try {
+        return JSON.parse(text);
+      } catch (err) {}
+    }
+    return raw;
+  };
+
+  const isMatch = (actualValue, predictedValue) => {
+    if (actualValue == null || predictedValue == null) return false;
+    if (Array.isArray(actualValue)) return actualValue.includes(predictedValue);
+    return String(actualValue) === String(predictedValue);
+  };
+
+  const scoreQuestion = (question, predictedRaw, actualRaw) => {
+    if (actualRaw == null || predictedRaw == null) return 0;
+    const type = question.type || "text";
+    if (type === "ranking") {
+      const points = question.points || {};
+      let score = 0;
+      const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
+      const count = Number(question.count) || 3;
+      for (let i = 0; i < count; i += 1) {
+        const actual = actualRaw[i];
+        const predicted = predictedRaw[i];
+        const key = positionLabels[i] || String(i + 1);
+        const value = Number(points[key] || 0);
+        if (actual == null || predicted == null) continue;
+        if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
+          score += value;
+        }
+      }
+      return score;
+    }
+    if (type === "single_choice" || type === "text" || type === "boolean") {
+      if (
+        type === "single_choice" &&
+        question.special_case === "all_podiums_bonus" &&
+        String(actualRaw) === String(question.bonus_value)
+      ) {
+        return String(predictedRaw) === String(question.bonus_value)
+          ? Number(question.bonus_points || 0)
+          : 0;
+      }
+      return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
+    }
+    if (type === "multi_select") {
+      const points = Number(question.points || 0);
+      const penalty = Number(question.penalty ?? points);
+      const minimum = Number(question.minimum ?? 0);
+      const actualSet = new Set(actualRaw || []);
+      const predictedSet = new Set(predictedRaw || []);
+      let correct = 0;
+      let wrong = 0;
+      let missing = 0;
+      predictedSet.forEach((item) => {
+        if (actualSet.has(item)) correct += 1;
+        else wrong += 1;
+      });
+      actualSet.forEach((item) => {
+        if (!predictedSet.has(item)) missing += 1;
+      });
+      return Math.max(minimum, correct * points - (wrong + missing) * penalty);
+    }
+    if (type === "teammate_battle") {
+      const base = Number(question.points || 0);
+      const tieBonus = Number(question.tie_bonus || 0);
+      const actualWinner = actualRaw?.winner;
+      const actualDiff = Number(actualRaw?.diff);
+      const predictedWinner = predictedRaw?.winner;
+      const predictedDiff = Number(predictedRaw?.diff);
+      if (!actualWinner) return 0;
+      if (actualWinner === "tie") return predictedWinner === "tie" ? tieBonus : 0;
+      if (predictedWinner !== actualWinner) return 0;
+      if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
+      return Math.max(0, base - Math.abs(predictedDiff - actualDiff));
+    }
+    if (type === "boolean_with_optional_driver") {
+      const base = Number(question.points || 0);
+      const bonus = Number(question.bonus_points || 0);
+      const actualChoice = actualRaw?.choice;
+      const actualDriver = actualRaw?.driver;
+      const predictedChoice = predictedRaw?.choice;
+      const predictedDriver = predictedRaw?.driver;
+      if (actualChoice == null || predictedChoice == null) return 0;
+      let score = 0;
+      if (String(actualChoice) === String(predictedChoice)) {
+        score += base;
+        if (
+          String(actualChoice) === "yes" &&
+          actualDriver &&
+          String(actualDriver) === String(predictedDriver)
+        ) {
+          score += bonus;
+        }
+      }
+      return score;
+    }
+    if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
+      const points = question.points || {};
+      const actualValue = actualRaw?.value;
+      const predictedValue = predictedRaw?.value;
+      const actualDriver = actualRaw?.driver;
+      const predictedDriver = predictedRaw?.driver;
+      let score = 0;
+      if (actualValue != null && predictedValue != null) {
+        if (isMatch(actualValue, predictedValue)) {
+          score += Number(points.position || 0);
+        } else if (
+          type === "single_choice_with_driver" &&
+          question.position_nearby_points &&
+          typeof question.position_nearby_points === "object"
+        ) {
+          const toGridNumber = (value) => {
+            if (value == null) return null;
+            const raw = String(value).trim().toLowerCase();
+            if (!raw) return null;
+            if (raw === "pitlane" || raw === "pit lane") return 23;
+            const numeric = Number(raw);
+            return Number.isFinite(numeric) ? numeric : null;
+          };
+          const actualGrid = toGridNumber(actualValue);
+          const predictedGrid = toGridNumber(predictedValue);
+          if (actualGrid != null && predictedGrid != null) {
+            const diff = Math.abs(actualGrid - predictedGrid);
+            score += Number(question.position_nearby_points[String(diff)] || 0);
+          }
+        }
+      }
+      if (actualDriver && predictedDriver && isMatch(actualDriver, predictedDriver)) {
+        score += Number(points.driver || 0);
+      }
+      return score;
+    }
+    if (type === "multi_select_limited") {
+      const points = Number(question.points || 0);
+      const dnfByRace = actualRaw?.dnf_by_race || {};
+      let total = 0;
+      (predictedRaw || []).forEach((race) => {
+        total += Number(dnfByRace[race] || 0) * points;
+      });
+      return total;
+    }
+    if (type === "numeric") {
+      return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
+    }
+    return 0;
+  };
+
+  const buildGroupLeaderboard = (groupId, questions, actualsByQuestion, options = {}) => {
+    const excludeHiddenAdmins = Boolean(options.excludeHiddenAdmins);
+    const questionMap = questions.reduce((acc, question) => {
+      acc[question.id] = question;
+      return acc;
+    }, {});
+
+    const members = db.prepare(
+      `
+      SELECT participant_id, user_name
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          u.name as user_name
+        FROM group_members gm
+        JOIN users u ON u.id = gm.user_id
+        WHERE gm.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
+
+        UNION ALL
+
+        SELECT
+          ngm.guest_id as participant_id,
+          ngm.display_name as user_name
+        FROM named_guest_group_members ngm
+        WHERE ngm.group_id = ?
+      ) combined_members
+      `
+    ).all(groupId, groupId);
+
+    const scoreByUser = {};
+    members.forEach((member) => {
+      scoreByUser[member.participant_id] = {
+        userId: member.participant_id,
+        name: member.user_name,
+        total: 0
+      };
+    });
+
+    const responses = db.prepare(
+      `
+      SELECT participant_id, question_id, answer
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          r.question_id,
+          r.answer
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
+
+        UNION ALL
+
+        SELECT
+          gr.guest_id as participant_id,
+          gr.question_id,
+          gr.answer
+        FROM guest_responses gr
+        JOIN named_guest_group_members ngm
+          ON ngm.group_id = gr.group_id
+         AND ngm.guest_id = gr.guest_id
+        WHERE gr.group_id = ?
+      ) combined_responses
+      `
+    ).all(groupId, groupId);
+
+    responses.forEach((row) => {
+      const question = questionMap[row.question_id];
+      const scoreRow = scoreByUser[row.participant_id];
+      if (!question || !scoreRow) return;
+      const actual = parseStoredValue(question, actualsByQuestion[question.id]);
+      const predicted = parseStoredValue(question, row.answer);
+      scoreRow.total += scoreQuestion(question, predicted, actual);
+    });
+
+    return Object.values(scoreByUser).sort(
+      (a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name))
+    );
+  };
+
+  const getDashboardGroupPositionMap = (locale, userId, groups) => {
+    if (!Array.isArray(groups) || groups.length === 0) return {};
+    const questions = typeof getQuestions === "function" ? getQuestions(locale) : [];
+    if (!Array.isArray(questions) || questions.length === 0) return {};
+
+    const actualRows = db.prepare("SELECT question_id, value FROM actuals").all();
+    if (actualRows.length === 0) return {};
+    const actualsByQuestion = actualRows.reduce((acc, row) => {
+      acc[row.question_id] = row.value;
+      return acc;
+    }, {});
+
+    const participantId = String(userId);
+    return groups.reduce((acc, group) => {
+      const groupId = Number(group.id);
+      if (!Number.isFinite(groupId) || groupId <= 0) return acc;
+      const leaderboard = buildGroupLeaderboard(groupId, questions, actualsByQuestion, {
+        excludeHiddenAdmins: Number(group.is_global) === 1
+      });
+      const rankIndex = leaderboard.findIndex((row) => row.userId === participantId);
+      if (rankIndex >= 0) {
+        acc[groupId] = {
+          rank: rankIndex + 1,
+          total: leaderboard.length
+        };
+      }
+      return acc;
+    }, {});
+  };
 
   const buildAvailableUserNameSuggestion = (rawBaseName) => {
     const baseName = normalizeSuggestedUserName(rawBaseName);
@@ -796,6 +1378,8 @@ function registerAuthRoutes(app, deps) {
 
   app.get("/dashboard", requireAuth, (req, res) => {
     const user = getCurrentUser(req);
+    const locale = res.locals.locale || "en";
+    const dashboardPageSize = 8;
     const groups = db
       .prepare(
         `
@@ -807,6 +1391,26 @@ function registerAuthRoutes(app, deps) {
         `
       )
       .all(user.id);
+
+    const groupPositions = getDashboardGroupPositionMap(locale, user.id, groups);
+    const groupsWithPositions = groups.map((group) => ({
+      ...group,
+      dashboardPosition: groupPositions[Number(group.id)] || null
+    }));
+    const featuredGlobalGroup =
+      groupsWithPositions.find((group) => Number(group.is_global) === 1) || null;
+    const regularGroups = groupsWithPositions.filter((group) => Number(group.is_global) !== 1);
+    const requestedGroupsPage = Number(req.query.groupsPage || 1);
+    const currentGroupsPage =
+      Number.isFinite(requestedGroupsPage) && requestedGroupsPage > 0
+        ? Math.floor(requestedGroupsPage)
+        : 1;
+    const totalGroupsPages = Math.max(1, Math.ceil(regularGroups.length / dashboardPageSize));
+    const safeGroupsPage = Math.min(currentGroupsPage, totalGroupsPages);
+    const pagedRegularGroups = regularGroups.slice(
+      (safeGroupsPage - 1) * dashboardPageSize,
+      safeGroupsPage * dashboardPageSize
+    );
 
     const publicGroups = db
       .prepare(
@@ -820,11 +1424,30 @@ function registerAuthRoutes(app, deps) {
         `
       )
       .all(user.id);
+    const requestedPublicGroupsPage = Number(req.query.publicGroupsPage || 1);
+    const currentPublicGroupsPage =
+      Number.isFinite(requestedPublicGroupsPage) && requestedPublicGroupsPage > 0
+        ? Math.floor(requestedPublicGroupsPage)
+        : 1;
+    const totalPublicGroupsPages = Math.max(1, Math.ceil(publicGroups.length / dashboardPageSize));
+    const safePublicGroupsPage = Math.min(currentPublicGroupsPage, totalPublicGroupsPages);
+    const pagedPublicGroups = publicGroups.slice(
+      (safePublicGroupsPage - 1) * dashboardPageSize,
+      safePublicGroupsPage * dashboardPageSize
+    );
 
     return res.render("dashboard", {
       user,
-      groups,
-      publicGroups,
+      groups: groupsWithPositions,
+      featuredGlobalGroup,
+      regularGroups: pagedRegularGroups,
+      currentGroupsPage: safeGroupsPage,
+      totalGroupsPages,
+      globalLeaderboard: getHomeGlobalLeaderboard(locale, user.id),
+      globalLeaderboardHref: "/global/leaderboard",
+      publicGroups: pagedPublicGroups,
+      currentPublicGroupsPage: safePublicGroupsPage,
+      totalPublicGroupsPages,
       error: null,
       success: null
     });

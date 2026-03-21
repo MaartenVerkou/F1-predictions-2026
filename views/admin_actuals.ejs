@@ -12,14 +12,63 @@
     <div class="alert" style="background: rgba(32, 140, 90, 0.12); border-color: rgba(32, 140, 90, 0.28); color: inherit;"><%= saveSuccess %></div>
   <% } %>
 
-  <div class="inline-actions" style="margin: 12px 0 18px;">
-    <form method="post" action="/admin/actuals/autofill-current-season">
-      <button type="submit" class="secondary">Autofill From Current 2026 Standings</button>
-    </form>
-    <span class="muted">Uses current completed-race data to fill the questions that can be derived safely now, including ties where multiple answers should score.</span>
-  </div>
+  <% if (actualsTarget === 'current') { %>
+    <div class="inline-actions" style="margin: 12px 0 18px;">
+      <form method="post" action="/admin/actuals/autofill-current-season">
+        <button type="submit" class="secondary">Autofill From Current 2026 Standings</button>
+      </form>
+      <span class="muted">Uses current completed-race data to fill the questions that can be derived safely now, including ties where multiple answers should score.</span>
+    </div>
+  <% } %>
+
+  <form method="get" action="/admin/actuals" class="inline-actions" style="margin: 0 0 18px;">
+    <label style="display:grid; gap:6px; min-width:min(100%, 360px);">
+      <span class="muted">Actuals target</span>
+      <select name="target" onchange="this.form.submit()">
+        <option value="current" <%= actualsTarget === 'current' ? 'selected' : '' %>>Current live actuals</option>
+        <% raceTargets.forEach((target) => { %>
+          <option value="<%= target.key %>" <%= actualsTarget === target.key ? 'selected' : '' %>>
+            <%= `R${target.roundNumber} - ${target.raceName}` %><%= target.timing === 'past' ? ' (past)' : target.timing === 'future' ? ' (future)' : ' (current race)' %>
+          </option>
+        <% }) %>
+      </select>
+    </label>
+    <% if (requiresPastUnlock) { %>
+      <input type="hidden" name="unlockPast" value="0" />
+    <% } else if (selectedRaceTarget && selectedRaceTarget.timing === 'past') { %>
+      <input type="hidden" name="unlockPast" value="1" />
+    <% } %>
+    <noscript><button type="submit" class="secondary">Open target</button></noscript>
+  </form>
+
+  <% if (selectedRaceTarget && selectedRaceTarget.timing === 'past' && requiresPastUnlock) { %>
+    <div class="alert" style="margin-bottom:18px;">
+      This race is in the past. Editing it updates the archived snapshot for <strong><%= `R${selectedRaceTarget.roundNumber} - ${selectedRaceTarget.raceName}` %></strong>.
+      <form method="get" action="/admin/actuals" style="margin-top:12px;">
+        <input type="hidden" name="target" value="<%= actualsTarget %>" />
+        <input type="hidden" name="unlockPast" value="1" />
+        <button type="submit" class="secondary">Continue and make changes</button>
+      </form>
+    </div>
+  <% } %>
+
+  <% if (isFutureRaceTarget) { %>
+    <div class="alert" style="margin-bottom:18px;">
+      This race is still in the future. Saving here creates or updates a snapshot for that race and does not change the current live actuals.
+    </div>
+  <% } %>
+
+  <% if (selectedRaceTarget && selectedRaceTarget.snapshotId) { %>
+    <p class="muted" style="margin: 0 0 18px;">Editing snapshot: <strong><%= selectedRaceTarget.snapshotLabel || `R${selectedRaceTarget.roundNumber} - ${selectedRaceTarget.raceName}` %></strong></p>
+  <% } else if (selectedRaceTarget) { %>
+    <p class="muted" style="margin: 0 0 18px;">No saved snapshot yet for <strong><%= `R${selectedRaceTarget.roundNumber} - ${selectedRaceTarget.raceName}` %></strong>. Saving will create one.</p>
+  <% } %>
 
   <form method="post" action="/admin/actuals" data-admin-actuals-form data-initial-dirty="<%= hasDraft ? 'true' : 'false' %>">
+    <input type="hidden" name="actualsTarget" value="<%= actualsTarget %>" />
+    <% if (selectedRaceTarget && selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
+      <input type="hidden" name="unlockPast" value="1" />
+    <% } %>
     <% const sourceOptionsFor = (question) => {
       if (question.options_source === 'drivers') return roster.drivers;
       if (question.options_source === 'teams') return roster.teams;
@@ -35,6 +84,7 @@
       'closest_qualifying_teammates'
     ]); %>
     <% const multiActualDriverFieldIds = new Set(['lowest_grid_win_position']); %>
+    <fieldset style="border:0; margin:0; padding:0;" <%= requiresPastUnlock ? 'disabled' : '' %>>
 
     <% questions.forEach(question => { 
       const sourceOptions = sourceOptionsFor(question);
@@ -270,7 +320,7 @@
     <% }) %>
 
     <div class="questions-save-row admin-actuals-save-row">
-      <button type="submit">Save actuals</button>
+      <button type="submit"><%= actualsTarget === 'current' ? 'Save actuals' : 'Save snapshot' %></button>
       <span
         class="muted admin-actuals-save-feedback <%= hasDraft ? 'is-visible is-unsaved' : '' %>"
         data-admin-actuals-unsaved-note
@@ -278,6 +328,7 @@
         data-saving-label="Saving..."
       ><%= hasDraft ? 'Unsaved changes' : '' %></span>
     </div>
+    </fieldset>
   </form>
 </div>
 

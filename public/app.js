@@ -88,36 +88,25 @@ const initCountdown = () => {
   const prefixText = el.dataset.countdownPrefix || prefixEl?.textContent || '';
   const closedText = el.dataset.countdownClosed || 'Predictions are closed!';
   const compactClosedText = el.dataset.countdownClosedCompact || 'Closed!';
-  const brandTimerEls = Array.from(document.querySelectorAll('[data-brand-mobile-timer-value]'));
-  const brandPrefixEls = Array.from(document.querySelectorAll('.brand-mobile-timer-prefix'));
   const headerEl = document.querySelector('header');
   const rawDate = el.dataset.closeDate;
   const target = new Date(rawDate);
   if (Number.isNaN(target.getTime())) return;
   let isClosed = false;
 
-  const isCompactMode = () => Boolean(headerEl?.classList.contains('is-time-compact'));
-  const getClosedDisplayText = () => (isCompactMode() ? compactClosedText : closedText);
   const syncClosedClass = () => {
     el.classList.toggle('is-closed', isClosed);
   };
+  const getClosedDisplayText = () =>
+    headerEl?.classList.contains('is-time-compact') ? compactClosedText : closedText;
   const setPrefixText = (text) => {
     if (prefixEl) prefixEl.textContent = text;
-    brandPrefixEls.forEach(timerPrefixEl => {
-      timerPrefixEl.textContent = text;
-    });
   };
   const setTimerText = (text) => {
     valueEl.textContent = text;
-    brandTimerEls.forEach(timerEl => {
-      timerEl.textContent = text;
-    });
   };
   const setTimerMarkup = (html) => {
     valueEl.innerHTML = html;
-    brandTimerEls.forEach(timerEl => {
-      timerEl.innerHTML = html;
-    });
   };
   const applyClosedState = () => {
     syncClosedClass();
@@ -708,12 +697,15 @@ const initThemeToggle = () => {
 
 const initHeaderMenu = () => {
   const header = document.querySelector('header');
+  const headerInner = header?.querySelector('.header-inner');
   const toggle = document.querySelector('[data-header-menu-toggle]');
+  const headerCenter = document.querySelector('[data-header-center]');
   const menu = document.querySelector('[data-header-menu]');
-  if (!header || !toggle || !menu) return;
+  if (!header || !headerInner || !toggle || !menu) return;
 
+  const LAYOUT_COLLAPSE_WIDTH = 980;
   const TIMER_COMPACT_WIDTH = 1000;
-  const MENU_COLLAPSE_WIDTH = 800;
+  const MENU_COLLAPSE_WIDTH = LAYOUT_COLLAPSE_WIDTH;
   const TIMER_COMPACT_COLLAPSED_WIDTH = 600;
 
   const isOpen = () => menu.classList.contains('is-open');
@@ -738,6 +730,14 @@ const initHeaderMenu = () => {
 
     header.classList.toggle('is-collapsed', shouldCollapseMenu);
     header.classList.toggle('is-time-compact', shouldCompactTimer);
+    header.classList.remove('is-center-hidden');
+
+    if (headerCenter) {
+      const hasOverflow = headerInner.scrollWidth > headerInner.clientWidth + 1;
+      if (hasOverflow) {
+        header.classList.add('is-center-hidden');
+      }
+    }
 
     if (!shouldCollapseMenu) {
       closeMenu();
@@ -784,6 +784,34 @@ const initHeaderMenu = () => {
   syncLayout();
 };
 
+const initHeaderOffsets = () => {
+  const root = document.documentElement;
+  const header = document.querySelector('header');
+  const devToolbar = document.querySelector('.dev-toolbar');
+  if (!root || !header) return;
+
+  const syncOffsets = () => {
+    const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
+    const devToolbarHeight = devToolbar
+      ? Math.ceil(devToolbar.getBoundingClientRect().height || 0)
+      : 0;
+    root.style.setProperty('--header-offset', `${headerHeight}px`);
+    root.style.setProperty('--dev-toolbar-offset', `${devToolbarHeight}px`);
+  };
+
+  syncOffsets();
+  window.addEventListener('resize', syncOffsets);
+  window.addEventListener('load', syncOffsets);
+
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(() => syncOffsets());
+    observer.observe(header);
+    if (devToolbar) {
+      observer.observe(devToolbar);
+    }
+  }
+};
+
 const initScrollToEndButton = () => {
   const button = document.querySelector('[data-scroll-to-end]');
   if (!button) return;
@@ -811,7 +839,10 @@ const initLeaderboardPanels = () => {
   document.querySelectorAll('.leaderboard-layout').forEach(scope => {
     const activators = Array.from(scope.querySelectorAll('[data-member-activate]'));
     const panels = Array.from(scope.querySelectorAll('.leaderboard-member-panel[id]'));
+    const mainColumn = scope.querySelector('.leaderboard-main-column');
     const mainCard = scope.querySelector('.leaderboard-main-card');
+    const detailCard = scope.querySelector('.leaderboard-detail-card');
+    const panelHeightSource = mainColumn || mainCard;
     if (activators.length === 0 || panels.length === 0) return;
 
     const activatePanel = (targetId) => {
@@ -829,27 +860,28 @@ const initLeaderboardPanels = () => {
     };
 
     const syncPanelHeight = () => {
-      if (!mainCard) return;
+      if (!panelHeightSource) return;
       if (window.matchMedia('(max-width: 980px)').matches) {
         scope.style.removeProperty('--leaderboard-panel-height');
+        if (detailCard) {
+          detailCard.style.removeProperty('height');
+          detailCard.style.removeProperty('maxHeight');
+        }
         panels.forEach(panel => {
           panel.style.removeProperty('height');
+          panel.style.removeProperty('maxHeight');
         });
         return;
       }
-      const samplePanel = panels.find(panel => !panel.hidden) || panels[0];
-      const headerHeight = samplePanel?.querySelector('thead')?.offsetHeight || 42;
-      const rowHeight = samplePanel?.querySelector('tbody tr')?.offsetHeight || 52;
-      const chromeHeight = 36;
-      const minPanelHeight = chromeHeight + headerHeight + rowHeight * 10;
-      const maxPanelHeight = chromeHeight + headerHeight + rowHeight * 12;
-      const targetHeight = Math.min(
-        Math.max(mainCard.offsetHeight, minPanelHeight),
-        maxPanelHeight
-      );
+      const targetHeight = panelHeightSource.offsetHeight;
       scope.style.setProperty('--leaderboard-panel-height', `${targetHeight}px`);
+      if (detailCard) {
+        detailCard.style.height = `${targetHeight}px`;
+        detailCard.style.maxHeight = `${targetHeight}px`;
+      }
       panels.forEach(panel => {
-        panel.style.height = `${targetHeight}px`;
+        panel.style.height = '100%';
+        panel.style.maxHeight = '100%';
       });
     };
 
@@ -873,15 +905,16 @@ const initLeaderboardPanels = () => {
     activatePanel(initialTargetId);
     syncPanelHeight();
     window.addEventListener('resize', syncPanelHeight);
-    if (typeof ResizeObserver !== 'undefined' && mainCard) {
+    if (typeof ResizeObserver !== 'undefined' && panelHeightSource) {
       const observer = new ResizeObserver(() => syncPanelHeight());
-      observer.observe(mainCard);
+      observer.observe(panelHeightSource);
     }
   });
 };
 
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
+  initHeaderOffsets();
   initThemeToggle();
   initRankingGroups();
   initCheckboxLimits();

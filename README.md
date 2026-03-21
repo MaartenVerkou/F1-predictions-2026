@@ -23,6 +23,20 @@ copy .env.example .env
 docker compose up -d --build
 ```
 
+In `NODE_ENV=development`, the Compose app service now bind-mounts the live source files and runs `npm run start:dev` with Node watch mode. That means:
+
+- edits in `server.js` and `src/` restart the server automatically
+- edits in `views/`, `public/`, and `locales/` are visible on refresh without rebuilding
+
+If containers are already running, rebuild once after pulling these changes:
+
+```powershell
+docker compose up -d --build
+docker compose logs -f app
+```
+
+When you save a file, the app container should restart automatically in development mode.
+
 Enable built-in Caddy edge proxy (profile `edge`):
 
 ```powershell
@@ -55,6 +69,7 @@ docker compose -f docker-compose.yml -f docker-compose.server.yml --profile edge
 Notes:
 
 - App URL: `http://localhost:3000`
+- Live reload behavior only applies when `NODE_ENV=development`
 - Login/user/session data persists at `/app/state` in container.
 - By default this uses Docker volume `f1predictions_f1_state`; set `STATE_DIR` in `.env` to use a host path instead (for example a Hetzner volume mount).
 - Question config stays in repo `./data` and is mounted read-only at `/app/config`.

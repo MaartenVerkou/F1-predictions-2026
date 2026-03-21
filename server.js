@@ -130,6 +130,7 @@ const ADMIN_EMAILS = new Set(
     .filter(Boolean)
 );
 const LEADERBOARD_ENABLED = process.env.LEADERBOARD_ENABLED === "1";
+const CURRENT_SEASON = Number(process.env.F1_SEASON || 2026);
 const MAX_PRIVILEGED_GROUPS = 3;
 const LOCALES_DIR = path.join(__dirname, "locales");
 const SUPPORTED_LOCALES = ["en", "de", "fr", "nl", "es"];
@@ -340,6 +341,32 @@ db.exec(`
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS actual_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season INTEGER NOT NULL,
+    round_number INTEGER,
+    round_name TEXT,
+    label TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_note TEXT,
+    created_at TEXT NOT NULL,
+    created_by_user_id INTEGER,
+    FOREIGN KEY(created_by_user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS actual_snapshot_values (
+    snapshot_id INTEGER NOT NULL,
+    question_id TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY(snapshot_id, question_id),
+    FOREIGN KEY(snapshot_id) REFERENCES actual_snapshots(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_actual_snapshots_season_round
+    ON actual_snapshots(season, round_number, created_at);
+  CREATE INDEX IF NOT EXISTS idx_actual_snapshot_values_snapshot
+    ON actual_snapshot_values(snapshot_id);
 
   CREATE TABLE IF NOT EXISTS question_settings (
     question_id TEXT PRIMARY KEY,
@@ -1979,7 +2006,8 @@ registerAuthRoutes(app, {
   DEV_AUTO_LOGIN,
   NODE_ENV: process.env.NODE_ENV || "development",
   claimGuestResponsesForUser,
-  predictionsClosed
+  predictionsClosed,
+  getQuestions
 });
 
 app.get("/api/groups/check-name", requireAuth, (req, res) => {
@@ -2209,13 +2237,320 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   return res.redirect(getGroupBasePath(group));
 });
 
+function parseLeaderboardStoredValue(question, raw) {
+  if (!raw) return null;
+  const text = String(raw).trim();
+  const type = question.type || "text";
+  if (
+    type === "ranking" ||
+    type === "multi_select" ||
+    type === "multi_select_limited" ||
+    type === "teammate_battle" ||
+    type === "boolean_with_optional_driver" ||
+    type === "numeric_with_driver" ||
+    type === "single_choice_with_driver"
+  ) {
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      return null;
+    }
+  }
+  if (text.startsWith("[") || text.startsWith("{")) {
+    try {
+      return JSON.parse(text);
+    } catch (err) {}
+  }
+  return raw;
+}
+
+function leaderboardValuesMatch(actualValue, predictedValue) {
+  if (actualValue == null || predictedValue == null) return false;
+  if (Array.isArray(actualValue)) return actualValue.includes(predictedValue);
+  return String(actualValue) === String(predictedValue);
+}
+
+function scoreLeaderboardQuestion(question, predictedRaw, actualRaw) {
+  if (actualRaw == null || predictedRaw == null) return 0;
+  const type = question.type || "text";
+  if (type === "ranking") {
+    const points = question.points || {};
+    let score = 0;
+    const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
+    const count = Number(question.count) || 3;
+    for (let i = 0; i < count; i += 1) {
+      const actual = actualRaw[i];
+      const predicted = predictedRaw[i];
+      const key = positionLabels[i] || String(i + 1);
+      const value = Number(points[key] || 0);
+      if (actual == null || predicted == null) continue;
+      if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
+        score += value;
+      }
+    }
+    return score;
+  }
+  if (type === "single_choice" || type === "text" || type === "boolean") {
+    if (
+      type === "single_choice" &&
+      question.special_case === "all_podiums_bonus" &&
+      String(actualRaw) === String(question.bonus_value)
+    ) {
+      return String(predictedRaw) === String(question.bonus_value)
+        ? Number(question.bonus_points || 0)
+        : 0;
+    }
+    return leaderboardValuesMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
+  }
+  if (type === "multi_select") {
+    const points = Number(question.points || 0);
+    const penalty = Number(question.penalty ?? points);
+    const minimum = Number(question.minimum ?? 0);
+    const actualSet = new Set(actualRaw || []);
+    const predictedSet = new Set(predictedRaw || []);
+    let correct = 0;
+    let wrong = 0;
+    let missing = 0;
+    predictedSet.forEach((item) => {
+      if (actualSet.has(item)) correct += 1;
+      else wrong += 1;
+    });
+    actualSet.forEach((item) => {
+      if (!predictedSet.has(item)) missing += 1;
+    });
+    return Math.max(minimum, correct * points - (wrong + missing) * penalty);
+  }
+  if (type === "teammate_battle") {
+    const base = Number(question.points || 0);
+    const tieBonus = Number(question.tie_bonus || 0);
+    const actualWinner = actualRaw?.winner;
+    const actualDiff = Number(actualRaw?.diff);
+    const predictedWinner = predictedRaw?.winner;
+    const predictedDiff = Number(predictedRaw?.diff);
+    if (!actualWinner) return 0;
+    if (actualWinner === "tie") return predictedWinner === "tie" ? tieBonus : 0;
+    if (predictedWinner !== actualWinner) return 0;
+    if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
+    return Math.max(0, base - Math.abs(predictedDiff - actualDiff));
+  }
+  if (type === "boolean_with_optional_driver") {
+    const base = Number(question.points || 0);
+    const bonus = Number(question.bonus_points || 0);
+    const actualChoice = actualRaw?.choice;
+    const actualDriver = actualRaw?.driver;
+    const predictedChoice = predictedRaw?.choice;
+    const predictedDriver = predictedRaw?.driver;
+    if (actualChoice == null || predictedChoice == null) return 0;
+    let score = 0;
+    if (String(actualChoice) === String(predictedChoice)) {
+      score += base;
+      if (
+        String(actualChoice) === "yes" &&
+        actualDriver &&
+        String(actualDriver) === String(predictedDriver)
+      ) {
+        score += bonus;
+      }
+    }
+    return score;
+  }
+  if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
+    const points = question.points || {};
+    const actualValue = actualRaw?.value;
+    const predictedValue = predictedRaw?.value;
+    const actualDriver = actualRaw?.driver;
+    const predictedDriver = predictedRaw?.driver;
+    let score = 0;
+    if (actualValue != null && predictedValue != null) {
+      if (leaderboardValuesMatch(actualValue, predictedValue)) {
+        score += Number(points.position || 0);
+      } else if (
+        type === "single_choice_with_driver" &&
+        question.position_nearby_points &&
+        typeof question.position_nearby_points === "object"
+      ) {
+        const toGridNumber = (value) => {
+          if (value == null) return null;
+          const raw = String(value).trim().toLowerCase();
+          if (!raw) return null;
+          if (raw === "pitlane" || raw === "pit lane") return 23;
+          const numeric = Number(raw);
+          return Number.isFinite(numeric) ? numeric : null;
+        };
+        const actualGrid = toGridNumber(actualValue);
+        const predictedGrid = toGridNumber(predictedValue);
+        if (actualGrid != null && predictedGrid != null) {
+          const diff = Math.abs(actualGrid - predictedGrid);
+          score += Number(question.position_nearby_points[String(diff)] || 0);
+        }
+      }
+    }
+    if (actualDriver && predictedDriver && leaderboardValuesMatch(actualDriver, predictedDriver)) {
+      score += Number(points.driver || 0);
+    }
+    return score;
+  }
+  if (type === "multi_select_limited") {
+    const points = Number(question.points || 0);
+    const dnfByRace = actualRaw?.dnf_by_race || {};
+    let total = 0;
+    (predictedRaw || []).forEach((race) => {
+      total += Number(dnfByRace[race] || 0) * points;
+    });
+    return total;
+  }
+  if (type === "numeric") {
+    return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
+  }
+  return 0;
+}
+
+function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, options = {}) {
+  const excludeHiddenAdmins = Boolean(options.excludeHiddenAdmins);
+  const includeDetails = Boolean(options.includeDetails);
+  const questionMap = questions.reduce((acc, question) => {
+    acc[question.id] = question;
+    return acc;
+  }, {});
+
+  const members = db
+    .prepare(
+      `
+      SELECT participant_id, user_name
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          u.name as user_name
+        FROM group_members gm
+        JOIN users u ON u.id = gm.user_id
+        WHERE gm.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
+
+        UNION ALL
+
+        SELECT
+          ngm.guest_id as participant_id,
+          ngm.display_name as user_name
+        FROM named_guest_group_members ngm
+        WHERE ngm.group_id = ?
+      ) combined_members
+      `
+    )
+    .all(groupId, groupId);
+
+  const scoreByUser = {};
+  members.forEach((member) => {
+    scoreByUser[member.participant_id] = {
+      userId: member.participant_id,
+      name: member.user_name,
+      total: 0,
+      byQuestion: includeDetails ? {} : undefined,
+      answersByQuestion: includeDetails ? {} : undefined
+    };
+  });
+
+  const responses = db
+    .prepare(
+      `
+      SELECT participant_id, question_id, answer
+      FROM (
+        SELECT
+          CAST(u.id AS TEXT) as participant_id,
+          r.question_id,
+          r.answer
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
+
+        UNION ALL
+
+        SELECT
+          gr.guest_id as participant_id,
+          gr.question_id,
+          gr.answer
+        FROM guest_responses gr
+        JOIN named_guest_group_members ngm
+          ON ngm.group_id = gr.group_id
+         AND ngm.guest_id = gr.guest_id
+        WHERE gr.group_id = ?
+      ) combined_responses
+      `
+    )
+    .all(groupId, groupId);
+
+  responses.forEach((row) => {
+    const question = questionMap[row.question_id];
+    const scoreRow = scoreByUser[row.participant_id];
+    if (!question || !scoreRow) return;
+    const actual = parseLeaderboardStoredValue(question, actualsByQuestion[question.id]);
+    const predicted = parseLeaderboardStoredValue(question, row.answer);
+    const points = scoreLeaderboardQuestion(question, predicted, actual);
+    scoreRow.total += points;
+    if (includeDetails) {
+      scoreRow.byQuestion[row.question_id] = points;
+      scoreRow.answersByQuestion[row.question_id] = row.answer;
+    }
+  });
+
+  return Object.values(scoreByUser).sort(
+    (a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name))
+  );
+}
+
+function buildLeaderboardPreviewRows(leaderboard, currentParticipantId, limit = 5) {
+  const safeLimit = Math.max(1, Number(limit) || 5);
+  const rankedRows = leaderboard.map((row, index) => ({
+    rank: index + 1,
+    ...row
+  }));
+  if (rankedRows.length <= safeLimit) {
+    return rankedRows;
+  }
+  const currentId = String(currentParticipantId || "");
+  const currentIndex = currentId
+    ? rankedRows.findIndex((row) => String(row.userId) === currentId)
+    : -1;
+  if (currentIndex < 0 || currentIndex < safeLimit) {
+    return rankedRows.slice(0, safeLimit);
+  }
+  return [...rankedRows.slice(0, safeLimit - 1), rankedRows[currentIndex]];
+}
+
+function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
+  const groupId = Number(group?.id || 0);
+  if (!Number.isFinite(groupId) || groupId <= 0) return null;
+  const questions = getQuestions(locale);
+  if (!Array.isArray(questions) || questions.length === 0) return null;
+  const actualRows = db.prepare("SELECT question_id, value FROM actuals").all();
+  if (actualRows.length === 0) return null;
+  const actualsByQuestion = actualRows.reduce((acc, row) => {
+    acc[row.question_id] = row.value;
+    return acc;
+  }, {});
+  const rows = buildLeaderboardPreviewRows(
+    buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, {
+      excludeHiddenAdmins: isGlobalGroup(group)
+    }),
+    currentUserId,
+    limit
+  ).map((row) => ({
+      rank: row.rank,
+      name: row.name,
+      total: row.total
+    }));
+  return rows.length > 0 ? { rows } : null;
+}
+
 function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRules, isNamedGuest = false, error = null, success = null }) {
   const locale = res.locals.locale || DEFAULT_LOCALE;
   const groupId = Number(group?.id || 0);
   const closed = predictionsClosed();
   const leaderboardAvailable = isLeaderboardAvailable();
+  const leaderboardPreview =
+    leaderboardAvailable && !isNamedGuest ? getGroupLeaderboardPreview(group, locale, user?.id, 10) : null;
   const includeNamedGuests = Number(group?.is_global || 0) !== 1;
-  const membersPerPage = 25;
+  const membersPerPage = 12;
   const requestedMembersPage = Number(req.query.membersPage || 1);
   const currentMembersPage =
     Number.isFinite(requestedMembersPage) && requestedMembersPage > 0
@@ -2315,6 +2650,7 @@ function renderGroupPage(req, res, { user, group, groupBasePath, role, canEditRu
     groupBasePath,
     closed,
     leaderboardAvailable,
+    leaderboardPreview,
     isNamedGuest,
     error,
     success
@@ -3511,287 +3847,79 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   }
   const questions = getQuestions(locale);
   const actualRows = db.prepare("SELECT * FROM actuals").all();
-  const actuals = actualRows.reduce((acc, row) => {
+  const currentActuals = actualRows.reduce((acc, row) => {
     acc[row.question_id] = row.value;
     return acc;
   }, {});
-
-  const responses = db
+  const snapshotRows = db
     .prepare(
       `
-      SELECT participant_id, user_name, question_id, answer
-      FROM (
-        SELECT
-          CAST(u.id AS TEXT) as participant_id,
-          u.name as user_name,
-          r.question_id,
-          r.answer
-        FROM responses r
-        JOIN users u ON u.id = r.user_id
-        WHERE r.group_id = ?
-          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
-
-        UNION ALL
-
-        SELECT
-          gr.guest_id as participant_id,
-          ngm.display_name as user_name,
-          gr.question_id,
-          gr.answer
-        FROM guest_responses gr
-        JOIN named_guest_group_members ngm
-          ON ngm.group_id = gr.group_id
-         AND ngm.guest_id = gr.guest_id
-        WHERE gr.group_id = ?
-      ) combined_responses
+      SELECT id, season, round_number, round_name, created_at
+      FROM actual_snapshots
+      WHERE round_number IS NOT NULL
+      ORDER BY season DESC, round_number DESC, created_at DESC, id DESC
       `
     )
-    .all(groupId, groupId);
-
-  const questionMap = questions.reduce((acc, q) => {
-    acc[q.id] = q;
-    return acc;
-  }, {});
-
-  const scoreByUser = {};
-  const members = db
-    .prepare(
-      `
-      SELECT participant_id, user_name
-      FROM (
-        SELECT
-          CAST(u.id AS TEXT) as participant_id,
-          u.name as user_name
-        FROM group_members gm
-        JOIN users u ON u.id = gm.user_id
-        WHERE gm.group_id = ?
-          ${excludeHiddenAdmins ? "AND COALESCE(u.hide_from_global, 0) = 0" : ""}
-
-        UNION ALL
-
-        SELECT
-          ngm.guest_id as participant_id,
-          ngm.display_name as user_name
-        FROM named_guest_group_members ngm
-        WHERE ngm.group_id = ?
-      ) combined_members
-      `
-    )
-    .all(groupId, groupId);
-
-  members.forEach((member) => {
-    scoreByUser[member.participant_id] = {
-      userId: member.participant_id,
-      name: member.user_name,
-      total: 0,
-      byQuestion: {},
-      answersByQuestion: {}
-    };
+    .all();
+  const snapshotByRound = new Set();
+  const actualSnapshots = [];
+  snapshotRows.forEach((row) => {
+    const roundNumber = Number(row.round_number);
+    const season = Number(row.season);
+    if (!Number.isFinite(roundNumber) || roundNumber <= 0) return;
+    if (!Number.isFinite(season) || season <= 0) return;
+    const key = `${season}:${roundNumber}`;
+    if (snapshotByRound.has(key)) return;
+    snapshotByRound.add(key);
+    const roundName = String(row.round_name || "").trim();
+    const seasonLabel = season === CURRENT_SEASON ? "" : `${season} `;
+    const title = roundName || `Round ${roundNumber}`;
+    actualSnapshots.push({
+      id: Number(row.id),
+      season,
+      roundNumber,
+      roundName,
+      label: `${seasonLabel}R${roundNumber} - ${title}`.trim()
+    });
   });
-
-  function parseStoredValue(question, raw) {
-    if (!raw) return null;
-    const text = String(raw).trim();
-    const type = question.type || "text";
-    if (
-      type === "ranking" ||
-      type === "multi_select" ||
-      type === "multi_select_limited" ||
-      type === "teammate_battle" ||
-      type === "boolean_with_optional_driver" ||
-      type === "numeric_with_driver" ||
-      type === "single_choice_with_driver"
-    ) {
-      try {
-        return JSON.parse(raw);
-      } catch (err) {
-        return null;
+  const requestedSnapshotId = Number(req.query.snapshot || 0);
+  let selectedActualSnapshotId = null;
+  let scoringActuals = currentActuals;
+  if (Number.isFinite(requestedSnapshotId) && requestedSnapshotId > 0) {
+    const snapshotMeta = db
+      .prepare(
+        `
+        SELECT id
+        FROM actual_snapshots
+        WHERE id = ?
+        LIMIT 1
+        `
+      )
+      .get(requestedSnapshotId);
+    if (snapshotMeta) {
+      const snapshotValueRows = db
+        .prepare(
+          `
+          SELECT question_id, value
+          FROM actual_snapshot_values
+          WHERE snapshot_id = ?
+          `
+        )
+        .all(requestedSnapshotId);
+      if (snapshotValueRows.length > 0) {
+        scoringActuals = snapshotValueRows.reduce((acc, row) => {
+          acc[row.question_id] = row.value;
+          return acc;
+        }, {});
+        selectedActualSnapshotId = requestedSnapshotId;
       }
     }
-    if (text.startsWith("[") || text.startsWith("{")) {
-      try {
-        return JSON.parse(text);
-      } catch (err) {}
-    }
-    return raw;
   }
 
-  function getActual(question) {
-    const raw = actuals[question.id];
-    return parseStoredValue(question, raw);
-  }
-
-  function isMatch(actualValue, predictedValue) {
-    if (actualValue == null || predictedValue == null) return false;
-    if (Array.isArray(actualValue)) {
-      return actualValue.includes(predictedValue);
-    }
-    return String(actualValue) === String(predictedValue);
-  }
-
-  function scoreQuestion(question, predictedRaw, actualRaw) {
-    if (actualRaw == null || predictedRaw == null) return 0;
-    const type = question.type || "text";
-    if (type === "ranking") {
-      const points = question.points || {};
-      let score = 0;
-      const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
-      const count = Number(question.count) || 3;
-      for (let i = 0; i < count; i += 1) {
-        const actual = actualRaw[i];
-        const predicted = predictedRaw[i];
-        const key = positionLabels[i] || String(i + 1);
-        const value = points[key] || 0;
-        if (actual == null || predicted == null) continue;
-        if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
-          score += value;
-        }
-      }
-      return score;
-    }
-    if (type === "single_choice" || type === "text") {
-      if (question.special_case === "all_podiums_bonus") {
-        if (String(actualRaw) === String(question.bonus_value)) {
-          return String(predictedRaw) === String(question.bonus_value)
-            ? Number(question.bonus_points || 0)
-            : 0;
-        }
-      }
-      return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
-    }
-    if (type === "boolean") {
-      return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
-    }
-    if (type === "multi_select") {
-      const points = Number(question.points || 0);
-      const penalty = Number(question.penalty ?? points);
-      const minimum = Number(question.minimum ?? 0);
-      const actualSet = new Set(actualRaw || []);
-      const predictedSet = new Set(predictedRaw || []);
-      let correct = 0;
-      let wrong = 0;
-      let missing = 0;
-      predictedSet.forEach((item) => {
-        if (actualSet.has(item)) {
-          correct += 1;
-        } else {
-          wrong += 1;
-        }
-      });
-      actualSet.forEach((item) => {
-        if (!predictedSet.has(item)) {
-          missing += 1;
-        }
-      });
-      const score = correct * points - (wrong + missing) * penalty;
-      return Math.max(minimum, score);
-    }
-    if (type === "teammate_battle") {
-      const base = Number(question.points || 0);
-      const tieBonus = Number(question.tie_bonus || 0);
-      const actualWinner = actualRaw?.winner;
-      const actualDiff = Number(actualRaw?.diff);
-      const predictedWinner = predictedRaw?.winner;
-      const predictedDiff = Number(predictedRaw?.diff);
-      if (!actualWinner) return 0;
-      if (actualWinner === "tie") {
-        return predictedWinner === "tie" ? tieBonus : 0;
-      }
-      if (predictedWinner !== actualWinner) return 0;
-      if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
-      const score = base - Math.abs(predictedDiff - actualDiff);
-      return Math.max(0, score);
-    }
-    if (type === "boolean_with_optional_driver") {
-      const base = Number(question.points || 0);
-      const bonus = Number(question.bonus_points || 0);
-      const actualChoice = actualRaw?.choice;
-      const actualDriver = actualRaw?.driver;
-      const predictedChoice = predictedRaw?.choice;
-      const predictedDriver = predictedRaw?.driver;
-      if (actualChoice == null || predictedChoice == null) return 0;
-      let score = 0;
-      if (String(actualChoice) === String(predictedChoice)) {
-        score += base;
-        if (
-          String(actualChoice) === "yes" &&
-          actualDriver &&
-          String(actualDriver) === String(predictedDriver)
-        ) {
-          score += bonus;
-        }
-      }
-      return score;
-    }
-    if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
-      const points = question.points || {};
-      const actualValue = actualRaw?.value;
-      const predictedValue = predictedRaw?.value;
-      const actualDriver = actualRaw?.driver;
-      const predictedDriver = predictedRaw?.driver;
-      let score = 0;
-      if (actualValue != null && predictedValue != null) {
-        if (isMatch(actualValue, predictedValue)) {
-          score += Number(points.position || 0);
-        } else if (
-          type === "single_choice_with_driver" &&
-          question.position_nearby_points &&
-          typeof question.position_nearby_points === "object"
-        ) {
-          const toGridNumber = (value) => {
-            if (value == null) return null;
-            const raw = String(value).trim().toLowerCase();
-            if (!raw) return null;
-            if (raw === "pitlane" || raw === "pit lane") return 23;
-            const numeric = Number(raw);
-            return Number.isFinite(numeric) ? numeric : null;
-          };
-
-          const actualGrid = toGridNumber(actualValue);
-          const predictedGrid = toGridNumber(predictedValue);
-          if (actualGrid != null && predictedGrid != null) {
-            const diff = Math.abs(actualGrid - predictedGrid);
-            const nearbyPoints = Number(
-              question.position_nearby_points[String(diff)] || 0
-            );
-            if (nearbyPoints > 0) score += nearbyPoints;
-          }
-        }
-      }
-      if (actualDriver && predictedDriver && isMatch(actualDriver, predictedDriver)) {
-        score += Number(points.driver || 0);
-      }
-      return score;
-    }
-    if (type === "multi_select_limited") {
-      const points = Number(question.points || 0);
-      const dnfByRace = actualRaw?.dnf_by_race || {};
-      let total = 0;
-      (predictedRaw || []).forEach((race) => {
-        const count = Number(dnfByRace[race] || 0);
-        total += count * points;
-      });
-      return total;
-    }
-    if (type === "numeric") {
-      return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
-    }
-    return 0;
-  }
-
-  responses.forEach((row) => {
-    const question = questionMap[row.question_id];
-    if (!question) return;
-    const actual = getActual(question);
-    const predicted = parseStoredValue(question, row.answer);
-    const points = scoreQuestion(question, predicted, actual);
-    if (!scoreByUser[row.participant_id]) return;
-    scoreByUser[row.participant_id].total += points;
-    scoreByUser[row.participant_id].byQuestion[row.question_id] = points;
-    scoreByUser[row.participant_id].answersByQuestion[row.question_id] = row.answer;
+  const leaderboard = buildGroupLeaderboardRows(groupId, questions, scoringActuals, {
+    excludeHiddenAdmins,
+    includeDetails: true
   });
-
-  const leaderboard = Object.values(scoreByUser).sort((a, b) => b.total - a.total);
   const leaderboardPerPage = 10;
   const requestedLeaderboardPage = Number(req.query.page || 1);
   const currentLeaderboardPage =
@@ -3818,12 +3946,17 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     group,
     questions,
     leaderboard: pagedLeaderboard,
-    actuals,
+    actuals: scoringActuals,
+    actualSnapshots,
+    selectedActualSnapshotId,
     leaderboardTotal: leaderboard.length,
     leaderboardPerPage,
     currentLeaderboardPage: safeLeaderboardPage,
     totalLeaderboardPages,
-    leaderboardBasePath: `${getGroupBasePath(group)}/leaderboard`
+    leaderboardBasePath: `${getGroupBasePath(group)}/leaderboard`,
+    leaderboardQuery: selectedActualSnapshotId
+      ? `snapshot=${encodeURIComponent(String(selectedActualSnapshotId))}`
+      : ""
   });
 });
 

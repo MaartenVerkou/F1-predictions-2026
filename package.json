@@ -6,6 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
+    "start:dev": "node --watch --watch-path=server.js --watch-path=src --watch-path=views --watch-path=public --watch-path=locales --watch-preserve-output server.js",
     "analyze:balance": "node scripts/analyze-balance.js",
     "build:last-season-results": "node scripts/build-last-season-results.js"
   },

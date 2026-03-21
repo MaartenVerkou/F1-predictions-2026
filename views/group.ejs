@@ -1,199 +1,210 @@
-﻿<%- include('partials/header', { title: group.name, user }) %>
+<%- include('partials/header', { title: group.name, user }) %>
 
-<section class="hero">
-  <div class="card">
-    <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
-    <div class="page-title-row">
-      <h1><%= group.name %></h1>
-      <% if (!isNamedGuest) { %>
-        <a class="link page-back-link" href="/dashboard">&lt; <%= t('group.back_to_dashboard') %></a>
-      <% } %>
-    </div>
-    <% if (!group.is_global) { %>
-      <p class="muted"><%= t('group.invite_friends') %></p>
-    <% } %>
-    <div class="group-rules-box">
-      <div class="group-rules-header">
-        <div class="group-rules-label"><%= t('group.rules_label') %></div>
-        <% if (canEditRules) { %>
-          <button
-            type="button"
-            class="group-rules-edit-icon-btn"
-            data-group-rules-toggle
-            aria-label="<%= t('group.edit_rules') %>"
-            title="<%= t('group.edit_rules') %>"
-            aria-expanded="false"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 20h4.5L19 9.5a1.7 1.7 0 0 0 0-2.4l-1.1-1.1a1.7 1.7 0 0 0-2.4 0L5 16.5V20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path>
-              <path d="m13.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
-            </svg>
-          </button>
+<section class="hero group-page">
+  <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
+
+  <div class="group-main-column">
+    <div class="card">
+      <div class="page-title-row">
+        <h1><%= group.name %></h1>
+        <% if (!isNamedGuest) { %>
+          <a class="link page-back-link" href="/dashboard">&lt; <%= t('group.back_to_dashboard') %></a>
         <% } %>
       </div>
-      <p class="muted group-rules-text"><%= groupRules %></p>
-      <% if (canEditRules) { %>
-        <form
-          class="group-rules-inline-form"
-          data-group-rules-form
-          method="post"
-          action="/groups/<%= group.id %>/rules"
-          hidden
-        >
-          <label>
-            <%= t('group.rules_text') %>
-            <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
-          </label>
-          <div class="inline-actions">
-            <button type="submit"><%= t('group.save_rules') %></button>
-          </div>
-        </form>
-      <% } %>
-    </div>
-    <% if (!group.is_public) { %>
-      <p class="muted"><%= t('group.group_code') %>: <strong><%= group.join_code || t('group.code_not_set') %></strong></p>
-    <% } %>
-    <div class="inline-actions">
-      <% if (closed) { %>
-        <a class="button-link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
-        <% if (!isNamedGuest) { %>
-          <a class="link" href="<%= `${currentGroupPath}/responses?mine=1` %>"><%= t('group.view_my_responses') %></a>
-        <% } %>
-        <% if (leaderboardAvailable && !isNamedGuest) { %>
-          <a class="link" href="<%= `${currentGroupPath}/leaderboard` %>"><%= t('leaderboard.page_title') %></a>
-        <% } %>
-      <% } else { %>
-        <a class="button-link" href="<%= `${currentGroupPath}/questions` %>"><%= t('group.answer_questions') %></a>
-        <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
-        <% if (leaderboardAvailable && !isNamedGuest) { %>
-          <a class="link" href="<%= `${currentGroupPath}/leaderboard` %>"><%= t('leaderboard.page_title') %></a>
-        <% } %>
-      <% } %>
-    </div>
-  </div>
-
-  <% if (!group.is_global) { %>
-    <div class="card">
-      <h2><%= t('group.invite_link') %></h2>
-      <% if (invite) { %>
-        <div class="group-invite-link-card">
-          <div class="inline-actions" style="justify-content: space-between;">
-            <span class="link" id="invite-link" data-copy-value="<%= baseUrl %>/join/<%= invite.code %>"><%= baseUrl %>/join/<%= invite.code %></span>
+      <div class="group-rules-box">
+        <div class="group-rules-header">
+          <div class="group-rules-label"><%= t('group.rules_label') %></div>
+          <% if (canEditRules) { %>
             <button
               type="button"
-              class="group-copy-icon-btn"
-              data-copy-target="invite-link"
-              aria-label="<%= t('group.copy') %>"
-              title="<%= t('group.copy') %>"
+              class="group-rules-edit-icon-btn"
+              data-group-rules-toggle
+              aria-label="<%= t('group.edit_rules') %>"
+              title="<%= t('group.edit_rules') %>"
+              aria-expanded="false"
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <rect x="9" y="9" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"></rect>
-                <rect x="5" y="5" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"></rect>
+                <path d="M4 20h4.5L19 9.5a1.7 1.7 0 0 0 0-2.4l-1.1-1.1a1.7 1.7 0 0 0-2.4 0L5 16.5V20Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path>
+                <path d="m13.8 7.2 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path>
               </svg>
             </button>
-          </div>
-          <% if (role === 'owner' || role === 'admin') { %>
-            <div class="group-invite-meta"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
-            <div class="group-invite-status <%= Number(group.invite_link_open ?? 1) === 1 ? 'is-open' : 'is-closed' %>">
-              <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.invite_link_open') : t('group.invite_link_closed') %>
-            </div>
           <% } %>
         </div>
-      <% } else { %>
-        <p class="muted"><%= t('group.no_invite_link') %></p>
-      <% } %>
-
-      <% if (role === 'owner' || role === 'admin') { %>
-        <div class="inline-actions" style="margin-top:12px;">
-          <form method="post" action="/groups/<%= group.id %>/invite-link/toggle">
-            <input type="hidden" name="open" value="<%= Number(group.invite_link_open ?? 1) === 1 ? 0 : 1 %>" />
-            <button class="secondary" type="submit">
-              <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.close_link') : t('group.open_link') %>
-            </button>
+        <p class="muted group-rules-text"><%= groupRules %></p>
+        <% if (canEditRules) { %>
+          <form
+            class="group-rules-inline-form"
+            data-group-rules-form
+            method="post"
+            action="/groups/<%= group.id %>/rules"
+            hidden
+          >
+            <label>
+              <%= t('group.rules_text') %>
+              <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
+            </label>
+            <div class="inline-actions">
+              <button type="submit"><%= t('group.save_rules') %></button>
+            </div>
           </form>
-        </div>
+        <% } %>
+      </div>
+      <% if (!group.is_public) { %>
+        <p class="muted"><%= t('group.group_code') %>: <strong><%= group.join_code || t('group.code_not_set') %></strong></p>
       <% } %>
+      <div class="inline-actions">
+        <% if (closed) { %>
+          <a class="button-link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
+          <% if (leaderboardAvailable && !isNamedGuest) { %>
+            <a class="link" href="<%= `${currentGroupPath}/leaderboard` %>"><%= t('leaderboard.page_title') %></a>
+          <% } %>
+        <% } else { %>
+          <a class="button-link" href="<%= `${currentGroupPath}/questions` %>"><%= t('group.answer_questions') %></a>
+          <a class="link" href="<%= `${currentGroupPath}/responses` %>"><%= Number(group.is_global) === 1 ? t('group.view_global_responses') : t('group.view_group_responses') %></a>
+          <% if (leaderboardAvailable && !isNamedGuest) { %>
+            <a class="link" href="<%= `${currentGroupPath}/leaderboard` %>"><%= t('leaderboard.page_title') %></a>
+          <% } %>
+        <% } %>
+      </div>
     </div>
-  <% } %>
 
-  <div class="card">
-    <h2><%= t('group.members') %></h2>
-    <ul class="list group-members-list">
-      <% members.forEach(member => { %>
-        <% if (group.is_global && member.role === 'owner') { return; } %>
-        <% const isNamedGuestMember = member.member_type === 'named_guest'; %>
-        <% const memberResponsesHref = isNamedGuestMember
-          ? (member.guest_id
-            ? `${currentGroupPath}/responses?focusGuestId=${encodeURIComponent(String(member.guest_id))}`
-            : `${currentGroupPath}/responses`)
-          : `${currentGroupPath}/responses?focusUserId=${member.id}`; %>
-        <li class="group-member-item">
-          <div class="group-member-main">
-            <strong><a class="link" href="<%= memberResponsesHref %>"><%= member.name %></a></strong>
-            <span class="muted">(<%= member.role %>)</span>
+    <% if (!group.is_global) { %>
+      <div class="card">
+        <h2><%= t('group.invite_link') %></h2>
+        <% if (invite) { %>
+          <div class="group-invite-link-card">
+            <div class="inline-actions" style="justify-content: space-between;">
+              <span class="link group-invite-link-text" id="invite-link" data-copy-value="<%= baseUrl %>/join/<%= invite.code %>"><%= baseUrl %>/join/<%= invite.code %></span>
+              <button
+                type="button"
+                class="group-copy-icon-btn"
+                data-copy-target="invite-link"
+                aria-label="<%= t('group.copy') %>"
+                title="<%= t('group.copy') %>"
+              >
+                <svg viewBox="0 0 115.77 122.88" aria-hidden="true">
+                  <path d="M89.62 13.96v7.73h12.19v.02c3.85.01 7.34 1.57 9.86 4.1 2.5 2.51 4.06 5.98 4.07 9.82h.02v73.3h-.02c-.01 3.84-1.57 7.33-4.1 9.86-2.51 2.5-5.98 4.06-9.82 4.07v.02H40.1v-.02c-3.84-.01-7.34-1.57-9.86-4.1-2.5-2.51-4.06-5.98-4.07-9.82h-.02V92.51H13.96v-.02c-3.84-.01-7.34-1.57-9.86-4.1C1.59 85.88.03 82.41.02 78.57H0V13.96h.02c.01-3.85 1.58-7.34 4.1-9.86C6.63 1.59 10.1.03 13.94.02V0h61.73v.02c3.85.01 7.34 1.57 9.86 4.1 2.5 2.51 4.06 5.98 4.07 9.82h.02v.02Zm-10.58 7.73v-7.73h.02c0-.91-.39-1.75-1.01-2.37-.61-.61-1.46-1-2.37-1v.02H13.94v-.02c-.91 0-1.75.39-2.37 1.01-.61.61-1 1.46-1 2.37h.02v64.61h-.02c0 .91.39 1.75 1.01 2.37.61.61 1.46 1 2.37 1v-.02h12.19V35.65h.02c.01-3.85 1.58-7.34 4.1-9.86 2.51-2.5 5.98-4.06 9.82-4.07v-.02h38.96Zm26.14 87.23V35.65h.02c0-.91-.39-1.75-1.01-2.37-.61-.61-1.46-1-2.37-1v.02H40.09v-.02c-.91 0-1.75.39-2.37 1.01-.61.61-1 1.46-1 2.37h.02v73.29h-.02c0 .91.39 1.75 1.01 2.37.61.61 1.46 1 2.37 1v-.02h61.73v.02c.91 0 1.75-.39 2.37-1.01.61-.61 1-1.46 1-2.37h-.02Z" fill="currentColor"></path>
+                </svg>
+              </button>
+            </div>
+            <% if (role === 'owner' || role === 'admin') { %>
+              <div class="group-invite-meta"><%= t('group.created_at') %> <%= new Date(invite.created_at).toLocaleString() %></div>
+              <div class="group-invite-status <%= Number(group.invite_link_open ?? 1) === 1 ? 'is-open' : 'is-closed' %>">
+                <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.invite_link_open') : t('group.invite_link_closed') %>
+              </div>
+            <% } %>
           </div>
-          <% if (role === 'owner' || role === 'admin') { %>
-            <div class="group-member-actions">
-              <% if (isNamedGuestMember && member.guest_id) { %>
-                <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/named-guests/<%= encodeURIComponent(String(member.guest_id)) %>/kick">
-                  <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
-                </form>
-              <% } else { %>
-                <% if (member.role !== 'owner') { %>
-                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick">
+        <% } else { %>
+          <p class="muted"><%= t('group.no_invite_link') %></p>
+        <% } %>
+
+        <% if (role === 'owner' || role === 'admin') { %>
+          <div class="inline-actions" style="margin-top:12px;">
+            <form method="post" action="/groups/<%= group.id %>/invite-link/toggle">
+              <input type="hidden" name="open" value="<%= Number(group.invite_link_open ?? 1) === 1 ? 0 : 1 %>" />
+              <button class="secondary" type="submit">
+                <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.close_link') : t('group.open_link') %>
+              </button>
+            </form>
+          </div>
+        <% } %>
+      </div>
+    <% } %>
+
+    <div class="card">
+      <h2><%= t('group.members') %></h2>
+      <ul class="list group-members-list">
+        <% members.forEach(member => { %>
+          <% if (group.is_global && member.role === 'owner') { return; } %>
+          <% const isNamedGuestMember = member.member_type === 'named_guest'; %>
+          <% const memberResponsesHref = isNamedGuestMember
+            ? (member.guest_id
+              ? `${currentGroupPath}/responses?focusGuestId=${encodeURIComponent(String(member.guest_id))}`
+              : `${currentGroupPath}/responses`)
+            : `${currentGroupPath}/responses?focusUserId=${member.id}`; %>
+          <li class="group-member-item">
+            <div class="group-member-main">
+              <strong><a class="link" href="<%= memberResponsesHref %>"><%= member.name %></a></strong>
+              <span class="muted">(<%= member.role %>)</span>
+            </div>
+            <% if (role === 'owner' || role === 'admin') { %>
+              <div class="group-member-actions">
+                <% if (isNamedGuestMember && member.guest_id) { %>
+                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/named-guests/<%= encodeURIComponent(String(member.guest_id)) %>/kick">
                     <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
                   </form>
+                <% } else { %>
+                  <% if (member.role !== 'owner') { %>
+                    <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick">
+                      <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
+                    </form>
+                  <% } %>
+                  <% if (member.role === 'member') { %>
+                    <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote">
+                      <button class="secondary group-member-action-btn" type="submit"><%= t('group.make_admin') %></button>
+                    </form>
+                  <% } %>
+                  <% if (member.role === 'admin') { %>
+                    <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote">
+                      <button class="secondary group-member-action-btn" type="submit"><%= t('group.remove_admin') %></button>
+                    </form>
+                  <% } %>
                 <% } %>
-                <% if (member.role === 'member') { %>
-                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote">
-                    <button class="secondary group-member-action-btn" type="submit"><%= t('group.make_admin') %></button>
-                  </form>
-                <% } %>
-                <% if (member.role === 'admin') { %>
-                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote">
-                    <button class="secondary group-member-action-btn" type="submit"><%= t('group.remove_admin') %></button>
-                  </form>
-                <% } %>
-              <% } %>
-            </div>
-          <% } %>
-        </li>
-      <% }) %>
-    </ul>
-    <% if (totalMembersPages > 1) { %>
-      <% const membersPageHref = (page) => `${currentGroupPath}?membersPage=${page}`; %>
-      <div class="inline-actions group-members-pagination">
-        <% if (currentMembersPage > 1) { %>
-          <a class="link" href="<%= membersPageHref(currentMembersPage - 1) %>"><%= t('group.previous_25') %></a>
-        <% } %>
-        <span class="muted"><%= t('group.page_x_of_y', { current: currentMembersPage, total: totalMembersPages }) %></span>
-        <% if (currentMembersPage < totalMembersPages) { %>
-          <a class="link" href="<%= membersPageHref(currentMembersPage + 1) %>"><%= t('group.next_25') %></a>
-        <% } %>
+              </div>
+            <% } %>
+          </li>
+        <% }) %>
+      </ul>
+      <% if (totalMembersPages > 1) { %>
+        <%- include('partials/admin_pagination', {
+          currentPage: currentMembersPage,
+          totalPages: totalMembersPages,
+          pageParamName: 'membersPage',
+          basePath: currentGroupPath,
+          showSummary: false,
+          maxVisiblePages: 5,
+          firstLabel: '<<',
+          prevLabel: '<',
+          nextLabel: '>',
+          lastLabel: '>>'
+        }) %>
+      <% } %>
+    </div>
+
+    <% if (!group.is_public && (role === 'owner' || role === 'admin')) { %>
+      <div class="card">
+        <h2><%= t('group.group_password') %></h2>
+        <form method="post" action="/groups/<%= group.id %>/password">
+          <label>
+            <%= t('group.set_new_password') %>
+            <input type="password" name="joinPassword" required minlength="4" />
+          </label>
+          <button type="submit"><%= t('group.update_password') %></button>
+        </form>
+      </div>
+    <% } %>
+
+    <% if (!group.is_global && user) { %>
+      <div class="card">
+        <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('<%= t('group.leave_confirm') %>');" style="margin:0;">
+          <button class="secondary" type="submit"><%= t('group.leave_group') %></button>
+        </form>
       </div>
     <% } %>
   </div>
 
-  <% if (!group.is_public && (role === 'owner' || role === 'admin')) { %>
-    <div class="card">
-      <h2><%= t('group.group_password') %></h2>
-      <form method="post" action="/groups/<%= group.id %>/password">
-        <label>
-          <%= t('group.set_new_password') %>
-          <input type="password" name="joinPassword" required minlength="4" />
-        </label>
-        <button type="submit"><%= t('group.update_password') %></button>
-      </form>
-    </div>
-  <% } %>
-
-  <% if (!group.is_global && user) { %>
-    <div class="card">
-      <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('<%= t('group.leave_confirm') %>');" style="margin:0;">
-        <button class="secondary" type="submit"><%= t('group.leave_group') %></button>
-      </form>
-    </div>
-  <% } %>
+  <%- include('partials/leaderboard_preview', {
+    leaderboardCard: leaderboardPreview && Array.isArray(leaderboardPreview.rows) && leaderboardPreview.rows.length > 0
+      ? {
+          badge: t('leaderboard.page_title'),
+          cta: t('leaderboard.full_cta'),
+          href: `${currentGroupPath}/leaderboard`,
+          ariaLabel: `${group.name}: ${t('leaderboard.page_title')}`,
+          rows: leaderboardPreview.rows,
+          className: 'group-desktop-leaderboard-preview'
+        }
+      : null
+  }) %>
 </section>
 
 <% if (canEditRules) { %>
