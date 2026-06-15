@@ -95,16 +95,16 @@ The backup command performs SQLite online backups with integrity checks before s
 
 ## GitHub deploy workflow
 
-The repo now includes `.github/workflows/deploy.yml`. It deploys on pushes to `main`/`master` and also supports manual `workflow_dispatch`.
+The repo now includes `.github/workflows/deploy.yml`. A merge or push to `main` runs CI first; deploy starts automatically only after that CI workflow succeeds. Manual `workflow_dispatch` deploys are also supported.
 
 The workflow keeps the current server contract:
 
 - uploads a runtime bundle to the server over SSH
-- refreshes only repo-managed runtime paths under `/opt/F1-predictions-2026` by default
+- refreshes only repo-managed runtime paths under `/opt/F1-predictions-2026` by default, including JSON config in `data/`
 - runs `bash scripts/deploy-app.sh`
 - rebuilds only the Docker Compose `app` service
 - waits for `GET /healthz` before marking the deploy successful
-- does not overwrite host-managed `.env`, `/var/lib/wheelofknowledge/state`, or the external Restic/R2 backup setup
+- does not overwrite host-managed `.env`, SQLite state, `/var/lib/wheelofknowledge/state`, or the external Restic/R2 backup setup
 
 Required GitHub secrets:
 
@@ -129,7 +129,7 @@ To generate `DEPLOY_KNOWN_HOSTS` safely:
 ssh-keyscan -H your-server.example.com
 ```
 
-For guarded production rollouts, configure the GitHub `production` environment with required reviewers before enabling auto-deploy from `main`.
+For guarded production rollouts, configure the GitHub `production` environment with required reviewers.
 
 If you previously used `./data:/app/data` and want to keep that old database, run this once before first start with the new setup (Linux/macOS shell):
 

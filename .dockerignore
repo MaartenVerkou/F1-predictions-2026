@@ -1,7 +1,8 @@
 node_modules
 npm-debug.log
-data/app.db
-data/sessions.db
+data/*.db
+data/*.db-shm
+data/*.db-wal
 .git
 .env
 .codex

@@ -1,10 +1,13 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
-      - master
   workflow_dispatch:
     inputs:
       ref:
@@ -21,10 +24,12 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 30
     env:
+      DEPLOY_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
       DEPLOY_HOST_VAR: ${{ vars.DEPLOY_HOST }}
       DEPLOY_HOST_SECRET: ${{ secrets.DEPLOY_HOST }}
       DEPLOY_USER_VAR: ${{ vars.DEPLOY_USER }}
@@ -40,7 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
 
       - name: Resolve deploy settings
         shell: bash
@@ -63,27 +68,30 @@ jobs:
             echo "DEPLOY_PATH=${deploy_path:-/opt/F1-predictions-2026}"
             echo "DEPLOY_COMPOSE_FILES=${deploy_compose_files:-docker-compose.yml}"
             echo "DEPLOY_HEALTH_URL=${deploy_health_url:-http://127.0.0.1:3000/healthz}"
-            echo "REMOTE_BUNDLE=/tmp/f1predictions-${GITHUB_SHA}.tgz"
+            echo "REMOTE_BUNDLE=/tmp/f1predictions-${DEPLOY_SOURCE_SHA}.tgz"
           } >> "$GITHUB_ENV"
 
       - name: Build Docker image locally
-        run: docker build -t f1predictions-deploy-check:${{ github.sha }} .
+        run: docker build -t f1predictions-deploy-check:${{ github.run_id }} .
 
       - name: Create deploy bundle
         shell: bash
         run: |
           set -euo pipefail
           required_paths=(
-            .dockerignore \
-            Dockerfile \
-            docker-compose.yml \
-            package.json \
-            package-lock.json \
-            server.js \
-            data \
-            public \
-            scripts \
-            src \
+            .dockerignore
+            Dockerfile
+            docker-compose.yml
+            package.json
+            package-lock.json
+            server.js
+            data/last-season-results.json
+            data/questions.json
+            data/races.json
+            data/roster.json
+            public
+            scripts
+            src
             views
           )
           optional_paths=(
@@ -147,6 +155,10 @@ jobs:
             package.json \
             package-lock.json \
             server.js \
+            data/last-season-results.json \
+            data/questions.json \
+            data/races.json \
+            data/roster.json \
             public \
             scripts \
             src \
