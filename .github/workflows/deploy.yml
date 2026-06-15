@@ -73,22 +73,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tar -czf deploy-bundle.tgz \
+          required_paths=(
             .dockerignore \
-            Caddyfile \
             Dockerfile \
             docker-compose.yml \
-            docker-compose.server.yml \
             package.json \
             package-lock.json \
             server.js \
             data \
-            deploy \
-            locales \
             public \
             scripts \
             src \
             views
+          )
+          optional_paths=(
+            Caddyfile
+            docker-compose.server.yml
+            deploy
+            locales
+          )
+
+          bundle_paths=()
+          for path in "${required_paths[@]}"; do
+            if [[ ! -e "$path" ]]; then
+              echo "Missing required deploy path: $path" >&2
+              exit 1
+            fi
+            bundle_paths+=("$path")
+          done
+
+          for path in "${optional_paths[@]}"; do
+            if [[ -e "$path" ]]; then
+              bundle_paths+=("$path")
+            fi
+          done
+
+          printf 'Bundling %s\n' "${bundle_paths[@]}"
+          tar -czf deploy-bundle.tgz "${bundle_paths[@]}"
 
       - name: Configure SSH
         shell: bash
@@ -121,16 +142,11 @@ jobs:
           cd "$DEPLOY_PATH"
           for managed_path in \
             .dockerignore \
-            Caddyfile \
             Dockerfile \
             docker-compose.yml \
-            docker-compose.server.yml \
             package.json \
             package-lock.json \
             server.js \
-            data \
-            deploy \
-            locales \
             public \
             scripts \
             src \
