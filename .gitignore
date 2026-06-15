@@ -7,3 +7,19 @@
 /backups/*
 !/backups/.gitkeep
 .env
+
+# Added by production-project-setup
+node_modules/
+.env.*
+!.env.example
+dist/
+build/
+.next/
+out/
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.tmp/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,88 @@
+﻿name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        if: hashFiles('package.json') != ''
+        run: npm ci
+
+      - name: Audit JavaScript dependencies
+        if: hashFiles('package.json') != ''
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        if: hashFiles('package.json') != ''
+        run: npm run lint
+
+      - name: Typecheck
+        if: hashFiles('package.json') != ''
+        run: npm run typecheck
+
+      - name: Build
+        if: hashFiles('package.json') != ''
+        run: npm run build
+
+      - name: Test
+        if: hashFiles('package.json') != ''
+        run: npm test
+
+      - name: Playwright
+        if: hashFiles('package.json') != '' && hashFiles('playwright.config.*') != ''
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build Docker image
+        run: docker build -t production-project:${{ github.sha }} .
+
+      - name: Smoke Docker image
+        run: |
+          docker rm -f f1predictions-ci-smoke >/dev/null 2>&1 || true
+          docker run -d \
+            --name f1predictions-ci-smoke \
+            -p 3000:3000 \
+            -e NODE_ENV=production \
+            -e SESSION_SECRET=ci-session-secret-change-before-deploy \
+            -e LOG_LEVEL=warn \
+            production-project:${{ github.sha }}
+          cleanup() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              docker logs f1predictions-ci-smoke || true
+            fi
+            docker rm -f f1predictions-ci-smoke >/dev/null 2>&1 || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/healthz; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1

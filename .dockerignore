@@ -1,6 +1,15 @@
-﻿node_modules
+node_modules
 npm-debug.log
 data/app.db
 data/sessions.db
 .git
 .env
+.codex
+.github
+.tmp
+backups
+coverage
+docs
+playwright-report
+test-results
+tests

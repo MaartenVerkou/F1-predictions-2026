@@ -1,0 +1,143 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      DEPLOY_HOST_VAR: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_HOST_SECRET: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER_VAR: ${{ vars.DEPLOY_USER }}
+      DEPLOY_USER_SECRET: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT_VAR: ${{ vars.DEPLOY_PORT }}
+      DEPLOY_PORT_SECRET: ${{ secrets.DEPLOY_PORT }}
+      DEPLOY_PATH_VAR: ${{ vars.DEPLOY_PATH }}
+      DEPLOY_PATH_SECRET: ${{ secrets.DEPLOY_PATH }}
+      DEPLOY_COMPOSE_FILES_VAR: ${{ vars.DEPLOY_COMPOSE_FILES }}
+      DEPLOY_COMPOSE_FILES_SECRET: ${{ secrets.DEPLOY_COMPOSE_FILES }}
+      DEPLOY_HEALTH_URL_VAR: ${{ vars.DEPLOY_HEALTH_URL }}
+      DEPLOY_HEALTH_URL_SECRET: ${{ secrets.DEPLOY_HEALTH_URL }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+
+      - name: Resolve deploy settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          deploy_host="${DEPLOY_HOST_VAR:-$DEPLOY_HOST_SECRET}"
+          deploy_user="${DEPLOY_USER_VAR:-$DEPLOY_USER_SECRET}"
+          deploy_port="${DEPLOY_PORT_VAR:-$DEPLOY_PORT_SECRET}"
+          deploy_path="${DEPLOY_PATH_VAR:-$DEPLOY_PATH_SECRET}"
+          deploy_compose_files="${DEPLOY_COMPOSE_FILES_VAR:-$DEPLOY_COMPOSE_FILES_SECRET}"
+          deploy_health_url="${DEPLOY_HEALTH_URL_VAR:-$DEPLOY_HEALTH_URL_SECRET}"
+
+          : "${deploy_host:?Set DEPLOY_HOST as a repo or environment variable/secret.}"
+          : "${deploy_user:?Set DEPLOY_USER as a repo or environment variable/secret.}"
+
+          {
+            echo "DEPLOY_HOST=$deploy_host"
+            echo "DEPLOY_USER=$deploy_user"
+            echo "DEPLOY_PORT=${deploy_port:-22}"
+            echo "DEPLOY_PATH=${deploy_path:-/opt/F1-predictions-2026}"
+            echo "DEPLOY_COMPOSE_FILES=${deploy_compose_files:-docker-compose.yml}"
+            echo "DEPLOY_HEALTH_URL=${deploy_health_url:-http://127.0.0.1:3000/healthz}"
+            echo "REMOTE_BUNDLE=/tmp/f1predictions-${GITHUB_SHA}.tgz"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Docker image locally
+        run: docker build -t f1predictions-deploy-check:${{ github.sha }} .
+
+      - name: Create deploy bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar -czf deploy-bundle.tgz \
+            .dockerignore \
+            Caddyfile \
+            Dockerfile \
+            docker-compose.yml \
+            docker-compose.server.yml \
+            package.json \
+            package-lock.json \
+            server.js \
+            data \
+            deploy \
+            locales \
+            public \
+            scripts \
+            src \
+            views
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_KEY:?Set DEPLOY_SSH_KEY secret.}"
+          : "${DEPLOY_KNOWN_HOSTS:?Set DEPLOY_KNOWN_HOSTS secret.}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Upload deploy bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -P "$DEPLOY_PORT" deploy-bundle.tgz "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_BUNDLE"
+
+      - name: Roll out on server
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_BUNDLE='$REMOTE_BUNDLE' DEPLOY_COMPOSE_FILES='$DEPLOY_COMPOSE_FILES' DEPLOY_HEALTH_URL='$DEPLOY_HEALTH_URL' bash -s" <<'EOF'
+          set -euo pipefail
+          mkdir -p "$DEPLOY_PATH"
+          cd "$DEPLOY_PATH"
+          for managed_path in \
+            .dockerignore \
+            Caddyfile \
+            Dockerfile \
+            docker-compose.yml \
+            docker-compose.server.yml \
+            package.json \
+            package-lock.json \
+            server.js \
+            data \
+            deploy \
+            locales \
+            public \
+            scripts \
+            src \
+            views; do
+            rm -rf "$DEPLOY_PATH/$managed_path"
+          done
+          tar -xzf "$DEPLOY_BUNDLE" -C "$DEPLOY_PATH"
+          rm -f "$DEPLOY_BUNDLE"
+          bash scripts/deploy-app.sh
+          EOF

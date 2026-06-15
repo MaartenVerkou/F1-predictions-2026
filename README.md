@@ -6,11 +6,13 @@ Simple group-based prediction game for the 2026 F1 season.
 
 ```powershell
 copy .env.example .env
-npm install
+npm ci
 npm start
 ```
 
 Visit `http://localhost:3000`.
+
+Use Node 20 for parity with Docker and GitHub Actions. The current native dependencies also support Node 22, 23, and 24 for local work.
 
 ## Docker Compose (recommended)
 
@@ -75,56 +77,59 @@ Notes:
 - Question config stays in repo `./data` and is mounted read-only at `/app/config`.
 - `docker compose down -v` removes the Docker volume (database + sessions).
 
-## Backups (recommended on server)
+## Server backups
 
-This repo includes a backup script with retention, so backup storage does not grow forever.
+The deployed server uses an external Restic backup workflow for Cloudflare R2. It is intentionally not stored in this repo because it depends on host secrets.
 
-Run one backup now:
+Current server shape:
+
+- State directory: `/var/lib/wheelofknowledge/state`
+- Databases backed up: `app.db` and `sessions.db`
+- Cron: `/etc/cron.d/wok-backup`
+- Backup command: `/usr/local/sbin/wok-backup`
+- Prune command: `/usr/local/sbin/wok-backup-prune`
+- Secret/config file: `/etc/wok-backup.env`
+- Log file: `/var/log/wok-backup.log`
+
+The backup command performs SQLite online backups with integrity checks before sending snapshots to the Restic repository. Do not replace this with a repo-local backup script unless the host-level R2 setup is being retired deliberately.
+
+## GitHub deploy workflow
+
+The repo now includes `.github/workflows/deploy.yml`. It deploys on pushes to `main`/`master` and also supports manual `workflow_dispatch`.
+
+The workflow keeps the current server contract:
+
+- uploads a runtime bundle to the server over SSH
+- refreshes only repo-managed runtime paths under `/opt/F1-predictions-2026` by default
+- runs `bash scripts/deploy-app.sh`
+- rebuilds only the Docker Compose `app` service
+- waits for `GET /healthz` before marking the deploy successful
+- does not overwrite host-managed `.env`, `/var/lib/wheelofknowledge/state`, or the external Restic/R2 backup setup
+
+Required GitHub secrets:
+
+- `DEPLOY_SSH_KEY`
+- `DEPLOY_KNOWN_HOSTS`
+
+Required GitHub repository or environment variables/secrets:
+
+- `DEPLOY_HOST`
+- `DEPLOY_USER`
+
+Optional GitHub repository or environment variables/secrets:
+
+- `DEPLOY_PORT` (default `22`)
+- `DEPLOY_PATH` (default `/opt/F1-predictions-2026`)
+- `DEPLOY_COMPOSE_FILES` (default `docker-compose.yml`; set `docker-compose.yml:docker-compose.server.yml` when the server should use the override)
+- `DEPLOY_HEALTH_URL` (default `http://127.0.0.1:3000/healthz`)
+
+To generate `DEPLOY_KNOWN_HOSTS` safely:
 
 ```bash
-sh ./scripts/run-backup.sh
+ssh-keyscan -H your-server.example.com
 ```
 
-What it does:
-
-- Uses SQLite online backup for `app.db` and `sessions.db`
-- Compresses to `.sqlite.gz`
-- Writes metadata `.json` (hash + size)
-- Prunes old backup + metadata files by age/count
-
-Defaults:
-
-- Backup folder: `./backups` (on host, not in DB volume)
-- Keep files up to `30` days
-- Keep max `90` backup files per DB type
-
-Override retention/folder:
-
-```bash
-BACKUP_DIR=/srv/backups/f1 KEEP_DAYS=21 KEEP_COUNT=60 sh ./scripts/run-backup.sh
-```
-
-If you need extra compose files (for example server override), pass them via `COMPOSE_ARGS`:
-
-```bash
-COMPOSE_ARGS="-f docker-compose.yml -f docker-compose.server.yml" sh ./scripts/run-backup.sh
-```
-
-Cron example (daily 03:00):
-
-```bash
-0 3 * * * cd /root/F1-predictions-2026 && BACKUP_DIR=/srv/backups/f1 KEEP_DAYS=30 KEEP_COUNT=90 sh ./scripts/run-backup.sh >> /var/log/f1-backup.log 2>&1
-```
-
-Restore (example):
-
-```bash
-gunzip -c /srv/backups/f1/f1predictions-app-YYYYMMDD-HHMMSSZ.sqlite.gz > /tmp/app.db
-gunzip -c /srv/backups/f1/f1predictions-sessions-YYYYMMDD-HHMMSSZ.sqlite.gz > /tmp/sessions.db
-docker compose down
-docker run --rm -v f1predictions_f1_state:/state -v /tmp:/restore alpine sh -c "cp -f /restore/app.db /state/app.db && cp -f /restore/sessions.db /state/sessions.db"
-docker compose up -d
-```
+For guarded production rollouts, configure the GitHub `production` environment with required reviewers before enabling auto-deploy from `main`.
 
 If you previously used `./data:/app/data` and want to keep that old database, run this once before first start with the new setup (Linux/macOS shell):
 
@@ -216,7 +221,26 @@ Race options are loaded from `data/races.json`:
 
 ## Scoring / actuals
 
-Enter season results at `/admin/actuals` after the season. Leaderboard scoring is currently disabled until season results are finalized.
+`/admin/actuals` now supports two workflows:
+
+- `Preview Autofill In Form` fills the current admin form draft only.
+- `Run Season Sync Now` backfills every completed round snapshot, updates live actuals from the latest completed round, and leaves the latest synced round pending admin review.
+
+The app can also run the same season sync automatically in production. Each synced round snapshot stores a review state:
+
+- `Pending review`: auto-filled or changed since the last admin confirmation.
+- `Reviewed`: confirmed manually by an admin.
+
+The leaderboard uses live actuals immediately, but the UI shows when the current round is still pending review.
+
+Cancelled races that stay on the season calendar but never start are handled as zero-result rounds for the race-derived actuals that depend on official classification data, so later rounds can still backfill cleanly.
+
+Manual commands:
+
+```powershell
+npm run actuals:auto-update
+npm run actuals:auto-apply
+```
 
 ## Last season references per question
 
@@ -281,11 +305,17 @@ npm run analyze:balance -- --players 1000 --seasons 200 --json balance-report.js
 - `SMTP_PORT` - optional SMTP port (default `465`); SSL/TLS is chosen automatically (`465` secure, others STARTTLS/plain)
 - `SMTP_CLIENT_NAME` - optional SMTP client/EHLO name; defaults to `APP_DOMAIN` host (then `SMTP_USER` domain as fallback)
 - `APP_DOMAIN` - app domain/host (default `localhost`); used by built-in Caddy edge profile and for email verification/reset links. For localhost, the app uses `http://localhost:PORT`; otherwise it uses `https://APP_DOMAIN`.
+- `LOG_LEVEL` - structured server log threshold: `debug`, `info`, `warn`, `error`, or `silent` (default `info`)
+- `TRUST_PROXY_HOPS` - trusted reverse proxy hop count for secure cookies and forwarded HTTPS detection (default `1` outside development)
 - `DEV_AUTO_LOGIN` - set to `1` to auto-login a dev user on each request (disabled when `NODE_ENV=production`)
 - `DEV_AUTO_LOGIN_EMAIL` - email used for dev auto-login (default `dev@example.com`)
 - `DEV_AUTO_LOGIN_NAME` - display name used for dev auto-login (default `Dev Admin`)
 - `PREDICTIONS_CLOSE_AT` - ISO datetime after which predictions are locked
 - `LEADERBOARD_ENABLED` - set to `1` to enable leaderboard for non-admin users
+- `ACTUALS_AUTO_UPDATE_ENABLED` - set to `1` to run automatic completed-round actuals sync in the app process (defaults to `1` in production and `0` in development/test)
+- `ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES` - background sync interval in minutes (default `180`)
+- `ACTUALS_AUTO_UPDATE_ON_START` - set to `1` to run one sync shortly after app boot (default `1`)
+- `ACTUALS_AUTO_UPDATE_START_DELAY_MS` - delay before the startup sync runs (default `30000`)
 - `PAYPAL_DONATION_URL` - optional full PayPal donation URL; when set, a donation button is shown on home page
 - `PAYPAL_DONATION_LABEL` - optional button label for donation button (default `Donate`)
 

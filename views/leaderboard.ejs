@@ -184,6 +184,12 @@
   <% } %>
   <% const selectedSnapshotKey =
     selectedActualSnapshotId == null ? "" : String(selectedActualSnapshotId); %>
+  <% const formatAdminDate = (value) => {
+    if (!value) return '-';
+    if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+  }; %>
 
   <div class="page-title-row">
     <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
@@ -202,6 +208,20 @@
 
     <div id="leaderboard-overview" class="leaderboard-layout">
       <div class="leaderboard-main-column">
+        <% if (selectedSnapshotKey === '' && currentActualsReview) { %>
+          <div class="alert" style="margin-bottom:16px;">
+            Live scoring reflects <strong><%= `R${currentActualsReview.roundNumber} - ${currentActualsReview.roundName}` %></strong>.
+            Status: <strong><%= currentActualsReview.reviewStatus === 'pending' ? 'Pending review' : 'Reviewed' %></strong>.
+            Last sync: <strong><%= formatAdminDate(currentActualsReview.updatedAt) %></strong>.
+          </div>
+        <% } else if (selectedActualSnapshotMeta) { %>
+          <div class="alert" style="margin-bottom:16px;">
+            Viewing snapshot <strong><%= `R${selectedActualSnapshotMeta.round_number} - ${selectedActualSnapshotMeta.round_name || `Round ${selectedActualSnapshotMeta.round_number}`}` %></strong>.
+            Status: <strong><%= selectedActualSnapshotMeta.review_status === 'pending' ? 'Pending review' : 'Reviewed' %></strong>.
+            Last sync: <strong><%= formatAdminDate(selectedActualSnapshotMeta.updated_at || selectedActualSnapshotMeta.created_at) %></strong>.
+          </div>
+        <% } %>
+
         <% if ((actualSnapshots || []).length > 0) { %>
           <form method="get" action="<%= leaderboardBaseHref %>" class="leaderboard-snapshot-form inline-actions">
             <% Object.entries(snapshotFilterParams).forEach(([key, value]) => { %>
@@ -216,7 +236,7 @@
               <option value="" <%= selectedSnapshotKey === "" ? "selected" : "" %>><%= t('leaderboard.current_snapshot') %></option>
               <% actualSnapshots.forEach((snapshot) => { %>
                 <option value="<%= snapshot.id %>" <%= selectedSnapshotKey === String(snapshot.id) ? "selected" : "" %>>
-                  <%= snapshot.label %>
+                  <%= snapshot.label %><%= snapshot.reviewStatus === 'pending' ? ' | pending review' : '' %>
                 </option>
               <% }) %>
             </select>

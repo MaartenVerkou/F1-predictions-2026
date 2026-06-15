@@ -2,11 +2,19 @@
 const fs = require("fs");
 const crypto = require("crypto");
 const express = require("express");
+const helmet = require("helmet");
 const session = require("express-session");
-const SQLiteStore = require("connect-sqlite3")(session);
 const bcrypt = require("bcrypt");
 const Database = require("better-sqlite3");
 const nodemailer = require("nodemailer");
+const { BetterSqliteSessionStore } = require("./src/session-store");
+const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
+const {
+  REVIEW_STATUS_PENDING,
+  ensureActualSnapshotColumns,
+  findSnapshotById,
+  findLatestRoundSnapshotForSeason
+} = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
 
@@ -131,6 +139,19 @@ const ADMIN_EMAILS = new Set(
 );
 const LEADERBOARD_ENABLED = process.env.LEADERBOARD_ENABLED === "1";
 const CURRENT_SEASON = Number(process.env.F1_SEASON || 2026);
+const ACTUALS_AUTO_UPDATE_ENABLED =
+  String(process.env.ACTUALS_AUTO_UPDATE_ENABLED || (IS_DEVELOPMENT ? "0" : "1")).trim() === "1";
+const ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES = Number(
+  process.env.ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES || 180
+);
+const ACTUALS_AUTO_UPDATE_ON_START =
+  String(process.env.ACTUALS_AUTO_UPDATE_ON_START || "1").trim() === "1";
+const ACTUALS_AUTO_UPDATE_START_DELAY_MS = Number(
+  process.env.ACTUALS_AUTO_UPDATE_START_DELAY_MS || 30000
+);
+const SERVICE_NAME = "f1-predictions-2026";
+const LOG_LEVEL = String(process.env.LOG_LEVEL || "info").trim().toLowerCase();
+const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS || (IS_DEVELOPMENT ? 0 : 1));
 const MAX_PRIVILEGED_GROUPS = 3;
 const LOCALES_DIR = path.join(__dirname, "locales");
 const SUPPORTED_LOCALES = ["en", "de", "fr", "nl", "es"];
@@ -143,6 +164,69 @@ const LOCALE_LABELS = {
   es: "Español"
 };
 const localeCache = new Map();
+
+const LOG_LEVELS = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+  silent: 100
+};
+
+function shouldLog(level) {
+  const configured = LOG_LEVELS[LOG_LEVEL] ?? LOG_LEVELS.info;
+  const requested = LOG_LEVELS[level] ?? LOG_LEVELS.info;
+  return requested >= configured;
+}
+
+function serializeError(err) {
+  if (!err || typeof err !== "object") {
+    return { message: String(err || "Unknown error") };
+  }
+  return {
+    name: err.name || "Error",
+    message: err.message || "Unknown error",
+    stack: IS_DEVELOPMENT ? err.stack : undefined
+  };
+}
+
+function logEvent(level, event, fields = {}) {
+  if (!shouldLog(level)) return;
+  const record = {
+    timestamp: new Date().toISOString(),
+    level,
+    service: SERVICE_NAME,
+    event,
+    ...fields
+  };
+  const line = JSON.stringify(record);
+  if (level === "error") {
+    console.error(line);
+  } else if (level === "warn") {
+    console.warn(line);
+  } else {
+    console.log(line);
+  }
+}
+
+function getRequestId(req) {
+  const raw = String(req.get("x-request-id") || "").trim();
+  if (/^[A-Za-z0-9._:-]{1,128}$/.test(raw)) return raw;
+  return crypto.randomUUID();
+}
+
+function validateProductionConfig() {
+  if (IS_DEVELOPMENT) return;
+  const normalizedSecret = String(SESSION_SECRET || "").trim().toLowerCase();
+  const isPlaceholderSecret =
+    !normalizedSecret ||
+    normalizedSecret === "change-me" ||
+    normalizedSecret === "dev-only-change-me" ||
+    normalizedSecret.includes("replace-with");
+  if (isPlaceholderSecret) {
+    throw new Error("SESSION_SECRET must be set to a strong non-placeholder value in production.");
+  }
+}
 
 function detectLocaleFromAcceptLanguage(headerValue) {
   const raw = String(headerValue || "").trim();
@@ -251,6 +335,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 const db = new Database(DB_PATH);
+db.pragma("busy_timeout = 5000");
 
 db.exec(`
   PRAGMA journal_mode = WAL;
@@ -351,7 +436,11 @@ db.exec(`
     source_type TEXT NOT NULL,
     source_note TEXT,
     created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
     created_by_user_id INTEGER,
+    review_status TEXT NOT NULL DEFAULT 'reviewed',
+    reviewed_at TEXT,
+    reviewed_by_user_id INTEGER,
     FOREIGN KEY(created_by_user_id) REFERENCES users(id)
   );
 
@@ -480,6 +569,7 @@ function ensureQuestionSettingsColumns() {
 }
 
 ensureQuestionSettingsColumns();
+ensureActualSnapshotColumns(db);
 
 function backfillNamedGuestGroupMembers() {
   db.exec(
@@ -834,18 +924,79 @@ function sanitizeRedirectPath(rawValue) {
 const app = express();
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+if (Number.isFinite(TRUST_PROXY_HOPS) && TRUST_PROXY_HOPS > 0) {
+  app.set("trust proxy", TRUST_PROXY_HOPS);
+}
+app.disable("x-powered-by");
+
+app.use((req, res, next) => {
+  const requestId = getRequestId(req);
+  const started = process.hrtime.bigint();
+  req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+  res.on("finish", () => {
+    const durationMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+    const statusCode = res.statusCode;
+    const level = statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
+    logEvent(level, "http_request", {
+      requestId,
+      method: req.method,
+      path: req.path,
+      statusCode,
+      durationMs: Number(durationMs.toFixed(1))
+    });
+  });
+  next();
+});
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false
+  })
+);
+
+app.get("/healthz", (req, res) => {
+  try {
+    db.prepare("SELECT 1 AS ok").get();
+    return res.json({
+      status: "ok",
+      service: SERVICE_NAME,
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Number(process.uptime().toFixed(3)),
+      checks: {
+        database: "ok"
+      }
+    });
+  } catch (err) {
+    logEvent("error", "health_check_failed", {
+      requestId: req.requestId,
+      error: serializeError(err)
+    });
+    return res.status(503).json({
+      status: "error",
+      service: SERVICE_NAME,
+      checks: {
+        database: "error"
+      }
+    });
+  }
+});
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
-    store: new SQLiteStore({ db: "sessions.db", dir: DATA_DIR }),
+    store: new BetterSqliteSessionStore({
+      filename: path.join(DATA_DIR, "sessions.db"),
+      ttlMs: 1000 * 60 * 60 * 24 * 7
+    }),
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
+      secure: IS_DEVELOPMENT ? false : "auto",
       maxAge: 1000 * 60 * 60 * 24 * 7
     }
   })
@@ -3854,10 +4005,10 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   const snapshotRows = db
     .prepare(
       `
-      SELECT id, season, round_number, round_name, created_at
+      SELECT id, season, round_number, round_name, created_at, updated_at, review_status, reviewed_at
       FROM actual_snapshots
       WHERE round_number IS NOT NULL
-      ORDER BY season DESC, round_number DESC, created_at DESC, id DESC
+      ORDER BY season DESC, round_number DESC, COALESCE(updated_at, created_at) DESC, id DESC
       `
     )
     .all();
@@ -3879,23 +4030,21 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
       season,
       roundNumber,
       roundName,
-      label: `${seasonLabel}R${roundNumber} - ${title}`.trim()
+      label: `${seasonLabel}R${roundNumber} - ${title}`.trim(),
+      reviewStatus:
+        String(row.review_status || "").trim().toLowerCase() === REVIEW_STATUS_PENDING
+          ? REVIEW_STATUS_PENDING
+          : "reviewed",
+      reviewedAt: row.reviewed_at || null,
+      updatedAt: row.updated_at || row.created_at || null
     });
   });
   const requestedSnapshotId = Number(req.query.snapshot || 0);
   let selectedActualSnapshotId = null;
+  let selectedActualSnapshotMeta = null;
   let scoringActuals = currentActuals;
   if (Number.isFinite(requestedSnapshotId) && requestedSnapshotId > 0) {
-    const snapshotMeta = db
-      .prepare(
-        `
-        SELECT id
-        FROM actual_snapshots
-        WHERE id = ?
-        LIMIT 1
-        `
-      )
-      .get(requestedSnapshotId);
+    const snapshotMeta = findSnapshotById(db, requestedSnapshotId);
     if (snapshotMeta) {
       const snapshotValueRows = db
         .prepare(
@@ -3912,9 +4061,27 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
           return acc;
         }, {});
         selectedActualSnapshotId = requestedSnapshotId;
+        selectedActualSnapshotMeta = snapshotMeta;
       }
     }
   }
+  const currentActualsSnapshotMeta = findLatestRoundSnapshotForSeason(db, CURRENT_SEASON);
+  const currentActualsReview =
+    currentActualsSnapshotMeta && Number.isFinite(Number(currentActualsSnapshotMeta.round_number))
+      ? {
+          snapshotId: Number(currentActualsSnapshotMeta.id),
+          roundNumber: Number(currentActualsSnapshotMeta.round_number),
+          roundName:
+            String(currentActualsSnapshotMeta.round_name || "").trim()
+            || `Round ${currentActualsSnapshotMeta.round_number}`,
+          reviewStatus: currentActualsSnapshotMeta.review_status,
+          reviewedAt: currentActualsSnapshotMeta.reviewed_at || null,
+          updatedAt:
+            currentActualsSnapshotMeta.updated_at
+            || currentActualsSnapshotMeta.created_at
+            || null
+        }
+      : null;
 
   const leaderboard = buildGroupLeaderboardRows(groupId, questions, scoringActuals, {
     excludeHiddenAdmins,
@@ -3948,7 +4115,9 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     leaderboard: pagedLeaderboard,
     actuals: scoringActuals,
     actualSnapshots,
+    currentActualsReview,
     selectedActualSnapshotId,
+    selectedActualSnapshotMeta,
     leaderboardTotal: leaderboard.length,
     leaderboardPerPage,
     currentLeaderboardPage: safeLeaderboardPage,
@@ -3968,7 +4137,13 @@ registerAdminRoutes(app, {
   getRoster,
   getRaces,
   clampNumber,
-  generateUniqueGroupId
+  generateUniqueGroupId,
+  dataDir: DATA_DIR,
+  dbPath: DB_PATH,
+  questionsPath: QUESTIONS_PATH,
+  rosterPath: ROSTER_PATH,
+  racesPath: RACES_PATH,
+  logEvent
 });
 
 app.use((req, res) => {
@@ -3976,13 +4151,95 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error("Unhandled server error:", err);
+  logEvent("error", "unhandled_server_error", {
+    requestId: req.requestId,
+    method: req.method,
+    path: req.path,
+    error: serializeError(err)
+  });
   if (res.headersSent) {
     return next(err);
   }
   return sendError(req, res, 500, "Something went wrong. Please try again.");
 });
 
+let actualsAutoUpdateTimer = null;
+let actualsAutoUpdateRunning = false;
+
+async function executeActualsAutoUpdate(reason) {
+  if (!ACTUALS_AUTO_UPDATE_ENABLED) return;
+  if (actualsAutoUpdateRunning) {
+    logEvent("debug", "actuals_auto_update_skipped", { reason, skip: "already_running" });
+    return;
+  }
+
+  actualsAutoUpdateRunning = true;
+  logEvent("info", "actuals_auto_update_started", {
+    reason,
+    season: CURRENT_SEASON
+  });
+
+  try {
+    const result = await runActualsAutoUpdate({
+      season: CURRENT_SEASON,
+      dbPath: DB_PATH,
+      dataDir: DATA_DIR,
+      questionsPath: QUESTIONS_PATH,
+      rosterPath: ROSTER_PATH,
+      racesPath: RACES_PATH,
+      dryRun: false
+    });
+    logEvent("info", "actuals_auto_update_succeeded", {
+      reason,
+      season: CURRENT_SEASON,
+      latestRound: Number(result?.latestRound || 0) || null,
+      snapshotCount: Array.isArray(result?.snapshots) ? result.snapshots.length : 0,
+      changedSnapshotCount: Number(result?.changedSnapshotCount || 0) || 0,
+      liveActualCount: Number(result?.liveActualCount || 0) || 0
+    });
+  } catch (err) {
+    logEvent("warn", "actuals_auto_update_failed", {
+      reason,
+      season: CURRENT_SEASON,
+      error: serializeError(err)
+    });
+  } finally {
+    actualsAutoUpdateRunning = false;
+  }
+}
+
+function startActualsAutoUpdateScheduler() {
+  if (!ACTUALS_AUTO_UPDATE_ENABLED) return;
+
+  const safeIntervalMinutes =
+    Number.isFinite(ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES) && ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES > 0
+      ? ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES
+      : 180;
+  const safeStartDelayMs =
+    Number.isFinite(ACTUALS_AUTO_UPDATE_START_DELAY_MS) && ACTUALS_AUTO_UPDATE_START_DELAY_MS >= 0
+      ? ACTUALS_AUTO_UPDATE_START_DELAY_MS
+      : 30000;
+
+  if (ACTUALS_AUTO_UPDATE_ON_START) {
+    const startupTimer = setTimeout(() => {
+      executeActualsAutoUpdate("startup").catch(() => {});
+    }, safeStartDelayMs);
+    startupTimer.unref?.();
+  }
+
+  actualsAutoUpdateTimer = setInterval(() => {
+    executeActualsAutoUpdate("interval").catch(() => {});
+  }, safeIntervalMinutes * 60 * 1000);
+  actualsAutoUpdateTimer.unref?.();
+}
+
+validateProductionConfig();
+
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  logEvent("info", "server_started", {
+    port: Number(PORT),
+    nodeEnv: process.env.NODE_ENV || "development",
+    baseUrl: BASE_URL
+  });
+  startActualsAutoUpdateScheduler();
 });
