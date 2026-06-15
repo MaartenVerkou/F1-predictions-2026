@@ -3997,6 +3997,8 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     return sendError(req, res, 403, "Not a group member.");
   }
   const questions = getQuestions(locale);
+  const races = getRaces();
+  const snapshotRoundOptions = { maxRoundNumber: races.length };
   const actualRows = db.prepare("SELECT * FROM actuals").all();
   const currentActuals = actualRows.reduce((acc, row) => {
     acc[row.question_id] = row.value;
@@ -4018,6 +4020,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     const roundNumber = Number(row.round_number);
     const season = Number(row.season);
     if (!Number.isFinite(roundNumber) || roundNumber <= 0) return;
+    if (roundNumber > races.length) return;
     if (!Number.isFinite(season) || season <= 0) return;
     const key = `${season}:${roundNumber}`;
     if (snapshotByRound.has(key)) return;
@@ -4044,7 +4047,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   let selectedActualSnapshotMeta = null;
   let scoringActuals = currentActuals;
   if (Number.isFinite(requestedSnapshotId) && requestedSnapshotId > 0) {
-    const snapshotMeta = findSnapshotById(db, requestedSnapshotId);
+    const snapshotMeta = findSnapshotById(db, requestedSnapshotId, snapshotRoundOptions);
     if (snapshotMeta) {
       const snapshotValueRows = db
         .prepare(
@@ -4065,7 +4068,11 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
       }
     }
   }
-  const currentActualsSnapshotMeta = findLatestRoundSnapshotForSeason(db, CURRENT_SEASON);
+  const currentActualsSnapshotMeta = findLatestRoundSnapshotForSeason(
+    db,
+    CURRENT_SEASON,
+    snapshotRoundOptions
+  );
   const currentActualsReview =
     currentActualsSnapshotMeta && Number.isFinite(Number(currentActualsSnapshotMeta.round_number))
       ? {

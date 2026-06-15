@@ -98,7 +98,22 @@ function fetchSnapshotValues(db, snapshotId) {
     }, {});
 }
 
-function findLatestSnapshotForRound(db, season, roundNumber) {
+function normalizeMaxRoundNumber(options = {}) {
+  const maxRoundNumber = Number(options.maxRoundNumber);
+  return Number.isFinite(maxRoundNumber) && maxRoundNumber > 0
+    ? Math.floor(maxRoundNumber)
+    : null;
+}
+
+function isSnapshotWithinRoundLimit(snapshot, options = {}) {
+  const maxRoundNumber = normalizeMaxRoundNumber(options);
+  if (maxRoundNumber == null) return true;
+  const roundNumber = Number(snapshot?.round_number);
+  return Number.isFinite(roundNumber) && roundNumber > 0 && roundNumber <= maxRoundNumber;
+}
+
+function findLatestSnapshotForRound(db, season, roundNumber, options = {}) {
+  if (!isSnapshotWithinRoundLimit({ round_number: roundNumber }, options)) return null;
   return mapSnapshotRow(
     db
       .prepare(
@@ -128,7 +143,14 @@ function findLatestSnapshotForRound(db, season, roundNumber) {
   );
 }
 
-function findLatestRoundSnapshotForSeason(db, season) {
+function findLatestRoundSnapshotForSeason(db, season, options = {}) {
+  const maxRoundNumber = normalizeMaxRoundNumber(options);
+  const params = [season];
+  const roundLimitClause =
+    maxRoundNumber == null
+      ? ""
+      : "AND round_number <= ?";
+  if (maxRoundNumber != null) params.push(maxRoundNumber);
   return mapSnapshotRow(
     db
       .prepare(
@@ -150,15 +172,23 @@ function findLatestRoundSnapshotForSeason(db, season) {
         FROM actual_snapshots
         WHERE season = ?
           AND round_number IS NOT NULL
+          ${roundLimitClause}
         ORDER BY round_number DESC, COALESCE(updated_at, created_at) DESC, id DESC
         LIMIT 1
         `
       )
-      .get(season)
+      .get(...params)
   );
 }
 
-function listLatestSnapshotsForSeason(db, season) {
+function listLatestSnapshotsForSeason(db, season, options = {}) {
+  const maxRoundNumber = normalizeMaxRoundNumber(options);
+  const params = [season];
+  const roundLimitClause =
+    maxRoundNumber == null
+      ? ""
+      : "AND round_number <= ?";
+  if (maxRoundNumber != null) params.push(maxRoundNumber);
   const rows = db
     .prepare(
       `
@@ -179,10 +209,11 @@ function listLatestSnapshotsForSeason(db, season) {
       FROM actual_snapshots
       WHERE season = ?
         AND round_number IS NOT NULL
+        ${roundLimitClause}
       ORDER BY round_number ASC, COALESCE(updated_at, created_at) DESC, id DESC
       `
     )
-    .all(season);
+    .all(...params);
   const latestByRound = new Map();
   rows.forEach((row) => {
     const snapshot = mapSnapshotRow(row);
@@ -194,8 +225,8 @@ function listLatestSnapshotsForSeason(db, season) {
   return Array.from(latestByRound.values()).sort((a, b) => a.round_number - b.round_number);
 }
 
-function findSnapshotById(db, snapshotId) {
-  return mapSnapshotRow(
+function findSnapshotById(db, snapshotId, options = {}) {
+  const snapshot = mapSnapshotRow(
     db
       .prepare(
         `
@@ -220,6 +251,7 @@ function findSnapshotById(db, snapshotId) {
       )
       .get(snapshotId)
   );
+  return isSnapshotWithinRoundLimit(snapshot, options) ? snapshot : null;
 }
 
 function filterNonEmptyValues(valuesByQuestion) {

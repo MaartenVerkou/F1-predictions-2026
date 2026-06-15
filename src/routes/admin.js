@@ -906,8 +906,12 @@ function registerAdminRoutes(app, deps) {
     return `${basePath}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
   }
 
+  function getSnapshotRoundOptions() {
+    return { maxRoundNumber: getRaces().length };
+  }
+
   function findLatestRoundSnapshotForSeason(season) {
-    return loadLatestRoundSnapshotForSeason(db, season);
+    return loadLatestRoundSnapshotForSeason(db, season, getSnapshotRoundOptions());
   }
 
   function fetchSnapshotValues(snapshotId) {
@@ -2256,7 +2260,9 @@ function registerAdminRoutes(app, deps) {
       typeof req.session.adminActualsDraft.values === "object"
         ? req.session.adminActualsDraft.values
         : null;
-    const latestSnapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON);
+    const latestSnapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
+      maxRoundNumber: races.length
+    });
     const latestSnapshotByRound = new Map(
       latestSnapshots.map((snapshot) => [Number(snapshot.round_number), snapshot])
     );
@@ -2482,7 +2488,7 @@ function registerAdminRoutes(app, deps) {
     const snapshotId = Number(req.body.snapshotId || 0);
     const target = String(req.body.target || "current").trim() || "current";
     const unlockPast = String(req.body.unlockPast || "").trim() === "1";
-    const snapshot = findSnapshotById(db, snapshotId);
+    const snapshot = findSnapshotById(db, snapshotId, getSnapshotRoundOptions());
     if (!snapshot) {
       return res.redirect(
         `/admin/actuals?target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent("Snapshot not found.")}`
@@ -2509,6 +2515,16 @@ function registerAdminRoutes(app, deps) {
     const selectedTarget = String(req.body.actualsTarget || "current").trim() || "current";
     const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
     const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
+    if (
+      selectedRoundNumber != null &&
+      (!Number.isFinite(selectedRoundNumber) ||
+        selectedRoundNumber < 1 ||
+        selectedRoundNumber > races.length)
+    ) {
+      return res.redirect(
+        `/admin/actuals?error=${encodeURIComponent("Selected race is outside the configured calendar.")}`
+      );
+    }
     const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
     const latestRoundNumber =
       Number.isFinite(Number(latestRoundSnapshot?.round_number))

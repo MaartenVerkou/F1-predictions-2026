@@ -10,7 +10,10 @@ const {
   REVIEW_STATUS_PENDING,
   REVIEW_STATUS_REVIEWED,
   ensureActualSnapshotColumns,
+  findLatestRoundSnapshotForSeason,
   findLatestSnapshotForRound,
+  findSnapshotById,
+  listLatestSnapshotsForSeason,
   upsertSnapshotForRound
 } = require("../src/actuals-snapshots");
 
@@ -143,4 +146,48 @@ test("automatic snapshot updates preserve reviewed status until values change", 
   assert.equal(snapshot.review_status, REVIEW_STATUS_PENDING);
   assert.equal(snapshot.reviewed_at, null);
   assert.equal(snapshot.reviewed_by_user_id, null);
+});
+
+test("round-limited snapshot lookups ignore stale debug rounds", (t) => {
+  const { db, tempDir } = createTempDb();
+  t.after(() => {
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  ensureActualSnapshotColumns(db);
+  const validSnapshot = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 7,
+    roundName: "Barcelona-Catalunya Grand Prix",
+    valuesByQuestion: { q1: "A" },
+    sourceType: "autofill_backfill",
+    sourceNote: "automatic sync",
+    label: "R7 - Barcelona-Catalunya Grand Prix",
+    reviewStatus: REVIEW_STATUS_PENDING
+  });
+  const debugSnapshot = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 66,
+    roundName: "Debug Grand Prix",
+    valuesByQuestion: { q1: "B" },
+    sourceType: "autofill_backfill",
+    sourceNote: "debug",
+    label: "R66 - Debug Grand Prix",
+    reviewStatus: REVIEW_STATUS_PENDING
+  });
+
+  const options = { maxRoundNumber: 24 };
+  const latest = findLatestRoundSnapshotForSeason(db, 2026, options);
+  assert.equal(latest.id, validSnapshot.snapshotId);
+  assert.equal(latest.round_number, 7);
+
+  const snapshots = listLatestSnapshotsForSeason(db, 2026, options);
+  assert.deepEqual(
+    snapshots.map((snapshot) => snapshot.round_number),
+    [7]
+  );
+
+  assert.equal(findSnapshotById(db, debugSnapshot.snapshotId, options), null);
+  assert.equal(findSnapshotById(db, debugSnapshot.snapshotId).round_number, 66);
 });
