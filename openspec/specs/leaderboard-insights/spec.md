@@ -196,6 +196,21 @@ Rule: Leaderboard presentation SHALL remain usable in light and dark mode.
 - **AND** selected/current participant emphasis SHALL remain distinguishable from ordinary chart lines and rows
 - **AND** the ranking table SHALL use the primary content width before selected participant details are shown
 - **AND** the points-over-rounds chart SHALL appear beside the ranking table as a lighter companion panel on wide screens
+- **AND** the ranking table and chart panel SHALL take comparable vertical space on wide screens
+
+#### Scenario: Chart legend controls plotted series
+- **GIVEN** the points-over-rounds chart has plotted participants
+- **WHEN** the leaderboard renders
+- **THEN** the legend SHALL show checked participant controls without repeating latest point totals
+- **AND** unchecking a participant control SHALL hide that participant's plotted line and points
+- **AND** rechecking the control SHALL show that participant's plotted line and points again
+
+#### Scenario: Compact ranking headers avoid wasted space
+- **GIVEN** a leaderboard has latest-race movement data
+- **WHEN** the ranking table renders
+- **THEN** the visible position header SHALL be `POS`
+- **AND** the visible points header SHALL be `PTS`
+- **AND** the movement column SHALL keep an accessible label without visible header text
 
 #### Scenario: Selected details follow the ranking table
 - **GIVEN** a participant is selected on a desktop leaderboard
