@@ -3893,6 +3893,30 @@ function registerAdminRoutes(app, deps) {
           actuals: actualsMap,
           actualSnapshots: [],
           selectedActualSnapshotId: null,
+          leaderboardHistory: {
+            hasEnoughHistory: false,
+            rounds: [],
+            series: [],
+            maxTotal: 0
+          },
+          leaderboardFocusParticipantIds: [],
+          participantInsights: {
+            selectedParticipant: null,
+            comparisonRows: [],
+            gaps: [],
+            strengths: [],
+            distinctive: [],
+            emptyReason: null
+          },
+          selectedBreakdown: {
+            mode: "scored",
+            hasScoredRows: false,
+            rows: []
+          },
+          canViewQuestionBreakdown: false,
+          selectedParticipantId: null,
+          selectedLatestRoundDelta: null,
+          latestRoundDeltaMeta: null,
           leaderboardTotal: fullLeaderboard.length,
           leaderboardPerPage,
           currentLeaderboardPage: safeLeaderboardPage,
