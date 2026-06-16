@@ -182,6 +182,25 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(page.getByText(/Top 10 plus selected participants/i)).toHaveCount(0);
   await expect(page.getByText(/Last race: R1 to R2/i)).toHaveCount(0);
   await expect(page.locator(".leaderboard-trend-chart")).toBeVisible();
+  const chartDomain = await page.locator(".leaderboard-trend-chart").evaluate((chart) => {
+    const circles = Array.from(chart.querySelectorAll("circle.leaderboard-chart-line"))
+      .map((circle) => Number(circle.getAttribute("cy")))
+      .filter(Number.isFinite);
+    return {
+      min: Number(chart.getAttribute("data-chart-domain-min")),
+      max: Number(chart.getAttribute("data-chart-domain-max")),
+      minPointY: Math.min(...circles),
+      maxPointY: Math.max(...circles),
+      axisLabels: Array.from(chart.querySelectorAll(".leaderboard-chart-label")).map((label) =>
+        label.textContent.trim()
+      )
+    };
+  });
+  expect(chartDomain.min).toBeGreaterThan(0);
+  expect(chartDomain.max).toBeGreaterThan(chartDomain.min);
+  expect(chartDomain.minPointY).toBeGreaterThanOrEqual(16);
+  expect(chartDomain.maxPointY).toBeLessThanOrEqual(318);
+  expect(chartDomain.axisLabels).toContain(String(chartDomain.min));
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("CHANGE");
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("POSITION");
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("POINTS");
@@ -361,6 +380,7 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       chartBottom: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().bottom),
       chartHeight: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().height),
       chartWidth: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().width),
+      chartWrapWidth: Math.round(document.querySelector(".leaderboard-chart-wrap").getBoundingClientRect().width),
       chartWrapRight: Math.round(document.querySelector(".leaderboard-chart-wrap").getBoundingClientRect().right),
       chartWrapBottom: Math.round(document.querySelector(".leaderboard-chart-wrap").getBoundingClientRect().bottom),
       chartSvgHeight: Math.round(document.querySelector(".leaderboard-trend-chart").getBoundingClientRect().height),
@@ -383,12 +403,14 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
     if (testCase.width >= 1100) {
       expect(metrics.legendLeft).toBeGreaterThanOrEqual(metrics.chartWrapRight);
       expect(metrics.chartWidth).toBeGreaterThan(metrics.mainWidth);
-      expect(metrics.legendWidth).toBeGreaterThanOrEqual(260);
+      expect(metrics.legendWidth).toBeGreaterThanOrEqual(150);
+      expect(metrics.legendWidth).toBeLessThanOrEqual(230);
+      expect(metrics.chartWrapWidth).toBeGreaterThan(metrics.legendWidth * 3);
       expect(metrics.chartSvgHeight).toBeGreaterThanOrEqual(250);
       expect(metrics.chartBottom).toBeLessThanOrEqual(metrics.mainTop);
       expect(metrics.detailLeft).toBeGreaterThanOrEqual(metrics.mainRight);
-      expect(metrics.detailWidth / metrics.mainWidth).toBeGreaterThanOrEqual(0.9);
-      expect(metrics.detailWidth / metrics.mainWidth).toBeLessThanOrEqual(1.1);
+      expect(metrics.mainWidth).toBeLessThanOrEqual(460);
+      expect(metrics.detailWidth / metrics.mainWidth).toBeGreaterThanOrEqual(1.2);
       expect(Math.abs(metrics.detailTop - metrics.mainTop)).toBeLessThanOrEqual(8);
     } else {
       expect(metrics.legendTop).toBeGreaterThanOrEqual(metrics.chartWrapBottom);

@@ -285,6 +285,20 @@
     '#5f6f52',
     '#7b4f86'
   ]; %>
+  <% const niceChartStep = (value) => {
+    const raw = Math.abs(Number(value || 0));
+    if (!Number.isFinite(raw) || raw <= 0) return 1;
+    const power = 10 ** Math.floor(Math.log10(raw));
+    const normalized = raw / power;
+    const multiplier = normalized <= 1 ? 1 : (normalized <= 2 ? 2 : (normalized <= 5 ? 5 : 10));
+    return multiplier * power;
+  }; %>
+  <% const formatChartTick = (value) => {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) return '0';
+    if (Number.isInteger(number)) return String(number);
+    return String(Number(number.toFixed(1)));
+  }; %>
 
   <div class="page-title-row">
     <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
@@ -348,9 +362,10 @@
                     <a
                       class="leaderboard-row-link"
                       href="<%= leaderboardHref({ participant: row.userId }) %>"
+                      title="<%= row.name %>"
                       data-leaderboard-participant-link
                     >
-                      <strong><%= row.name %></strong>
+                      <strong class="leaderboard-row-name"><%= row.name %></strong>
                     </a>
                   </td>
                   <td><strong><%= row.total %></strong></td>
@@ -401,11 +416,47 @@
             <% const padBottom = 42; %>
             <% const plotWidth = chartWidth - padLeft - padRight; %>
             <% const plotHeight = chartHeight - padTop - padBottom; %>
-            <% const maxTotal = Math.max(1, Number(safeHistory.maxTotal || 0)); %>
+            <% const chartLatestPoints = safeHistory.series
+              .map((series) => series.points?.[series.points.length - 1])
+              .filter(Boolean); %>
+            <% const chartTopRankTotals = chartLatestPoints
+              .filter((point) => Number(point.rank || 0) > 0 && Number(point.rank || 0) <= 10)
+              .map((point) => Number(point.total))
+              .filter((value) => Number.isFinite(value)); %>
+            <% const chartAllLatestTotals = chartLatestPoints
+              .map((point) => Number(point.total))
+              .filter((value) => Number.isFinite(value)); %>
+            <% const chartDomainTotals = chartTopRankTotals.length > 0 ? chartTopRankTotals : chartAllLatestTotals; %>
+            <% const chartCurrentMin = chartDomainTotals.length > 0 ? Math.min(...chartDomainTotals) : 0; %>
+            <% const chartCurrentMax = chartDomainTotals.length > 0
+              ? Math.max(...chartDomainTotals)
+              : Math.max(1, Number(safeHistory.maxTotal || 0)); %>
+            <% const chartStep = niceChartStep(
+              chartCurrentMax > chartCurrentMin
+                ? (chartCurrentMax - chartCurrentMin) / 4
+                : Math.max(1, chartCurrentMax / 4)
+            ); %>
+            <% const chartDomainMin = chartCurrentMin > 0
+              ? Math.max(0, Math.floor(chartCurrentMin / chartStep) * chartStep)
+              : 0; %>
+            <% const chartDomainMax = Math.max(
+              chartDomainMin + chartStep,
+              Math.ceil(Math.max(chartCurrentMax, chartDomainMin + chartStep) / chartStep) * chartStep
+            ); %>
+            <% const chartDomainSpan = Math.max(1, chartDomainMax - chartDomainMin); %>
+            <% const chartTickValues = [
+              chartDomainMin,
+              chartDomainMin + chartDomainSpan / 2,
+              chartDomainMax
+            ]; %>
             <% const xForIndex = (idx) => safeHistory.rounds.length <= 1
               ? padLeft
               : padLeft + (idx / (safeHistory.rounds.length - 1)) * plotWidth; %>
-            <% const yForTotal = (total) => padTop + plotHeight - (Number(total || 0) / maxTotal) * plotHeight; %>
+            <% const yForTotal = (total) => {
+              const value = Number(total || 0);
+              const clamped = Math.min(chartDomainMax, Math.max(chartDomainMin, Number.isFinite(value) ? value : chartDomainMin));
+              return padTop + plotHeight - ((clamped - chartDomainMin) / chartDomainSpan) * plotHeight;
+            }; %>
             <div class="leaderboard-chart-content">
             <div class="leaderboard-chart-wrap">
               <svg
@@ -413,13 +464,15 @@
                 viewBox="0 0 <%= chartWidth %> <%= chartHeight %>"
                 role="img"
                 aria-label="Leaderboard points over completed rounds"
+                data-chart-domain-min="<%= formatChartTick(chartDomainMin) %>"
+                data-chart-domain-max="<%= formatChartTick(chartDomainMax) %>"
               >
                 <line x1="<%= padLeft %>" y1="<%= padTop %>" x2="<%= padLeft %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
                 <line x1="<%= padLeft %>" y1="<%= padTop + plotHeight %>" x2="<%= padLeft + plotWidth %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
-                <% [0, 0.5, 1].forEach((tick) => { %>
-                  <% const y = padTop + plotHeight - tick * plotHeight; %>
+                <% chartTickValues.forEach((tickValue) => { %>
+                  <% const y = yForTotal(tickValue); %>
                   <line x1="<%= padLeft %>" y1="<%= y %>" x2="<%= padLeft + plotWidth %>" y2="<%= y %>" class="leaderboard-chart-grid" />
-                  <text x="<%= padLeft - 10 %>" y="<%= y + 4 %>" text-anchor="end" class="leaderboard-chart-label"><%= Math.round(maxTotal * tick) %></text>
+                  <text x="<%= padLeft - 10 %>" y="<%= y + 4 %>" text-anchor="end" class="leaderboard-chart-label"><%= formatChartTick(tickValue) %></text>
                 <% }) %>
                 <% safeHistory.rounds.forEach((round, idx) => { %>
                   <% const x = xForIndex(idx); %>
@@ -463,6 +516,7 @@
                   <a
                     class="leaderboard-chart-legend-link"
                     href="<%= leaderboardHref({ participant: series.participantId }) %>"
+                    title="<%= series.name %>"
                     data-leaderboard-participant-link
                   >
                     <span class="leaderboard-legend-swatch"></span>
