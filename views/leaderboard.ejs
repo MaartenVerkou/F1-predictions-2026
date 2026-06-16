@@ -378,9 +378,9 @@
                   <span class="leaderboard-header-short">PTS</span>
                 </th>
                 <% if (hasRoundDeltaColumn) { %>
-                  <th>
-                    <span class="leaderboard-header-long">CHANGE</span>
-                    <span class="leaderboard-header-short">CHG.</span>
+                  <th class="leaderboard-delta-header" aria-label="Latest race movement">
+                    <span class="sr-only">Latest race movement</span>
+                    <span aria-hidden="true">±</span>
                   </th>
                 <% } %>
               </tr>
@@ -401,10 +401,15 @@
                     <% const delta = row.latestRoundDelta; %>
                     <td class="leaderboard-delta-cell">
                       <% if (delta) { %>
-                        <% const deltaClass = Number(delta.rankDelta || 0) > 0 ? 'is-positive' : (Number(delta.rankDelta || 0) < 0 ? 'is-negative' : ''); %>
-                        <strong class="<%= deltaClass %>"><%= formatRankDelta(delta.rankDelta) %></strong>
+                        <% const rankDelta = Number(delta.rankDelta || 0); %>
+                        <% const deltaClass = rankDelta > 0 ? 'is-positive' : (rankDelta < 0 ? 'is-negative' : ''); %>
+                        <% if (rankDelta === 0) { %>
+                          <span class="leaderboard-delta-empty" aria-label="No rank change">-</span>
+                        <% } else { %>
+                          <strong class="<%= deltaClass %>"><%= formatRankDelta(rankDelta) %></strong>
+                        <% } %>
                       <% } else { %>
-                        <span class="muted">-</span>
+                        <span class="leaderboard-delta-empty" aria-label="No movement data">-</span>
                       <% } %>
                     </td>
                   <% } %>
@@ -429,12 +434,11 @@
         </section>
       </div>
 
-      <section class="leaderboard-detail-card">
-        <section class="leaderboard-member-panel leaderboard-selected-panel">
+      <section class="leaderboard-detail-card leaderboard-selected-panel">
           <% if (safeInsights.selectedParticipant) { %>
             <div class="leaderboard-member-heading">
               <div>
-                <h2><%= safeInsights.selectedParticipant.name %></h2>
+                <h2 id="leaderboard-selected-heading"><%= safeInsights.selectedParticipant.name %></h2>
                 <p class="muted">
                   Rank <strong><%= safeInsights.selectedParticipant.rank %></strong>
                   - <strong><%= safeInsights.selectedParticipant.total %></strong> points
@@ -573,7 +577,6 @@
           <% } else { %>
             <p class="muted leaderboard-empty-copy">Select a scored participant to see leaderboard insights.</p>
           <% } %>
-        </section>
       </section>
     </div>
   <% } %>

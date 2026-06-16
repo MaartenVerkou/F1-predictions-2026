@@ -62,6 +62,18 @@
   box-sizing: border-box;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 html {
   background: var(--page-grad-start);
   overflow-x: hidden;
@@ -2380,11 +2392,10 @@ button:disabled {
 
 .leaderboard-trend-panel {
   min-width: 0;
-  padding: 14px 18px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--card) 90%, var(--rules-bg));
-  box-shadow: var(--shadow-soft);
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  box-shadow: none;
 }
 
 .leaderboard-section-heading {
@@ -2539,10 +2550,10 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
 .leaderboard-layout {
   display: grid;
-  grid-template-columns: minmax(318px, 0.95fr) minmax(0, 1.35fr);
-  gap: 28px;
-  align-items: stretch;
-  margin-top: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 16px;
 }
 
 .leaderboard-main-column {
@@ -2570,10 +2581,12 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
 .leaderboard-detail-card {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   min-height: 0;
   align-content: start;
   overflow: visible;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
 }
 
 .leaderboard-rank-row {
@@ -2604,13 +2617,20 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
 .leaderboard-main-card > .table th:nth-child(3),
 .leaderboard-main-card > .table td:nth-child(3) {
-  width: 84px;
+  width: 78px;
 }
 
+.leaderboard-delta-header,
 .leaderboard-main-card > .table th:nth-child(4),
 .leaderboard-main-card > .table td:nth-child(4) {
-  width: 82px;
+  width: 44px;
   text-align: right;
+}
+
+.leaderboard-delta-header {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .leaderboard-row-link {
@@ -2626,7 +2646,7 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 }
 
 .leaderboard-delta-cell {
-  min-width: 64px;
+  min-width: 36px;
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
@@ -2645,41 +2665,10 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   color: var(--accent);
 }
 
-.leaderboard-member-panel {
-  margin-top: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--card) 88%, var(--rules-bg));
-  box-shadow: var(--shadow-soft);
-  min-height: 0;
-  height: var(--leaderboard-panel-height, auto);
-  max-height: var(--leaderboard-panel-height, none);
-  overflow-y: auto;
-  overflow-x: hidden;
-  box-sizing: border-box;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(128, 146, 182, 0.6) transparent;
-}
-
-.leaderboard-member-panel::-webkit-scrollbar {
-  width: 10px;
-}
-
-.leaderboard-member-panel::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.leaderboard-member-panel::-webkit-scrollbar-thumb {
-  background: rgba(128, 146, 182, 0.45);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.leaderboard-member-panel::-webkit-scrollbar-thumb:hover {
-  background: rgba(128, 146, 182, 0.65);
-  background-clip: padding-box;
+.leaderboard-delta-empty {
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+  display: inline-block;
+  font-weight: 700;
 }
 
 .leaderboard-member-heading {
@@ -2925,8 +2914,7 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 }
 
 :root[data-theme="dark"] .leaderboard-trend-panel,
-:root[data-theme="dark"] .leaderboard-member-panel {
-  background: color-mix(in srgb, var(--card) 82%, var(--rules-bg));
+:root[data-theme="dark"] .leaderboard-detail-card {
   border-color: color-mix(in srgb, var(--border) 88%, #ffffff 6%);
 }
 
@@ -2955,26 +2943,12 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   background: rgba(155, 169, 201, 0.16);
 }
 
+:root[data-theme="dark"] .leaderboard-delta-empty {
+  color: color-mix(in srgb, var(--muted) 76%, transparent);
+}
+
 :root[data-theme="dark"] .leaderboard-breakdown-toggle a.is-active {
   color: #ffffff;
-}
-
-:root[data-theme="dark"] .leaderboard-member-panel {
-  scrollbar-color: rgba(155, 169, 201, 0.7) rgba(17, 29, 59, 0.25);
-}
-
-:root[data-theme="dark"] .leaderboard-member-panel::-webkit-scrollbar-track {
-  background: rgba(17, 29, 59, 0.25);
-}
-
-:root[data-theme="dark"] .leaderboard-member-panel::-webkit-scrollbar-thumb {
-  background: rgba(155, 169, 201, 0.55);
-  background-clip: padding-box;
-}
-
-:root[data-theme="dark"] .leaderboard-member-panel::-webkit-scrollbar-thumb:hover {
-  background: rgba(155, 169, 201, 0.78);
-  background-clip: padding-box;
 }
 
 @media (max-width: 980px) {
@@ -3004,19 +2978,15 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   .leaderboard-detail-card {
     min-height: 0;
   }
-
-  .leaderboard-member-panel {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
 }
 
 @media (max-width: 720px) {
-  .leaderboard-trend-panel,
-  .leaderboard-member-panel {
-    padding: 13px;
-    border-radius: 14px;
+  .leaderboard-trend-panel {
+    padding-bottom: 14px;
+  }
+
+  .leaderboard-detail-card {
+    padding-top: 14px;
   }
 
   .leaderboard-section-heading {
@@ -3138,16 +3108,17 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
   .leaderboard-main-card > .table th:nth-child(3),
   .leaderboard-main-card > .table td:nth-child(3) {
-    width: 50px;
+    width: 48px;
   }
 
+  .leaderboard-delta-header,
   .leaderboard-main-card > .table th:nth-child(4),
   .leaderboard-main-card > .table td:nth-child(4) {
-    width: 50px;
+    width: 34px;
   }
 
   .leaderboard-delta-cell {
-    min-width: 40px;
+    min-width: 30px;
     font-size: 12px;
   }
 }
@@ -3173,10 +3144,14 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   }
 
   .leaderboard-main-card > .table th:nth-child(3),
-  .leaderboard-main-card > .table td:nth-child(3),
+  .leaderboard-main-card > .table td:nth-child(3) {
+    width: 44px;
+  }
+
+  .leaderboard-delta-header,
   .leaderboard-main-card > .table th:nth-child(4),
   .leaderboard-main-card > .table td:nth-child(4) {
-    width: 46px;
+    width: 30px;
   }
 }
 

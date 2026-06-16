@@ -180,9 +180,15 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(page.getByText(/Live scoring reflects/i)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /Points over rounds/i })).toBeVisible();
   await expect(page.locator(".leaderboard-trend-chart")).toBeVisible();
-  await expect(page.locator(".leaderboard-main-card thead")).toContainText("CHANGE");
+  await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("CHANGE");
+  await expect(page.locator(".leaderboard-delta-header")).toHaveAttribute(
+    "aria-label",
+    "Latest race movement"
+  );
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
   await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
+  const apexRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Apex" });
+  await expect(apexRow.locator(".leaderboard-delta-cell")).toHaveText("-");
   await expect(page.locator(".leaderboard-chart-legend")).toContainText("Dev Admin");
 
   const selectedPanel = page.locator(".leaderboard-selected-panel");
@@ -282,12 +288,17 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
         document.body.scrollWidth - document.body.clientWidth
       ),
       legendItems: document.querySelectorAll(".leaderboard-chart-legend-item").length,
-      rows: document.querySelectorAll(".leaderboard-main-card tbody tr").length
+      rows: document.querySelectorAll(".leaderboard-main-card tbody tr").length,
+      nestedDetailPanels: document.querySelectorAll(".leaderboard-member-panel").length,
+      mainBottom: Math.round(document.querySelector(".leaderboard-main-card").getBoundingClientRect().bottom),
+      detailTop: Math.round(document.querySelector(".leaderboard-detail-card").getBoundingClientRect().top)
     }));
 
     expect(metrics.theme).toBe(testCase.theme);
     expect(metrics.overflowX).toBeLessThanOrEqual(0);
     expect(metrics.legendItems).toBeGreaterThan(0);
     expect(metrics.rows).toBeGreaterThan(0);
+    expect(metrics.nestedDetailPanels).toBe(0);
+    expect(metrics.detailTop).toBeGreaterThanOrEqual(metrics.mainBottom);
   }
 });
