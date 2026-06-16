@@ -190,6 +190,7 @@
   <% const selectedParticipantKey = selectedParticipantId == null ? "" : String(selectedParticipantId); %>
   <% const safeSelectedLatestRoundDelta = selectedLatestRoundDelta || null; %>
   <% const currentUserKey = user && user.id != null ? String(user.id) : ""; %>
+  <% const showSnapshotReviewStatus = user && Number(user.is_admin || 0) === 1; %>
   <% const safeLatestRoundDeltaMeta = latestRoundDeltaMeta || null; %>
   <% const hasRoundDeltaColumn = Boolean(safeLatestRoundDeltaMeta); %>
   <% const leaderboardHref = (updates = {}, anchor = 'leaderboard-overview') => {
@@ -265,12 +266,12 @@
           </div>
         </div>
         <% if (safeHistory.hasEnoughHistory && safeHistory.series.length > 0) { %>
-          <% const chartWidth = 720; %>
-          <% const chartHeight = 260; %>
-          <% const padLeft = 46; %>
-          <% const padRight = 18; %>
-          <% const padTop = 18; %>
-          <% const padBottom = 42; %>
+          <% const chartWidth = 960; %>
+          <% const chartHeight = 240; %>
+          <% const padLeft = 52; %>
+          <% const padRight = 24; %>
+          <% const padTop = 16; %>
+          <% const padBottom = 38; %>
           <% const plotWidth = chartWidth - padLeft - padRight; %>
           <% const plotHeight = chartHeight - padTop - padBottom; %>
           <% const maxTotal = Math.max(1, Number(safeHistory.maxTotal || 0)); %>
@@ -354,7 +355,7 @@
               <option value="" <%= selectedSnapshotKey === "" ? "selected" : "" %>><%= t('leaderboard.current_snapshot') %></option>
               <% actualSnapshots.forEach((snapshot) => { %>
                 <option value="<%= snapshot.id %>" <%= selectedSnapshotKey === String(snapshot.id) ? "selected" : "" %>>
-                  <%= snapshot.label %><%= snapshot.reviewStatus === 'pending' ? ' | pending review' : '' %>
+                  <%= snapshot.label %><%= showSnapshotReviewStatus && snapshot.reviewStatus === 'pending' ? ' | pending review' : '' %>
                 </option>
               <% }) %>
             </select>

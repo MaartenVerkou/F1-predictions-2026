@@ -2373,6 +2373,11 @@ button:disabled {
   margin: 18px 0 22px;
 }
 
+#leaderboard-overview,
+#leaderboard-breakdown {
+  scroll-margin-top: calc(var(--header-offset) + var(--dev-toolbar-offset) + 16px);
+}
+
 .leaderboard-trend-panel {
   min-width: 0;
   padding: 16px 18px;
@@ -2405,7 +2410,7 @@ button:disabled {
 .leaderboard-trend-chart {
   display: block;
   width: 100%;
-  min-width: 520px;
+  min-width: 640px;
   height: auto;
 }
 
@@ -2955,7 +2960,7 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   }
 
   .leaderboard-trend-chart {
-    min-width: 460px;
+    min-width: 620px;
   }
 
   .leaderboard-chart-legend {
