@@ -13,6 +13,7 @@
 - [x] 2.2 Add chart history, focus set, latest-race movement data, insight data, and breakdown data to the leaderboard render model.
 - [x] 2.3 Preserve existing snapshot selection, access control, pagination, and admin analysis leaderboard behavior.
 - [x] 2.4 Add safe empty states for insufficient snapshot history, no scored questions, and selected participants without scored rows.
+- [x] 2.5 Allow anonymous access to the global leaderboard while keeping private group leaderboards member-only.
 
 ## 3. User Interface
 
@@ -22,6 +23,7 @@
 - [x] 3.4 Add a selected-participant insight panel explaining gaps, strengths, and distinctive predictions.
 - [x] 3.5 Add an expandable question breakdown that defaults to scored questions and toggles to all questions.
 - [x] 3.6 Ensure mobile and desktop layouts keep chart labels, latest-race movement, insights, and breakdown text readable without overlap.
+- [x] 3.7 Hide detailed prediction breakdown rows for anonymous global leaderboard visitors and show a sign-in prompt.
 
 ## 4. Verification
 
@@ -30,3 +32,4 @@
 - [x] 4.3 Run `npm run lint`, `npm test`, `npm run build`, and `npm run test:e2e`.
 - [x] 4.4 Validate the OpenSpec change with `openspec validate enhance-leaderboard-insights --type change --strict`.
 - [x] 4.5 Run a local visual check of the leaderboard on desktop and mobile viewports before deployment.
+- [x] 4.6 Verify anonymous global access and anonymous private-group protection in Playwright.

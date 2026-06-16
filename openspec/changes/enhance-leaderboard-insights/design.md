@@ -13,6 +13,7 @@ The current leaderboard view shows a paginated rank table, snapshot selector, an
 - Explain the selected participant's position using question-level score gaps, strengths, and distinctive predictions against nearby competitors.
 - Show compact latest-race rank movement from the latest completed round compared with the previous round directly in leaderboard rows, with point-change detail in the selected participant panel.
 - Let users expand a selected participant's question breakdown, defaulting to scored questions with a toggle to all questions.
+- Let anonymous visitors view the global leaderboard while requiring login for private group leaderboards and detailed prediction breakdowns.
 
 **Non-Goals:**
 - Changing how questions are scored.
@@ -64,6 +65,12 @@ The selected participant's expanded breakdown SHALL default to scored questions 
 Rationale: the current all-question table is comprehensive but noisy. Defaulting to scored questions supports the "why are they winning/behind" job while preserving access to the full overview.
 
 Alternative considered: always show all questions. That preserves completeness but makes the insights panel harder to scan.
+
+### Keep public viewing limited to the global classement
+
+The global leaderboard SHALL be readable without login, but private group leaderboards SHALL remain member-only. Anonymous global visitors SHALL see rankings, chart context, and selected-participant summary, but SHALL NOT see detailed prediction breakdown rows.
+
+Rationale: a public global classement is useful for sharing and discovery, while private groups and per-question predictions carry stronger privacy expectations.
 
 ## Risks / Trade-offs
 

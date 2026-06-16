@@ -10,12 +10,13 @@ The leaderboard currently shows ranks, total points, snapshot selection, and per
 - Add leaderboard insights for the selected participant that explain gaps to nearby competitors above them, strengths versus nearby peers, and distinctive predictions or scoring patterns.
 - Add a compact latest-race rank-change column in the leaderboard table, while showing point-change detail in the selected participant panel.
 - Add an expandable question breakdown for the selected participant that defaults to scored questions and can toggle to all questions.
+- Allow the global leaderboard to be viewed without login while keeping private group leaderboards and detailed prediction breakdowns protected.
 - Preserve existing leaderboard access control, pagination, snapshot selection, and scoring behavior.
 
 ## Capabilities
 
 ### New Capabilities
-- `leaderboard-insights`: Historical leaderboard trends, focus-set charting, selected-participant insights, compact latest-race rank movement, and scored/all question breakdown behavior.
+- `leaderboard-insights`: Historical leaderboard trends, focus-set charting, selected-participant insights, compact latest-race rank movement, public global viewing, and scored/all question breakdown behavior.
 
 ### Modified Capabilities
 - None.

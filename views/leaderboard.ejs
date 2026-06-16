@@ -187,6 +187,7 @@
   <% const safeHistory = leaderboardHistory || { hasEnoughHistory: false, rounds: [], series: [], maxTotal: 0 }; %>
   <% const safeInsights = participantInsights || { selectedParticipant: null, comparisonRows: [], gaps: [], strengths: [], distinctive: [], emptyReason: null }; %>
   <% const safeBreakdown = selectedBreakdown || { mode: 'scored', hasScoredRows: false, rows: [] }; %>
+  <% const canViewBreakdown = Boolean(canViewQuestionBreakdown); %>
   <% const selectedParticipantKey = selectedParticipantId == null ? "" : String(selectedParticipantId); %>
   <% const safeSelectedLatestRoundDelta = selectedLatestRoundDelta || null; %>
   <% const currentUserKey = user && user.id != null ? String(user.id) : ""; %>
@@ -504,63 +505,71 @@
               </section>
             </div>
 
-            <div class="leaderboard-breakdown-header">
-              <div>
-                <h3>Question breakdown</h3>
-                <p class="muted"><%= safeBreakdown.mode === 'all' ? 'All questions' : 'Scored questions' %></p>
+            <% if (canViewBreakdown) { %>
+              <div class="leaderboard-breakdown-header">
+                <div>
+                  <h3>Question breakdown</h3>
+                  <p class="muted"><%= safeBreakdown.mode === 'all' ? 'All questions' : 'Scored questions' %></p>
+                </div>
+                <div class="leaderboard-breakdown-toggle" aria-label="Question breakdown filter">
+                  <a class="<%= safeBreakdown.mode === 'scored' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: '' }, 'leaderboard-breakdown') %>">Scored</a>
+                  <a class="<%= safeBreakdown.mode === 'all' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: 'all' }, 'leaderboard-breakdown') %>">All</a>
+                </div>
               </div>
-              <div class="leaderboard-breakdown-toggle" aria-label="Question breakdown filter">
-                <a class="<%= safeBreakdown.mode === 'scored' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: '' }, 'leaderboard-breakdown') %>">Scored</a>
-                <a class="<%= safeBreakdown.mode === 'all' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: 'all' }, 'leaderboard-breakdown') %>">All</a>
-              </div>
-            </div>
 
-            <div id="leaderboard-breakdown">
-              <% if (safeBreakdown.rows.length > 0) { %>
-                <table class="table compact leaderboard-breakdown-table">
-                  <thead>
-                    <tr>
-                      <th>Q</th>
-                      <th><%= t('leaderboard.prediction') %></th>
-                      <th><%= t('leaderboard.actual') %></th>
-                      <th><%= t('leaderboard.points_short_caps') %></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                  <% safeBreakdown.rows.forEach((breakdownRow) => { %>
-                    <% const q = breakdownRow.question; %>
-                    <% const actualDisplay = formatValue(q, breakdownRow.actualRaw); %>
-                    <% const answerDisplay = formatValue(q, breakdownRow.predictionRaw); %>
-                    <tr class="<%= breakdownRow.isScored ? '' : 'is-unscored' %>">
-                      <td>
-                        <span class="leaderboard-question-chip" tabindex="0">
-                          <span class="leaderboard-question-code">Q<%= breakdownRow.questionNumber %></span>
-                          <span class="leaderboard-question-tooltip"><%= q.prompt %></span>
-                        </span>
-                      </td>
-                      <td>
-                        <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, breakdownRow.predictionRaw, answerDisplay) ? 'has-short' : '' %>">
-                          <span class="leaderboard-value-full"><%= answerDisplay %></span>
-                          <span class="leaderboard-value-short"><%= abbreviateEntities(answerDisplay) %></span>
-                        </span>
-                      </td>
-                      <td>
-                        <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, breakdownRow.actualRaw, actualDisplay) ? 'has-short' : '' %>">
-                          <span class="leaderboard-value-full"><%= actualDisplay %></span>
-                          <span class="leaderboard-value-short"><%= abbreviateEntities(actualDisplay) %></span>
-                        </span>
-                      </td>
-                      <td><strong><%= breakdownRow.points %></strong></td>
-                    </tr>
-                  <% }) %>
-                  </tbody>
-                </table>
-              <% } else { %>
-                <p class="muted leaderboard-empty-copy">
-                  <%= safeBreakdown.mode === 'scored' ? 'No scored questions for this participant yet.' : 'No question answers found for this participant.' %>
-                </p>
-              <% } %>
-            </div>
+              <div id="leaderboard-breakdown">
+                <% if (safeBreakdown.rows.length > 0) { %>
+                  <table class="table compact leaderboard-breakdown-table">
+                    <thead>
+                      <tr>
+                        <th>Q</th>
+                        <th><%= t('leaderboard.prediction') %></th>
+                        <th><%= t('leaderboard.actual') %></th>
+                        <th><%= t('leaderboard.points_short_caps') %></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                    <% safeBreakdown.rows.forEach((breakdownRow) => { %>
+                      <% const q = breakdownRow.question; %>
+                      <% const actualDisplay = formatValue(q, breakdownRow.actualRaw); %>
+                      <% const answerDisplay = formatValue(q, breakdownRow.predictionRaw); %>
+                      <tr class="<%= breakdownRow.isScored ? '' : 'is-unscored' %>">
+                        <td>
+                          <span class="leaderboard-question-chip" tabindex="0">
+                            <span class="leaderboard-question-code">Q<%= breakdownRow.questionNumber %></span>
+                            <span class="leaderboard-question-tooltip"><%= q.prompt %></span>
+                          </span>
+                        </td>
+                        <td>
+                          <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, breakdownRow.predictionRaw, answerDisplay) ? 'has-short' : '' %>">
+                            <span class="leaderboard-value-full"><%= answerDisplay %></span>
+                            <span class="leaderboard-value-short"><%= abbreviateEntities(answerDisplay) %></span>
+                          </span>
+                        </td>
+                        <td>
+                          <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, breakdownRow.actualRaw, actualDisplay) ? 'has-short' : '' %>">
+                            <span class="leaderboard-value-full"><%= actualDisplay %></span>
+                            <span class="leaderboard-value-short"><%= abbreviateEntities(actualDisplay) %></span>
+                          </span>
+                        </td>
+                        <td><strong><%= breakdownRow.points %></strong></td>
+                      </tr>
+                    <% }) %>
+                    </tbody>
+                  </table>
+                <% } else { %>
+                  <p class="muted leaderboard-empty-copy">
+                    <%= safeBreakdown.mode === 'scored' ? 'No scored questions for this participant yet.' : 'No question answers found for this participant.' %>
+                  </p>
+                <% } %>
+              </div>
+            <% } else { %>
+              <div class="leaderboard-breakdown-locked">
+                <h3>Question breakdown</h3>
+                <p class="muted">Sign in to view detailed predictions and scored-question breakdowns.</p>
+                <a class="link" href="/login?redirectTo=<%= encodeURIComponent(leaderboardHref({ participant: selectedParticipantKey }, 'leaderboard-overview')) %>">Sign in</a>
+              </div>
+            <% } %>
           <% } else { %>
             <p class="muted leaderboard-empty-copy">Select a scored participant to see leaderboard insights.</p>
           <% } %>

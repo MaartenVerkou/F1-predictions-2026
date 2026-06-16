@@ -139,7 +139,33 @@ function seedLeaderboardInsights(db) {
     ).run(questionId, value, now);
   });
 
-  return { devAdminId: Number(devAdmin.id) };
+  const privateGroupId = 990001;
+  db.prepare("DELETE FROM responses WHERE group_id = ?").run(privateGroupId);
+  db.prepare("DELETE FROM guest_responses WHERE group_id = ?").run(privateGroupId);
+  db.prepare("DELETE FROM named_guest_group_members WHERE group_id = ?").run(privateGroupId);
+  db.prepare("DELETE FROM group_members WHERE group_id = ?").run(privateGroupId);
+  db.prepare("DELETE FROM groups WHERE id = ?").run(privateGroupId);
+  db.prepare(
+    `
+    INSERT INTO groups (
+      id,
+      name,
+      owner_id,
+      created_at,
+      is_global,
+      is_public,
+      join_password_hash,
+      is_simulated,
+      invite_link_open
+    )
+    VALUES (?, 'E2E Private League', ?, ?, 0, 0, NULL, 0, 0)
+    `
+  ).run(privateGroupId, devAdmin.id, now);
+  db.prepare(
+    "INSERT INTO group_members (user_id, group_id, role, joined_at, coupled_to_global) VALUES (?, ?, 'owner', ?, 1)"
+  ).run(devAdmin.id, privateGroupId, now);
+
+  return { devAdminId: Number(devAdmin.id), privateGroupId };
 }
 
 test("leaderboard shows trend chart, latest-race movement, selected insights, and breakdown modes", async ({ page }) => {
@@ -178,4 +204,25 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await selectedPanel.getByRole("link", { name: "Scored" }).click();
   await expect(page.locator("#leaderboard-breakdown tbody tr")).toHaveCount(3);
   await expect(page.locator("#leaderboard-breakdown tbody tr.is-unscored")).toHaveCount(0);
+});
+
+test("global leaderboard is public while private group leaderboard stays protected", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  const { privateGroupId } = seedLeaderboardInsights(db);
+  db.close();
+
+  await page.getByRole("button", { name: "Visitor" }).click();
+
+  await page.goto("/global/leaderboard");
+  await expect(page.getByRole("heading", { name: /Global: Leaderboard/i })).toBeVisible();
+  await expect(page.locator(".leaderboard-main-card")).toBeVisible();
+  await expect(page.locator(".leaderboard-breakdown-locked")).toContainText(
+    "Sign in to view detailed predictions"
+  );
+  await expect(page.locator("#leaderboard-breakdown")).toHaveCount(0);
+
+  await page.goto(`/groups/${privateGroupId}/leaderboard`);
+  await expect(page).toHaveURL(/\/login/);
 });

@@ -3793,10 +3793,10 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
   });
 });
 
-app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, res) => {
+app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
-  const adminAccess = isAdmin(req);
+  const adminAccess = user ? isAdmin(req) : false;
   if (!isLeaderboardAvailable() && !adminAccess) {
     return sendError(
       req,
@@ -3811,9 +3811,13 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   }
   const groupId = Number(group.id);
   const excludeHiddenAdmins = isGlobalGroup(group);
-  if (!adminAccess && !isMember(user.id, groupId)) {
+  if (!excludeHiddenAdmins && !user) {
+    return res.redirect(`/login?redirectTo=${encodeURIComponent(req.originalUrl || req.path)}`);
+  }
+  if (!excludeHiddenAdmins && !adminAccess && !isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
+  const canViewQuestionBreakdown = Boolean(user);
   const questions = getQuestions(locale);
   const races = getRaces();
   const snapshotRoundOptions = { maxRoundNumber: races.length };
@@ -3943,12 +3947,14 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   const breakdownMode = String(req.query.breakdown || "").trim().toLowerCase() === "all"
     ? "all"
     : "scored";
-  const selectedBreakdown = leaderboardModel.buildSelectedParticipantBreakdown({
-    questions,
-    selectedRow: selectedLeaderboardRow,
-    actualsByQuestion: scoringActuals,
-    mode: breakdownMode
-  });
+  const selectedBreakdown = canViewQuestionBreakdown
+    ? leaderboardModel.buildSelectedParticipantBreakdown({
+        questions,
+        selectedRow: selectedLeaderboardRow,
+        actualsByQuestion: scoringActuals,
+        mode: breakdownMode
+      })
+    : { mode: breakdownMode, hasScoredRows: false, rows: [] };
   const leaderboardQueryParams = new URLSearchParams();
   if (selectedActualSnapshotId) {
     leaderboardQueryParams.set("snapshot", String(selectedActualSnapshotId));
@@ -3956,7 +3962,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   if (selectedParticipantId) {
     leaderboardQueryParams.set("participant", selectedParticipantId);
   }
-  if (breakdownMode === "all") {
+  if (canViewQuestionBreakdown && breakdownMode === "all") {
     leaderboardQueryParams.set("breakdown", "all");
   }
   const leaderboardPerPage = 10;
@@ -3998,6 +4004,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
       selectedParticipantId
         ? latestRoundDeltasByParticipantId[selectedParticipantId] || null
         : null,
+    canViewQuestionBreakdown,
     leaderboardHistory,
     leaderboardFocusParticipantIds: focusParticipantIds,
     latestRoundDeltaMeta,

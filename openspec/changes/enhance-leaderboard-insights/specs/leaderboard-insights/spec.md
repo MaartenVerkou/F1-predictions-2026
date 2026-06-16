@@ -124,3 +124,29 @@ Rule: Question breakdown SHALL prioritize scored questions while preserving acce
 - **GIVEN** a user selects a different participant from the leaderboard or chart
 - **WHEN** the selected participant changes
 - **THEN** the insight panel and expanded breakdown SHALL update to that selected participant
+
+### Requirement: Global leaderboard is publicly readable
+The system SHALL allow anonymous visitors to view the global leaderboard while protecting private group leaderboards and detailed prediction breakdowns.
+
+Feature: Leaderboard insights
+
+Rule: Public access SHALL apply only to the global leaderboard.
+
+#### Scenario: Anonymous visitor opens global leaderboard
+- **GIVEN** leaderboard scoring is available
+- **AND** the visitor is not logged in
+- **WHEN** the visitor opens the global leaderboard
+- **THEN** the system SHALL show the global leaderboard ranking
+- **AND** it SHALL show public trend and selected-participant summary context
+- **AND** it SHALL not redirect the visitor to login
+
+#### Scenario: Anonymous visitor cannot view detailed prediction breakdown
+- **GIVEN** the visitor is not logged in
+- **WHEN** the visitor opens the global leaderboard
+- **THEN** the system SHALL not show selected participant prediction breakdown rows
+- **AND** it SHALL prompt the visitor to sign in for detailed prediction breakdowns
+
+#### Scenario: Anonymous visitor cannot open private group leaderboard
+- **GIVEN** the visitor is not logged in
+- **WHEN** the visitor opens a private group leaderboard
+- **THEN** the system SHALL require login before showing the private group leaderboard
