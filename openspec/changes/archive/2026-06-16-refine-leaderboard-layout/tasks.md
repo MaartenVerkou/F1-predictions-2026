@@ -15,4 +15,4 @@
 - [x] 3.1 Run `npm run lint`, `npm test`, `npm run build`, and `npm run test:e2e`.
 - [x] 3.2 Run `openspec validate refine-leaderboard-layout --type change --strict`.
 - [x] 3.3 Run browser visual checks for desktop/mobile and light/dark leaderboard layouts.
-- [ ] 3.4 Archive the OpenSpec change, merge to `main`, push, and watch CI/deploy.
+- [x] 3.4 Archive the OpenSpec change, merge to `main`, push, and watch CI/deploy.
