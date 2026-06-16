@@ -5,7 +5,7 @@ const { test } = require("node:test");
 const {
   buildLeaderboardFocusSet,
   buildLeaderboardRows,
-  buildRoundMovers,
+  buildRoundDeltas,
   buildSelectedParticipantBreakdown,
   buildSelectedParticipantInsights,
   buildSnapshotHistory,
@@ -109,7 +109,7 @@ test("focus set includes top 10 plus current and selected participants", () => {
   );
 });
 
-test("round movers compare latest and previous ranked snapshots", () => {
+test("latest-race deltas compare latest and previous ranked snapshots", () => {
   const previousRows = rankLeaderboardRows([
     { userId: "1", name: "Alice", total: 10 },
     { userId: "2", name: "Bob", total: 5 },
@@ -121,23 +121,34 @@ test("round movers compare latest and previous ranked snapshots", () => {
     { userId: "3", name: "Cara", total: 6 }
   ]);
 
-  const movers = buildRoundMovers({
-    latestRows,
-    previousRows,
-    latestRound: { roundNumber: 2, roundName: "Chinese Grand Prix" },
-    previousRound: { roundNumber: 1, roundName: "Australian Grand Prix" }
-  });
-
+  const deltas = buildRoundDeltas({ latestRows, previousRows });
   assert.deepEqual(
-    movers.items.map((item) => ({
-      participantId: item.participantId,
-      pointsDelta: item.pointsDelta,
-      rankDelta: item.rankDelta
-    })),
-    [
-      { participantId: "2", pointsDelta: 15, rankDelta: 1 },
-      { participantId: "3", pointsDelta: 6, rankDelta: 0 }
-    ]
+    {
+      bob: deltas["2"],
+      alice: deltas["1"]
+    },
+    {
+      bob: {
+        participantId: "2",
+        userId: "2",
+        pointsDelta: 15,
+        rankDelta: 1,
+        previousRank: 2,
+        rank: 1,
+        previousTotal: 5,
+        total: 20
+      },
+      alice: {
+        participantId: "1",
+        userId: "1",
+        pointsDelta: 0,
+        rankDelta: -1,
+        previousRank: 1,
+        rank: 2,
+        previousTotal: 10,
+        total: 10
+      }
+    }
   );
 });
 

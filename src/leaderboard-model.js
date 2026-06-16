@@ -362,47 +362,29 @@ function buildSnapshotHistory({
   };
 }
 
-function buildRoundMovers({ latestRows, previousRows, latestRound, previousRound, limit = 5 }) {
+function buildRoundDeltas({ latestRows, previousRows }) {
   const latestRanked = rankLeaderboardRows(latestRows || []);
   const previousRanked = rankLeaderboardRows(previousRows || []);
-  if (latestRanked.length === 0 || previousRanked.length === 0) {
-    return { isAvailable: false, latestRound: latestRound || null, previousRound: previousRound || null, items: [] };
-  }
-  const previousById = new Map(previousRanked.map((row) => [normalizeParticipantId(row.userId), row]));
-  const items = latestRanked
-    .map((row) => {
-      const id = normalizeParticipantId(row.userId);
-      const previous = previousById.get(id);
-      const previousTotal = Number(previous?.total || 0);
-      const pointsDelta = Number(row.total || 0) - previousTotal;
-      const rankDelta = previous?.rank ? Number(previous.rank) - Number(row.rank) : 0;
-      return {
-        participantId: id,
-        userId: id,
-        name: row.name,
-        total: Number(row.total || 0),
-        previousTotal,
-        pointsDelta,
-        rank: row.rank,
-        previousRank: previous?.rank || null,
-        rankDelta
-      };
-    })
-    .filter((item) => item.pointsDelta > 0)
-    .sort(
-      (a, b) =>
-        b.pointsDelta - a.pointsDelta ||
-        b.rankDelta - a.rankDelta ||
-        String(a.name).localeCompare(String(b.name))
-    )
-    .slice(0, Math.max(1, Number(limit) || 5));
+  if (latestRanked.length === 0 || previousRanked.length === 0) return {};
 
-  return {
-    isAvailable: items.length > 0,
-    latestRound: latestRound || null,
-    previousRound: previousRound || null,
-    items
-  };
+  const previousById = new Map(previousRanked.map((row) => [normalizeParticipantId(row.userId), row]));
+  return latestRanked.reduce((acc, row) => {
+    const id = normalizeParticipantId(row.userId);
+    if (!id) return acc;
+    const previous = previousById.get(id);
+    const previousTotal = Number(previous?.total || 0);
+    acc[id] = {
+      participantId: id,
+      userId: id,
+      pointsDelta: Number(row.total || 0) - previousTotal,
+      rankDelta: previous?.rank ? Number(previous.rank) - Number(row.rank) : 0,
+      previousRank: previous?.rank || null,
+      rank: row.rank,
+      previousTotal,
+      total: Number(row.total || 0)
+    };
+    return acc;
+  }, {});
 }
 
 function questionScore(row, questionId) {
@@ -545,7 +527,7 @@ module.exports = {
   buildLeaderboardFocusSet,
   buildLeaderboardPreviewRows,
   buildLeaderboardRows,
-  buildRoundMovers,
+  buildRoundDeltas,
   buildSelectedParticipantBreakdown,
   buildSelectedParticipantInsights,
   buildSnapshotHistory,

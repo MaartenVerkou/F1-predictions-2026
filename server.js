@@ -13,8 +13,7 @@ const leaderboardModel = require("./src/leaderboard-model");
 const {
   REVIEW_STATUS_PENDING,
   ensureActualSnapshotColumns,
-  findSnapshotById,
-  findLatestRoundSnapshotForSeason
+  findSnapshotById
 } = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
@@ -3863,7 +3862,6 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   });
   const requestedSnapshotId = Number(req.query.snapshot || 0);
   let selectedActualSnapshotId = null;
-  let selectedActualSnapshotMeta = null;
   let scoringActuals = currentActuals;
   if (Number.isFinite(requestedSnapshotId) && requestedSnapshotId > 0) {
     const snapshotMeta = findSnapshotById(db, requestedSnapshotId, snapshotRoundOptions);
@@ -3883,31 +3881,9 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
           return acc;
         }, {});
         selectedActualSnapshotId = requestedSnapshotId;
-        selectedActualSnapshotMeta = snapshotMeta;
       }
     }
   }
-  const currentActualsSnapshotMeta = findLatestRoundSnapshotForSeason(
-    db,
-    CURRENT_SEASON,
-    snapshotRoundOptions
-  );
-  const currentActualsReview =
-    currentActualsSnapshotMeta && Number.isFinite(Number(currentActualsSnapshotMeta.round_number))
-      ? {
-          snapshotId: Number(currentActualsSnapshotMeta.id),
-          roundNumber: Number(currentActualsSnapshotMeta.round_number),
-          roundName:
-            String(currentActualsSnapshotMeta.round_name || "").trim()
-            || `Round ${currentActualsSnapshotMeta.round_number}`,
-          reviewStatus: currentActualsSnapshotMeta.review_status,
-          reviewedAt: currentActualsSnapshotMeta.reviewed_at || null,
-          updatedAt:
-            currentActualsSnapshotMeta.updated_at
-            || currentActualsSnapshotMeta.created_at
-            || null
-        }
-      : null;
 
   const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
   const leaderboard = leaderboardModel.buildLeaderboardRows({
@@ -3948,15 +3924,17 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     leaderboardHistory.rounds.length >= 1
       ? leaderboardHistory.rounds[leaderboardHistory.rounds.length - 1]
       : null;
-  const roundMovers =
-    previousTrendRound && latestTrendRound
-      ? leaderboardModel.buildRoundMovers({
+  const latestRoundDeltasByParticipantId =
+    !selectedActualSnapshotId && previousTrendRound && latestTrendRound
+      ? leaderboardModel.buildRoundDeltas({
           latestRows: leaderboardHistory.rankedRowsBySnapshotId[latestTrendRound.id] || [],
-          previousRows: leaderboardHistory.rankedRowsBySnapshotId[previousTrendRound.id] || [],
-          latestRound: latestTrendRound,
-          previousRound: previousTrendRound
+          previousRows: leaderboardHistory.rankedRowsBySnapshotId[previousTrendRound.id] || []
         })
-      : { isAvailable: false, latestRound: latestTrendRound, previousRound: previousTrendRound, items: [] };
+      : {};
+  const latestRoundDeltaMeta =
+    !selectedActualSnapshotId && previousTrendRound && latestTrendRound
+      ? { latestRound: latestTrendRound, previousRound: previousTrendRound }
+      : null;
   const participantInsights = leaderboardModel.buildSelectedParticipantInsights({
     leaderboard,
     questions,
@@ -4000,7 +3978,11 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     .slice(leaderboardOffset, leaderboardOffset + leaderboardPerPage)
     .map((row, index) => ({
       ...row,
-      rank: leaderboardOffset + index + 1
+      rank: leaderboardOffset + index + 1,
+      latestRoundDelta:
+        latestRoundDeltasByParticipantId[
+          leaderboardModel.normalizeParticipantId(row.userId)
+        ] || null
     }));
   res.render("leaderboard", {
     user,
@@ -4009,14 +3991,12 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     leaderboard: pagedLeaderboard,
     actuals: scoringActuals,
     actualSnapshots,
-    currentActualsReview,
     selectedActualSnapshotId,
-    selectedActualSnapshotMeta,
     selectedParticipantId,
     selectedLeaderboardRow,
     leaderboardHistory,
     leaderboardFocusParticipantIds: focusParticipantIds,
-    roundMovers,
+    latestRoundDeltaMeta,
     participantInsights,
     selectedBreakdown,
     breakdownMode,

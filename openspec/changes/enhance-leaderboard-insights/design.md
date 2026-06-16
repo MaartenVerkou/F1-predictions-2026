@@ -2,7 +2,7 @@
 
 The leaderboard route already computes scored rows from responses and either live actuals or a selected actual snapshot. The app now stores per-round `actual_snapshots`, so the same scoring logic can be replayed for each completed round to show score history.
 
-The current leaderboard view shows a paginated rank table, snapshot selector, and question breakdown for rows on the visible page. It does not yet provide historical trend context, explain why a participant is ahead or behind, or surface recent movers after the latest race.
+The current leaderboard view shows a paginated rank table, snapshot selector, and question breakdown for rows on the visible page. It does not yet provide historical trend context, explain why a participant is ahead or behind, or surface recent score movement after the latest race.
 
 ## Goals / Non-Goals
 
@@ -11,7 +11,7 @@ The current leaderboard view shows a paginated rank table, snapshot selector, an
 - Default the selected participant to the logged-in participant when they have a scored row, otherwise P1.
 - Keep the logged-in participant and selected participant visible and visually emphasized in the chart.
 - Explain the selected participant's position using question-level score gaps, strengths, and distinctive predictions against nearby competitors.
-- Show round movers from the latest completed round compared with the previous round.
+- Show latest-race movement from the latest completed round compared with the previous round directly in leaderboard rows.
 - Let users expand a selected participant's question breakdown, defaulting to scored questions with a toggle to all questions.
 
 **Non-Goals:**
@@ -49,13 +49,13 @@ Rationale: users need context around the classement they are looking at now. A n
 
 Alternative considered: compare everyone only against P1. That is simple but weak for mid-table users because it mostly explains why they are not winning, not what separates them from nearby competitors.
 
-### Treat round movers as latest-vs-previous snapshot deltas
+### Treat latest-race movement as latest-vs-previous snapshot deltas
 
-Round movers SHALL compare the latest available actual snapshot against the immediately previous snapshot for the same season. Movers SHALL prioritize points gained, with rank movement shown as supporting context.
+Latest-race movement SHALL compare the latest available actual snapshot against the immediately previous snapshot for the same season. The leaderboard table SHALL prioritize points gained, with rank movement shown as supporting context.
 
 Rationale: this matches the user's "points change" concern and gives a concise story after each race without crowding the main chart.
 
-Alternative considered: show movers across arbitrary date ranges. That can come later if users need it; latest race movement is the highest-value first step.
+Alternative considered: show score movement across arbitrary date ranges. That can come later if users need it; latest race movement is the highest-value first step.
 
 ### Keep question breakdown focused by default
 
@@ -79,4 +79,4 @@ No database migration is expected. Deploying the feature is a code-only rollout.
 
 ## Open Questions
 
-- Whether to add a future chart mode for per-round points gained. The first implementation will keep total points as the chart default and surface point gains through tooltips and round movers.
+- Whether to add a future chart mode for per-round points gained. The first implementation will keep total points as the chart default and surface point gains through tooltips and the leaderboard's latest-race movement column.

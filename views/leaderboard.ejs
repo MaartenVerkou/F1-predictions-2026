@@ -184,18 +184,13 @@
   <% } %>
   <% const selectedSnapshotKey =
     selectedActualSnapshotId == null ? "" : String(selectedActualSnapshotId); %>
-  <% const formatAdminDate = (value) => {
-    if (!value) return '-';
-    if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
-  }; %>
   <% const safeHistory = leaderboardHistory || { hasEnoughHistory: false, rounds: [], series: [], maxTotal: 0 }; %>
-  <% const safeRoundMovers = roundMovers || { isAvailable: false, items: [] }; %>
   <% const safeInsights = participantInsights || { selectedParticipant: null, comparisonRows: [], gaps: [], strengths: [], distinctive: [], emptyReason: null }; %>
   <% const safeBreakdown = selectedBreakdown || { mode: 'scored', hasScoredRows: false, rows: [] }; %>
   <% const selectedParticipantKey = selectedParticipantId == null ? "" : String(selectedParticipantId); %>
   <% const currentUserKey = user && user.id != null ? String(user.id) : ""; %>
+  <% const safeLatestRoundDeltaMeta = latestRoundDeltaMeta || null; %>
+  <% const hasRoundDeltaColumn = Boolean(safeLatestRoundDeltaMeta); %>
   <% const leaderboardHref = (updates = {}, anchor = 'leaderboard-overview') => {
     const params = new URLSearchParams(leaderboardQueryPart);
     params.delete('page');
@@ -210,6 +205,11 @@
     const number = Number(value || 0);
     if (!Number.isFinite(number) || number === 0) return '0';
     return number > 0 ? `+${number}` : String(number);
+  }; %>
+  <% const formatRankDelta = (value) => {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number) || number === 0) return 'steady';
+    return number > 0 ? `+${number} rank` : `${number} rank`;
   }; %>
   <% const truncatePrompt = (value) => {
     const text = String(value || '');
@@ -250,7 +250,12 @@
         <div class="leaderboard-section-heading">
           <div>
             <h2>Points over rounds</h2>
-            <p class="muted">Top 10 plus selected participants.</p>
+            <p class="muted">
+              Top 10 plus selected participants.
+              <% if (hasRoundDeltaColumn) { %>
+                Last race: R<%= safeLatestRoundDeltaMeta.previousRound.roundNumber %> to R<%= safeLatestRoundDeltaMeta.latestRound.roundNumber %>.
+              <% } %>
+            </p>
           </div>
         </div>
         <% if (safeHistory.hasEnoughHistory && safeHistory.series.length > 0) { %>
@@ -325,51 +330,10 @@
         <% } %>
       </section>
 
-      <section class="leaderboard-movers-panel">
-        <div class="leaderboard-section-heading">
-          <div>
-            <h2>Round movers</h2>
-            <% if (safeRoundMovers.latestRound && safeRoundMovers.previousRound) { %>
-              <p class="muted">R<%= safeRoundMovers.previousRound.roundNumber %> to R<%= safeRoundMovers.latestRound.roundNumber %>.</p>
-            <% } %>
-          </div>
-        </div>
-        <% if (safeRoundMovers.isAvailable) { %>
-          <ol class="leaderboard-movers-list">
-            <% safeRoundMovers.items.forEach((mover) => { %>
-              <li>
-                <a href="<%= leaderboardHref({ participant: mover.participantId }) %>"><%= mover.name %></a>
-                <strong><%= formatSigned(mover.pointsDelta) %> pts</strong>
-                <% if (mover.rankDelta > 0) { %>
-                  <span class="muted"><%= formatSigned(mover.rankDelta) %> rank</span>
-                <% } else { %>
-                  <span class="muted">rank steady</span>
-                <% } %>
-              </li>
-            <% }) %>
-          </ol>
-        <% } else { %>
-          <p class="muted leaderboard-empty-copy">No points movement to show yet.</p>
-        <% } %>
-      </section>
     </section>
 
     <div id="leaderboard-overview" class="leaderboard-layout">
       <div class="leaderboard-main-column">
-        <% if (selectedSnapshotKey === '' && currentActualsReview) { %>
-          <div class="alert" style="margin-bottom:16px;">
-            Live scoring reflects <strong><%= `R${currentActualsReview.roundNumber} - ${currentActualsReview.roundName}` %></strong>.
-            Status: <strong><%= currentActualsReview.reviewStatus === 'pending' ? 'Pending review' : 'Reviewed' %></strong>.
-            Last sync: <strong><%= formatAdminDate(currentActualsReview.updatedAt) %></strong>.
-          </div>
-        <% } else if (selectedActualSnapshotMeta) { %>
-          <div class="alert" style="margin-bottom:16px;">
-            Viewing snapshot <strong><%= `R${selectedActualSnapshotMeta.round_number} - ${selectedActualSnapshotMeta.round_name || `Round ${selectedActualSnapshotMeta.round_number}`}` %></strong>.
-            Status: <strong><%= selectedActualSnapshotMeta.review_status === 'pending' ? 'Pending review' : 'Reviewed' %></strong>.
-            Last sync: <strong><%= formatAdminDate(selectedActualSnapshotMeta.updated_at || selectedActualSnapshotMeta.created_at) %></strong>.
-          </div>
-        <% } %>
-
         <% if ((actualSnapshots || []).length > 0) { %>
           <form method="get" action="<%= leaderboardBaseHref %>" class="leaderboard-snapshot-form inline-actions">
             <% Object.entries(snapshotFilterParams).forEach(([key, value]) => { %>
@@ -405,6 +369,12 @@
                   <span class="leaderboard-header-long">POINTS</span>
                   <span class="leaderboard-header-short">PTS</span>
                 </th>
+                <% if (hasRoundDeltaColumn) { %>
+                  <th>
+                    <span class="leaderboard-header-long">LAST RACE</span>
+                    <span class="leaderboard-header-short">LAST</span>
+                  </th>
+                <% } %>
               </tr>
             </thead>
             <tbody>
@@ -419,6 +389,18 @@
                     </a>
                   </td>
                   <td><strong><%= row.total %></strong></td>
+                  <% if (hasRoundDeltaColumn) { %>
+                    <% const delta = row.latestRoundDelta; %>
+                    <td class="leaderboard-delta-cell">
+                      <% if (delta) { %>
+                        <% const deltaClass = Number(delta.pointsDelta || 0) > 0 ? 'is-positive' : (Number(delta.pointsDelta || 0) < 0 ? 'is-negative' : ''); %>
+                        <strong class="<%= deltaClass %>"><%= formatSigned(delta.pointsDelta) %> pts</strong>
+                        <span class="muted"><%= formatRankDelta(delta.rankDelta) %></span>
+                      <% } else { %>
+                        <span class="muted">-</span>
+                      <% } %>
+                    </td>
+                  <% } %>
                 </tr>
               <% }) %>
             </tbody>

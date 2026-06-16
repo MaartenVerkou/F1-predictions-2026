@@ -51,23 +51,23 @@ Rule: The chart focus set SHALL keep the most relevant participants visible with
 - **THEN** the system SHALL treat the logged-in participant as the selected participant
 - **AND** the insight panel SHALL describe the logged-in participant
 
-### Requirement: Leaderboard shows round movers
-The system SHALL show notable round movers when at least two valid actual snapshots are available for the configured season.
+### Requirement: Leaderboard shows latest-race movement
+The system SHALL show latest-race movement in leaderboard rows when at least two valid actual snapshots are available for the configured season.
 
 Feature: Leaderboard insights
 
-Rule: Round movers SHALL compare the latest valid actual snapshot with the immediately previous valid actual snapshot.
+Rule: Latest-race movement SHALL compare the latest valid actual snapshot with the immediately previous valid actual snapshot.
 
-#### Scenario: Latest round movers show points gained
+#### Scenario: Latest-race movement shows points gained
 - **GIVEN** a leaderboard has valid snapshots for two or more completed rounds
 - **WHEN** a participant opens the leaderboard
-- **THEN** the system SHALL show participants with notable points gained since the previous valid snapshot
+- **THEN** the system SHALL show points gained since the previous valid snapshot in the leaderboard rows
 - **AND** the system SHALL include rank movement as supporting context when rank changed
 
-#### Scenario: Round movers handle unchanged ranks
+#### Scenario: Latest-race movement handles unchanged ranks
 - **GIVEN** a participant gains points between the latest valid snapshot and previous valid snapshot
 - **AND** that participant's rank does not change
-- **WHEN** round movers are shown
+- **WHEN** latest-race movement is shown
 - **THEN** the system SHALL still be able to show the points gain
 - **AND** the system SHALL avoid implying a rank movement occurred
 

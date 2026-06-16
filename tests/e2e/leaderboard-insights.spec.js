@@ -142,7 +142,7 @@ function seedLeaderboardInsights(db) {
   return { devAdminId: Number(devAdmin.id) };
 }
 
-test("leaderboard shows trend chart, movers, selected insights, and breakdown modes", async ({ page }) => {
+test("leaderboard shows trend chart, latest-race movement, selected insights, and breakdown modes", async ({ page }) => {
   await page.goto("/");
 
   const db = new Database(DB_PATH);
@@ -151,10 +151,13 @@ test("leaderboard shows trend chart, movers, selected insights, and breakdown mo
 
   await page.goto("/global/leaderboard");
 
+  await expect(page.getByText(/Live scoring reflects/i)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /Points over rounds/i })).toBeVisible();
   await expect(page.locator(".leaderboard-trend-chart")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /Round movers/i })).toBeVisible();
-  await expect(page.locator(".leaderboard-movers-list li").first()).toContainText(/\+\d+ pts/);
+  await expect(page.locator(".leaderboard-main-card thead")).toContainText("LAST RACE");
+  const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
+  await expect(flowRow).toContainText("+20 pts");
+  await expect(flowRow).toContainText("+5 rank");
   await expect(page.locator(".leaderboard-chart-legend")).toContainText("Dev Admin");
 
   const selectedPanel = page.locator(".leaderboard-selected-panel");
