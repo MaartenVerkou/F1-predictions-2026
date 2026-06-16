@@ -11,7 +11,7 @@ The current leaderboard view shows a paginated rank table, snapshot selector, an
 - Default the selected participant to the logged-in participant when they have a scored row, otherwise P1.
 - Keep the logged-in participant and selected participant visible and visually emphasized in the chart.
 - Explain the selected participant's position using question-level score gaps, strengths, and distinctive predictions against nearby competitors.
-- Show latest-race movement from the latest completed round compared with the previous round directly in leaderboard rows.
+- Show compact latest-race rank movement from the latest completed round compared with the previous round directly in leaderboard rows, with point-change detail in the selected participant panel.
 - Let users expand a selected participant's question breakdown, defaulting to scored questions with a toggle to all questions.
 
 **Non-Goals:**
@@ -51,9 +51,9 @@ Alternative considered: compare everyone only against P1. That is simple but wea
 
 ### Treat latest-race movement as latest-vs-previous snapshot deltas
 
-Latest-race movement SHALL compare the latest available actual snapshot against the immediately previous snapshot for the same season. The leaderboard table SHALL prioritize points gained, with rank movement shown as supporting context.
+Latest-race movement SHALL compare the latest available actual snapshot against the immediately previous snapshot for the same season. The leaderboard table SHALL show a compact rank-change value only, while the selected participant panel SHALL show the more specific point-change detail.
 
-Rationale: this matches the user's "points change" concern and gives a concise story after each race without crowding the main chart.
+Rationale: this keeps the leaderboard scannable while still giving detailed score-change context where the user is already focused on one participant.
 
 Alternative considered: show score movement across arbitrary date ranges. That can come later if users need it; latest race movement is the highest-value first step.
 
@@ -79,4 +79,4 @@ No database migration is expected. Deploying the feature is a code-only rollout.
 
 ## Open Questions
 
-- Whether to add a future chart mode for per-round points gained. The first implementation will keep total points as the chart default and surface point gains through tooltips and the leaderboard's latest-race movement column.
+- Whether to add a future chart mode for per-round points gained. The first implementation will keep total points as the chart default and surface point gains through tooltips and the selected participant detail panel.

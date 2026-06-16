@@ -2597,7 +2597,8 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
 .leaderboard-main-card > .table th:nth-child(4),
 .leaderboard-main-card > .table td:nth-child(4) {
-  width: 112px;
+  width: 82px;
+  text-align: right;
 }
 
 .leaderboard-row-link {
@@ -2613,19 +2614,15 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 }
 
 .leaderboard-delta-cell {
-  min-width: 104px;
-  font-size: 13px;
+  min-width: 64px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
-}
-
-.leaderboard-delta-cell strong,
-.leaderboard-delta-cell span {
-  display: block;
-  white-space: nowrap;
 }
 
 .leaderboard-delta-cell strong {
   color: var(--text);
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .leaderboard-delta-cell strong.is-positive {
@@ -2683,6 +2680,34 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 .leaderboard-selected-panel {
   display: grid;
   gap: 16px;
+}
+
+.leaderboard-selected-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.leaderboard-selected-metrics > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rules-bg) 72%, transparent);
+}
+
+.leaderboard-selected-metrics span,
+.leaderboard-selected-metrics strong {
+  display: block;
+}
+
+.leaderboard-selected-metrics span {
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.leaderboard-selected-metrics strong {
+  font-variant-numeric: tabular-nums;
 }
 
 .leaderboard-insight-grid {
@@ -3010,16 +3035,12 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
   .leaderboard-main-card > .table th:nth-child(4),
   .leaderboard-main-card > .table td:nth-child(4) {
-    width: 76px;
+    width: 54px;
   }
 
   .leaderboard-delta-cell {
-    min-width: 72px;
+    min-width: 44px;
     font-size: 12px;
-  }
-
-  .leaderboard-delta-cell .muted {
-    font-size: 11px;
   }
 }
 

@@ -52,24 +52,23 @@ Rule: The chart focus set SHALL keep the most relevant participants visible with
 - **AND** the insight panel SHALL describe the logged-in participant
 
 ### Requirement: Leaderboard shows latest-race movement
-The system SHALL show latest-race movement in leaderboard rows when at least two valid actual snapshots are available for the configured season.
+The system SHALL show compact latest-race rank movement in leaderboard rows when at least two valid actual snapshots are available for the configured season.
 
 Feature: Leaderboard insights
 
 Rule: Latest-race movement SHALL compare the latest valid actual snapshot with the immediately previous valid actual snapshot.
 
-#### Scenario: Latest-race movement shows points gained
+#### Scenario: Latest-race movement shows rank change in rows
 - **GIVEN** a leaderboard has valid snapshots for two or more completed rounds
 - **WHEN** a participant opens the leaderboard
-- **THEN** the system SHALL show points gained since the previous valid snapshot in the leaderboard rows
-- **AND** the system SHALL include rank movement as supporting context when rank changed
+- **THEN** the system SHALL show the latest-race rank change in the leaderboard rows
+- **AND** the row value SHALL be compact, such as `+2`, `-3`, or `0`
 
-#### Scenario: Latest-race movement handles unchanged ranks
+#### Scenario: Selected participant shows point-change detail
 - **GIVEN** a participant gains points between the latest valid snapshot and previous valid snapshot
-- **AND** that participant's rank does not change
-- **WHEN** latest-race movement is shown
-- **THEN** the system SHALL still be able to show the points gain
-- **AND** the system SHALL avoid implying a rank movement occurred
+- **WHEN** that participant is selected
+- **THEN** the selected participant panel SHALL show the points gained since the previous valid snapshot
+- **AND** it SHALL show the rank movement label as supporting context
 
 ### Requirement: Leaderboard explains the selected participant
 The system SHALL provide an insight panel for the selected participant using question-level score differences and distinctive predictions.

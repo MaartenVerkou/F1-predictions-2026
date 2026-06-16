@@ -154,10 +154,9 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(page.getByText(/Live scoring reflects/i)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /Points over rounds/i })).toBeVisible();
   await expect(page.locator(".leaderboard-trend-chart")).toBeVisible();
-  await expect(page.locator(".leaderboard-main-card thead")).toContainText("LAST RACE");
+  await expect(page.locator(".leaderboard-main-card thead")).toContainText("CHANGE");
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
-  await expect(flowRow).toContainText("+20 pts");
-  await expect(flowRow).toContainText("+5 rank");
+  await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
   await expect(page.locator(".leaderboard-chart-legend")).toContainText("Dev Admin");
 
   const selectedPanel = page.locator(".leaderboard-selected-panel");
@@ -173,6 +172,8 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
 
   await page.locator(".leaderboard-main-card .leaderboard-row-link", { hasText: "E2E Insight Clutch" }).click();
   await expect(selectedPanel.getByRole("heading", { name: "E2E Insight Clutch" })).toBeVisible();
+  await expect(selectedPanel.locator(".leaderboard-selected-metrics")).toContainText("+15 pts");
+  await expect(selectedPanel.locator(".leaderboard-selected-metrics")).toContainText("steady");
 
   await selectedPanel.getByRole("link", { name: "Scored" }).click();
   await expect(page.locator("#leaderboard-breakdown tbody tr")).toHaveCount(3);

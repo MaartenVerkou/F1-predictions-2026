@@ -3994,6 +3994,10 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     selectedActualSnapshotId,
     selectedParticipantId,
     selectedLeaderboardRow,
+    selectedLatestRoundDelta:
+      selectedParticipantId
+        ? latestRoundDeltasByParticipantId[selectedParticipantId] || null
+        : null,
     leaderboardHistory,
     leaderboardFocusParticipantIds: focusParticipantIds,
     latestRoundDeltaMeta,

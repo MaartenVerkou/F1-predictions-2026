@@ -18,7 +18,7 @@
 
 - [x] 3.1 Add the points-over-time chart to the leaderboard page using the server-provided chart model.
 - [x] 3.2 Visually emphasize selected and logged-in participants while keeping ordinary top-10 lines muted.
-- [x] 3.3 Add latest-race movement to leaderboard rows showing latest-vs-previous points gained and rank movement.
+- [x] 3.3 Add compact latest-race rank movement to leaderboard rows and point-change detail to the selected participant panel.
 - [x] 3.4 Add a selected-participant insight panel explaining gaps, strengths, and distinctive predictions.
 - [x] 3.5 Add an expandable question breakdown that defaults to scored questions and toggles to all questions.
 - [x] 3.6 Ensure mobile and desktop layouts keep chart labels, latest-race movement, insights, and breakdown text readable without overlap.
