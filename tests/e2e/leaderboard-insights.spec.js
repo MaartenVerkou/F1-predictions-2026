@@ -190,12 +190,22 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   const leaderboardHeaders = await page.locator(".leaderboard-main-card thead th").evaluateAll((headers) =>
     headers.map((header) => header.textContent.trim())
   );
-  expect(leaderboardHeaders).toEqual(["P", "NAME", "PTS", "\u0394"]);
+  expect(leaderboardHeaders).toEqual(["POS", "NAME", "PTS", ""]);
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
   await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
   const apexRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Apex" });
   await expect(apexRow.locator(".leaderboard-delta-cell")).toHaveText("-");
   await expect(page.locator(".leaderboard-chart-legend")).toContainText("Dev Admin");
+  await expect(page.locator(".leaderboard-chart-legend")).not.toContainText("25");
+
+  const apexToggle = page.getByRole("checkbox", { name: "E2E Insight Apex" });
+  await expect(apexToggle).toBeChecked();
+  const apexSeriesId = await apexToggle.getAttribute("data-chart-series-toggle");
+  expect(apexSeriesId).toBeTruthy();
+  await apexToggle.uncheck();
+  await expect(page.locator(`[data-chart-series="${apexSeriesId}"]`)).toHaveAttribute("hidden", "");
+  await apexToggle.check();
+  await expect(page.locator(`[data-chart-series="${apexSeriesId}"]`)).not.toHaveAttribute("hidden", "");
 
   const selectedPanel = page.locator(".leaderboard-selected-panel");
   await expect(selectedPanel.getByRole("heading", { name: "Dev Admin" })).toBeVisible();
@@ -305,7 +315,11 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       chartTop: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().top),
       chartLeft: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().left),
       chartBottom: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().bottom),
+      chartHeight: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().height),
       chartWidth: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().width),
+      chartSvgHeight: Math.round(document.querySelector(".leaderboard-trend-chart").getBoundingClientRect().height),
+      mainHeight: Math.round(document.querySelector(".leaderboard-main-column").getBoundingClientRect().height),
+      checkedControls: document.querySelectorAll(".leaderboard-chart-legend input[type='checkbox']:checked").length,
       detailTop: Math.round(document.querySelector(".leaderboard-detail-card").getBoundingClientRect().top)
     }));
 
@@ -319,10 +333,14 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
     if (testCase.width >= 1100) {
       expect(metrics.chartLeft).toBeGreaterThanOrEqual(metrics.mainRight);
       expect(metrics.chartWidth).toBeGreaterThan(metrics.mainWidth);
+      expect(metrics.chartSvgHeight).toBeGreaterThanOrEqual(250);
+      expect(metrics.chartHeight / metrics.mainHeight).toBeGreaterThanOrEqual(0.75);
+      expect(metrics.chartHeight / metrics.mainHeight).toBeLessThanOrEqual(1.35);
       expect(Math.abs(metrics.chartTop - metrics.rowTop)).toBeLessThanOrEqual(8);
     } else {
       expect(metrics.mainTop).toBeLessThan(metrics.chartTop);
       expect(metrics.detailTop).toBeGreaterThanOrEqual(metrics.chartBottom);
     }
+    expect(metrics.checkedControls).toBeGreaterThan(0);
   }
 });

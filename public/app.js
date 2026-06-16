@@ -201,6 +201,33 @@ const initCopyButtons = () => {
   });
 };
 
+const initLeaderboardChartToggles = () => {
+  document.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]').forEach(input => {
+    const seriesId = input.dataset.chartSeriesToggle;
+    if (!seriesId) return;
+    const control = input.closest('.leaderboard-chart-legend-item');
+    const seriesElements = Array.from(document.querySelectorAll('[data-chart-series]'))
+      .filter(series => series.dataset.chartSeries === seriesId);
+    if (seriesElements.length === 0) return;
+
+    const sync = () => {
+      seriesElements.forEach(series => {
+        if (input.checked) {
+          series.removeAttribute('hidden');
+        } else {
+          series.setAttribute('hidden', '');
+        }
+      });
+      if (control) {
+        control.classList.toggle('is-muted', !input.checked);
+      }
+    };
+
+    input.addEventListener('change', sync);
+    sync();
+  });
+};
+
 const initNumberSpinners = () => {
   document.querySelectorAll('[data-number-spinner]').forEach(spinner => {
     const input = spinner.querySelector('input[type="number"]');
@@ -847,6 +874,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNumberSpinners();
   initCountdown();
   initCopyButtons();
+  initLeaderboardChartToggles();
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initQuestionsCouplingToggle();
