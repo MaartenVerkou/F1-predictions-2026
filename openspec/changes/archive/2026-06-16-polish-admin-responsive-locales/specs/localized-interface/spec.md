@@ -1,6 +1,8 @@
 ## ADDED Requirements
 
 ### Requirement: Dutch user-facing pages avoid mixed English UI copy
+The system SHALL render changed user-facing interface copy through the active locale where locale support exists.
+
 Feature: Localized interface
 
 Rule: User-facing labels, headings, empty states, and calls to action SHALL use the active locale where locale support exists.

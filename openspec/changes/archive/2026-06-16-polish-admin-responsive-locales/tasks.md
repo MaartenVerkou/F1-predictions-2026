@@ -17,4 +17,4 @@
 - [x] 3.1 Add or update Playwright coverage for mobile admin actuals/table overflow and Dutch leaderboard copy.
 - [x] 3.2 Run `npm run lint`, `npm test`, `npm run build`, and focused or full Playwright tests.
 - [x] 3.3 Run browser visual checks for admin actuals and leaderboard in desktop/mobile and light/dark themes.
-- [x] 3.4 Validate OpenSpec structure manually because the local `openspec` CLI is not available in this shell.
+- [x] 3.4 Validate OpenSpec structure with the local `openspec` CLI.

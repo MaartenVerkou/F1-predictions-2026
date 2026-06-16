@@ -183,11 +183,11 @@ Rule: Public global leaderboard navigation SHALL not send anonymous visitors thr
 - **THEN** the system SHALL require login before showing that private group leaderboard
 
 ### Requirement: Leaderboard presentation adapts to viewport and theme
-The system SHALL present leaderboard insights, ranking, and selected-participant context without incoherent overlap or theme contrast regressions on supported desktop and phone layouts.
+The system SHALL present leaderboard insights, ranking, and selected-participant context without incoherent overlap or theme contrast regressions on supported desktop and phone layouts, and SHALL render interface copy through the active locale.
 
 Feature: Leaderboard insights
 
-Rule: Leaderboard presentation SHALL remain usable in light and dark mode.
+Rule: Leaderboard presentation SHALL remain usable in light and dark mode and localized where locale support exists.
 
 #### Scenario: Desktop leaderboard uses available space cleanly
 - **GIVEN** a user or visitor opens the global leaderboard on a desktop viewport
@@ -265,4 +265,10 @@ Rule: Leaderboard presentation SHALL remain usable in light and dark mode.
 - **WHEN** the leaderboard renders in light or dark mode
 - **THEN** the page SHALL stack the chart, legend controls, ranking table, and selected insight panel in a readable order
 - **AND** table columns, legend items, and action controls SHALL not overlap or truncate essential labels incoherently
+
+#### Scenario: Dutch leaderboard insight copy is localized
+- **GIVEN** a visitor or user opens the leaderboard using Dutch
+- **WHEN** the leaderboard renders chart, ranking, selected details, breakdown, and empty states
+- **THEN** the leaderboard SHALL use Dutch UI labels for insight headings, metadata, controls, empty states, and sign-in prompt
+- **AND** the chart and movement accessibility labels SHALL also use Dutch locale strings
 

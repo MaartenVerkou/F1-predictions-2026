@@ -1,6 +1,11 @@
-## ADDED Requirements
+# admin-interface Specification
 
+## Purpose
+TBD - created by archiving change polish-admin-responsive-locales. Update Purpose after archive.
+## Requirements
 ### Requirement: Admin pages fit supported viewports
+The system SHALL render admin pages within supported phone and desktop viewports without page-level horizontal overflow.
+
 Feature: Admin interface
 
 Rule: Admin pages SHALL avoid page-level horizontal overflow while preserving dense operational data.
@@ -26,6 +31,8 @@ Rule: Admin pages SHALL avoid page-level horizontal overflow while preserving de
 - **AND** destructive actions SHALL remain visibly separate from navigation actions
 
 ### Requirement: Admin layout uses reusable presentation classes
+The system SHALL use shared presentation classes for repeated admin layout concerns.
+
 Feature: Admin interface
 
 Rule: Shared admin layout concerns SHALL be expressed through reusable CSS classes rather than repeated inline styles.
@@ -35,3 +42,4 @@ Rule: Shared admin layout concerns SHALL be expressed through reusable CSS class
 - **WHEN** the templates are inspected
 - **THEN** repeated layout decisions SHALL use shared classes
 - **AND** inline styles SHALL be limited to data-specific or exceptional presentation that cannot be shared cleanly
+
