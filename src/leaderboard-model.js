@@ -422,7 +422,8 @@ function buildSelectedParticipantInsights({
   const strengths = [];
   const distinctive = [];
 
-  for (const question of questions || []) {
+  for (const [questionIndex, question] of (questions || []).entries()) {
+    const questionNumber = questionIndex + 1;
     const selectedPoints = questionScore(selected, question.id);
     if (gapRows.length > 0) {
       const gapAverage =
@@ -431,6 +432,7 @@ function buildSelectedParticipantInsights({
       if (difference > 0) {
         gaps.push({
           questionId: question.id,
+          questionNumber,
           prompt: question.prompt,
           selectedPoints,
           comparisonAverage: Number(gapAverage.toFixed(2)),
@@ -447,6 +449,7 @@ function buildSelectedParticipantInsights({
       if (difference > 0) {
         strengths.push({
           questionId: question.id,
+          questionNumber,
           prompt: question.prompt,
           selectedPoints,
           comparisonAverage: Number(comparisonAverage.toFixed(2)),
@@ -466,6 +469,7 @@ function buildSelectedParticipantInsights({
           if (sameAnswerCount <= Math.floor(comparableAnswers.length / 2)) {
             distinctive.push({
               questionId: question.id,
+              questionNumber,
               prompt: question.prompt,
               selectedAnswer,
               selectedPoints,

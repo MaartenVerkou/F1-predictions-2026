@@ -219,6 +219,54 @@
     if (!Number.isFinite(number) || number === 0) return 'steady';
     return number > 0 ? `+${number} rank` : `${number} rank`;
   }; %>
+  <% const formatInsightAbsPoints = (value) => {
+    const number = Math.abs(Number(value || 0));
+    if (!Number.isFinite(number)) return '0 pts';
+    return `${Number.isInteger(number) ? number : Number(number.toFixed(2))} pts`;
+  }; %>
+  <% const formatInsightSignedPoints = (value) => {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number) || number === 0) return '0 pts';
+    return number > 0 ? `+${formatInsightAbsPoints(number)}` : `-${formatInsightAbsPoints(number)}`;
+  }; %>
+  <% const formatInsightCountLabel = (count) => {
+    const number = Number(count || 0);
+    const labels = { 1: 'One', 2: 'Two', 3: 'Three' };
+    return `${labels[number] || number} ${number === 1 ? 'question' : 'questions'}`;
+  }; %>
+  <% const sumInsightField = (items, field) => {
+    const total = (items || []).reduce((sum, item) => sum + Number(item?.[field] || 0), 0);
+    return Number(total.toFixed(2));
+  }; %>
+  <% const selectedInsightName = safeInsights.selectedParticipant?.name || 'this participant'; %>
+  <% const summarizeInsightRows = (type, items) => {
+    const rows = items || [];
+    const count = rows.length;
+    const first = rows[0];
+    if (!count || !first) return '';
+    if (type === 'gaps') {
+      const total = sumInsightField(rows, 'difference');
+      if (count === 1) {
+        return `Q${first.questionNumber} leaves ${selectedInsightName} ${formatInsightAbsPoints(total)} behind nearby rivals.`;
+      }
+      return `${formatInsightCountLabel(count)} leave ${selectedInsightName} ${formatInsightAbsPoints(total)} behind nearby rivals.`;
+    }
+    if (type === 'strengths') {
+      const total = sumInsightField(rows, 'difference');
+      if (count === 1) {
+        return `Q${first.questionNumber} gives ${selectedInsightName} ${formatInsightSignedPoints(total)} versus nearby rivals.`;
+      }
+      return `${formatInsightCountLabel(count)} give ${selectedInsightName} ${formatInsightSignedPoints(total)} versus nearby rivals.`;
+    }
+    if (type === 'distinctive') {
+      const total = sumInsightField(rows, 'selectedPoints');
+      if (count === 1) {
+        return `Q${first.questionNumber} is a distinctive answer worth ${formatInsightAbsPoints(total)} for ${selectedInsightName}.`;
+      }
+      return `${formatInsightCountLabel(count)} give ${selectedInsightName} ${formatInsightAbsPoints(total)} from distinctive answers.`;
+    }
+    return '';
+  }; %>
   <% const truncatePrompt = (value) => {
     const text = String(value || '');
     return text.length > 90 ? `${text.slice(0, 87)}...` : text;
@@ -297,7 +345,11 @@
                 >
                   <td><%= row.rank %></td>
                   <td>
-                    <a class="leaderboard-row-link" href="<%= leaderboardHref({ participant: row.userId }) %>">
+                    <a
+                      class="leaderboard-row-link"
+                      href="<%= leaderboardHref({ participant: row.userId }) %>"
+                      data-leaderboard-participant-link
+                    >
                       <strong><%= row.name %></strong>
                     </a>
                   </td>
@@ -339,18 +391,7 @@
           </section>
         </div>
 
-        <aside class="leaderboard-trend-panel" aria-label="Leaderboard insights">
-          <div class="leaderboard-section-heading">
-            <div>
-              <h2>Points over rounds</h2>
-              <p class="muted">
-                Top 10 plus selected participants.
-                <% if (hasRoundDeltaColumn) { %>
-                  Last race: R<%= safeLatestRoundDeltaMeta.previousRound.roundNumber %> to R<%= safeLatestRoundDeltaMeta.latestRound.roundNumber %>.
-                <% } %>
-              </p>
-            </div>
-          </div>
+        <aside class="leaderboard-trend-panel" aria-label="Points over rounds">
           <% if (safeHistory.hasEnoughHistory && safeHistory.series.length > 0) { %>
             <% const chartWidth = 960; %>
             <% const chartHeight = 360; %>
@@ -365,6 +406,7 @@
               ? padLeft
               : padLeft + (idx / (safeHistory.rounds.length - 1)) * plotWidth; %>
             <% const yForTotal = (total) => padTop + plotHeight - (Number(total || 0) / maxTotal) * plotHeight; %>
+            <div class="leaderboard-chart-content">
             <div class="leaderboard-chart-wrap">
               <svg
                 class="leaderboard-trend-chart"
@@ -389,7 +431,7 @@
                   <% const cssClass = `leaderboard-chart-line ${isSelected ? 'is-selected' : ''} ${isCurrentUser ? 'is-current-user' : ''}`; %>
                   <% const pointsAttr = series.points.map((point, idx) => `${xForIndex(idx).toFixed(2)},${yForTotal(point.total).toFixed(2)}`).join(' '); %>
                   <% const seriesColor = chartPalette[seriesIndex % chartPalette.length]; %>
-                <g class="leaderboard-chart-series" data-chart-series="<%= series.participantId %>">
+                <g class="leaderboard-chart-series <%= isSelected ? 'is-selected' : '' %> <%= isCurrentUser ? 'is-current-user' : '' %>" data-chart-series="<%= series.participantId %>">
                   <polyline class="<%= cssClass %>" points="<%= pointsAttr %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;" />
                     <% series.points.forEach((point, idx) => { %>
                       <% const x = xForIndex(idx); %>
@@ -406,20 +448,29 @@
             <% safeHistory.series.forEach((series, seriesIndex) => { %>
               <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
               <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
-                <label
+                <div
                   class="leaderboard-chart-legend-item <%= isSelected ? 'is-selected' : '' %> <%= isCurrentUser ? 'is-current-user' : '' %>"
+                  data-chart-legend-item="<%= series.participantId %>"
                   style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= chartPalette[seriesIndex % chartPalette.length] %>;"
                 >
                   <input
                     class="leaderboard-chart-toggle"
                     type="checkbox"
                     checked
+                    aria-label="<%= series.name %>"
                     data-chart-series-toggle="<%= series.participantId %>"
                   />
-                  <span class="leaderboard-legend-swatch"></span>
-                  <span><%= series.name %></span>
-                </label>
+                  <a
+                    class="leaderboard-chart-legend-link"
+                    href="<%= leaderboardHref({ participant: series.participantId }) %>"
+                    data-leaderboard-participant-link
+                  >
+                    <span class="leaderboard-legend-swatch"></span>
+                    <span class="leaderboard-legend-name"><%= series.name %></span>
+                  </a>
+                </div>
             <% }) %>
+          </div>
           </div>
           <% } else { %>
             <p class="muted leaderboard-empty-copy">Trends will appear after two race snapshots are available.</p>
@@ -432,35 +483,35 @@
             <div class="leaderboard-member-heading">
               <div>
                 <h2 id="leaderboard-selected-heading"><%= safeInsights.selectedParticipant.name %></h2>
-                <p class="muted">
+                <p class="muted leaderboard-member-meta">
                   Rank <strong><%= safeInsights.selectedParticipant.rank %></strong>
-                  - <strong><%= safeInsights.selectedParticipant.total %></strong> points
+                  <span aria-hidden="true">-</span>
+                  <strong><%= safeInsights.selectedParticipant.total %></strong> points
+                  <% if (safeSelectedLatestRoundDelta) { %>
+                    <span aria-hidden="true">-</span>
+                    Last race <strong><%= formatSigned(safeSelectedLatestRoundDelta.pointsDelta) %> pts</strong>
+                    <span aria-hidden="true">-</span>
+                    <strong><%= formatRankDeltaLabel(safeSelectedLatestRoundDelta.rankDelta) %></strong>
+                  <% } %>
                 </p>
               </div>
             </div>
-
-            <% if (safeSelectedLatestRoundDelta) { %>
-              <div class="leaderboard-selected-metrics" aria-label="Selected participant latest race change">
-                <div>
-                  <span class="muted">Last race</span>
-                  <strong><%= formatSigned(safeSelectedLatestRoundDelta.pointsDelta) %> pts</strong>
-                </div>
-                <div>
-                  <span class="muted">Rank change</span>
-                  <strong><%= formatRankDeltaLabel(safeSelectedLatestRoundDelta.rankDelta) %></strong>
-                </div>
-              </div>
-            <% } %>
 
             <div class="leaderboard-insight-grid">
               <section>
                 <h3>Gaps above</h3>
                 <% if (safeInsights.gaps.length > 0) { %>
+                  <p class="muted leaderboard-insight-summary">
+                    <%= summarizeInsightRows('gaps', safeInsights.gaps) %>
+                  </p>
                   <ul class="leaderboard-insight-list">
                     <% safeInsights.gaps.forEach((item) => { %>
                       <li>
+                        <span class="leaderboard-question-chip leaderboard-insight-question-chip" tabindex="0" aria-label="Q<%= item.questionNumber %>: <%= item.prompt %>">
+                          <span class="leaderboard-question-code">Q<%= item.questionNumber %></span>
+                          <span class="leaderboard-question-tooltip"><%= item.prompt %></span>
+                        </span>
                         <strong><%= formatSigned(-item.difference) %> pts</strong>
-                        <span><%= truncatePrompt(item.prompt) %></span>
                       </li>
                     <% }) %>
                   </ul>
@@ -472,27 +523,39 @@
               <section>
                 <h3>Strengths</h3>
                 <% if (safeInsights.strengths.length > 0) { %>
+                  <p class="muted leaderboard-insight-summary">
+                    <%= summarizeInsightRows('strengths', safeInsights.strengths) %>
+                  </p>
                   <ul class="leaderboard-insight-list">
                     <% safeInsights.strengths.forEach((item) => { %>
                       <li>
+                        <span class="leaderboard-question-chip leaderboard-insight-question-chip" tabindex="0" aria-label="Q<%= item.questionNumber %>: <%= item.prompt %>">
+                          <span class="leaderboard-question-code">Q<%= item.questionNumber %></span>
+                          <span class="leaderboard-question-tooltip"><%= item.prompt %></span>
+                        </span>
                         <strong><%= formatSigned(item.difference) %> pts</strong>
-                        <span><%= truncatePrompt(item.prompt) %></span>
                       </li>
                     <% }) %>
                   </ul>
                 <% } else { %>
-                  <p class="muted">No standout scored edge in the nearby band yet.</p>
+                  <p class="muted">No scored strength against nearby rivals yet.</p>
                 <% } %>
               </section>
 
               <section class="leaderboard-insight-wide">
                 <h3>Distinctive picks</h3>
                 <% if (safeInsights.distinctive.length > 0) { %>
+                  <p class="muted leaderboard-insight-summary">
+                    <%= summarizeInsightRows('distinctive', safeInsights.distinctive) %>
+                  </p>
                   <ul class="leaderboard-insight-list">
                     <% safeInsights.distinctive.forEach((item) => { %>
                       <li>
+                        <span class="leaderboard-question-chip leaderboard-insight-question-chip" tabindex="0" aria-label="Q<%= item.questionNumber %>: <%= item.prompt %>">
+                          <span class="leaderboard-question-code">Q<%= item.questionNumber %></span>
+                          <span class="leaderboard-question-tooltip"><%= item.prompt %></span>
+                        </span>
                         <strong><%= item.selectedPoints %> pts</strong>
-                        <span><%= truncatePrompt(item.prompt) %></span>
                       </li>
                     <% }) %>
                   </ul>

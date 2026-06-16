@@ -184,7 +184,9 @@ test("selected participant insights and breakdown use scored question data", () 
   });
   assert.equal(insights.selectedParticipant.name, "Cara");
   assert.equal(insights.gaps[0].questionId, "q1");
+  assert.equal(insights.gaps[0].questionNumber, 1);
   assert.equal(insights.strengths[0].questionId, "q2");
+  assert.equal(insights.strengths[0].questionNumber, 2);
   assert.ok(insights.distinctive.some((item) => item.questionId === "q1"));
 
   const scoredBreakdown = buildSelectedParticipantBreakdown({

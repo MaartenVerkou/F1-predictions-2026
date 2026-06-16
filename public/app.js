@@ -201,30 +201,163 @@ const initCopyButtons = () => {
   });
 };
 
-const initLeaderboardChartToggles = () => {
-  document.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]').forEach(input => {
+const findLeaderboardSeriesElements = (seriesId) =>
+  Array.from(document.querySelectorAll('[data-chart-series]'))
+    .filter(series => series.dataset.chartSeries === seriesId);
+
+const setLeaderboardSeriesHover = (seriesId, isHovered) => {
+  if (!seriesId) return;
+  findLeaderboardSeriesElements(seriesId).forEach(series => {
+    series.classList.toggle('is-hovered', isHovered);
+  });
+  document.querySelectorAll('.leaderboard-chart-legend-item[data-chart-legend-item]').forEach(item => {
+    item.classList.toggle('is-hovered', item.dataset.chartLegendItem === seriesId && isHovered);
+  });
+};
+
+const syncLeaderboardChartToggle = (input) => {
+  const seriesId = input.dataset.chartSeriesToggle;
+  if (!seriesId) return;
+  const control = input.closest('.leaderboard-chart-legend-item');
+  const seriesElements = findLeaderboardSeriesElements(seriesId);
+  if (seriesElements.length === 0) return;
+
+  seriesElements.forEach(series => {
+    if (input.checked) {
+      series.removeAttribute('hidden');
+    } else {
+      series.setAttribute('hidden', '');
+    }
+  });
+  if (control) {
+    control.classList.toggle('is-muted', !input.checked);
+  }
+};
+
+const initLeaderboardChartToggles = (root = document) => {
+  root.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]').forEach(input => {
+    if (input.dataset.chartToggleReady === 'true') {
+      syncLeaderboardChartToggle(input);
+      return;
+    }
+    input.dataset.chartToggleReady = 'true';
     const seriesId = input.dataset.chartSeriesToggle;
     if (!seriesId) return;
-    const control = input.closest('.leaderboard-chart-legend-item');
-    const seriesElements = Array.from(document.querySelectorAll('[data-chart-series]'))
-      .filter(series => series.dataset.chartSeries === seriesId);
-    if (seriesElements.length === 0) return;
 
-    const sync = () => {
-      seriesElements.forEach(series => {
-        if (input.checked) {
-          series.removeAttribute('hidden');
-        } else {
-          series.setAttribute('hidden', '');
+    input.addEventListener('change', () => syncLeaderboardChartToggle(input));
+    syncLeaderboardChartToggle(input);
+  });
+};
+
+const initLeaderboardChartHover = (root = document) => {
+  root.querySelectorAll('.leaderboard-chart-legend-item[data-chart-legend-item]').forEach(item => {
+    if (item.dataset.chartHoverReady === 'true') return;
+    item.dataset.chartHoverReady = 'true';
+    const seriesId = item.dataset.chartLegendItem;
+    if (!seriesId) return;
+
+    item.addEventListener('mouseenter', () => setLeaderboardSeriesHover(seriesId, true));
+    item.addEventListener('mouseleave', () => setLeaderboardSeriesHover(seriesId, false));
+    item.addEventListener('focusin', () => setLeaderboardSeriesHover(seriesId, true));
+    item.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!item.contains(document.activeElement)) {
+          setLeaderboardSeriesHover(seriesId, false);
         }
-      });
-      if (control) {
-        control.classList.toggle('is-muted', !input.checked);
-      }
-    };
+      }, 0);
+    });
+  });
+};
 
-    input.addEventListener('change', sync);
-    sync();
+let leaderboardParticipantSelectionReady = false;
+let leaderboardParticipantSelectionRequest = 0;
+
+const collectHiddenLeaderboardSeries = () =>
+  new Set(
+    Array.from(document.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]:not(:checked)'))
+      .map(input => input.dataset.chartSeriesToggle)
+      .filter(Boolean)
+  );
+
+const applyHiddenLeaderboardSeries = (hiddenSeriesIds, root = document) => {
+  hiddenSeriesIds.forEach(seriesId => {
+    root.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]').forEach(input => {
+      if (input.dataset.chartSeriesToggle === seriesId) {
+        input.checked = false;
+      }
+    });
+  });
+};
+
+const updateLeaderboardFromUrl = async (url, { pushHistory = true } = {}) => {
+  const currentLayout = document.querySelector('.leaderboard-layout');
+  if (!currentLayout) {
+    window.location.href = url;
+    return;
+  }
+
+  const requestId = ++leaderboardParticipantSelectionRequest;
+  const hiddenSeriesIds = collectHiddenLeaderboardSeries();
+  currentLayout.setAttribute('aria-busy', 'true');
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'text/html',
+        'X-Requested-With': 'fetch'
+      },
+      credentials: 'same-origin'
+    });
+    if (!response.ok) throw new Error(`Leaderboard selection failed with status ${response.status}`);
+    const html = await response.text();
+    if (requestId !== leaderboardParticipantSelectionRequest) return;
+
+    const nextDocument = new DOMParser().parseFromString(html, 'text/html');
+    const nextLayout = nextDocument.querySelector('.leaderboard-layout');
+    if (!nextLayout) throw new Error('Leaderboard selection response did not include layout.');
+
+    currentLayout.replaceWith(nextLayout);
+    document.title = nextDocument.title || document.title;
+    applyHiddenLeaderboardSeries(hiddenSeriesIds, document);
+    initLeaderboardChartToggles(document);
+    initLeaderboardChartHover(document);
+
+    if (pushHistory) {
+      window.history.pushState({ leaderboardUrl: url }, '', url);
+    }
+  } catch (err) {
+    window.location.href = url;
+  } finally {
+    const nextCurrentLayout = document.querySelector('.leaderboard-layout');
+    if (nextCurrentLayout) {
+      nextCurrentLayout.removeAttribute('aria-busy');
+    }
+  }
+};
+
+const initLeaderboardParticipantSelection = () => {
+  if (leaderboardParticipantSelectionReady) return;
+  leaderboardParticipantSelectionReady = true;
+
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest('a[data-leaderboard-participant-link]');
+    if (!link) return;
+    const nextUrl = new URL(link.href, window.location.href);
+    if (nextUrl.origin !== window.location.origin) return;
+
+    event.preventDefault();
+    updateLeaderboardFromUrl(nextUrl.toString());
+  });
+
+  window.addEventListener('popstate', () => {
+    if (document.querySelector('.leaderboard-layout')) {
+      updateLeaderboardFromUrl(window.location.href, { pushHistory: false });
+    }
   });
 };
 
@@ -875,6 +1008,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initCountdown();
   initCopyButtons();
   initLeaderboardChartToggles();
+  initLeaderboardChartHover();
+  initLeaderboardParticipantSelection();
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initQuestionsCouplingToggle();
