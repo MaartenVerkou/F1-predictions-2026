@@ -276,6 +276,7 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       document.documentElement.setAttribute("data-theme", theme);
     }, testCase.theme);
 
+    await expect(page.locator(".leaderboard-overview-row")).toBeVisible();
     await expect(page.locator(".leaderboard-trend-panel")).toBeVisible();
     await expect(page.locator(".leaderboard-main-card")).toBeVisible();
     await expect(page.locator(".leaderboard-detail-card")).toBeVisible();
@@ -290,7 +291,15 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       legendItems: document.querySelectorAll(".leaderboard-chart-legend-item").length,
       rows: document.querySelectorAll(".leaderboard-main-card tbody tr").length,
       nestedDetailPanels: document.querySelectorAll(".leaderboard-member-panel").length,
-      mainBottom: Math.round(document.querySelector(".leaderboard-main-card").getBoundingClientRect().bottom),
+      rowTop: Math.round(document.querySelector(".leaderboard-overview-row").getBoundingClientRect().top),
+      rowBottom: Math.round(document.querySelector(".leaderboard-overview-row").getBoundingClientRect().bottom),
+      mainTop: Math.round(document.querySelector(".leaderboard-main-column").getBoundingClientRect().top),
+      mainRight: Math.round(document.querySelector(".leaderboard-main-column").getBoundingClientRect().right),
+      mainWidth: Math.round(document.querySelector(".leaderboard-main-column").getBoundingClientRect().width),
+      chartTop: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().top),
+      chartLeft: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().left),
+      chartBottom: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().bottom),
+      chartWidth: Math.round(document.querySelector(".leaderboard-trend-panel").getBoundingClientRect().width),
       detailTop: Math.round(document.querySelector(".leaderboard-detail-card").getBoundingClientRect().top)
     }));
 
@@ -299,6 +308,15 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
     expect(metrics.legendItems).toBeGreaterThan(0);
     expect(metrics.rows).toBeGreaterThan(0);
     expect(metrics.nestedDetailPanels).toBe(0);
-    expect(metrics.detailTop).toBeGreaterThanOrEqual(metrics.mainBottom);
+    expect(metrics.detailTop).toBeGreaterThanOrEqual(metrics.rowBottom);
+
+    if (testCase.width >= 1100) {
+      expect(metrics.chartLeft).toBeGreaterThanOrEqual(metrics.mainRight);
+      expect(metrics.mainWidth).toBeGreaterThan(metrics.chartWidth);
+      expect(Math.abs(metrics.chartTop - metrics.rowTop)).toBeLessThanOrEqual(8);
+    } else {
+      expect(metrics.mainTop).toBeLessThan(metrics.chartTop);
+      expect(metrics.detailTop).toBeGreaterThanOrEqual(metrics.chartBottom);
+    }
   }
 });

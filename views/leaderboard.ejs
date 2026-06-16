@@ -253,95 +253,9 @@
     <% const startRank = (currentLeaderboardPage - 1) * leaderboardPerPage + 1; %>
     <% const endRank = startRank + leaderboard.length - 1; %>
 
-    <section class="leaderboard-insights-overview" aria-label="Leaderboard insights">
-      <section class="leaderboard-trend-panel">
-        <div class="leaderboard-section-heading">
-          <div>
-            <h2>Points over rounds</h2>
-            <p class="muted">
-              Top 10 plus selected participants.
-              <% if (hasRoundDeltaColumn) { %>
-                Last race: R<%= safeLatestRoundDeltaMeta.previousRound.roundNumber %> to R<%= safeLatestRoundDeltaMeta.latestRound.roundNumber %>.
-              <% } %>
-            </p>
-          </div>
-        </div>
-        <% if (safeHistory.hasEnoughHistory && safeHistory.series.length > 0) { %>
-          <% const chartWidth = 960; %>
-          <% const chartHeight = 240; %>
-          <% const padLeft = 52; %>
-          <% const padRight = 24; %>
-          <% const padTop = 16; %>
-          <% const padBottom = 38; %>
-          <% const plotWidth = chartWidth - padLeft - padRight; %>
-          <% const plotHeight = chartHeight - padTop - padBottom; %>
-          <% const maxTotal = Math.max(1, Number(safeHistory.maxTotal || 0)); %>
-          <% const xForIndex = (idx) => safeHistory.rounds.length <= 1
-            ? padLeft
-            : padLeft + (idx / (safeHistory.rounds.length - 1)) * plotWidth; %>
-          <% const yForTotal = (total) => padTop + plotHeight - (Number(total || 0) / maxTotal) * plotHeight; %>
-          <div class="leaderboard-chart-wrap">
-            <svg
-              class="leaderboard-trend-chart"
-              viewBox="0 0 <%= chartWidth %> <%= chartHeight %>"
-              role="img"
-              aria-label="Leaderboard points over completed rounds"
-            >
-              <line x1="<%= padLeft %>" y1="<%= padTop %>" x2="<%= padLeft %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
-              <line x1="<%= padLeft %>" y1="<%= padTop + plotHeight %>" x2="<%= padLeft + plotWidth %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
-              <% [0, 0.5, 1].forEach((tick) => { %>
-                <% const y = padTop + plotHeight - tick * plotHeight; %>
-                <line x1="<%= padLeft %>" y1="<%= y %>" x2="<%= padLeft + plotWidth %>" y2="<%= y %>" class="leaderboard-chart-grid" />
-                <text x="<%= padLeft - 10 %>" y="<%= y + 4 %>" text-anchor="end" class="leaderboard-chart-label"><%= Math.round(maxTotal * tick) %></text>
-              <% }) %>
-              <% safeHistory.rounds.forEach((round, idx) => { %>
-                <% const x = xForIndex(idx); %>
-                <text x="<%= x %>" y="<%= chartHeight - 14 %>" text-anchor="middle" class="leaderboard-chart-label">R<%= round.roundNumber %></text>
-              <% }) %>
-              <% safeHistory.series.forEach((series, seriesIndex) => { %>
-                <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
-                <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
-                <% const cssClass = `leaderboard-chart-line ${isSelected ? 'is-selected' : ''} ${isCurrentUser ? 'is-current-user' : ''}`; %>
-                <% const pointsAttr = series.points.map((point, idx) => `${xForIndex(idx).toFixed(2)},${yForTotal(point.total).toFixed(2)}`).join(' '); %>
-                <% const seriesColor = chartPalette[seriesIndex % chartPalette.length]; %>
-                <polyline class="<%= cssClass %>" points="<%= pointsAttr %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;" />
-                <% series.points.forEach((point, idx) => { %>
-                  <% const x = xForIndex(idx); %>
-                  <% const y = yForTotal(point.total); %>
-                  <circle class="<%= cssClass %>" cx="<%= x %>" cy="<%= y %>" r="<%= isSelected || isCurrentUser ? 4 : 2.8 %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;">
-                    <title><%= `${series.name}: ${point.total} points after R${point.roundNumber}${point.rank ? `, rank ${point.rank}` : ''}` %></title>
-                  </circle>
-                <% }) %>
-              <% }) %>
-            </svg>
-          </div>
-          <div class="leaderboard-chart-legend" aria-label="Plotted participants">
-            <% safeHistory.series.forEach((series, seriesIndex) => { %>
-              <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
-              <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
-              <a
-                class="leaderboard-chart-legend-item <%= isSelected ? 'is-selected' : '' %> <%= isCurrentUser ? 'is-current-user' : '' %>"
-                href="<%= leaderboardHref({ participant: series.participantId }) %>"
-                style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= chartPalette[seriesIndex % chartPalette.length] %>;"
-              >
-                <span class="leaderboard-legend-swatch"></span>
-                <span><%= series.name %></span>
-                <% const latestPoint = series.points[series.points.length - 1]; %>
-                <% if (latestPoint) { %>
-                  <strong><%= latestPoint.total %></strong>
-                <% } %>
-              </a>
-            <% }) %>
-          </div>
-        <% } else { %>
-          <p class="muted leaderboard-empty-copy">Trends will appear after two race snapshots are available.</p>
-        <% } %>
-      </section>
-
-    </section>
-
     <div id="leaderboard-overview" class="leaderboard-layout">
-      <div class="leaderboard-main-column">
+      <div class="leaderboard-overview-row">
+        <div class="leaderboard-main-column">
         <% if ((actualSnapshots || []).length > 0) { %>
           <form method="get" action="<%= leaderboardBaseHref %>" class="leaderboard-snapshot-form inline-actions">
             <% Object.entries(snapshotFilterParams).forEach(([key, value]) => { %>
@@ -380,7 +294,7 @@
                 <% if (hasRoundDeltaColumn) { %>
                   <th class="leaderboard-delta-header" aria-label="Latest race movement">
                     <span class="sr-only">Latest race movement</span>
-                    <span aria-hidden="true">±</span>
+                    <span aria-hidden="true">&plusmn;</span>
                   </th>
                 <% } %>
               </tr>
@@ -431,7 +345,92 @@
             perPage: leaderboardPerPage,
             showSummary: false
           }) %>
-        </section>
+          </section>
+        </div>
+
+        <aside class="leaderboard-trend-panel" aria-label="Leaderboard insights">
+          <div class="leaderboard-section-heading">
+            <div>
+              <h2>Points over rounds</h2>
+              <p class="muted">
+                Top 10 plus selected participants.
+                <% if (hasRoundDeltaColumn) { %>
+                  Last race: R<%= safeLatestRoundDeltaMeta.previousRound.roundNumber %> to R<%= safeLatestRoundDeltaMeta.latestRound.roundNumber %>.
+                <% } %>
+              </p>
+            </div>
+          </div>
+          <% if (safeHistory.hasEnoughHistory && safeHistory.series.length > 0) { %>
+            <% const chartWidth = 960; %>
+            <% const chartHeight = 240; %>
+            <% const padLeft = 52; %>
+            <% const padRight = 24; %>
+            <% const padTop = 16; %>
+            <% const padBottom = 38; %>
+            <% const plotWidth = chartWidth - padLeft - padRight; %>
+            <% const plotHeight = chartHeight - padTop - padBottom; %>
+            <% const maxTotal = Math.max(1, Number(safeHistory.maxTotal || 0)); %>
+            <% const xForIndex = (idx) => safeHistory.rounds.length <= 1
+              ? padLeft
+              : padLeft + (idx / (safeHistory.rounds.length - 1)) * plotWidth; %>
+            <% const yForTotal = (total) => padTop + plotHeight - (Number(total || 0) / maxTotal) * plotHeight; %>
+            <div class="leaderboard-chart-wrap">
+              <svg
+                class="leaderboard-trend-chart"
+                viewBox="0 0 <%= chartWidth %> <%= chartHeight %>"
+                role="img"
+                aria-label="Leaderboard points over completed rounds"
+              >
+                <line x1="<%= padLeft %>" y1="<%= padTop %>" x2="<%= padLeft %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
+                <line x1="<%= padLeft %>" y1="<%= padTop + plotHeight %>" x2="<%= padLeft + plotWidth %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
+                <% [0, 0.5, 1].forEach((tick) => { %>
+                  <% const y = padTop + plotHeight - tick * plotHeight; %>
+                  <line x1="<%= padLeft %>" y1="<%= y %>" x2="<%= padLeft + plotWidth %>" y2="<%= y %>" class="leaderboard-chart-grid" />
+                  <text x="<%= padLeft - 10 %>" y="<%= y + 4 %>" text-anchor="end" class="leaderboard-chart-label"><%= Math.round(maxTotal * tick) %></text>
+                <% }) %>
+                <% safeHistory.rounds.forEach((round, idx) => { %>
+                  <% const x = xForIndex(idx); %>
+                  <text x="<%= x %>" y="<%= chartHeight - 14 %>" text-anchor="middle" class="leaderboard-chart-label">R<%= round.roundNumber %></text>
+                <% }) %>
+                <% safeHistory.series.forEach((series, seriesIndex) => { %>
+                  <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
+                  <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
+                  <% const cssClass = `leaderboard-chart-line ${isSelected ? 'is-selected' : ''} ${isCurrentUser ? 'is-current-user' : ''}`; %>
+                  <% const pointsAttr = series.points.map((point, idx) => `${xForIndex(idx).toFixed(2)},${yForTotal(point.total).toFixed(2)}`).join(' '); %>
+                  <% const seriesColor = chartPalette[seriesIndex % chartPalette.length]; %>
+                  <polyline class="<%= cssClass %>" points="<%= pointsAttr %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;" />
+                  <% series.points.forEach((point, idx) => { %>
+                    <% const x = xForIndex(idx); %>
+                    <% const y = yForTotal(point.total); %>
+                    <circle class="<%= cssClass %>" cx="<%= x %>" cy="<%= y %>" r="<%= isSelected || isCurrentUser ? 4 : 2.8 %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;">
+                      <title><%= `${series.name}: ${point.total} points after R${point.roundNumber}${point.rank ? `, rank ${point.rank}` : ''}` %></title>
+                    </circle>
+                  <% }) %>
+                <% }) %>
+              </svg>
+            </div>
+            <div class="leaderboard-chart-legend" aria-label="Plotted participants">
+              <% safeHistory.series.forEach((series, seriesIndex) => { %>
+                <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
+                <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
+                <a
+                  class="leaderboard-chart-legend-item <%= isSelected ? 'is-selected' : '' %> <%= isCurrentUser ? 'is-current-user' : '' %>"
+                  href="<%= leaderboardHref({ participant: series.participantId }) %>"
+                  style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= chartPalette[seriesIndex % chartPalette.length] %>;"
+                >
+                  <span class="leaderboard-legend-swatch"></span>
+                  <span><%= series.name %></span>
+                  <% const latestPoint = series.points[series.points.length - 1]; %>
+                  <% if (latestPoint) { %>
+                    <strong><%= latestPoint.total %></strong>
+                  <% } %>
+                </a>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <p class="muted leaderboard-empty-copy">Trends will appear after two race snapshots are available.</p>
+          <% } %>
+        </aside>
       </div>
 
       <section class="leaderboard-detail-card leaderboard-selected-panel">
