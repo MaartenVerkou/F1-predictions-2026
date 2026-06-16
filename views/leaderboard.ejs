@@ -89,6 +89,13 @@
 
     return false;
   }; %>
+  <% const formatSimpleValue = (value) => {
+    const text = String(value);
+    if (text === 'yes') return t('questions.yes');
+    if (text === 'no') return t('questions.no');
+    if (text === 'tie') return t('questions.tie');
+    return text;
+  }; %>
   <% const formatInlineValue = (value) => {
     if (value == null || value === "") return "-";
     if (Array.isArray(value)) return value.join(" | ");
@@ -97,7 +104,7 @@
         .map(([key, inner]) => `${key}: ${formatInlineValue(inner)}`)
         .join("; ");
     }
-    return String(value);
+    return formatSimpleValue(value);
   }; %>
   <% const formatValue = (question, raw) => {
     if (raw == null || raw === "") return "-";
@@ -131,7 +138,7 @@
         if (Array.isArray(parsed)) return parsed.join(" | ");
         if (parsed && typeof parsed === "object") {
           if (type === "teammate_battle") {
-            if (parsed.winner === "tie") return "Tie";
+            if (parsed.winner === "tie") return t('questions.tie');
             if (parsed.winner) {
               const diffText =
                 parsed.diff == null || parsed.diff === ""
@@ -141,7 +148,7 @@
             }
           }
           if (type === "boolean_with_optional_driver") {
-            const choice = parsed.choice == null ? "-" : String(parsed.choice);
+            const choice = parsed.choice == null ? "-" : formatSimpleValue(parsed.choice);
             return parsed.driver ? `${choice} - ${parsed.driver}` : choice;
           }
           if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
@@ -150,12 +157,12 @@
           }
           return formatInlineValue(parsed);
         }
-        return parsed == null ? "-" : String(parsed);
+        return parsed == null ? "-" : formatSimpleValue(parsed);
       } catch (err) {
-        return text;
+        return formatSimpleValue(text);
       }
     }
-    return text;
+    return formatSimpleValue(text);
   }; %>
   <% const leaderboardBaseHref =
     typeof leaderboardBasePath === "string" && leaderboardBasePath
@@ -216,29 +223,32 @@
   }; %>
   <% const formatRankDeltaLabel = (value) => {
     const number = Number(value || 0);
-    if (!Number.isFinite(number) || number === 0) return 'steady';
-    return number > 0 ? `+${number} rank` : `${number} rank`;
+    if (!Number.isFinite(number) || number === 0) return t('leaderboard.rank_delta_steady');
+    return number > 0
+      ? t('leaderboard.rank_delta_up', { count: number })
+      : t('leaderboard.rank_delta_down', { count: Math.abs(number) });
   }; %>
   <% const formatInsightAbsPoints = (value) => {
     const number = Math.abs(Number(value || 0));
-    if (!Number.isFinite(number)) return '0 pts';
-    return `${Number.isInteger(number) ? number : Number(number.toFixed(2))} pts`;
+    if (!Number.isFinite(number)) return `0 ${t('leaderboard.points_short')}`;
+    return `${Number.isInteger(number) ? number : Number(number.toFixed(2))} ${t('leaderboard.points_short')}`;
   }; %>
   <% const formatInsightSignedPoints = (value) => {
     const number = Number(value || 0);
-    if (!Number.isFinite(number) || number === 0) return '0 pts';
+    if (!Number.isFinite(number) || number === 0) return `0 ${t('leaderboard.points_short')}`;
     return number > 0 ? `+${formatInsightAbsPoints(number)}` : `-${formatInsightAbsPoints(number)}`;
   }; %>
   <% const formatInsightCountLabel = (count) => {
     const number = Number(count || 0);
-    const labels = { 1: 'One', 2: 'Two', 3: 'Three' };
-    return `${labels[number] || number} ${number === 1 ? 'question' : 'questions'}`;
+    return t(number === 1 ? 'leaderboard.question_count_one' : 'leaderboard.question_count_many', {
+      count: number
+    });
   }; %>
   <% const sumInsightField = (items, field) => {
     const total = (items || []).reduce((sum, item) => sum + Number(item?.[field] || 0), 0);
     return Number(total.toFixed(2));
   }; %>
-  <% const selectedInsightName = safeInsights.selectedParticipant?.name || 'this participant'; %>
+  <% const selectedInsightName = safeInsights.selectedParticipant?.name || t('leaderboard.this_participant'); %>
   <% const summarizeInsightRows = (type, items) => {
     const rows = items || [];
     const count = rows.length;
@@ -247,23 +257,47 @@
     if (type === 'gaps') {
       const total = sumInsightField(rows, 'difference');
       if (count === 1) {
-        return `Q${first.questionNumber} leaves ${selectedInsightName} ${formatInsightAbsPoints(total)} behind nearby rivals.`;
+        return t('leaderboard.gaps_summary_one', {
+          question: first.questionNumber,
+          name: selectedInsightName,
+          points: formatInsightAbsPoints(total)
+        });
       }
-      return `${formatInsightCountLabel(count)} leave ${selectedInsightName} ${formatInsightAbsPoints(total)} behind nearby rivals.`;
+      return t('leaderboard.gaps_summary_many', {
+        count_label: formatInsightCountLabel(count),
+        name: selectedInsightName,
+        points: formatInsightAbsPoints(total)
+      });
     }
     if (type === 'strengths') {
       const total = sumInsightField(rows, 'difference');
       if (count === 1) {
-        return `Q${first.questionNumber} gives ${selectedInsightName} ${formatInsightSignedPoints(total)} versus nearby rivals.`;
+        return t('leaderboard.strengths_summary_one', {
+          question: first.questionNumber,
+          name: selectedInsightName,
+          points: formatInsightSignedPoints(total)
+        });
       }
-      return `${formatInsightCountLabel(count)} give ${selectedInsightName} ${formatInsightSignedPoints(total)} versus nearby rivals.`;
+      return t('leaderboard.strengths_summary_many', {
+        count_label: formatInsightCountLabel(count),
+        name: selectedInsightName,
+        points: formatInsightSignedPoints(total)
+      });
     }
     if (type === 'distinctive') {
       const total = sumInsightField(rows, 'selectedPoints');
       if (count === 1) {
-        return `Q${first.questionNumber} is a distinctive answer worth ${formatInsightAbsPoints(total)} for ${selectedInsightName}.`;
+        return t('leaderboard.distinctive_summary_one', {
+          question: first.questionNumber,
+          name: selectedInsightName,
+          points: formatInsightAbsPoints(total)
+        });
       }
-      return `${formatInsightCountLabel(count)} give ${selectedInsightName} ${formatInsightAbsPoints(total)} from distinctive answers.`;
+      return t('leaderboard.distinctive_summary_many', {
+        count_label: formatInsightCountLabel(count),
+        name: selectedInsightName,
+        points: formatInsightAbsPoints(total)
+      });
     }
     return '';
   }; %>
@@ -331,7 +365,7 @@
             >
               <% actualSnapshots.forEach((snapshot) => { %>
                 <option value="<%= snapshot.id %>" <%= selectedSnapshotKey === String(snapshot.id) ? "selected" : "" %>>
-                  <%= snapshot.label %><%= showSnapshotReviewStatus && snapshot.reviewStatus === 'pending' ? ' | pending review' : '' %>
+                  <%= snapshot.label %><%= showSnapshotReviewStatus && snapshot.reviewStatus === 'pending' ? ` | ${t('leaderboard.pending_review')}` : '' %>
                 </option>
               <% }) %>
             </select>
@@ -343,11 +377,11 @@
           <table class="table">
             <thead>
               <tr>
-                <th class="leaderboard-position-header" aria-label="Position"><span aria-hidden="true">POS</span></th>
-                <th>NAME</th>
-                <th class="leaderboard-points-header" aria-label="Points"><span aria-hidden="true">PTS</span></th>
+                <th class="leaderboard-position-header" aria-label="<%= t('leaderboard.position') %>"><span aria-hidden="true">POS</span></th>
+                <th><%= t('common.name').toUpperCase() %></th>
+                <th class="leaderboard-points-header" aria-label="<%= t('leaderboard.points_label') %>"><span aria-hidden="true">PTS</span></th>
                 <% if (hasRoundDeltaColumn) { %>
-                  <th class="leaderboard-delta-header" aria-label="Rank change since previous saved race"></th>
+                  <th class="leaderboard-delta-header" aria-label="<%= t('leaderboard.rank_change_aria') %>"></th>
                 <% } %>
               </tr>
             </thead>
@@ -375,12 +409,12 @@
                         <% const rankDelta = Number(delta.rankDelta || 0); %>
                         <% const deltaClass = rankDelta > 0 ? 'is-positive' : (rankDelta < 0 ? 'is-negative' : ''); %>
                         <% if (rankDelta === 0) { %>
-                          <span class="leaderboard-delta-empty" aria-label="No rank change">-</span>
+                          <span class="leaderboard-delta-empty" aria-label="<%= t('leaderboard.no_rank_change') %>">-</span>
                         <% } else { %>
                           <strong class="<%= deltaClass %>"><%= formatRankDelta(rankDelta) %></strong>
                         <% } %>
                       <% } else { %>
-                        <span class="leaderboard-delta-empty" aria-label="No movement data">-</span>
+                        <span class="leaderboard-delta-empty" aria-label="<%= t('leaderboard.no_movement_data') %>">-</span>
                       <% } %>
                     </td>
                   <% } %>
@@ -405,7 +439,7 @@
           </section>
         </div>
 
-        <aside class="leaderboard-trend-panel" aria-label="Points over rounds">
+        <aside class="leaderboard-trend-panel" aria-label="<%= t('leaderboard.chart_aria_label') %>">
           <% if (safeHistory.hasEnoughHistory && safeHistory.series.length > 0) { %>
             <% const chartWidth = 960; %>
             <% const chartHeight = 360; %>
@@ -463,7 +497,7 @@
                 class="leaderboard-trend-chart"
                 viewBox="0 0 <%= chartWidth %> <%= chartHeight %>"
                 role="img"
-                aria-label="Leaderboard points over completed rounds"
+                aria-label="<%= t('leaderboard.chart_aria_label') %>"
                 data-chart-domain-min="<%= formatChartTick(chartDomainMin) %>"
                 data-chart-domain-max="<%= formatChartTick(chartDomainMax) %>"
                 data-chart-selected-round-id="<%= selectedSnapshotKey %>"
@@ -503,14 +537,14 @@
                       <% const x = xForIndex(idx); %>
                       <% const y = yForTotal(point.total); %>
                       <circle class="<%= cssClass %>" cx="<%= x %>" cy="<%= y %>" r="<%= isSelected || isCurrentUser ? 4 : 2.8 %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;">
-                        <title><%= `${series.name}: ${point.total} points after R${point.roundNumber}${point.rank ? `, rank ${point.rank}` : ''}` %></title>
+                        <title><%= t('leaderboard.chart_point_title', { name: series.name, points: point.total, round: point.roundNumber, rank: point.rank ? t('leaderboard.chart_rank_suffix', { rank: point.rank }) : '' }) %></title>
                       </circle>
                     <% }) %>
                 </g>
               <% }) %>
             </svg>
           </div>
-          <div class="leaderboard-chart-legend" aria-label="Plotted participants">
+          <div class="leaderboard-chart-legend" aria-label="<%= t('leaderboard.plotted_participants') %>">
             <% safeHistory.series.forEach((series, seriesIndex) => { %>
               <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
               <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
@@ -540,7 +574,7 @@
           </div>
           </div>
           <% } else { %>
-            <p class="muted leaderboard-empty-copy">Trends will appear after two race snapshots are available.</p>
+            <p class="muted leaderboard-empty-copy"><%= t('leaderboard.trends_empty') %></p>
           <% } %>
         </aside>
       </div>
@@ -551,12 +585,12 @@
               <div>
                 <h2 id="leaderboard-selected-heading"><%= safeInsights.selectedParticipant.name %></h2>
                 <p class="muted leaderboard-member-meta">
-                  Rank <strong><%= safeInsights.selectedParticipant.rank %></strong>
+                  <%= t('leaderboard.rank_label') %> <strong><%= safeInsights.selectedParticipant.rank %></strong>
                   <span aria-hidden="true">-</span>
-                  <strong><%= safeInsights.selectedParticipant.total %></strong> points
+                  <strong><%= safeInsights.selectedParticipant.total %></strong> <%= t('leaderboard.points_word') %>
                   <% if (safeSelectedLatestRoundDelta) { %>
                     <span aria-hidden="true">-</span>
-                    Race change <strong><%= formatSigned(safeSelectedLatestRoundDelta.pointsDelta) %> pts</strong>
+                    <%= t('leaderboard.race_change') %> <strong><%= formatSigned(safeSelectedLatestRoundDelta.pointsDelta) %> <%= t('leaderboard.points_short') %></strong>
                     <span aria-hidden="true">-</span>
                     <strong><%= formatRankDeltaLabel(safeSelectedLatestRoundDelta.rankDelta) %></strong>
                   <% } %>
@@ -566,7 +600,7 @@
 
             <div class="leaderboard-insight-grid">
               <section>
-                <h3>Gaps above</h3>
+                <h3><%= t('leaderboard.gaps_above') %></h3>
                 <% if (safeInsights.gaps.length > 0) { %>
                   <p class="muted leaderboard-insight-summary">
                     <%= summarizeInsightRows('gaps', safeInsights.gaps) %>
@@ -578,17 +612,17 @@
                           <span class="leaderboard-question-code">Q<%= item.questionNumber %></span>
                           <span class="leaderboard-question-tooltip"><%= item.prompt %></span>
                         </span>
-                        <strong><%= formatSigned(-item.difference) %> pts</strong>
+                        <strong><%= formatSigned(-item.difference) %> <%= t('leaderboard.points_short') %></strong>
                       </li>
                     <% }) %>
                   </ul>
                 <% } else { %>
-                  <p class="muted">No clear scored gap to nearby rivals yet.</p>
+                  <p class="muted"><%= t('leaderboard.gaps_empty') %></p>
                 <% } %>
               </section>
 
               <section>
-                <h3>Strengths</h3>
+                <h3><%= t('leaderboard.strengths') %></h3>
                 <% if (safeInsights.strengths.length > 0) { %>
                   <p class="muted leaderboard-insight-summary">
                     <%= summarizeInsightRows('strengths', safeInsights.strengths) %>
@@ -600,17 +634,17 @@
                           <span class="leaderboard-question-code">Q<%= item.questionNumber %></span>
                           <span class="leaderboard-question-tooltip"><%= item.prompt %></span>
                         </span>
-                        <strong><%= formatSigned(item.difference) %> pts</strong>
+                        <strong><%= formatSigned(item.difference) %> <%= t('leaderboard.points_short') %></strong>
                       </li>
                     <% }) %>
                   </ul>
                 <% } else { %>
-                  <p class="muted">No scored strength against nearby rivals yet.</p>
+                  <p class="muted"><%= t('leaderboard.strengths_empty') %></p>
                 <% } %>
               </section>
 
               <section class="leaderboard-insight-wide">
-                <h3>Distinctive picks</h3>
+                <h3><%= t('leaderboard.distinctive_picks') %></h3>
                 <% if (safeInsights.distinctive.length > 0) { %>
                   <p class="muted leaderboard-insight-summary">
                     <%= summarizeInsightRows('distinctive', safeInsights.distinctive) %>
@@ -622,12 +656,12 @@
                           <span class="leaderboard-question-code">Q<%= item.questionNumber %></span>
                           <span class="leaderboard-question-tooltip"><%= item.prompt %></span>
                         </span>
-                        <strong><%= item.selectedPoints %> pts</strong>
+                        <strong><%= item.selectedPoints %> <%= t('leaderboard.points_short') %></strong>
                       </li>
                     <% }) %>
                   </ul>
                 <% } else { %>
-                  <p class="muted"><%= safeInsights.emptyReason || 'No distinctive scoring pattern in the nearby band yet.' %></p>
+                  <p class="muted"><%= t('leaderboard.distinctive_empty') %></p>
                 <% } %>
               </section>
             </div>
@@ -635,12 +669,12 @@
             <% if (canViewBreakdown) { %>
               <div class="leaderboard-breakdown-header">
                 <div>
-                  <h3>Question breakdown</h3>
-                  <p class="muted"><%= safeBreakdown.mode === 'all' ? 'All questions' : 'Scored questions' %></p>
+                  <h3><%= t('leaderboard.question_breakdown') %></h3>
+                  <p class="muted"><%= safeBreakdown.mode === 'all' ? t('leaderboard.all_questions') : t('leaderboard.scored_questions') %></p>
                 </div>
-                <div class="leaderboard-breakdown-toggle" aria-label="Question breakdown filter">
-                  <a class="<%= safeBreakdown.mode === 'scored' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: '' }, 'leaderboard-breakdown') %>">Scored</a>
-                  <a class="<%= safeBreakdown.mode === 'all' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: 'all' }, 'leaderboard-breakdown') %>">All</a>
+                <div class="leaderboard-breakdown-toggle" aria-label="<%= t('leaderboard.question_breakdown_filter') %>">
+                  <a class="<%= safeBreakdown.mode === 'scored' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: '' }, 'leaderboard-breakdown') %>"><%= t('leaderboard.scored') %></a>
+                  <a class="<%= safeBreakdown.mode === 'all' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: 'all' }, 'leaderboard-breakdown') %>"><%= t('leaderboard.all') %></a>
                 </div>
               </div>
 
@@ -649,7 +683,7 @@
                   <table class="table compact leaderboard-breakdown-table">
                     <thead>
                       <tr>
-                        <th>Q</th>
+                        <th><%= t('leaderboard.question_short') %></th>
                         <th><%= t('leaderboard.prediction') %></th>
                         <th><%= t('leaderboard.actual') %></th>
                         <th><%= t('leaderboard.points_short_caps') %></th>
@@ -686,19 +720,19 @@
                   </table>
                 <% } else { %>
                   <p class="muted leaderboard-empty-copy">
-                    <%= safeBreakdown.mode === 'scored' ? 'No scored questions for this participant yet.' : 'No question answers found for this participant.' %>
+                    <%= safeBreakdown.mode === 'scored' ? t('leaderboard.no_scored_questions_participant') : t('leaderboard.no_question_answers_participant') %>
                   </p>
                 <% } %>
               </div>
             <% } else { %>
               <div class="leaderboard-breakdown-locked">
-                <h3>Question breakdown</h3>
-                <p class="muted">Sign in to view detailed predictions and scored-question breakdowns.</p>
-                <a class="link" href="/login?redirectTo=<%= encodeURIComponent(leaderboardHref({ participant: selectedParticipantKey }, 'leaderboard-overview')) %>">Sign in</a>
+                <h3><%= t('leaderboard.question_breakdown') %></h3>
+                <p class="muted"><%= t('leaderboard.sign_in_breakdown_prompt') %></p>
+                <a class="link" href="/login?redirectTo=<%= encodeURIComponent(leaderboardHref({ participant: selectedParticipantKey }, 'leaderboard-overview')) %>"><%= t('header.login') %></a>
               </div>
             <% } %>
           <% } else { %>
-            <p class="muted leaderboard-empty-copy">Select a scored participant to see leaderboard insights.</p>
+            <p class="muted leaderboard-empty-copy"><%= t('leaderboard.select_participant_empty') %></p>
           <% } %>
       </section>
     </div>

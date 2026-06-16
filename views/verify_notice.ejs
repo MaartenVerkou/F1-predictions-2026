@@ -1,27 +1,27 @@
-﻿<%- include('partials/header', { title: 'Verify email', user: null }) %>
+<%- include('partials/header', { title: t('verify_notice.page_title'), user: null }) %>
 
 <div class="card" style="max-width:520px; margin: 0 auto;">
-  <h1>Verify your email</h1>
+  <h1><%= t('verify_notice.heading') %></h1>
   <p class="muted"><%= message %></p>
-  <p class="muted">If you do not see it shortly, check your spam/junk folder.</p>
+  <p class="muted"><%= t('password_reset.check_spam') %></p>
   <% if (verifyUrl) { %>
-    <div class="alert">Verification link (dev mode): <a class="link" href="<%= verifyUrl %>"><%= verifyUrl %></a></div>
+    <div class="alert"><%= t('verify_notice.dev_link_label') %>: <a class="link" href="<%= verifyUrl %>"><%= verifyUrl %></a></div>
   <% } %>
-  <p class="muted">Email: <strong><%= email %></strong></p>
+  <p class="muted"><%= t('common.email') %>: <strong><%= email %></strong></p>
   <% if (allowResend) { %>
     <div class="inline-actions" style="margin-top:12px;">
       <form method="post" action="/resend-verification" style="margin:0;">
         <input type="hidden" name="email" value="<%= email %>" />
         <input type="hidden" name="redirectTo" value="<%= redirectTo || '/' %>" />
         <input type="hidden" name="returnToVerifyNotice" value="1" />
-        <button type="submit" class="secondary">Resend verification</button>
+        <button type="submit" class="secondary"><%= t('verify_notice.resend_verification') %></button>
       </form>
       <button
         type="button"
         class="secondary"
         onclick="window.close(); setTimeout(function () { window.location.href = '/'; }, 150);"
       >
-        Close this window
+        <%= t('verify_notice.close_window') %>
       </button>
     </div>
   <% } %>

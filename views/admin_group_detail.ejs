@@ -7,11 +7,11 @@
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 }; %>
 
-<div class="card">
+<div class="card admin-page-card">
   <% const groupDetailReturnTo = `/admin/groups/${group.id}?returnTo=${encodeURIComponent(returnTo)}`; %>
-  <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-    <h1 style="margin:0;">Group overview</h1>
-    <div class="inline-actions">
+  <div class="admin-page-header">
+    <h1>Group overview</h1>
+    <div class="admin-actions">
       <a class="link" href="<%= returnTo %>">&lt; Back to admin overview</a>
       <a class="link" href="<%= Number(group.is_global) === 1 ? '/global' : `/groups/${group.id}` %>">Open group page</a>
       <a class="link" href="<%= Number(group.is_global) === 1 ? '/global/leaderboard' : `/groups/${group.id}/leaderboard` %>">Leaderboard</a>
@@ -22,11 +22,12 @@
     </div>
   </div>
 
-  <h2 style="margin-top:0;"><%= group.name %></h2>
-  <table class="table compact">
+  <h2><%= group.name %></h2>
+  <div class="admin-table-scroll" role="region" aria-label="Group details table" tabindex="0">
+  <table class="table compact admin-detail-table">
     <tbody>
       <tr>
-        <th style="width: 220px;">Group ID</th>
+        <th>Group ID</th>
         <td><%= group.id %></td>
       </tr>
       <tr>
@@ -67,9 +68,11 @@
       </tr>
     </tbody>
   </table>
+  </div>
 
-  <h2 style="margin-top:24px;">Members and named guests</h2>
-  <table class="table compact">
+  <h2>Members and named guests</h2>
+  <div class="admin-table-scroll" role="region" aria-label="Group members table" tabindex="0">
+  <table class="table compact admin-table-detail">
     <thead>
       <tr>
         <th>Name</th>
@@ -105,9 +108,11 @@
       <% } %>
     </tbody>
   </table>
+  </div>
 
-  <h2 style="margin-top:24px;">Latest responses</h2>
-  <table class="table compact">
+  <h2>Latest responses</h2>
+  <div class="admin-table-scroll" role="region" aria-label="Latest group responses table" tabindex="0">
+  <table class="table compact admin-table-detail">
     <thead>
       <tr>
         <th>Type</th>
@@ -133,7 +138,8 @@
       <% } %>
     </tbody>
   </table>
-  <p class="muted" style="margin-top:8px;">Showing latest <%= responses.length %> rows (max 500).</p>
+  </div>
+  <p class="muted admin-page-note">Showing latest <%= responses.length %> rows (max 500).</p>
 </div>
 
 <%- include('partials/footer') %>

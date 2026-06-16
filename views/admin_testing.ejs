@@ -7,7 +7,7 @@
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 }; %>
 
-<div class="card">
+<div class="card admin-page-card">
   <h1>Admin analysis</h1>
   <p class="muted">Create simulation groups and manage existing test groups.</p>
   <% if (adminError) { %>
@@ -18,12 +18,12 @@
   <% } %>
 
   <h2>Create test group</h2>
-  <form method="post" action="/admin/test-group" class="inline-actions" style="align-items:flex-end; margin: 0 0 20px;">
-    <label class="muted" style="display:flex; flex-direction:column; gap:6px; min-width:260px;">
+  <form method="post" action="/admin/test-group" class="admin-actions admin-analysis-create-form">
+    <label class="muted admin-field">
       Group name
       <input type="text" name="groupName" placeholder="Test Group Sprint 1" />
     </label>
-    <label class="muted" style="display:flex; flex-direction:column; gap:6px; width:180px;">
+    <label class="muted admin-field admin-analysis-count-field">
       Fake players
       <input type="number" name="fakePlayerCount" min="1" max="1000" value="200" required />
     </label>
@@ -34,7 +34,7 @@
   <% if (groups.length === 0) { %>
     <p class="muted">No test groups yet.</p>
   <% } else { %>
-    <div class="admin-analysis-table-scroll" role="region" aria-label="Test groups table" tabindex="0">
+    <div class="admin-analysis-table-scroll admin-table-scroll" role="region" aria-label="Test groups table" tabindex="0">
       <table class="table compact admin-analysis-groups-table">
         <thead>
           <tr>

@@ -7,7 +7,7 @@
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 }; %>
 
-<div class="card">
+<div class="card admin-page-card">
   <% const overviewReturn = `/admin/overview?groupPage=${currentGroupPage}&usersPage=${currentUserPage}&namedGuestPage=${currentNamedGuestPage}&visitorPage=${currentVisitorPage}`; %>
   <% const groupsReturn = `${overviewReturn}#admin-groups`; %>
   <% const adminsReturn = `${overviewReturn}#admin-admins`; %>
@@ -34,7 +34,8 @@
   <% } %>
 
   <h2 id="admin-groups">Groups</h2>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Groups table" tabindex="0">
+  <table class="table compact admin-table-overview-groups">
     <thead>
       <tr>
         <th>Group</th>
@@ -69,6 +70,7 @@
       <% }) %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'groupPage',
@@ -89,7 +91,8 @@
       | Last activity: <strong><%= formatAdminDate(adminStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Admins table" tabindex="0">
+  <table class="table compact admin-table-overview-users">
     <thead>
       <tr>
         <th>Name</th>
@@ -154,6 +157,7 @@
       <% } %>
     </tbody>
   </table>
+  </div>
 
   <h2 id="admin-users" style="margin-top:24px;">Users</h2>
   <p class="muted">
@@ -164,7 +168,8 @@
       | Last activity: <strong><%= formatAdminDate(userStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Users table" tabindex="0">
+  <table class="table compact admin-table-overview-users">
     <thead>
       <tr>
         <th>Name</th>
@@ -207,6 +212,7 @@
       <% }) %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'usersPage',
@@ -227,7 +233,8 @@
       | Last activity: <strong><%= formatAdminDate(namedGuestStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Named guests table" tabindex="0">
+  <table class="table compact admin-table-overview-guests">
     <thead>
       <tr>
         <th>Name</th>
@@ -278,6 +285,7 @@
       <% } %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'namedGuestPage',
@@ -298,7 +306,8 @@
       | Last activity: <strong><%= formatAdminDate(visitorStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Visitors table" tabindex="0">
+  <table class="table compact admin-table-overview-guests">
     <thead>
       <tr>
         <th>Guest ID</th>
@@ -343,6 +352,7 @@
       <% } %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'visitorPage',

@@ -1,7 +1,7 @@
 <%- include('partials/header', { title: 'Question settings', user }) %>
 <%- include('partials/admin_nav', { active: 'questions' }) %>
 
-<div class="card">
+<div class="card admin-page-card">
   <h1>Question settings</h1>
   <p class="muted">
     Enable/disable questions and override points for simulation. Changes apply immediately to prediction forms, actuals, and leaderboard scoring.
@@ -22,7 +22,7 @@
   }; %>
 
   <form method="post" action="/admin/questions">
-    <div class="admin-question-table-wrap">
+    <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Question settings table" tabindex="0">
     <table class="table compact admin-question-table">
       <thead>
         <tr>

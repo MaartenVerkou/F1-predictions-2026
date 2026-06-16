@@ -100,7 +100,12 @@
 
   <% if (safeShowSummary) { %>
     <span class="muted admin-pagination-summary">
-      <%= sectionLabel %> page <%= current %> of <%= total %><%= pageSize > 0 ? ` (${pageSize}/page)` : "" %>
+      <%= t('admin.pagination_summary', {
+        label: sectionLabel,
+        current,
+        total,
+        per_page: pageSize > 0 ? t('admin.per_page_suffix', { count: pageSize }) : ''
+      }) %>
     </span>
   <% } %>
 </div>

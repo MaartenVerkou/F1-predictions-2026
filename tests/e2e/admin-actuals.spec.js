@@ -63,7 +63,7 @@ test("admin actuals shows pending review backlog and can mark latest sync review
   await page.goto("/admin/actuals");
 
   await expect(page.locator("body")).toContainText("Review backlog:");
-  await expect(page.locator("body")).toContainText("1 round snapshot still need admin review.");
+  await expect(page.locator("body")).toContainText("1 round snapshot still needs admin review.");
   await expect(
     page.getByRole("button", { name: /Mark latest synced round reviewed/i })
   ).toBeVisible();
@@ -72,4 +72,76 @@ test("admin actuals shows pending review backlog and can mark latest sync review
 
   await expect(page.getByText(/marked as reviewed/i)).toBeVisible();
   await expect(page.getByText(/Status:\s*Reviewed/i)).toBeVisible();
+});
+
+test("admin actuals and admin tables fit phone-width screens", async ({ page }) => {
+  await page.goto("/");
+
+  const cases = [
+    { width: 390, height: 844, theme: "light" },
+    { width: 390, height: 844, theme: "dark" },
+    { width: 1280, height: 900, theme: "light" },
+    { width: 1280, height: 900, theme: "dark" }
+  ];
+
+  for (const testCase of cases) {
+    await page.setViewportSize({ width: testCase.width, height: testCase.height });
+    await page.goto("/admin/actuals");
+    await page.evaluate((theme) => {
+      localStorage.setItem("theme", theme);
+      document.documentElement.setAttribute("data-theme", theme);
+    }, testCase.theme);
+    await expect(page.getByRole("heading", { name: "Season actuals" })).toBeVisible();
+    await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
+
+    const actualsMetrics = await page.evaluate(() => {
+      const viewportWidth = document.documentElement.clientWidth;
+      const targetSelect = document.querySelector(".admin-target-form select");
+      const dnfRows = Array.from(document.querySelectorAll(".actuals-dnf-row"));
+      return {
+        theme: document.documentElement.getAttribute("data-theme"),
+        overflowX: Math.max(
+          document.documentElement.scrollWidth - viewportWidth,
+          document.body.scrollWidth - document.body.clientWidth
+        ),
+        targetWidth: targetSelect ? Math.round(targetSelect.getBoundingClientRect().width) : 0,
+        maxDnfRight: dnfRows.reduce(
+          (max, row) => Math.max(max, Math.round(row.getBoundingClientRect().right)),
+          0
+        ),
+        dnfRows: dnfRows.length
+      };
+    });
+
+    expect(actualsMetrics.theme).toBe(testCase.theme);
+    expect(actualsMetrics.overflowX).toBeLessThanOrEqual(0);
+    expect(actualsMetrics.targetWidth).toBeLessThanOrEqual(testCase.width);
+    expect(actualsMetrics.dnfRows).toBeGreaterThan(0);
+    expect(actualsMetrics.maxDnfRight).toBeLessThanOrEqual(testCase.width);
+
+    await page.goto("/admin/overview");
+    await page.evaluate((theme) => {
+      localStorage.setItem("theme", theme);
+      document.documentElement.setAttribute("data-theme", theme);
+    }, testCase.theme);
+    await expect(page.getByRole("heading", { name: "Admin overview" })).toBeVisible();
+    const overviewMetrics = await page.evaluate(() => ({
+      theme: document.documentElement.getAttribute("data-theme"),
+      overflowX: Math.max(
+        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        document.body.scrollWidth - document.body.clientWidth
+      ),
+      scrollRegions: document.querySelectorAll(".admin-table-scroll").length,
+      internalWideTables: Array.from(document.querySelectorAll(".admin-table-scroll")).filter(
+        (region) => region.scrollWidth > region.clientWidth
+      ).length
+    }));
+
+    expect(overviewMetrics.theme).toBe(testCase.theme);
+    expect(overviewMetrics.overflowX).toBeLessThanOrEqual(0);
+    expect(overviewMetrics.scrollRegions).toBeGreaterThanOrEqual(4);
+    if (testCase.width < 720) {
+      expect(overviewMetrics.internalWideTables).toBeGreaterThan(0);
+    }
+  }
 });

@@ -379,6 +379,42 @@ test("global leaderboard is public while private group leaderboard stays protect
   await expect(page).toHaveURL(/\/login/);
 });
 
+test("Dutch leaderboard renders localized insight copy", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  seedLeaderboardInsights(db);
+  db.close();
+
+  await page.request.post("/language", {
+    form: {
+      locale: "nl",
+      redirectTo: "/"
+    }
+  });
+
+  await page.goto("/global/leaderboard");
+  await expect(page.getByRole("heading", { name: /Global: Klassement/i })).toBeVisible();
+  await expect(page.locator(".leaderboard-trend-chart")).toHaveAttribute(
+    "aria-label",
+    "Klassementspunten over gereden rondes"
+  );
+  await page.locator(".leaderboard-main-card .leaderboard-row-link", { hasText: "E2E Insight Clutch" }).click();
+
+  const selectedPanel = page.locator(".leaderboard-selected-panel");
+  await expect(selectedPanel.getByRole("heading", { name: "E2E Insight Clutch" })).toBeVisible();
+  await expect(selectedPanel).toContainText("Sterke punten");
+  await expect(selectedPanel).toContainText("Gaten naar boven");
+  await expect(selectedPanel).toContainText("Opvallende keuzes");
+  await expect(selectedPanel).toContainText("Uitsplitsing per vraag");
+  await expect(selectedPanel).toContainText("Racewijziging");
+  await expect(selectedPanel.getByRole("link", { name: "Gescoord" })).toBeVisible();
+  await expect(selectedPanel.getByRole("link", { name: "Alles" })).toBeVisible();
+
+  const selectedText = await selectedPanel.innerText();
+  expect(selectedText).not.toMatch(/Strengths|Gaps above|Distinctive picks|Question breakdown|Race change|Scored questions/);
+});
+
 test("anonymous home preview opens the public global leaderboard without login", async ({ page }) => {
   await page.goto("/");
 

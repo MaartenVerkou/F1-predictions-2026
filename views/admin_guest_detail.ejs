@@ -7,10 +7,10 @@
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 }; %>
 
-<div class="card">
-  <div class="inline-actions" style="justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-    <h1 style="margin:0;">Guest overview</h1>
-    <div class="inline-actions">
+<div class="card admin-page-card">
+  <div class="admin-page-header">
+    <h1>Guest overview</h1>
+    <div class="admin-actions">
       <a class="link" href="<%= returnTo %>">&lt; Back to admin overview</a>
       <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
         <input type="hidden" name="returnTo" value="<%= returnTo %>">
@@ -19,16 +19,17 @@
     </div>
   </div>
 
-  <h2 style="margin-top:0;"><%= namedGuestProfile ? "Named guest" : "Guest ID" %></h2>
+  <h2><%= namedGuestProfile ? "Named guest" : "Guest ID" %></h2>
   <% if (namedGuestProfile) { %>
     <p style="margin:0 0 6px;"><strong><%= namedGuestProfile.display_name %></strong></p>
   <% } %>
   <p style="margin-top:0;"><code class="admin-question-code"><%= guestId %></code></p>
 
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Guest details table" tabindex="0">
+  <table class="table compact admin-detail-table">
     <tbody>
       <tr>
-        <th style="width: 180px;">Total responses</th>
+        <th>Total responses</th>
         <td><%= Number(guestStats?.response_count || 0) %></td>
       </tr>
       <tr>
@@ -49,9 +50,11 @@
       </tr>
     </tbody>
   </table>
+  </div>
 
-  <h2 style="margin-top:24px;">Groups touched</h2>
-  <table class="table compact">
+  <h2>Groups touched</h2>
+  <div class="admin-table-scroll" role="region" aria-label="Guest groups table" tabindex="0">
+  <table class="table compact admin-table-detail">
     <thead>
       <tr>
         <th>Group</th>
@@ -78,9 +81,11 @@
       <% } %>
     </tbody>
   </table>
+  </div>
 
-  <h2 style="margin-top:24px;">Latest responses</h2>
-  <table class="table compact">
+  <h2>Latest responses</h2>
+  <div class="admin-table-scroll" role="region" aria-label="Latest guest responses table" tabindex="0">
+  <table class="table compact admin-table-detail">
     <thead>
       <tr>
         <th>Group</th>
@@ -107,7 +112,8 @@
       <% } %>
     </tbody>
   </table>
-  <p class="muted" style="margin-top:8px;">Showing latest <%= responses.length %> rows (max 500).</p>
+  </div>
+  <p class="muted admin-page-note">Showing latest <%= responses.length %> rows (max 500).</p>
 </div>
 
 <%- include('partials/footer') %>

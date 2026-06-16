@@ -21,7 +21,9 @@
   "common": {
     "name": "Nom",
     "email": "E-mail",
-    "password": "Mot de passe"
+    "password": "Mot de passe",
+    "home": "Home",
+    "cancel": "Cancel"
   },
   "login": {
     "page_title": "Connexion",
@@ -209,7 +211,49 @@
     "answer": "Reponse",
     "details": "Details",
     "points_short": "pts",
-    "points_short_caps": "PTS"
+    "points_short_caps": "PTS",
+    "position": "Position",
+    "points_label": "Points",
+    "rank_change_aria": "Rank change since previous saved race",
+    "pending_review": "pending review",
+    "no_rank_change": "No rank change",
+    "no_movement_data": "No movement data",
+    "chart_aria_label": "Leaderboard points over completed rounds",
+    "chart_point_title": "{name}: {points} points after R{round}{rank}",
+    "chart_rank_suffix": ", rank {rank}",
+    "plotted_participants": "Plotted participants",
+    "trends_empty": "Trends will appear after two race snapshots are available.",
+    "rank_label": "Rank",
+    "points_word": "points",
+    "race_change": "Race change",
+    "rank_delta_steady": "steady",
+    "rank_delta_up": "+{count} rank",
+    "rank_delta_down": "-{count} rank",
+    "question_count_one": "One question",
+    "question_count_many": "{count} questions",
+    "this_participant": "this participant",
+    "gaps_summary_one": "Q{question} leaves {name} {points} behind nearby rivals.",
+    "gaps_summary_many": "{count_label} leave {name} {points} behind nearby rivals.",
+    "strengths_summary_one": "Q{question} gives {name} {points} versus nearby rivals.",
+    "strengths_summary_many": "{count_label} give {name} {points} versus nearby rivals.",
+    "distinctive_summary_one": "Q{question} is a distinctive answer worth {points} for {name}.",
+    "distinctive_summary_many": "{count_label} give {name} {points} from distinctive answers.",
+    "gaps_above": "Gaps above",
+    "gaps_empty": "No clear scored gap to nearby rivals yet.",
+    "strengths": "Strengths",
+    "strengths_empty": "No scored strength against nearby rivals yet.",
+    "distinctive_picks": "Distinctive picks",
+    "distinctive_empty": "No distinctive scoring pattern in the nearby band yet.",
+    "question_breakdown": "Question breakdown",
+    "all_questions": "All questions",
+    "scored_questions": "Scored questions",
+    "question_breakdown_filter": "Question breakdown filter",
+    "scored": "Scored",
+    "all": "All",
+    "no_scored_questions_participant": "No scored questions for this participant yet.",
+    "no_question_answers_participant": "No question answers found for this participant.",
+    "sign_in_breakdown_prompt": "Sign in to view detailed predictions and scored-question breakdowns.",
+    "select_participant_empty": "Select a scored participant to see leaderboard insights."
   },
   "responses": {
     "page_title": "Reponses",
@@ -386,6 +430,99 @@
     "mini_q5_team_engine_switch_2027_2028": {
       "prompt": "Avant la fin de 2026, une ou plusieurs equipes annoncent un changement de motoriste pour 2027 ou 2028"
     }
+  },
+  "admin": {
+    "nav_overview": "Overview",
+    "nav_questions": "Questions",
+    "nav_actuals": "Actuals",
+    "nav_analysis": "Analysis",
+    "increase_value": "Increase value",
+    "decrease_value": "Decrease value",
+    "pagination_summary": "{label} page {current} of {total}{per_page}",
+    "per_page_suffix": " ({count}/page)"
+  },
+  "admin_actuals": {
+    "page_title": "Set actuals",
+    "heading": "Season actuals",
+    "intro": "Enter the real outcomes once the season is complete. These power the leaderboard immediately once actuals exist.",
+    "review_backlog_label": "Review backlog:",
+    "review_backlog_one": "1 round snapshot still needs admin review.",
+    "review_backlog_many": "{count} round snapshots still need admin review.",
+    "live_scoring_source": "Live scoring source",
+    "status_label": "Status",
+    "status_pending": "Pending review",
+    "status_reviewed": "Reviewed",
+    "last_sync_label": "Last sync",
+    "reviewed_label": "Reviewed",
+    "mark_latest_reviewed": "Mark latest synced round reviewed",
+    "preview_autofill": "Preview autofill in form",
+    "run_sync_now": "Run season sync now",
+    "sync_help": "Preview autofill only changes the form. Season sync updates live actuals plus every completed-race snapshot and leaves the latest synced round pending review.",
+    "target_label": "Actuals target",
+    "current_live_actuals": "Current live actuals",
+    "timing_past": "past",
+    "timing_future": "future",
+    "timing_current_race": "current race",
+    "needs_review": "needs review",
+    "reviewed": "reviewed",
+    "open_target": "Open target",
+    "past_race_warning_prefix": "This race is in the past. Editing it updates the archived snapshot for",
+    "continue_make_changes": "Continue and make changes",
+    "future_race_warning": "This race is still in the future. Saving here creates or updates a snapshot for that race and does not change the current live actuals.",
+    "editing_snapshot": "Editing snapshot",
+    "mark_snapshot_reviewed": "Mark this snapshot reviewed",
+    "no_snapshot_yet_prefix": "No saved snapshot yet for",
+    "no_snapshot_yet_suffix": "Saving will create one.",
+    "enter_dnfs_per_race": "Enter total DNFs per race.",
+    "save_actuals": "Save actuals",
+    "save_snapshot": "Save snapshot"
+  },
+  "not_found": {
+    "page_title": "Not found",
+    "heading": "Page not found",
+    "body": "That page does not exist.",
+    "home": "Go home"
+  },
+  "account": {
+    "page_title": "My account",
+    "heading": "My account",
+    "signed_in_as": "Signed in as",
+    "change_password": "Change password",
+    "current_password": "Current password",
+    "new_password": "New password",
+    "confirm_new_password": "Confirm new password",
+    "update_password": "Update password",
+    "delete_account": "Delete account",
+    "delete_warning": "This removes your user account and your personal predictions. This cannot be undone.",
+    "delete_confirm": "Delete your account permanently?"
+  },
+  "password_reset": {
+    "forgot_title": "Forgot password",
+    "forgot_heading": "Reset your password",
+    "forgot_intro": "Enter your account email and we will send a reset link.",
+    "check_spam": "If you do not receive it shortly, check your spam/junk folder.",
+    "send_reset_link": "Send reset link",
+    "set_title": "Set new password",
+    "set_heading": "Set a new password"
+  },
+  "verify_notice": {
+    "page_title": "Verify email",
+    "heading": "Verify your email",
+    "dev_link_label": "Verification link (dev mode)",
+    "resend_verification": "Resend verification",
+    "resend_verification_email": "Resend verification email",
+    "close_window": "Close this window"
+  },
+  "verify_success": {
+    "page_title": "Verified",
+    "heading": "Email verified",
+    "body": "Your account is now active. You can log in.",
+    "login_link": "Go to login"
+  },
+  "join_confirm": {
+    "page_title": "Join group",
+    "heading": "Join {group_name}?",
+    "intro": "You were invited to this group. Confirm to join.",
+    "join_group": "Join group"
   }
 }
-

@@ -4,11 +4,11 @@
   <h1><%= statusCode %></h1>
   <p class="muted"><%= message %></p>
   <div class="inline-actions">
-    <a class="link" href="/">Home</a>
+    <a class="link" href="/"><%= t('common.home') %></a>
     <% if (user) { %>
-      <a class="link" href="/dashboard">Dashboard</a>
+      <a class="link" href="/dashboard"><%= t('header.dashboard') %></a>
     <% } else { %>
-      <a class="link" href="/login">Log in</a>
+      <a class="link" href="/login"><%= t('header.login') %></a>
     <% } %>
   </div>
 </div>

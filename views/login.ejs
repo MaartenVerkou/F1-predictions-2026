@@ -10,7 +10,7 @@
     <% if (unverifiedEmail) { %>
       <form method="post" action="/resend-verification" class="auth-links" style="margin: 6px 0 14px;">
         <input type="hidden" name="email" value="<%= unverifiedEmail %>" />
-        <button type="submit" class="link underlined-link link-button">Resend verification email</button>
+        <button type="submit" class="link underlined-link link-button"><%= t('verify_notice.resend_verification_email') %></button>
       </form>
     <% } %>
   <% } %>
