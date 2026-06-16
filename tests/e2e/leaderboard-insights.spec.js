@@ -241,6 +241,18 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
     headers.map((header) => header.textContent.trim())
   );
   expect(leaderboardHeaders).toEqual(["POS", "NAME", "PTS", ""]);
+  const leaderboardHeaderStyles = await page.locator(".leaderboard-main-card thead th").evaluateAll((headers) =>
+    headers.map((header) => ({
+      color: getComputedStyle(header).color,
+      fontSize: getComputedStyle(header).fontSize,
+      fontWeight: getComputedStyle(header).fontWeight
+    }))
+  );
+  expect(leaderboardHeaderStyles[1]).toEqual(leaderboardHeaderStyles[0]);
+  await expect(page.locator(".leaderboard-main-card")).not.toContainText(/Showing|Toont/);
+  const paginationText = await page.locator(".leaderboard-main-card .admin-pagination").innerText();
+  expect(paginationText).not.toContain("<<");
+  expect(paginationText).not.toContain(">>");
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
   await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
   const apexRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Apex" });
@@ -274,6 +286,19 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(apexToggle).toBeChecked();
   const apexSeriesId = await apexToggle.getAttribute("data-chart-series-toggle");
   expect(apexSeriesId).toBeTruthy();
+  await page.mouse.move(10, 10);
+  const selectedStrokeBeforeHover = await page.locator(`[data-chart-series="${apexSeriesId}"] polyline`).evaluate((node) =>
+    parseFloat(getComputedStyle(node).strokeWidth)
+  );
+  await page.locator(".leaderboard-chart-legend-item", { hasText: "E2E Insight Apex" }).hover();
+  await expect.poll(async () =>
+    page.locator(`[data-chart-series="${apexSeriesId}"]`).evaluate((node) => node.classList.contains("is-hovered"))
+  ).toBe(true);
+  const selectedStrokeOnHover = await page.locator(`[data-chart-series="${apexSeriesId}"] polyline`).evaluate((node) =>
+    parseFloat(getComputedStyle(node).strokeWidth)
+  );
+  expect(selectedStrokeOnHover).toBeGreaterThan(selectedStrokeBeforeHover);
+  await page.mouse.move(10, 10);
   await apexToggle.uncheck();
   expect(page.url()).toBe(selectedUrl);
   await expect(page.locator(`[data-chart-series="${apexSeriesId}"]`)).toHaveAttribute("hidden", "");
@@ -315,6 +340,21 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   expect(visibleInsightText).not.toContain("pick");
   await selectedPanel.locator(".leaderboard-insight-question-chip").first().focus();
   await expect(selectedPanel.locator(".leaderboard-question-tooltip").first()).toBeVisible();
+
+  const flowSeriesId = await page
+    .locator(".leaderboard-rank-row", { hasText: "E2E Insight Flow" })
+    .getAttribute("data-leaderboard-row-participant");
+  await page.locator(".leaderboard-rank-row", { hasText: "E2E Insight Flow" }).hover();
+  await expect.poll(async () =>
+    page.locator(`[data-chart-series="${flowSeriesId}"]`).evaluate((node) => node.classList.contains("is-hovered"))
+  ).toBe(true);
+  await expect(page.locator(".leaderboard-chart-legend-item", { hasText: "E2E Insight Flow" })).toHaveClass(/is-hovered/);
+  await page.evaluate(() => {
+    window.__leaderboardSelectionMarker = "same-document";
+  });
+  await page.locator(".leaderboard-rank-row", { hasText: "E2E Insight Flow" }).locator("td").first().click();
+  await expect(selectedPanel.getByRole("heading", { name: "E2E Insight Flow" })).toBeVisible();
+  await expect.poll(async () => page.evaluate(() => window.__leaderboardSelectionMarker)).toBe("same-document");
 
   await selectedPanel.getByRole("link", { name: "Scored" }).click();
   await expect(page.locator("#leaderboard-breakdown tbody tr")).toHaveCount(3);
@@ -383,7 +423,11 @@ test("Dutch leaderboard renders localized insight copy", async ({ page }) => {
   await page.goto("/");
 
   const db = new Database(DB_PATH);
-  seedLeaderboardInsights(db);
+  const { snapshotIds } = seedLeaderboardInsights(db);
+  db.prepare("UPDATE actual_snapshots SET label = ? WHERE id = ?").run(
+    "R2 - Chinese Grand Prix with an intentionally long official display label for layout testing",
+    snapshotIds.round2
+  );
   db.close();
 
   await page.request.post("/language", {
@@ -486,6 +530,8 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       chartWrapRight: Math.round(document.querySelector(".leaderboard-chart-wrap").getBoundingClientRect().right),
       chartWrapBottom: Math.round(document.querySelector(".leaderboard-chart-wrap").getBoundingClientRect().bottom),
       chartSvgHeight: Math.round(document.querySelector(".leaderboard-trend-chart").getBoundingClientRect().height),
+      snapshotWidth: Math.round(document.querySelector(".leaderboard-snapshot-form").getBoundingClientRect().width),
+      tableWidth: Math.round(document.querySelector(".leaderboard-main-card table").getBoundingClientRect().width),
       legendLeft: Math.round(document.querySelector(".leaderboard-chart-legend").getBoundingClientRect().left),
       legendTop: Math.round(document.querySelector(".leaderboard-chart-legend").getBoundingClientRect().top),
       legendWidth: Math.round(document.querySelector(".leaderboard-chart-legend").getBoundingClientRect().width),
@@ -514,10 +560,12 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       expect(metrics.mainWidth).toBeLessThanOrEqual(460);
       expect(metrics.detailWidth / metrics.mainWidth).toBeGreaterThanOrEqual(1.2);
       expect(Math.abs(metrics.detailTop - metrics.mainTop)).toBeLessThanOrEqual(8);
+      expect(Math.abs(metrics.snapshotWidth - metrics.tableWidth)).toBeLessThanOrEqual(2);
     } else {
       expect(metrics.legendTop).toBeGreaterThanOrEqual(metrics.chartWrapBottom);
       expect(metrics.mainTop).toBeGreaterThanOrEqual(metrics.chartBottom);
       expect(metrics.detailTop).toBeGreaterThanOrEqual(metrics.mainTop);
+      expect(metrics.snapshotWidth).toBeLessThanOrEqual(metrics.mainWidth);
     }
     expect(metrics.checkedControls).toBeGreaterThan(0);
   }

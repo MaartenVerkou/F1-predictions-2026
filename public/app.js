@@ -213,6 +213,9 @@ const setLeaderboardSeriesHover = (seriesId, isHovered) => {
   document.querySelectorAll('.leaderboard-chart-legend-item[data-chart-legend-item]').forEach(item => {
     item.classList.toggle('is-hovered', item.dataset.chartLegendItem === seriesId && isHovered);
   });
+  document.querySelectorAll('.leaderboard-rank-row[data-leaderboard-row-participant]').forEach(row => {
+    row.classList.toggle('is-hovered', row.dataset.leaderboardRowParticipant === seriesId && isHovered);
+  });
 };
 
 const syncLeaderboardChartToggle = (input) => {
@@ -250,10 +253,9 @@ const initLeaderboardChartToggles = (root = document) => {
 };
 
 const initLeaderboardChartHover = (root = document) => {
-  root.querySelectorAll('.leaderboard-chart-legend-item[data-chart-legend-item]').forEach(item => {
+  const bindHoverTarget = (item, seriesId) => {
     if (item.dataset.chartHoverReady === 'true') return;
     item.dataset.chartHoverReady = 'true';
-    const seriesId = item.dataset.chartLegendItem;
     if (!seriesId) return;
 
     item.addEventListener('mouseenter', () => setLeaderboardSeriesHover(seriesId, true));
@@ -266,6 +268,18 @@ const initLeaderboardChartHover = (root = document) => {
         }
       }, 0);
     });
+  };
+
+  root.querySelectorAll('.leaderboard-chart-legend-item[data-chart-legend-item]').forEach(item => {
+    bindHoverTarget(item, item.dataset.chartLegendItem);
+  });
+
+  root.querySelectorAll('.leaderboard-rank-row[data-leaderboard-row-participant]').forEach(item => {
+    bindHoverTarget(item, item.dataset.leaderboardRowParticipant);
+  });
+
+  root.querySelectorAll('.leaderboard-chart-series[data-chart-series]').forEach(item => {
+    bindHoverTarget(item, item.dataset.chartSeries);
   });
 };
 
@@ -346,8 +360,11 @@ const initLeaderboardParticipantSelection = () => {
     const target = event.target;
     if (!(target instanceof Element)) return;
     const link = target.closest('a[data-leaderboard-participant-link]');
-    if (!link) return;
-    const nextUrl = new URL(link.href, window.location.href);
+    const interactive = target.closest('a, button, input, select, textarea, label');
+    const row = interactive ? null : target.closest('.leaderboard-rank-row[data-leaderboard-row-href]');
+    const href = link?.href || row?.dataset.leaderboardRowHref;
+    if (!href) return;
+    const nextUrl = new URL(href, window.location.href);
     if (nextUrl.origin !== window.location.origin) return;
 
     event.preventDefault();

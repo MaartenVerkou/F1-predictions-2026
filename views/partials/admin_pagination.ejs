@@ -11,6 +11,8 @@
   const safePerPage = typeof perPage === "undefined" ? 0 : perPage;
   const safeShowSummary =
     typeof showSummary === "undefined" ? true : Boolean(showSummary);
+  const safeShowBoundaryControls =
+    typeof showBoundaryControls === "undefined" ? true : Boolean(showBoundaryControls);
   const safeMaxVisiblePages =
     typeof maxVisiblePages === "undefined" ? 3 : Number(maxVisiblePages);
   const safeFirstLabel = typeof firstLabel === "undefined" ? "<<" : String(firstLabel);
@@ -73,10 +75,14 @@
 %>
 <div class="admin-pagination">
   <% if (current > 1) { %>
-    <a class="admin-page-link" href="<%= buildHref(1) %>"><%= safeFirstLabel %></a>
+    <% if (safeShowBoundaryControls) { %>
+      <a class="admin-page-link" href="<%= buildHref(1) %>"><%= safeFirstLabel %></a>
+    <% } %>
     <a class="admin-page-link" href="<%= buildHref(current - 1) %>"><%= safePrevLabel %></a>
   <% } else { %>
-    <span class="admin-page-link is-disabled"><%= safeFirstLabel %></span>
+    <% if (safeShowBoundaryControls) { %>
+      <span class="admin-page-link is-disabled"><%= safeFirstLabel %></span>
+    <% } %>
     <span class="admin-page-link is-disabled"><%= safePrevLabel %></span>
   <% } %>
 
@@ -92,10 +98,14 @@
 
   <% if (current < total) { %>
     <a class="admin-page-link" href="<%= buildHref(current + 1) %>"><%= safeNextLabel %></a>
-    <a class="admin-page-link" href="<%= buildHref(total) %>"><%= safeLastLabel %></a>
+    <% if (safeShowBoundaryControls) { %>
+      <a class="admin-page-link" href="<%= buildHref(total) %>"><%= safeLastLabel %></a>
+    <% } %>
   <% } else { %>
     <span class="admin-page-link is-disabled"><%= safeNextLabel %></span>
-    <span class="admin-page-link is-disabled"><%= safeLastLabel %></span>
+    <% if (safeShowBoundaryControls) { %>
+      <span class="admin-page-link is-disabled"><%= safeLastLabel %></span>
+    <% } %>
   <% } %>
 
   <% if (safeShowSummary) { %>

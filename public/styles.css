@@ -2910,6 +2910,13 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 
+.leaderboard-chart-legend-item.is-selected:hover,
+.leaderboard-chart-legend-item.is-selected:focus-within,
+.leaderboard-chart-legend-item.is-selected.is-hovered {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+}
+
 .leaderboard-chart-legend-item.is-current-user:not(.is-selected) {
   background: rgba(31, 122, 140, 0.09);
   border-color: rgba(31, 122, 140, 0.32);
@@ -2933,13 +2940,21 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   opacity: 1;
 }
 
-.leaderboard-chart-series.is-hovered .leaderboard-chart-line:not(.is-selected) {
-  opacity: 0.9;
+.leaderboard-chart-series.is-hovered .leaderboard-chart-line {
+  opacity: 1;
   stroke-width: 3;
 }
 
-.leaderboard-chart-series.is-hovered circle.leaderboard-chart-line:not(.is-selected) {
+.leaderboard-chart-series.is-hovered .leaderboard-chart-line.is-selected {
+  stroke-width: 4.2;
+}
+
+.leaderboard-chart-series.is-hovered circle.leaderboard-chart-line {
   stroke-width: 2.2;
+}
+
+.leaderboard-chart-series.is-hovered circle.leaderboard-chart-line.is-selected {
+  stroke-width: 3;
 }
 
 .leaderboard-empty-copy {
@@ -2985,11 +3000,15 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   margin: 0;
   align-items: center;
   gap: 10px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .leaderboard-snapshot-form select {
-  min-width: 260px;
-  max-width: min(100%, 520px);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  text-overflow: ellipsis;
 }
 
 .leaderboard-main-card,
@@ -3008,12 +3027,24 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 }
 
 .leaderboard-rank-row {
-  cursor: default;
+  cursor: pointer;
   transition: background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.leaderboard-rank-row:hover,
+.leaderboard-rank-row.is-hovered {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .leaderboard-rank-row.is-active {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.leaderboard-rank-row.is-active:hover,
+.leaderboard-rank-row.is-active.is-hovered {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
@@ -3053,6 +3084,7 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 }
 
 .leaderboard-position-header,
+.leaderboard-name-header,
 .leaderboard-points-header,
 .leaderboard-delta-header {
   color: var(--muted);
@@ -3394,9 +3426,9 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   }
 
   .leaderboard-main-column {
-    width: fit-content;
+    width: clamp(340px, 28vw, 400px);
     min-width: 320px;
-    max-width: 440px;
+    max-width: 100%;
   }
 
   .leaderboard-trend-panel {
@@ -3431,8 +3463,8 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   }
 
   .leaderboard-main-card > .table {
-    width: auto;
-    min-width: 320px;
+    width: 100%;
+    min-width: 0;
     max-width: 100%;
     table-layout: auto;
   }
