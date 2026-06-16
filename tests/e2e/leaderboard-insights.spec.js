@@ -226,3 +226,68 @@ test("global leaderboard is public while private group leaderboard stays protect
   await page.goto(`/groups/${privateGroupId}/leaderboard`);
   await expect(page).toHaveURL(/\/login/);
 });
+
+test("anonymous home preview opens the public global leaderboard without login", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  seedLeaderboardInsights(db);
+  db.close();
+
+  await page.getByRole("button", { name: "Visitor" }).click();
+  await page.goto("/");
+
+  const previewLinks = page.locator(".home-leaderboard-preview a[href='/global/leaderboard']");
+  await expect(previewLinks).toHaveCount(2);
+  await previewLinks.first().click();
+
+  await expect(page).toHaveURL(/\/global\/leaderboard/);
+  await expect(page.getByRole("heading", { name: /Global: Leaderboard/i })).toBeVisible();
+  await expect(page.locator("form[action='/login']")).toHaveCount(0);
+});
+
+test("leaderboard presentation fits desktop and phone in light and dark mode", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  seedLeaderboardInsights(db);
+  db.close();
+
+  await page.getByRole("button", { name: "Visitor" }).click();
+
+  const cases = [
+    { width: 1440, height: 950, theme: "light" },
+    { width: 390, height: 844, theme: "light" },
+    { width: 1440, height: 950, theme: "dark" },
+    { width: 390, height: 844, theme: "dark" }
+  ];
+
+  for (const testCase of cases) {
+    await page.setViewportSize({ width: testCase.width, height: testCase.height });
+    await page.goto("/global/leaderboard");
+    await page.evaluate((theme) => {
+      localStorage.setItem("theme", theme);
+      document.documentElement.setAttribute("data-theme", theme);
+    }, testCase.theme);
+
+    await expect(page.locator(".leaderboard-trend-panel")).toBeVisible();
+    await expect(page.locator(".leaderboard-main-card")).toBeVisible();
+    await expect(page.locator(".leaderboard-detail-card")).toBeVisible();
+    await expect(page.locator(".leaderboard-breakdown-locked")).toContainText("Sign in");
+
+    const metrics = await page.evaluate(() => ({
+      theme: document.documentElement.getAttribute("data-theme"),
+      overflowX: Math.max(
+        document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        document.body.scrollWidth - document.body.clientWidth
+      ),
+      legendItems: document.querySelectorAll(".leaderboard-chart-legend-item").length,
+      rows: document.querySelectorAll(".leaderboard-main-card tbody tr").length
+    }));
+
+    expect(metrics.theme).toBe(testCase.theme);
+    expect(metrics.overflowX).toBeLessThanOrEqual(0);
+    expect(metrics.legendItems).toBeGreaterThan(0);
+    expect(metrics.rows).toBeGreaterThan(0);
+  }
+});

@@ -410,9 +410,7 @@ function registerAuthRoutes(app, deps) {
       user,
       predictionsClosed: typeof predictionsClosed === "function" ? predictionsClosed() : false,
       globalLeaderboard: getHomeGlobalLeaderboard(locale, user ? user.id : null),
-      globalLeaderboardHref: user
-        ? "/global/leaderboard"
-        : `/login?redirectTo=${encodeURIComponent("/global/leaderboard")}`
+      globalLeaderboardHref: "/global/leaderboard"
     });
   });
 
