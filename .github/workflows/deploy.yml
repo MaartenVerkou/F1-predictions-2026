@@ -133,18 +133,128 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
 
+      - name: Check SSH reachability
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          retry() {
+            local max_attempts="$1"
+            shift
+            local attempt=1
+            local delay=5
+            local status=0
+
+            until "$@"; do
+              status=$?
+              if (( attempt >= max_attempts )); then
+                echo "Command failed after $attempt attempts with exit $status: $*" >&2
+                return "$status"
+              fi
+
+              echo "Command failed with exit $status; retrying in ${delay}s ($attempt/$max_attempts): $*" >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+              if (( delay > 30 )); then
+                delay=30
+              fi
+            done
+          }
+
+          ssh_opts=(
+            -o BatchMode=yes
+            -o ConnectTimeout=20
+            -o ConnectionAttempts=3
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          )
+
+          retry 5 ssh "${ssh_opts[@]}" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "echo deploy-ssh-ready"
+
       - name: Upload deploy bundle
         shell: bash
         run: |
           set -euo pipefail
-          scp -P "$DEPLOY_PORT" deploy-bundle.tgz "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_BUNDLE"
+
+          retry() {
+            local max_attempts="$1"
+            shift
+            local attempt=1
+            local delay=5
+            local status=0
+
+            until "$@"; do
+              status=$?
+              if (( attempt >= max_attempts )); then
+                echo "Command failed after $attempt attempts with exit $status: $*" >&2
+                return "$status"
+              fi
+
+              echo "Command failed with exit $status; retrying in ${delay}s ($attempt/$max_attempts): $*" >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+              if (( delay > 30 )); then
+                delay=30
+              fi
+            done
+          }
+
+          ssh_opts=(
+            -o BatchMode=yes
+            -o ConnectTimeout=20
+            -o ConnectionAttempts=3
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          )
+
+          retry 5 scp "${ssh_opts[@]}" -P "$DEPLOY_PORT" deploy-bundle.tgz "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_BUNDLE"
 
       - name: Roll out on server
         shell: bash
         run: |
           set -euo pipefail
-          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_BUNDLE='$REMOTE_BUNDLE' DEPLOY_COMPOSE_FILES='$DEPLOY_COMPOSE_FILES' DEPLOY_HEALTH_URL='$DEPLOY_HEALTH_URL' bash -s" <<'EOF'
+
+          retry() {
+            local max_attempts="$1"
+            shift
+            local attempt=1
+            local delay=5
+            local status=0
+
+            until "$@"; do
+              status=$?
+              if (( attempt >= max_attempts )); then
+                echo "Command failed after $attempt attempts with exit $status: $*" >&2
+                return "$status"
+              fi
+
+              echo "Command failed with exit $status; retrying in ${delay}s ($attempt/$max_attempts): $*" >&2
+              sleep "$delay"
+              attempt=$((attempt + 1))
+              delay=$((delay * 2))
+              if (( delay > 30 )); then
+                delay=30
+              fi
+            done
+          }
+
+          ssh_opts=(
+            -o BatchMode=yes
+            -o ConnectTimeout=20
+            -o ConnectionAttempts=3
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          )
+
+          cat > remote-deploy.sh <<'EOF'
           set -euo pipefail
           mkdir -p "$DEPLOY_PATH"
           cd "$DEPLOY_PATH"
@@ -166,6 +276,9 @@ jobs:
             rm -rf "$DEPLOY_PATH/$managed_path"
           done
           tar -xzf "$DEPLOY_BUNDLE" -C "$DEPLOY_PATH"
-          rm -f "$DEPLOY_BUNDLE"
           bash scripts/deploy-app.sh
+          rm -f "$DEPLOY_BUNDLE"
           EOF
+
+          retry 3 ssh "${ssh_opts[@]}" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_BUNDLE='$REMOTE_BUNDLE' DEPLOY_COMPOSE_FILES='$DEPLOY_COMPOSE_FILES' DEPLOY_HEALTH_URL='$DEPLOY_HEALTH_URL' bash -s" < remote-deploy.sh

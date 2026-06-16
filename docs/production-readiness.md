@@ -43,3 +43,4 @@ Use this checklist for small production apps. Keep it practical; not every item 
 - Server backups are handled by external Restic/R2 host automation, not repo-local scripts.
 - Production can auto-sync completed race actuals in-process without moving SQLite writes into GitHub Actions.
 - Production deployment can ship the runtime bundle over SSH without taking ownership of host-managed secrets or SQLite state.
+- Production deployment retries transient SSH upload/rollout connection failures and keeps the remote bundle until health checks pass.
