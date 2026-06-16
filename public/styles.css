@@ -1060,9 +1060,9 @@ button:disabled {
 
 .leaderboard-preview-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) minmax(28px, auto) auto;
+  grid-template-columns: 40px minmax(28px, max-content) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   padding: 8px 11px;
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -1108,7 +1108,7 @@ button:disabled {
   font-size: 0.82rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: left;
   white-space: nowrap;
 }
 
@@ -3207,8 +3207,8 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
 .leaderboard-main-card > .table th:nth-child(1),
 .leaderboard-main-card > .table td:nth-child(1) {
-  width: 40px;
-  text-align: center;
+  width: 68px;
+  text-align: left;
 }
 
 .leaderboard-main-card > .table th:nth-child(3),
@@ -3217,20 +3217,46 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   text-align: right;
 }
 
-.leaderboard-delta-header,
-.leaderboard-main-card > .table th:nth-child(4),
-.leaderboard-main-card > .table td:nth-child(4) {
-  width: 34px;
-  text-align: right;
-}
-
 .leaderboard-position-header,
 .leaderboard-name-header,
-.leaderboard-points-header,
-.leaderboard-delta-header {
+.leaderboard-points-header {
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
+}
+
+.leaderboard-position-cell {
+  white-space: nowrap;
+}
+
+.leaderboard-position-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.leaderboard-position-number {
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.leaderboard-position-delta {
+  min-width: 26px;
+  color: color-mix(in srgb, var(--muted) 76%, transparent);
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.leaderboard-position-delta.is-positive {
+  color: #0b7a4b;
+}
+
+.leaderboard-position-delta.is-negative {
+  color: var(--accent);
 }
 
 .leaderboard-row-link {
@@ -3248,32 +3274,6 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 .leaderboard-row-link:focus-visible {
   color: var(--accent);
   outline: none;
-}
-
-.leaderboard-delta-cell {
-  min-width: 36px;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-}
-
-.leaderboard-delta-cell strong {
-  color: var(--text);
-  display: inline-block;
-  white-space: nowrap;
-}
-
-.leaderboard-delta-cell strong.is-positive {
-  color: #0b7a4b;
-}
-
-.leaderboard-delta-cell strong.is-negative {
-  color: var(--accent);
-}
-
-.leaderboard-delta-empty {
-  color: color-mix(in srgb, var(--muted) 72%, transparent);
-  display: inline-block;
-  font-weight: 700;
 }
 
 .leaderboard-member-heading {
@@ -3541,7 +3541,7 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   border-color: rgba(51, 181, 204, 0.42);
 }
 
-:root[data-theme="dark"] .leaderboard-delta-cell strong.is-positive {
+:root[data-theme="dark"] .leaderboard-position-delta.is-positive {
   color: #5fd8a0;
 }
 
@@ -3549,7 +3549,7 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   background: rgba(155, 169, 201, 0.16);
 }
 
-:root[data-theme="dark"] .leaderboard-delta-empty {
+:root[data-theme="dark"] .leaderboard-position-delta.is-empty {
   color: color-mix(in srgb, var(--muted) 76%, transparent);
 }
 
@@ -3766,7 +3766,7 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
   .leaderboard-main-card > .table th:nth-child(1),
   .leaderboard-main-card > .table td:nth-child(1) {
-    width: 34px;
+    width: 58px;
   }
 
   .leaderboard-main-card > .table th:nth-child(3),
@@ -3774,14 +3774,12 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
     width: 44px;
   }
 
-  .leaderboard-delta-header,
-  .leaderboard-main-card > .table th:nth-child(4),
-  .leaderboard-main-card > .table td:nth-child(4) {
-    width: 30px;
+  .leaderboard-position-wrap {
+    gap: 5px;
   }
 
-  .leaderboard-delta-cell {
-    min-width: 30px;
+  .leaderboard-position-delta {
+    min-width: 22px;
     font-size: 12px;
   }
 }
@@ -3802,18 +3800,12 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
   .leaderboard-main-card > .table th:nth-child(1),
   .leaderboard-main-card > .table td:nth-child(1) {
-    width: 32px;
+    width: 54px;
   }
 
   .leaderboard-main-card > .table th:nth-child(3),
   .leaderboard-main-card > .table td:nth-child(3) {
     width: 42px;
-  }
-
-  .leaderboard-delta-header,
-  .leaderboard-main-card > .table th:nth-child(4),
-  .leaderboard-main-card > .table td:nth-child(4) {
-    width: 28px;
   }
 }
 

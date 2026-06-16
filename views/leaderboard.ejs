@@ -221,6 +221,11 @@
     if (!Number.isFinite(number) || number === 0) return '0';
     return number > 0 ? `+${number}` : String(number);
   }; %>
+  <% const formatRankDeltaCompact = (value) => {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number) || number === 0) return '-';
+    return `${number > 0 ? '↑' : '↓'}${Math.abs(number)}`;
+  }; %>
   <% const formatRankDeltaLabel = (value) => {
     const number = Number(value || 0);
     if (!Number.isFinite(number) || number === 0) return t('leaderboard.rank_delta_steady');
@@ -377,19 +382,29 @@
                 <th class="leaderboard-position-header" aria-label="<%= t('leaderboard.position') %>"><span aria-hidden="true">POS</span></th>
                 <th class="leaderboard-name-header"><%= t('common.name').toUpperCase() %></th>
                 <th class="leaderboard-points-header" aria-label="<%= t('leaderboard.points_label') %>"><span aria-hidden="true">PTS</span></th>
-                <% if (hasRoundDeltaColumn) { %>
-                  <th class="leaderboard-delta-header" aria-label="<%= t('leaderboard.rank_change_aria') %>"></th>
-                <% } %>
               </tr>
             </thead>
             <tbody>
               <% leaderboard.forEach((row, index) => { %>
+                <% const rowDelta = hasRoundDeltaColumn ? row.latestRoundDelta : null; %>
+                <% const rowRankDelta = rowDelta ? Number(rowDelta.rankDelta || 0) : null; %>
+                <% const rowDeltaClass = rowRankDelta > 0 ? 'is-positive' : (rowRankDelta < 0 ? 'is-negative' : 'is-empty'); %>
+                <% const rowDeltaLabel = rowRankDelta == null
+                  ? t('leaderboard.no_movement_data')
+                  : (rowRankDelta === 0 ? t('leaderboard.no_rank_change') : `${t('leaderboard.rank_change_aria')}: ${rowRankDelta > 0 ? '+' : ''}${rowRankDelta}`); %>
                 <tr
                   class="leaderboard-rank-row <%= String(row.userId) === selectedParticipantKey ? 'is-active' : '' %>"
                   data-leaderboard-row-participant="<%= row.userId %>"
                   data-leaderboard-row-href="<%= leaderboardHref({ participant: row.userId }) %>"
                 >
-                  <td><%= row.rank %></td>
+                  <td class="leaderboard-position-cell">
+                    <span class="leaderboard-position-wrap">
+                      <span class="leaderboard-position-number"><%= row.rank %></span>
+                      <% if (hasRoundDeltaColumn) { %>
+                        <span class="leaderboard-position-delta <%= rowDeltaClass %>" aria-label="<%= rowDeltaLabel %>"><%= formatRankDeltaCompact(rowRankDelta) %></span>
+                      <% } %>
+                    </span>
+                  </td>
                   <td>
                     <a
                       class="leaderboard-row-link"
@@ -401,22 +416,6 @@
                     </a>
                   </td>
                   <td><strong><%= row.total %></strong></td>
-                  <% if (hasRoundDeltaColumn) { %>
-                    <% const delta = row.latestRoundDelta; %>
-                    <td class="leaderboard-delta-cell">
-                      <% if (delta) { %>
-                        <% const rankDelta = Number(delta.rankDelta || 0); %>
-                        <% const deltaClass = rankDelta > 0 ? 'is-positive' : (rankDelta < 0 ? 'is-negative' : ''); %>
-                        <% if (rankDelta === 0) { %>
-                          <span class="leaderboard-delta-empty" aria-label="<%= t('leaderboard.no_rank_change') %>">-</span>
-                        <% } else { %>
-                          <strong class="<%= deltaClass %>"><%= formatRankDelta(rankDelta) %></strong>
-                        <% } %>
-                      <% } else { %>
-                        <span class="leaderboard-delta-empty" aria-label="<%= t('leaderboard.no_movement_data') %>">-</span>
-                      <% } %>
-                    </td>
-                  <% } %>
                 </tr>
               <% }) %>
             </tbody>

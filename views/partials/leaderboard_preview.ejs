@@ -15,14 +15,14 @@
         <% const deltaLabel = rankDelta == null
           ? t('leaderboard.no_movement_data')
           : (rankDelta === 0 ? t('leaderboard.no_rank_change') : `${t('leaderboard.rank_change_aria')}: ${rankDelta > 0 ? '+' : ''}${rankDelta}`); %>
-        <% const deltaText = rankDelta == null || rankDelta === 0 ? '-' : `${rankDelta > 0 ? '+' : ''}${rankDelta}`; %>
+        <% const deltaText = rankDelta == null || rankDelta === 0 ? '-' : `${rankDelta > 0 ? '↑' : '↓'}${Math.abs(rankDelta)}`; %>
         <div
           class="leaderboard-preview-row <%= row.rank <= 3 ? `is-top-${row.rank}` : '' %>"
           role="listitem"
         >
           <div class="leaderboard-preview-rank"><%= row.rank %></div>
-          <div class="leaderboard-preview-name"><strong><%= row.name %></strong></div>
           <div class="leaderboard-preview-delta <%= deltaClass %>" aria-label="<%= deltaLabel %>"><%= deltaText %></div>
+          <div class="leaderboard-preview-name"><strong><%= row.name %></strong></div>
           <div class="leaderboard-preview-points"><strong><%= row.total %></strong></div>
         </div>
       <% }) %>

@@ -233,14 +233,11 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("CHANGE");
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("POSITION");
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("POINTS");
-  await expect(page.locator(".leaderboard-delta-header")).toHaveAttribute(
-    "aria-label",
-    "Rank change since previous saved race"
-  );
+  await expect(page.locator(".leaderboard-delta-header")).toHaveCount(0);
   const leaderboardHeaders = await page.locator(".leaderboard-main-card thead th").evaluateAll((headers) =>
     headers.map((header) => header.textContent.trim())
   );
-  expect(leaderboardHeaders).toEqual(["POS", "NAME", "PTS", ""]);
+  expect(leaderboardHeaders).toEqual(["POS", "NAME", "PTS"]);
   const leaderboardHeaderStyles = await page.locator(".leaderboard-main-card thead th").evaluateAll((headers) =>
     headers.map((header) => ({
       color: getComputedStyle(header).color,
@@ -254,9 +251,14 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   expect(paginationText).not.toContain("<<");
   expect(paginationText).not.toContain(">>");
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
-  await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
+  await expect(flowRow.locator("td")).toHaveCount(3);
+  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveText("↑5");
+  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveAttribute(
+    "aria-label",
+    "Rank change since previous saved race: +5"
+  );
   const apexRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Apex" });
-  await expect(apexRow.locator(".leaderboard-delta-cell")).toHaveText("-");
+  await expect(apexRow.locator(".leaderboard-position-delta")).toHaveText("-");
   await expect(page.locator(".leaderboard-chart-legend")).toContainText("Dev Admin");
   await expect(page.locator(".leaderboard-chart-legend")).not.toContainText("25 pts");
 
@@ -380,7 +382,7 @@ test("leaderboard defaults to latest saved race and keeps historical race moveme
   await page.goto(`/global/leaderboard?snapshot=${snapshotIds.round2}`);
   await expect(page.locator("#snapshot-select")).toHaveValue(String(snapshotIds.round2));
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
-  await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
+  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveText("↑5");
 
   const selectedRoundMarker = await page.locator(".leaderboard-trend-chart").evaluate((chart) => {
     const marker = chart.querySelector("[data-chart-selected-round-marker]");
@@ -474,7 +476,16 @@ test("anonymous home preview opens the public global leaderboard without login",
   const flowPreviewRow = page.locator(".home-leaderboard-preview .leaderboard-preview-row", {
     hasText: "E2E Insight Flow"
   });
-  await expect(flowPreviewRow.locator(".leaderboard-preview-delta")).toHaveText("+5");
+  await expect(flowPreviewRow.locator(".leaderboard-preview-delta")).toHaveText("↑5");
+  const previewColumnOrder = await flowPreviewRow.locator(":scope > div").evaluateAll((nodes) =>
+    nodes.map((node) => String(node.className).split(/\s+/)[0])
+  );
+  expect(previewColumnOrder).toEqual([
+    "leaderboard-preview-rank",
+    "leaderboard-preview-delta",
+    "leaderboard-preview-name",
+    "leaderboard-preview-points"
+  ]);
   await expect(flowPreviewRow.locator(".leaderboard-preview-points")).not.toBeEmpty();
   await previewLinks.first().click();
 
