@@ -181,10 +181,16 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(page.getByRole("heading", { name: /Points over rounds/i })).toBeVisible();
   await expect(page.locator(".leaderboard-trend-chart")).toBeVisible();
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("CHANGE");
+  await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("POSITION");
+  await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("POINTS");
   await expect(page.locator(".leaderboard-delta-header")).toHaveAttribute(
     "aria-label",
-    "Latest race movement"
+    "Rank change since latest race"
   );
+  const leaderboardHeaders = await page.locator(".leaderboard-main-card thead th").evaluateAll((headers) =>
+    headers.map((header) => header.textContent.trim())
+  );
+  expect(leaderboardHeaders).toEqual(["P", "NAME", "PTS", "\u0394"]);
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
   await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
   const apexRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Apex" });
@@ -312,7 +318,7 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
 
     if (testCase.width >= 1100) {
       expect(metrics.chartLeft).toBeGreaterThanOrEqual(metrics.mainRight);
-      expect(metrics.mainWidth).toBeGreaterThan(metrics.chartWidth);
+      expect(metrics.chartWidth).toBeGreaterThan(metrics.mainWidth);
       expect(Math.abs(metrics.chartTop - metrics.rowTop)).toBeLessThanOrEqual(8);
     } else {
       expect(metrics.mainTop).toBeLessThan(metrics.chartTop);

@@ -282,20 +282,11 @@
           <table class="table">
             <thead>
               <tr>
-                <th>
-                  <span class="leaderboard-header-long">POSITION</span>
-                  <span class="leaderboard-header-short">POS.</span>
-                </th>
+                <th class="leaderboard-position-header" aria-label="Position"><span aria-hidden="true">P</span></th>
                 <th>NAME</th>
-                <th>
-                  <span class="leaderboard-header-long">POINTS</span>
-                  <span class="leaderboard-header-short">PTS</span>
-                </th>
+                <th class="leaderboard-points-header" aria-label="Points"><span aria-hidden="true">PTS</span></th>
                 <% if (hasRoundDeltaColumn) { %>
-                  <th class="leaderboard-delta-header" aria-label="Latest race movement">
-                    <span class="sr-only">Latest race movement</span>
-                    <span aria-hidden="true">&plusmn;</span>
-                  </th>
+                  <th class="leaderboard-delta-header" aria-label="Rank change since latest race"><span aria-hidden="true">&Delta;</span></th>
                 <% } %>
               </tr>
             </thead>
