@@ -16,4 +16,4 @@
 - [x] 3.2 Run `npm run lint`, `npm test`, `npm run build`, and `npm run test:e2e`.
 - [x] 3.3 Run `openspec validate fix-public-leaderboard-polish --type change --strict`.
 - [x] 3.4 Run browser visual checks across desktop/mobile and light/dark themes.
-- [ ] 3.5 Archive the OpenSpec change after verification and merge to `main` for deployment.
+- [x] 3.5 Archive the OpenSpec change after verification and merge to `main` for deployment.
