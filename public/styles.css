@@ -1060,7 +1060,7 @@ button:disabled {
 
 .leaderboard-preview-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto;
+  grid-template-columns: 52px minmax(0, 1fr) minmax(28px, auto) auto;
   align-items: center;
   gap: 10px;
   padding: 8px 11px;
@@ -1102,6 +1102,24 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.leaderboard-preview-delta {
+  min-width: 28px;
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.leaderboard-preview-delta.is-positive {
+  color: #0b7a4b;
+}
+
+.leaderboard-preview-delta.is-negative {
+  color: var(--accent);
+}
+
 .leaderboard-preview-row.is-top-1 {
   border-color: color-mix(in srgb, var(--accent) 34%, #c89b2b);
   background:
@@ -1140,6 +1158,10 @@ button:disabled {
 
 :root[data-theme="dark"] .leaderboard-preview-rank {
   background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .leaderboard-preview-delta.is-positive {
+  color: #5fd8a0;
 }
 
 :root[data-theme="dark"] .leaderboard-preview-row.is-top-1 {
@@ -2074,7 +2096,7 @@ button:disabled {
 
   .dashboard-desktop-global-preview .leaderboard-preview-row,
   .group-desktop-leaderboard-preview .leaderboard-preview-row {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr) minmax(26px, auto) auto;
     gap: 7px;
     padding: 7px 9px;
   }
@@ -4425,7 +4447,7 @@ header.is-center-hidden .header-center {
   }
 
   .home-leaderboard-preview .leaderboard-preview-row {
-    grid-template-columns: 44px minmax(0, 1fr) auto;
+    grid-template-columns: 44px minmax(0, 1fr) minmax(26px, auto) auto;
     gap: 7px;
     padding: 7px 9px;
   }

@@ -471,6 +471,11 @@ test("anonymous home preview opens the public global leaderboard without login",
 
   const previewLinks = page.locator(".home-leaderboard-preview a[href='/global/leaderboard']");
   await expect(previewLinks).toHaveCount(2);
+  const flowPreviewRow = page.locator(".home-leaderboard-preview .leaderboard-preview-row", {
+    hasText: "E2E Insight Flow"
+  });
+  await expect(flowPreviewRow.locator(".leaderboard-preview-delta")).toHaveText("+5");
+  await expect(flowPreviewRow.locator(".leaderboard-preview-points")).not.toBeEmpty();
   await previewLinks.first().click();
 
   await expect(page).toHaveURL(/\/global\/leaderboard/);

@@ -12,7 +12,8 @@ const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
 const leaderboardModel = require("./src/leaderboard-model");
 const {
   REVIEW_STATUS_PENDING,
-  ensureActualSnapshotColumns
+  ensureActualSnapshotColumns,
+  listLatestSnapshotsForSeason
 } = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
@@ -2157,7 +2158,9 @@ registerAuthRoutes(app, {
   NODE_ENV: process.env.NODE_ENV || "development",
   claimGuestResponsesForUser,
   predictionsClosed,
-  getQuestions
+  getQuestions,
+  CURRENT_SEASON,
+  getRaces
 });
 
 app.get("/api/groups/check-name", requireAuth, (req, res) => {
@@ -2485,6 +2488,42 @@ function fetchSnapshotValuesBySnapshotIds(snapshotIds) {
   }, {});
 }
 
+function getLatestPreviewRoundDeltas({ groupId, questions, leaderboardInputs, excludeHiddenAdmins = false }) {
+  const safeGroupId = Number(groupId || 0);
+  if (!Number.isFinite(safeGroupId) || safeGroupId <= 0) return {};
+  const races = getRaces();
+  const snapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
+    maxRoundNumber: Array.isArray(races) ? races.length : null
+  });
+  if (snapshots.length < 2) return {};
+
+  const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(snapshots.map((snapshot) => snapshot.id));
+  const snapshotsWithValues = snapshots.filter((snapshot) => {
+    const values = snapshotValuesById[snapshot.id] || {};
+    return Object.keys(values).length > 0;
+  });
+  if (snapshotsWithValues.length < 2) return {};
+
+  const latestRound = snapshotsWithValues[snapshotsWithValues.length - 1];
+  const previousRound = snapshotsWithValues[snapshotsWithValues.length - 2];
+  const inputs =
+    leaderboardInputs ||
+    getGroupLeaderboardInputs(safeGroupId, { excludeHiddenAdmins });
+
+  return leaderboardModel.buildRoundDeltas({
+    latestRows: leaderboardModel.buildLeaderboardRows({
+      ...inputs,
+      questions,
+      actualsByQuestion: snapshotValuesById[latestRound.id] || {}
+    }),
+    previousRows: leaderboardModel.buildLeaderboardRows({
+      ...inputs,
+      questions,
+      actualsByQuestion: snapshotValuesById[previousRound.id] || {}
+    })
+  });
+}
+
 function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
   const groupId = Number(group?.id || 0);
   if (!Number.isFinite(groupId) || groupId <= 0) return null;
@@ -2496,16 +2535,30 @@ function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
     acc[row.question_id] = row.value;
     return acc;
   }, {});
+  const excludeHiddenAdmins = isGlobalGroup(group);
+  const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
+  const latestRoundDeltasByParticipantId = getLatestPreviewRoundDeltas({
+    groupId,
+    questions,
+    leaderboardInputs,
+    excludeHiddenAdmins
+  });
   const rows = buildLeaderboardPreviewRows(
-    buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, {
-      excludeHiddenAdmins: isGlobalGroup(group)
+    leaderboardModel.buildLeaderboardRows({
+      ...leaderboardInputs,
+      questions,
+      actualsByQuestion
     }),
     currentUserId,
     limit
   ).map((row) => ({
       rank: row.rank,
       name: row.name,
-      total: row.total
+      total: row.total,
+      latestRoundDelta:
+        latestRoundDeltasByParticipantId[
+          leaderboardModel.normalizeParticipantId(row.userId)
+        ] || null
     }));
   return rows.length > 0 ? { rows } : null;
 }

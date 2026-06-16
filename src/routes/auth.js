@@ -1,3 +1,6 @@
+const leaderboardModel = require("../leaderboard-model");
+const { listLatestSnapshotsForSeason } = require("../actuals-snapshots");
+
 function registerAuthRoutes(app, deps) {
   const MIN_PASSWORD_LENGTH = 6;
   const {
@@ -19,13 +22,16 @@ function registerAuthRoutes(app, deps) {
     NODE_ENV,
     claimGuestResponsesForUser,
     predictionsClosed,
-    getQuestions
+    getQuestions,
+    CURRENT_SEASON,
+    getRaces
   } = deps;
 
   const BRAND_NAME = String(COMPANY_NAME || "Wheel of Knowledge").trim() || "Wheel of Knowledge";
   const TEAM_SIGNOFF = `The ${BRAND_NAME} Team`;
   const EMAIL_SENDER = String(SMTP_FROM || "").trim()
     || (SMTP_USER ? `${BRAND_NAME} <${SMTP_USER}>` : BRAND_NAME);
+  const PREVIEW_SEASON = Number(CURRENT_SEASON || process.env.F1_SEASON || 2026);
 
   const escapeHtml = (value) =>
     String(value || "")
@@ -123,6 +129,69 @@ function registerAuthRoutes(app, deps) {
       return rankedRows.slice(0, safeLimit);
     }
     return [...rankedRows.slice(0, safeLimit - 1), rankedRows[currentIndex]];
+  };
+
+  const fetchSnapshotValuesBySnapshotIds = (snapshotIds) => {
+    const ids = (snapshotIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (ids.length === 0) return {};
+    const placeholders = ids.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `
+        SELECT snapshot_id, question_id, value
+        FROM actual_snapshot_values
+        WHERE snapshot_id IN (${placeholders})
+        `
+      )
+      .all(...ids);
+    return rows.reduce((acc, row) => {
+      const snapshotId = Number(row.snapshot_id);
+      if (!acc[snapshotId]) acc[snapshotId] = {};
+      acc[snapshotId][row.question_id] = row.value;
+      return acc;
+    }, {});
+  };
+
+  const getPreviewMaxRoundNumber = () => {
+    if (typeof getRaces !== "function") return null;
+    const races = getRaces();
+    return Array.isArray(races) && races.length > 0 ? races.length : null;
+  };
+
+  const buildPreviewRoundDeltas = ({ members, responses, questions }) => {
+    const maxRoundNumber = getPreviewMaxRoundNumber();
+    const snapshots = listLatestSnapshotsForSeason(db, PREVIEW_SEASON, {
+      maxRoundNumber
+    });
+    if (snapshots.length < 2) return {};
+
+    const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(
+      snapshots.map((snapshot) => snapshot.id)
+    );
+    const snapshotsWithValues = snapshots.filter((snapshot) => {
+      const values = snapshotValuesById[snapshot.id] || {};
+      return Object.keys(values).length > 0;
+    });
+    if (snapshotsWithValues.length < 2) return {};
+
+    const latestRound = snapshotsWithValues[snapshotsWithValues.length - 1];
+    const previousRound = snapshotsWithValues[snapshotsWithValues.length - 2];
+    return leaderboardModel.buildRoundDeltas({
+      latestRows: leaderboardModel.buildLeaderboardRows({
+        members,
+        responses,
+        questions,
+        actualsByQuestion: snapshotValuesById[latestRound.id] || {}
+      }),
+      previousRows: leaderboardModel.buildLeaderboardRows({
+        members,
+        responses,
+        questions,
+        actualsByQuestion: snapshotValuesById[previousRound.id] || {}
+      })
+    });
   };
 
   function getHomeGlobalLeaderboard(locale, currentUserId) {
@@ -383,6 +452,12 @@ function registerAuthRoutes(app, deps) {
       scoreRow.total += scoreQuestion(question, predicted, actual);
     });
 
+    const latestRoundDeltasByParticipantId = buildPreviewRoundDeltas({
+      members,
+      responses,
+      questions
+    });
+
     const rows = buildLeaderboardPreviewRows(
       Object.values(scoreByUser).sort(
         (a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name))
@@ -392,7 +467,11 @@ function registerAuthRoutes(app, deps) {
     ).map((row) => ({
       rank: row.rank,
       name: row.name,
-      total: row.total
+      total: row.total,
+      latestRoundDelta:
+        latestRoundDeltasByParticipantId[
+          leaderboardModel.normalizeParticipantId(row.userId)
+        ] || null
     }));
 
     if (rows.length === 0) return null;
