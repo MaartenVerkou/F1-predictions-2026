@@ -3,6 +3,7 @@
 - [x] 1.1 Add or update Playwright coverage for compact legend/table rails on desktop.
 - [x] 1.2 Add Playwright coverage that the chart domain lower bound is non-zero when current focus totals allow it and below-domain points remain inside the plot.
 - [x] 1.3 Preserve existing mobile/light/dark layout coverage.
+- [x] 1.4 Add Playwright coverage for latest-snapshot default, historical snapshot movement, and selected-round chart marker.
 
 ## 2. Implementation
 
@@ -10,6 +11,9 @@
 - [x] 2.2 Render chart domain metadata and updated axis labels.
 - [x] 2.3 Replace fixed desktop legend/table widths with bounded content-aware sizing.
 - [x] 2.4 Adjust the lower desktop grid so the compact ranking table no longer forces a 50/50 split with details.
+- [x] 2.5 Default scoring to the latest saved snapshot and remove the visible Current selector option.
+- [x] 2.6 Compute movement deltas for the selected snapshot against the previous saved race.
+- [x] 2.7 Render a subtle selected-round marker in the trend chart.
 
 ## 3. Validation
 

@@ -34,12 +34,31 @@ Rule: Leaderboard presentation SHALL remain usable in light and dark mode.
 - **AND** the lower bound SHALL not default to zero unless the plotted current standings require it
 - **AND** earlier historical points below the visible lower bound SHALL remain within the plot area at the baseline
 
+#### Scenario: Selected snapshot round is marked in the chart
+- **GIVEN** a leaderboard has two or more saved race snapshots
+- **WHEN** the leaderboard renders a selected saved race snapshot
+- **THEN** the chart SHALL show a subtle vertical marker at the selected race round
+- **AND** the marker SHALL remain visually subordinate to participant trend lines
+
 #### Scenario: Compact ranking headers avoid wasted space
 - **GIVEN** a leaderboard has latest-race movement data
 - **WHEN** the ranking table renders
 - **THEN** the visible position header SHALL be `POS`
 - **AND** the visible points header SHALL be `PTS`
 - **AND** the movement column SHALL keep an accessible label without visible header text
+
+#### Scenario: Default snapshot is the latest saved race
+- **GIVEN** a leaderboard has saved race snapshots
+- **WHEN** the leaderboard opens without an explicit snapshot filter
+- **THEN** the leaderboard SHALL score against the latest saved race snapshot
+- **AND** the snapshot selector SHALL show that latest race as selected
+- **AND** the selector SHALL not include a separate `Current` option
+
+#### Scenario: Historical snapshots show race movement
+- **GIVEN** a leaderboard has saved snapshots for at least three race rounds
+- **WHEN** the user selects a middle race snapshot
+- **THEN** the movement column SHALL compare that selected race snapshot against the immediately previous saved race snapshot
+- **AND** positive and negative rank movement SHALL use the same compact signed values as the latest race view
 
 #### Scenario: Selected details sit beside ranking after trend
 - **GIVEN** a participant is selected on a desktop leaderboard

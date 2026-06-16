@@ -329,7 +329,6 @@
               aria-label="<%= t('leaderboard.snapshot_label') %>"
               onchange="this.form.submit()"
             >
-              <option value="" <%= selectedSnapshotKey === "" ? "selected" : "" %>><%= t('leaderboard.current_snapshot') %></option>
               <% actualSnapshots.forEach((snapshot) => { %>
                 <option value="<%= snapshot.id %>" <%= selectedSnapshotKey === String(snapshot.id) ? "selected" : "" %>>
                   <%= snapshot.label %><%= showSnapshotReviewStatus && snapshot.reviewStatus === 'pending' ? ' | pending review' : '' %>
@@ -348,7 +347,7 @@
                 <th>NAME</th>
                 <th class="leaderboard-points-header" aria-label="Points"><span aria-hidden="true">PTS</span></th>
                 <% if (hasRoundDeltaColumn) { %>
-                  <th class="leaderboard-delta-header" aria-label="Rank change since latest race"></th>
+                  <th class="leaderboard-delta-header" aria-label="Rank change since previous saved race"></th>
                 <% } %>
               </tr>
             </thead>
@@ -452,6 +451,7 @@
             <% const xForIndex = (idx) => safeHistory.rounds.length <= 1
               ? padLeft
               : padLeft + (idx / (safeHistory.rounds.length - 1)) * plotWidth; %>
+            <% const selectedRoundIndex = safeHistory.rounds.findIndex((round) => String(round.id) === selectedSnapshotKey); %>
             <% const yForTotal = (total) => {
               const value = Number(total || 0);
               const clamped = Math.min(chartDomainMax, Math.max(chartDomainMin, Number.isFinite(value) ? value : chartDomainMin));
@@ -466,9 +466,22 @@
                 aria-label="Leaderboard points over completed rounds"
                 data-chart-domain-min="<%= formatChartTick(chartDomainMin) %>"
                 data-chart-domain-max="<%= formatChartTick(chartDomainMax) %>"
+                data-chart-selected-round-id="<%= selectedSnapshotKey %>"
               >
                 <line x1="<%= padLeft %>" y1="<%= padTop %>" x2="<%= padLeft %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
                 <line x1="<%= padLeft %>" y1="<%= padTop + plotHeight %>" x2="<%= padLeft + plotWidth %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
+                <% if (selectedRoundIndex >= 0) { %>
+                  <% const selectedRoundX = xForIndex(selectedRoundIndex); %>
+                  <line
+                    x1="<%= selectedRoundX %>"
+                    y1="<%= padTop %>"
+                    x2="<%= selectedRoundX %>"
+                    y2="<%= padTop + plotHeight %>"
+                    class="leaderboard-chart-selected-round-marker"
+                    data-chart-selected-round-marker
+                    aria-hidden="true"
+                  />
+                <% } %>
                 <% chartTickValues.forEach((tickValue) => { %>
                   <% const y = yForTotal(tickValue); %>
                   <line x1="<%= padLeft %>" y1="<%= y %>" x2="<%= padLeft + plotWidth %>" y2="<%= y %>" class="leaderboard-chart-grid" />
@@ -543,7 +556,7 @@
                   <strong><%= safeInsights.selectedParticipant.total %></strong> points
                   <% if (safeSelectedLatestRoundDelta) { %>
                     <span aria-hidden="true">-</span>
-                    Last race <strong><%= formatSigned(safeSelectedLatestRoundDelta.pointsDelta) %> pts</strong>
+                    Race change <strong><%= formatSigned(safeSelectedLatestRoundDelta.pointsDelta) %> pts</strong>
                     <span aria-hidden="true">-</span>
                     <strong><%= formatRankDeltaLabel(safeSelectedLatestRoundDelta.rankDelta) %></strong>
                   <% } %>

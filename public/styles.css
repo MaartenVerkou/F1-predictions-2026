@@ -2440,6 +2440,13 @@ button:disabled {
   stroke-width: 1;
 }
 
+.leaderboard-chart-selected-round-marker {
+  stroke: color-mix(in srgb, var(--accent) 42%, transparent);
+  stroke-width: 1.3;
+  stroke-dasharray: 4 7;
+  pointer-events: none;
+}
+
 .leaderboard-chart-label {
   fill: var(--muted);
   font-family: var(--font-body);
@@ -2991,6 +2998,10 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 
 :root[data-theme="dark"] .leaderboard-chart-grid {
   stroke: color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+:root[data-theme="dark"] .leaderboard-chart-selected-round-marker {
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 :root[data-theme="dark"] .leaderboard-chart-line {

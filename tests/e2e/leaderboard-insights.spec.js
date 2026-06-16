@@ -41,7 +41,7 @@ function upsertUser(db, { name, email, isAdmin = 0 }) {
   return db.prepare("SELECT id, name FROM users WHERE email = ?").get(email);
 }
 
-function seedLeaderboardInsights(db) {
+function seedLeaderboardInsights(db, { includeThirdSnapshot = false } = {}) {
   const now = new Date().toISOString();
   const devAdmin = upsertUser(db, {
     name: "Dev Admin",
@@ -122,22 +122,44 @@ function seedLeaderboardInsights(db) {
   const insertSnapshotValue = db.prepare(
     "INSERT INTO actual_snapshot_values (snapshot_id, question_id, value) VALUES (?, ?, ?)"
   );
+  const upsertCurrentActual = db.prepare(
+    "INSERT INTO actuals (question_id, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(question_id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+  );
+  const saveSnapshotValues = (snapshotId, values, { updateCurrent = false } = {}) => {
+    Object.entries(values).forEach(([questionId, value]) => {
+      insertSnapshotValue.run(snapshotId, questionId, value);
+      if (updateCurrent) {
+        upsertCurrentActual.run(questionId, value, now);
+      }
+    });
+  };
   const round1 = insertSnapshot.run(1, "Australian Grand Prix", "R1 - Australian Grand Prix", now, now, now);
   insertSnapshotValue.run(round1.lastInsertRowid, QUESTIONS[0], "yes");
 
   const round2 = insertSnapshot.run(2, "Chinese Grand Prix", "R2 - Chinese Grand Prix", now, now, now);
-  const currentActuals = {
+  const round2Actuals = {
     [QUESTIONS[0]]: "yes",
     [QUESTIONS[1]]: "no",
     [QUESTIONS[2]]: "yes",
     [QUESTIONS[3]]: "0"
   };
-  Object.entries(currentActuals).forEach(([questionId, value]) => {
-    insertSnapshotValue.run(round2.lastInsertRowid, questionId, value);
-    db.prepare(
-      "INSERT INTO actuals (question_id, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(question_id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
-    ).run(questionId, value, now);
-  });
+  saveSnapshotValues(round2.lastInsertRowid, round2Actuals, { updateCurrent: !includeThirdSnapshot });
+
+  const snapshotIds = {
+    round1: Number(round1.lastInsertRowid),
+    round2: Number(round2.lastInsertRowid),
+    round3: null
+  };
+
+  if (includeThirdSnapshot) {
+    const round3 = insertSnapshot.run(3, "Japanese Grand Prix", "R3 - Japanese Grand Prix", now, now, now);
+    const round3Actuals = {
+      ...round2Actuals,
+      [QUESTIONS[3]]: "2"
+    };
+    snapshotIds.round3 = Number(round3.lastInsertRowid);
+    saveSnapshotValues(round3.lastInsertRowid, round3Actuals, { updateCurrent: true });
+  }
 
   const privateGroupId = 990001;
   db.prepare("DELETE FROM responses WHERE group_id = ?").run(privateGroupId);
@@ -165,14 +187,14 @@ function seedLeaderboardInsights(db) {
     "INSERT INTO group_members (user_id, group_id, role, joined_at, coupled_to_global) VALUES (?, ?, 'owner', ?, 1)"
   ).run(devAdmin.id, privateGroupId, now);
 
-  return { devAdminId: Number(devAdmin.id), privateGroupId };
+  return { devAdminId: Number(devAdmin.id), privateGroupId, snapshotIds };
 }
 
 test("leaderboard shows trend chart, latest-race movement, selected insights, and breakdown modes", async ({ page }) => {
   await page.goto("/");
 
   const db = new Database(DB_PATH);
-  const { devAdminId } = seedLeaderboardInsights(db);
+  const { devAdminId, snapshotIds } = seedLeaderboardInsights(db);
   db.close();
 
   await page.goto("/global/leaderboard");
@@ -182,13 +204,18 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(page.getByText(/Top 10 plus selected participants/i)).toHaveCount(0);
   await expect(page.getByText(/Last race: R1 to R2/i)).toHaveCount(0);
   await expect(page.locator(".leaderboard-trend-chart")).toBeVisible();
+  await expect(page.locator("#snapshot-select")).toHaveValue(String(snapshotIds.round2));
+  await expect(page.locator("#snapshot-select option", { hasText: "Current" })).toHaveCount(0);
   const chartDomain = await page.locator(".leaderboard-trend-chart").evaluate((chart) => {
+    const marker = chart.querySelector("[data-chart-selected-round-marker]");
     const circles = Array.from(chart.querySelectorAll("circle.leaderboard-chart-line"))
       .map((circle) => Number(circle.getAttribute("cy")))
       .filter(Number.isFinite);
     return {
       min: Number(chart.getAttribute("data-chart-domain-min")),
       max: Number(chart.getAttribute("data-chart-domain-max")),
+      selectedRoundId: chart.getAttribute("data-chart-selected-round-id"),
+      markerX: marker ? Number(marker.getAttribute("x1")) : null,
       minPointY: Math.min(...circles),
       maxPointY: Math.max(...circles),
       axisLabels: Array.from(chart.querySelectorAll(".leaderboard-chart-label")).map((label) =>
@@ -198,6 +225,8 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   });
   expect(chartDomain.min).toBeGreaterThan(0);
   expect(chartDomain.max).toBeGreaterThan(chartDomain.min);
+  expect(chartDomain.selectedRoundId).toBe(String(snapshotIds.round2));
+  expect(chartDomain.markerX).not.toBeNull();
   expect(chartDomain.minPointY).toBeGreaterThanOrEqual(16);
   expect(chartDomain.maxPointY).toBeLessThanOrEqual(318);
   expect(chartDomain.axisLabels).toContain(String(chartDomain.min));
@@ -206,7 +235,7 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await expect(page.locator(".leaderboard-main-card thead")).not.toContainText("POINTS");
   await expect(page.locator(".leaderboard-delta-header")).toHaveAttribute(
     "aria-label",
-    "Rank change since latest race"
+    "Rank change since previous saved race"
   );
   const leaderboardHeaders = await page.locator(".leaderboard-main-card thead th").evaluateAll((headers) =>
     headers.map((header) => header.textContent.trim())
@@ -290,6 +319,43 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   await selectedPanel.getByRole("link", { name: "Scored" }).click();
   await expect(page.locator("#leaderboard-breakdown tbody tr")).toHaveCount(3);
   await expect(page.locator("#leaderboard-breakdown tbody tr.is-unscored")).toHaveCount(0);
+});
+
+test("leaderboard defaults to latest saved race and keeps historical race movement", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  const { snapshotIds } = seedLeaderboardInsights(db, { includeThirdSnapshot: true });
+  db.close();
+
+  await page.goto("/global/leaderboard");
+  await expect(page.locator("#snapshot-select")).toHaveValue(String(snapshotIds.round3));
+  await expect(page.locator("#snapshot-select option", { hasText: "Current" })).toHaveCount(0);
+  await expect(page.locator(".leaderboard-trend-chart")).toHaveAttribute(
+    "data-chart-selected-round-id",
+    String(snapshotIds.round3)
+  );
+  await expect(page.locator("[data-chart-selected-round-marker]")).toHaveCount(1);
+
+  await page.goto(`/global/leaderboard?snapshot=${snapshotIds.round2}`);
+  await expect(page.locator("#snapshot-select")).toHaveValue(String(snapshotIds.round2));
+  const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
+  await expect(flowRow.locator(".leaderboard-delta-cell")).toHaveText("+5");
+
+  const selectedRoundMarker = await page.locator(".leaderboard-trend-chart").evaluate((chart) => {
+    const marker = chart.querySelector("[data-chart-selected-round-marker]");
+    const roundLabel = Array.from(chart.querySelectorAll(".leaderboard-chart-label")).find(
+      (label) => label.textContent.trim() === "R2"
+    );
+    return {
+      selectedRoundId: chart.getAttribute("data-chart-selected-round-id"),
+      markerX: marker ? Number(marker.getAttribute("x1")) : null,
+      labelX: roundLabel ? Number(roundLabel.getAttribute("x")) : null
+    };
+  });
+  expect(selectedRoundMarker.selectedRoundId).toBe(String(snapshotIds.round2));
+  expect(selectedRoundMarker.markerX).not.toBeNull();
+  expect(selectedRoundMarker.markerX).toBeCloseTo(selectedRoundMarker.labelX, 1);
 });
 
 test("global leaderboard is public while private group leaderboard stays protected", async ({ page }) => {

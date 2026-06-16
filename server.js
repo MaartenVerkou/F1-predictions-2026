@@ -12,8 +12,7 @@ const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
 const leaderboardModel = require("./src/leaderboard-model");
 const {
   REVIEW_STATUS_PENDING,
-  ensureActualSnapshotColumns,
-  findSnapshotById
+  ensureActualSnapshotColumns
 } = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
@@ -3820,7 +3819,6 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
   const canViewQuestionBreakdown = Boolean(user);
   const questions = getQuestions(locale);
   const races = getRaces();
-  const snapshotRoundOptions = { maxRoundNumber: races.length };
   const actualRows = db.prepare("SELECT * FROM actuals").all();
   const currentActuals = actualRows.reduce((acc, row) => {
     acc[row.question_id] = row.value;
@@ -3865,28 +3863,27 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
     });
   });
   const requestedSnapshotId = Number(req.query.snapshot || 0);
+  const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(
+    actualSnapshots.map((snapshot) => snapshot.id)
+  );
+  const findSnapshotWithValues = (snapshotId) => {
+    const id = Number(snapshotId || 0);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    const snapshot = actualSnapshots.find((item) => Number(item.id) === id);
+    if (!snapshot) return null;
+    const values = snapshotValuesById[id] || {};
+    return Object.keys(values).length > 0 ? snapshot : null;
+  };
   let selectedActualSnapshotId = null;
   let scoringActuals = currentActuals;
-  if (Number.isFinite(requestedSnapshotId) && requestedSnapshotId > 0) {
-    const snapshotMeta = findSnapshotById(db, requestedSnapshotId, snapshotRoundOptions);
-    if (snapshotMeta) {
-      const snapshotValueRows = db
-        .prepare(
-          `
-          SELECT question_id, value
-          FROM actual_snapshot_values
-          WHERE snapshot_id = ?
-          `
-        )
-        .all(requestedSnapshotId);
-      if (snapshotValueRows.length > 0) {
-        scoringActuals = snapshotValueRows.reduce((acc, row) => {
-          acc[row.question_id] = row.value;
-          return acc;
-        }, {});
-        selectedActualSnapshotId = requestedSnapshotId;
-      }
-    }
+  const explicitSnapshot = findSnapshotWithValues(requestedSnapshotId);
+  const defaultSnapshot =
+    explicitSnapshot ||
+    actualSnapshots.find((snapshot) => Object.keys(snapshotValuesById[snapshot.id] || {}).length > 0) ||
+    null;
+  if (defaultSnapshot) {
+    selectedActualSnapshotId = Number(defaultSnapshot.id);
+    scoringActuals = snapshotValuesById[selectedActualSnapshotId] || currentActuals;
   }
 
   const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
@@ -3910,9 +3907,6 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
     currentParticipantId: user?.id,
     selectedParticipantId
   });
-  const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(
-    actualSnapshots.map((snapshot) => snapshot.id)
-  );
   const leaderboardHistory = leaderboardModel.buildSnapshotHistory({
     snapshots: actualSnapshots,
     snapshotValuesById,
@@ -3921,22 +3915,29 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
     focusParticipantIds
   });
   const previousTrendRound =
-    leaderboardHistory.rounds.length >= 2
-      ? leaderboardHistory.rounds[leaderboardHistory.rounds.length - 2]
+    selectedActualSnapshotId
+      ? (() => {
+          const selectedIndex = leaderboardHistory.rounds.findIndex(
+            (round) => Number(round.id) === Number(selectedActualSnapshotId)
+          );
+          return selectedIndex > 0 ? leaderboardHistory.rounds[selectedIndex - 1] : null;
+        })()
       : null;
   const latestTrendRound =
-    leaderboardHistory.rounds.length >= 1
-      ? leaderboardHistory.rounds[leaderboardHistory.rounds.length - 1]
+    selectedActualSnapshotId
+      ? leaderboardHistory.rounds.find(
+          (round) => Number(round.id) === Number(selectedActualSnapshotId)
+        ) || null
       : null;
   const latestRoundDeltasByParticipantId =
-    !selectedActualSnapshotId && previousTrendRound && latestTrendRound
+    previousTrendRound && latestTrendRound
       ? leaderboardModel.buildRoundDeltas({
           latestRows: leaderboardHistory.rankedRowsBySnapshotId[latestTrendRound.id] || [],
           previousRows: leaderboardHistory.rankedRowsBySnapshotId[previousTrendRound.id] || []
         })
       : {};
   const latestRoundDeltaMeta =
-    !selectedActualSnapshotId && previousTrendRound && latestTrendRound
+    previousTrendRound && latestTrendRound
       ? { latestRound: latestTrendRound, previousRound: previousTrendRound }
       : null;
   const participantInsights = leaderboardModel.buildSelectedParticipantInsights({
