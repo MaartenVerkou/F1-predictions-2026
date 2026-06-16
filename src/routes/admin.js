@@ -96,6 +96,8 @@ function registerAdminRoutes(app, deps) {
   const MULTI_ACTUAL_DRIVER_FIELD_IDS = new Set([
     "lowest_grid_win_position"
   ]);
+  const ADMIN_IDEA_TYPES = ["question", "feature", "other"];
+  const ADMIN_IDEA_STATUSES = ["open", "resolved", "ignored"];
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -904,6 +906,48 @@ function registerAdminRoutes(app, deps) {
     const hash = hashIndex >= 0 ? fullPath.slice(hashIndex) : "";
     const separator = basePath.includes("?") ? "&" : "?";
     return `${basePath}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
+  }
+
+  function normalizeAdminIdeaType(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return ADMIN_IDEA_TYPES.includes(normalized) ? normalized : "question";
+  }
+
+  function normalizeAdminIdeaStatus(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return ADMIN_IDEA_STATUSES.includes(normalized) ? normalized : null;
+  }
+
+  function mapAdminIdeaRow(row) {
+    return {
+      ...row,
+      id: Number(row.id),
+      created_by_user_id:
+        row.created_by_user_id == null ? null : Number(row.created_by_user_id),
+      updated_by_user_id:
+        row.updated_by_user_id == null ? null : Number(row.updated_by_user_id)
+    };
+  }
+
+  function listAdminIdeas() {
+    return db
+      .prepare(
+        `
+        SELECT
+          ai.*,
+          creator.name AS created_by_name,
+          updater.name AS updated_by_name
+        FROM admin_ideas ai
+        LEFT JOIN users creator ON creator.id = ai.created_by_user_id
+        LEFT JOIN users updater ON updater.id = ai.updated_by_user_id
+        ORDER BY
+          CASE ai.status WHEN 'open' THEN 0 WHEN 'resolved' THEN 1 ELSE 2 END,
+          COALESCE(ai.updated_at, ai.created_at) DESC,
+          ai.id DESC
+        `
+      )
+      .all()
+      .map(mapAdminIdeaRow);
   }
 
   function getSnapshotRoundOptions() {
@@ -2105,6 +2149,106 @@ function registerAdminRoutes(app, deps) {
   app.get("/admin/login", (req, res) => {
     if (!req.session.userId) return res.redirect("/login");
     return res.redirect("/admin/overview");
+  });
+
+  app.get("/admin/ideas", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const ideas = listAdminIdeas();
+    res.render("admin_ideas", {
+      user,
+      ideas,
+      openIdeas: ideas.filter((idea) => idea.status === "open"),
+      triagedIdeas: ideas.filter((idea) => idea.status !== "open"),
+      ideaTypes: ADMIN_IDEA_TYPES,
+      adminError: req.query.error ? String(req.query.error) : null,
+      adminSuccess: req.query.success ? String(req.query.success) : null
+    });
+  });
+
+  app.post("/admin/ideas", requireAdmin, (req, res) => {
+    const t = res.locals.t || ((key) => key);
+    const adminUser = getCurrentUser(req);
+    const type = normalizeAdminIdeaType(req.body.type);
+    const title = String(req.body.title || "").trim();
+    const notes = String(req.body.notes || "").trim();
+    if (!title) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_title_required"))
+      );
+    }
+    if (title.length > 500) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_title_too_long"))
+      );
+    }
+    if (notes.length > 4000) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_notes_too_long"))
+      );
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(
+      `
+      INSERT INTO admin_ideas (
+        type,
+        title,
+        notes,
+        status,
+        created_at,
+        updated_at,
+        created_by_user_id,
+        updated_by_user_id
+      )
+      VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
+      `
+    ).run(
+      type,
+      title,
+      notes || null,
+      now,
+      now,
+      adminUser?.id || null,
+      adminUser?.id || null
+    );
+
+    return res.redirect(
+      withQueryParam("/admin/ideas", "success", t("admin_ideas.created_success"))
+    );
+  });
+
+  app.post("/admin/ideas/:id/status", requireAdmin, (req, res) => {
+    const t = res.locals.t || ((key) => key);
+    const adminUser = getCurrentUser(req);
+    const ideaId = Number(req.params.id);
+    const status = normalizeAdminIdeaStatus(req.body.status);
+    if (!Number.isFinite(ideaId) || ideaId <= 0 || !status) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_invalid_status"))
+      );
+    }
+
+    const result = db
+      .prepare(
+        `
+        UPDATE admin_ideas
+        SET status = ?,
+            updated_at = ?,
+            updated_by_user_id = ?
+        WHERE id = ?
+        `
+      )
+      .run(status, new Date().toISOString(), adminUser?.id || null, ideaId);
+
+    if (result.changes === 0) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_not_found"))
+      );
+    }
+
+    return res.redirect(
+      withQueryParam("/admin/ideas", "success", t("admin_ideas.status_updated_success"))
+    );
   });
 
   app.get("/admin/questions", requireAdmin, (req, res) => {

@@ -1,0 +1,122 @@
+<%- include('partials/header', { title: t('admin_ideas.page_title'), user }) %>
+<%- include('partials/admin_nav', { active: 'ideas' }) %>
+<% const formatAdminDate = (value) => {
+  if (!value) return '-';
+  if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
+}; %>
+<% const typeLabel = (type) => t(`admin_ideas.type_${type || 'other'}`); %>
+<% const statusLabel = (status) => t(`admin_ideas.status_${status || 'open'}`); %>
+<% const statusActionLabel = (status) => {
+  if (status === 'open') return t('admin_ideas.action_reopen');
+  if (status === 'resolved') return t('admin_ideas.action_resolve');
+  if (status === 'ignored') return t('admin_ideas.action_ignore');
+  return status;
+}; %>
+<% const renderIdeaList = (items, emptyText) => { %>
+  <% if (!items || items.length === 0) { %>
+    <p class="muted admin-page-note"><%= emptyText %></p>
+  <% } else { %>
+    <div class="admin-ideas-list">
+      <% items.forEach((idea) => { %>
+        <article class="admin-idea-row">
+          <div class="admin-idea-main">
+            <div class="admin-idea-title-line">
+              <span class="badge admin-idea-type"><%= typeLabel(idea.type) %></span>
+              <span class="badge admin-idea-status admin-idea-status-<%= idea.status %>"><%= statusLabel(idea.status) %></span>
+            </div>
+            <h3><%= idea.title %></h3>
+            <% if (idea.notes) { %>
+              <p class="admin-idea-notes"><%= idea.notes %></p>
+            <% } %>
+            <p class="muted admin-idea-meta">
+              <%= t('admin_ideas.created_label') %> <strong><%= formatAdminDate(idea.created_at) %></strong>
+              <% if (idea.created_by_name) { %>
+                <span aria-hidden="true">-</span> <%= idea.created_by_name %>
+              <% } %>
+              <% if (idea.updated_at && idea.updated_at !== idea.created_at) { %>
+                <span aria-hidden="true">-</span>
+                <%= t('admin_ideas.updated_label') %> <strong><%= formatAdminDate(idea.updated_at) %></strong>
+              <% } %>
+            </p>
+          </div>
+          <div class="admin-idea-actions">
+            <% ['open', 'resolved', 'ignored'].forEach((nextStatus) => { %>
+              <% if (nextStatus !== idea.status) { %>
+                <form method="post" action="/admin/ideas/<%= idea.id %>/status">
+                  <input type="hidden" name="status" value="<%= nextStatus %>" />
+                  <button type="submit" class="secondary"><%= statusActionLabel(nextStatus) %></button>
+                </form>
+              <% } %>
+            <% }) %>
+          </div>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+<% }; %>
+
+<div class="card admin-page-card">
+  <div class="admin-page-header">
+    <div>
+      <h1><%= t('admin_ideas.heading') %></h1>
+      <p class="muted admin-page-intro"><%= t('admin_ideas.intro') %></p>
+    </div>
+  </div>
+
+  <% if (adminError) { %>
+    <div class="alert"><%= adminError %></div>
+  <% } %>
+  <% if (adminSuccess) { %>
+    <div class="alert admin-success"><%= adminSuccess %></div>
+  <% } %>
+
+  <section class="admin-page-section">
+    <h2><%= t('admin_ideas.add_heading') %></h2>
+    <form method="post" action="/admin/ideas" class="admin-idea-form">
+      <label>
+        <%= t('admin_ideas.type_label') %>
+        <select name="type">
+          <% ideaTypes.forEach((type) => { %>
+            <option value="<%= type %>"><%= typeLabel(type) %></option>
+          <% }) %>
+        </select>
+      </label>
+      <label>
+        <%= t('admin_ideas.title_label') %>
+        <input
+          type="text"
+          name="title"
+          maxlength="500"
+          required
+          placeholder="<%= t('admin_ideas.title_placeholder') %>"
+        />
+      </label>
+      <label class="admin-idea-notes-field">
+        <%= t('admin_ideas.notes_label') %>
+        <textarea
+          name="notes"
+          maxlength="4000"
+          rows="4"
+          placeholder="<%= t('admin_ideas.notes_placeholder') %>"
+        ></textarea>
+      </label>
+      <div class="admin-actions">
+        <button type="submit"><%= t('admin_ideas.add_button') %></button>
+      </div>
+    </form>
+  </section>
+
+  <section class="admin-page-section">
+    <h2><%= t('admin_ideas.open_heading', { count: openIdeas.length }) %></h2>
+    <% renderIdeaList(openIdeas, t('admin_ideas.empty_open')); %>
+  </section>
+
+  <section class="admin-page-section">
+    <h2><%= t('admin_ideas.triaged_heading', { count: triagedIdeas.length }) %></h2>
+    <% renderIdeaList(triagedIdeas, t('admin_ideas.empty_triaged')); %>
+  </section>
+</div>
+
+<%- include('partials/footer') %>

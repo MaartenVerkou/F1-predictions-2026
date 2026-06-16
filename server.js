@@ -489,6 +489,26 @@ db.exec(`
     created_at TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS admin_ideas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL DEFAULT 'question',
+    title TEXT NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    seed_key TEXT UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_by_user_id INTEGER,
+    updated_by_user_id INTEGER,
+    FOREIGN KEY(created_by_user_id) REFERENCES users(id),
+    FOREIGN KEY(updated_by_user_id) REFERENCES users(id),
+    CHECK(type IN ('question', 'feature', 'other')),
+    CHECK(status IN ('open', 'resolved', 'ignored'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_admin_ideas_status_updated
+    ON admin_ideas(status, updated_at);
 `);
 
 function ensureGroupColumns() {
@@ -570,6 +590,33 @@ function ensureQuestionSettingsColumns() {
 
 ensureQuestionSettingsColumns();
 ensureActualSnapshotColumns(db);
+
+function seedAdminIdeas() {
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT OR IGNORE INTO admin_ideas (
+      type,
+      title,
+      notes,
+      status,
+      seed_key,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, 'open', ?, ?, ?)
+    `
+  ).run(
+    "question",
+    "Voorspel de totale hoeveelheid time penalties die in het seizoen uitgedeeld worden.",
+    "Idee voor een mogelijke vraag voor volgend seizoen.",
+    "next-year-time-penalties-question",
+    now,
+    now
+  );
+}
+
+seedAdminIdeas();
 
 function backfillNamedGuestGroupMembers() {
   db.exec(
