@@ -190,6 +190,45 @@
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
   }; %>
+  <% const safeHistory = leaderboardHistory || { hasEnoughHistory: false, rounds: [], series: [], maxTotal: 0 }; %>
+  <% const safeRoundMovers = roundMovers || { isAvailable: false, items: [] }; %>
+  <% const safeInsights = participantInsights || { selectedParticipant: null, comparisonRows: [], gaps: [], strengths: [], distinctive: [], emptyReason: null }; %>
+  <% const safeBreakdown = selectedBreakdown || { mode: 'scored', hasScoredRows: false, rows: [] }; %>
+  <% const selectedParticipantKey = selectedParticipantId == null ? "" : String(selectedParticipantId); %>
+  <% const currentUserKey = user && user.id != null ? String(user.id) : ""; %>
+  <% const leaderboardHref = (updates = {}, anchor = 'leaderboard-overview') => {
+    const params = new URLSearchParams(leaderboardQueryPart);
+    params.delete('page');
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value == null || value === '') params.delete(key);
+      else params.set(key, String(value));
+    });
+    const query = params.toString();
+    return `${leaderboardBaseHref}${query ? `?${query}` : ''}${anchor ? `#${anchor}` : ''}`;
+  }; %>
+  <% const formatSigned = (value) => {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number) || number === 0) return '0';
+    return number > 0 ? `+${number}` : String(number);
+  }; %>
+  <% const truncatePrompt = (value) => {
+    const text = String(value || '');
+    return text.length > 90 ? `${text.slice(0, 87)}...` : text;
+  }; %>
+  <% const chartPalette = [
+    '#455a64',
+    '#1f7a8c',
+    '#6c5ce7',
+    '#2b6f3e',
+    '#8a6d3b',
+    '#3867d6',
+    '#ad1457',
+    '#00766c',
+    '#725ac1',
+    '#c44d00',
+    '#5f6f52',
+    '#7b4f86'
+  ]; %>
 
   <div class="page-title-row">
     <h1><%= group.name %>: <%= t('leaderboard.page_title') %></h1>
@@ -205,6 +244,115 @@
   <% } else { %>
     <% const startRank = (currentLeaderboardPage - 1) * leaderboardPerPage + 1; %>
     <% const endRank = startRank + leaderboard.length - 1; %>
+
+    <section class="leaderboard-insights-overview" aria-label="Leaderboard insights">
+      <section class="leaderboard-trend-panel">
+        <div class="leaderboard-section-heading">
+          <div>
+            <h2>Points over rounds</h2>
+            <p class="muted">Top 10 plus selected participants.</p>
+          </div>
+        </div>
+        <% if (safeHistory.hasEnoughHistory && safeHistory.series.length > 0) { %>
+          <% const chartWidth = 720; %>
+          <% const chartHeight = 260; %>
+          <% const padLeft = 46; %>
+          <% const padRight = 18; %>
+          <% const padTop = 18; %>
+          <% const padBottom = 42; %>
+          <% const plotWidth = chartWidth - padLeft - padRight; %>
+          <% const plotHeight = chartHeight - padTop - padBottom; %>
+          <% const maxTotal = Math.max(1, Number(safeHistory.maxTotal || 0)); %>
+          <% const xForIndex = (idx) => safeHistory.rounds.length <= 1
+            ? padLeft
+            : padLeft + (idx / (safeHistory.rounds.length - 1)) * plotWidth; %>
+          <% const yForTotal = (total) => padTop + plotHeight - (Number(total || 0) / maxTotal) * plotHeight; %>
+          <div class="leaderboard-chart-wrap">
+            <svg
+              class="leaderboard-trend-chart"
+              viewBox="0 0 <%= chartWidth %> <%= chartHeight %>"
+              role="img"
+              aria-label="Leaderboard points over completed rounds"
+            >
+              <line x1="<%= padLeft %>" y1="<%= padTop %>" x2="<%= padLeft %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
+              <line x1="<%= padLeft %>" y1="<%= padTop + plotHeight %>" x2="<%= padLeft + plotWidth %>" y2="<%= padTop + plotHeight %>" class="leaderboard-chart-axis" />
+              <% [0, 0.5, 1].forEach((tick) => { %>
+                <% const y = padTop + plotHeight - tick * plotHeight; %>
+                <line x1="<%= padLeft %>" y1="<%= y %>" x2="<%= padLeft + plotWidth %>" y2="<%= y %>" class="leaderboard-chart-grid" />
+                <text x="<%= padLeft - 10 %>" y="<%= y + 4 %>" text-anchor="end" class="leaderboard-chart-label"><%= Math.round(maxTotal * tick) %></text>
+              <% }) %>
+              <% safeHistory.rounds.forEach((round, idx) => { %>
+                <% const x = xForIndex(idx); %>
+                <text x="<%= x %>" y="<%= chartHeight - 14 %>" text-anchor="middle" class="leaderboard-chart-label">R<%= round.roundNumber %></text>
+              <% }) %>
+              <% safeHistory.series.forEach((series, seriesIndex) => { %>
+                <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
+                <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
+                <% const cssClass = `leaderboard-chart-line ${isSelected ? 'is-selected' : ''} ${isCurrentUser ? 'is-current-user' : ''}`; %>
+                <% const pointsAttr = series.points.map((point, idx) => `${xForIndex(idx).toFixed(2)},${yForTotal(point.total).toFixed(2)}`).join(' '); %>
+                <% const seriesColor = chartPalette[seriesIndex % chartPalette.length]; %>
+                <polyline class="<%= cssClass %>" points="<%= pointsAttr %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;" />
+                <% series.points.forEach((point, idx) => { %>
+                  <% const x = xForIndex(idx); %>
+                  <% const y = yForTotal(point.total); %>
+                  <circle class="<%= cssClass %>" cx="<%= x %>" cy="<%= y %>" r="<%= isSelected || isCurrentUser ? 4 : 2.8 %>" style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= seriesColor %>;">
+                    <title><%= `${series.name}: ${point.total} points after R${point.roundNumber}${point.rank ? `, rank ${point.rank}` : ''}` %></title>
+                  </circle>
+                <% }) %>
+              <% }) %>
+            </svg>
+          </div>
+          <div class="leaderboard-chart-legend" aria-label="Plotted participants">
+            <% safeHistory.series.forEach((series, seriesIndex) => { %>
+              <% const isSelected = String(series.participantId) === selectedParticipantKey; %>
+              <% const isCurrentUser = currentUserKey && String(series.participantId) === currentUserKey; %>
+              <a
+                class="leaderboard-chart-legend-item <%= isSelected ? 'is-selected' : '' %> <%= isCurrentUser ? 'is-current-user' : '' %>"
+                href="<%= leaderboardHref({ participant: series.participantId }) %>"
+                style="--series-index:<%= seriesIndex %>; --chart-line-color:<%= chartPalette[seriesIndex % chartPalette.length] %>;"
+              >
+                <span class="leaderboard-legend-swatch"></span>
+                <span><%= series.name %></span>
+                <% const latestPoint = series.points[series.points.length - 1]; %>
+                <% if (latestPoint) { %>
+                  <strong><%= latestPoint.total %></strong>
+                <% } %>
+              </a>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <p class="muted leaderboard-empty-copy">Trends will appear after two race snapshots are available.</p>
+        <% } %>
+      </section>
+
+      <section class="leaderboard-movers-panel">
+        <div class="leaderboard-section-heading">
+          <div>
+            <h2>Round movers</h2>
+            <% if (safeRoundMovers.latestRound && safeRoundMovers.previousRound) { %>
+              <p class="muted">R<%= safeRoundMovers.previousRound.roundNumber %> to R<%= safeRoundMovers.latestRound.roundNumber %>.</p>
+            <% } %>
+          </div>
+        </div>
+        <% if (safeRoundMovers.isAvailable) { %>
+          <ol class="leaderboard-movers-list">
+            <% safeRoundMovers.items.forEach((mover) => { %>
+              <li>
+                <a href="<%= leaderboardHref({ participant: mover.participantId }) %>"><%= mover.name %></a>
+                <strong><%= formatSigned(mover.pointsDelta) %> pts</strong>
+                <% if (mover.rankDelta > 0) { %>
+                  <span class="muted"><%= formatSigned(mover.rankDelta) %> rank</span>
+                <% } else { %>
+                  <span class="muted">rank steady</span>
+                <% } %>
+              </li>
+            <% }) %>
+          </ol>
+        <% } else { %>
+          <p class="muted leaderboard-empty-copy">No points movement to show yet.</p>
+        <% } %>
+      </section>
+    </section>
 
     <div id="leaderboard-overview" class="leaderboard-layout">
       <div class="leaderboard-main-column">
@@ -261,17 +409,15 @@
             </thead>
             <tbody>
               <% leaderboard.forEach((row, index) => { %>
-                <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
                 <tr
-                  class="leaderboard-rank-row <%= index === 0 ? 'is-active' : '' %>"
-                  data-member-activate="<%= panelId %>"
-                  tabindex="0"
-                  role="button"
-                  aria-controls="<%= panelId %>"
-                  aria-pressed="<%= index === 0 ? 'true' : 'false' %>"
+                  class="leaderboard-rank-row <%= String(row.userId) === selectedParticipantKey ? 'is-active' : '' %>"
                 >
                   <td><%= row.rank %></td>
-                  <td><strong><%= row.name %></strong></td>
+                  <td>
+                    <a class="leaderboard-row-link" href="<%= leaderboardHref({ participant: row.userId }) %>">
+                      <strong><%= row.name %></strong>
+                    </a>
+                  </td>
                   <td><strong><%= row.total %></strong></td>
                 </tr>
               <% }) %>
@@ -295,52 +441,129 @@
       </div>
 
       <section class="leaderboard-detail-card">
-        <% leaderboard.forEach((row, index) => { %>
-          <% const panelId = `leaderboard-member-panel-${row.userId}`; %>
-          <section
-            id="<%= panelId %>"
-            class="leaderboard-member-panel <%= index === 0 ? 'is-active' : '' %>"
-            <%= index === 0 ? '' : 'hidden' %>
-          >
-            <table class="table compact leaderboard-breakdown-table">
-              <thead>
-                <tr>
-                  <th>Q</th>
-                  <th><%= t('leaderboard.prediction') %></th>
-                  <th><%= t('leaderboard.actual') %></th>
-                  <th><%= t('leaderboard.points_short_caps') %></th>
-                </tr>
-              </thead>
-              <tbody>
-              <% questions.forEach((q, questionIndex) => { %>
-                <tr>
-                  <td>
-                    <span class="leaderboard-question-chip" tabindex="0">
-                      <span class="leaderboard-question-code">Q<%= questionIndex + 1 %></span>
-                      <span class="leaderboard-question-tooltip"><%= q.prompt %></span>
-                    </span>
-                  </td>
-                  <% const actualDisplay = formatValue(q, actuals?.[q.id]); %>
-                  <% const answerDisplay = formatValue(q, row.answersByQuestion?.[q.id]); %>
-                  <td>
-                    <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, row.answersByQuestion?.[q.id], answerDisplay) ? 'has-short' : '' %>">
-                      <span class="leaderboard-value-full"><%= answerDisplay %></span>
-                      <span class="leaderboard-value-short"><%= abbreviateEntities(answerDisplay) %></span>
-                    </span>
-                  </td>
-                  <td>
-                    <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, actuals?.[q.id], actualDisplay) ? 'has-short' : '' %>">
-                      <span class="leaderboard-value-full"><%= actualDisplay %></span>
-                      <span class="leaderboard-value-short"><%= abbreviateEntities(actualDisplay) %></span>
-                    </span>
-                  </td>
-                  <td><strong><%= row.byQuestion[q.id] ?? 0 %></strong></td>
-                </tr>
-              <% }) %>
-              </tbody>
-            </table>
-          </section>
-        <% }) %>
+        <section class="leaderboard-member-panel leaderboard-selected-panel">
+          <% if (safeInsights.selectedParticipant) { %>
+            <div class="leaderboard-member-heading">
+              <div>
+                <h2><%= safeInsights.selectedParticipant.name %></h2>
+                <p class="muted">
+                  Rank <strong><%= safeInsights.selectedParticipant.rank %></strong>
+                  - <strong><%= safeInsights.selectedParticipant.total %></strong> points
+                </p>
+              </div>
+            </div>
+
+            <div class="leaderboard-insight-grid">
+              <section>
+                <h3>Gaps above</h3>
+                <% if (safeInsights.gaps.length > 0) { %>
+                  <ul class="leaderboard-insight-list">
+                    <% safeInsights.gaps.forEach((item) => { %>
+                      <li>
+                        <strong><%= formatSigned(-item.difference) %> pts</strong>
+                        <span><%= truncatePrompt(item.prompt) %></span>
+                      </li>
+                    <% }) %>
+                  </ul>
+                <% } else { %>
+                  <p class="muted">No clear scored gap to nearby rivals yet.</p>
+                <% } %>
+              </section>
+
+              <section>
+                <h3>Strengths</h3>
+                <% if (safeInsights.strengths.length > 0) { %>
+                  <ul class="leaderboard-insight-list">
+                    <% safeInsights.strengths.forEach((item) => { %>
+                      <li>
+                        <strong><%= formatSigned(item.difference) %> pts</strong>
+                        <span><%= truncatePrompt(item.prompt) %></span>
+                      </li>
+                    <% }) %>
+                  </ul>
+                <% } else { %>
+                  <p class="muted">No standout scored edge in the nearby band yet.</p>
+                <% } %>
+              </section>
+
+              <section class="leaderboard-insight-wide">
+                <h3>Distinctive picks</h3>
+                <% if (safeInsights.distinctive.length > 0) { %>
+                  <ul class="leaderboard-insight-list">
+                    <% safeInsights.distinctive.forEach((item) => { %>
+                      <li>
+                        <strong><%= item.selectedPoints %> pts</strong>
+                        <span><%= truncatePrompt(item.prompt) %></span>
+                      </li>
+                    <% }) %>
+                  </ul>
+                <% } else { %>
+                  <p class="muted"><%= safeInsights.emptyReason || 'No distinctive scoring pattern in the nearby band yet.' %></p>
+                <% } %>
+              </section>
+            </div>
+
+            <div class="leaderboard-breakdown-header">
+              <div>
+                <h3>Question breakdown</h3>
+                <p class="muted"><%= safeBreakdown.mode === 'all' ? 'All questions' : 'Scored questions' %></p>
+              </div>
+              <div class="leaderboard-breakdown-toggle" aria-label="Question breakdown filter">
+                <a class="<%= safeBreakdown.mode === 'scored' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: '' }, 'leaderboard-breakdown') %>">Scored</a>
+                <a class="<%= safeBreakdown.mode === 'all' ? 'is-active' : '' %>" href="<%= leaderboardHref({ breakdown: 'all' }, 'leaderboard-breakdown') %>">All</a>
+              </div>
+            </div>
+
+            <div id="leaderboard-breakdown">
+              <% if (safeBreakdown.rows.length > 0) { %>
+                <table class="table compact leaderboard-breakdown-table">
+                  <thead>
+                    <tr>
+                      <th>Q</th>
+                      <th><%= t('leaderboard.prediction') %></th>
+                      <th><%= t('leaderboard.actual') %></th>
+                      <th><%= t('leaderboard.points_short_caps') %></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  <% safeBreakdown.rows.forEach((breakdownRow) => { %>
+                    <% const q = breakdownRow.question; %>
+                    <% const actualDisplay = formatValue(q, breakdownRow.actualRaw); %>
+                    <% const answerDisplay = formatValue(q, breakdownRow.predictionRaw); %>
+                    <tr class="<%= breakdownRow.isScored ? '' : 'is-unscored' %>">
+                      <td>
+                        <span class="leaderboard-question-chip" tabindex="0">
+                          <span class="leaderboard-question-code">Q<%= breakdownRow.questionNumber %></span>
+                          <span class="leaderboard-question-tooltip"><%= q.prompt %></span>
+                        </span>
+                      </td>
+                      <td>
+                        <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, breakdownRow.predictionRaw, answerDisplay) ? 'has-short' : '' %>">
+                          <span class="leaderboard-value-full"><%= answerDisplay %></span>
+                          <span class="leaderboard-value-short"><%= abbreviateEntities(answerDisplay) %></span>
+                        </span>
+                      </td>
+                      <td>
+                        <span class="leaderboard-value-cell <%= shouldPreferCompactValue(q, breakdownRow.actualRaw, actualDisplay) ? 'has-short' : '' %>">
+                          <span class="leaderboard-value-full"><%= actualDisplay %></span>
+                          <span class="leaderboard-value-short"><%= abbreviateEntities(actualDisplay) %></span>
+                        </span>
+                      </td>
+                      <td><strong><%= breakdownRow.points %></strong></td>
+                    </tr>
+                  <% }) %>
+                  </tbody>
+                </table>
+              <% } else { %>
+                <p class="muted leaderboard-empty-copy">
+                  <%= safeBreakdown.mode === 'scored' ? 'No scored questions for this participant yet.' : 'No question answers found for this participant.' %>
+                </p>
+              <% } %>
+            </div>
+          <% } else { %>
+            <p class="muted leaderboard-empty-copy">Select a scored participant to see leaderboard insights.</p>
+          <% } %>
+        </section>
       </section>
     </div>
   <% } %>

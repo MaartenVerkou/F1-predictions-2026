@@ -10,6 +10,7 @@ const stateDir = path.join(__dirname, ".tmp", "playwright-state");
 module.exports = defineConfig({
   testDir: "./tests/e2e",
   timeout: 30_000,
+  workers: 1,
   expect: {
     timeout: 5_000
   },

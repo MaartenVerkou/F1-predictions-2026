@@ -835,83 +835,6 @@ const initScrollToEndButton = () => {
   updateVisibility();
 };
 
-const initLeaderboardPanels = () => {
-  document.querySelectorAll('.leaderboard-layout').forEach(scope => {
-    const activators = Array.from(scope.querySelectorAll('[data-member-activate]'));
-    const panels = Array.from(scope.querySelectorAll('.leaderboard-member-panel[id]'));
-    const mainColumn = scope.querySelector('.leaderboard-main-column');
-    const mainCard = scope.querySelector('.leaderboard-main-card');
-    const detailCard = scope.querySelector('.leaderboard-detail-card');
-    const panelHeightSource = mainColumn || mainCard;
-    if (activators.length === 0 || panels.length === 0) return;
-
-    const activatePanel = (targetId) => {
-      if (!targetId) return;
-      activators.forEach(activator => {
-        const isActive = activator.dataset.memberActivate === targetId;
-        activator.classList.toggle('is-active', isActive);
-        activator.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-      });
-      panels.forEach(panel => {
-        const isActive = panel.id === targetId;
-        panel.classList.toggle('is-active', isActive);
-        panel.hidden = !isActive;
-      });
-    };
-
-    const syncPanelHeight = () => {
-      if (!panelHeightSource) return;
-      if (window.matchMedia('(max-width: 980px)').matches) {
-        scope.style.removeProperty('--leaderboard-panel-height');
-        if (detailCard) {
-          detailCard.style.removeProperty('height');
-          detailCard.style.removeProperty('maxHeight');
-        }
-        panels.forEach(panel => {
-          panel.style.removeProperty('height');
-          panel.style.removeProperty('maxHeight');
-        });
-        return;
-      }
-      const targetHeight = panelHeightSource.offsetHeight;
-      scope.style.setProperty('--leaderboard-panel-height', `${targetHeight}px`);
-      if (detailCard) {
-        detailCard.style.height = `${targetHeight}px`;
-        detailCard.style.maxHeight = `${targetHeight}px`;
-      }
-      panels.forEach(panel => {
-        panel.style.height = '100%';
-        panel.style.maxHeight = '100%';
-      });
-    };
-
-    activators.forEach(activator => {
-      const targetId = activator.dataset.memberActivate || '';
-      if (!targetId) return;
-      const activate = () => activatePanel(targetId);
-      activator.addEventListener('click', activate);
-      activator.addEventListener('keydown', event => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        activate();
-      });
-    });
-
-    const initialTargetId =
-      activators.find(activator => activator.classList.contains('is-active'))?.dataset.memberActivate ||
-      panels.find(panel => !panel.hidden)?.id ||
-      activators[0]?.dataset.memberActivate ||
-      '';
-    activatePanel(initialTargetId);
-    syncPanelHeight();
-    window.addEventListener('resize', syncPanelHeight);
-    if (typeof ResizeObserver !== 'undefined' && panelHeightSource) {
-      const observer = new ResizeObserver(() => syncPanelHeight());
-      observer.observe(panelHeightSource);
-    }
-  });
-};
-
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
   initHeaderOffsets();
@@ -932,5 +855,4 @@ document.addEventListener('DOMContentLoaded', () => {
   initAdminActualsUnsavedState();
   initSignupPasswordMatch();
   initScrollToEndButton();
-  initLeaderboardPanels();
 });

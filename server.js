@@ -9,6 +9,7 @@ const Database = require("better-sqlite3");
 const nodemailer = require("nodemailer");
 const { BetterSqliteSessionStore } = require("./src/session-store");
 const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
+const leaderboardModel = require("./src/leaderboard-model");
 const {
   REVIEW_STATUS_PENDING,
   ensureActualSnapshotColumns,
@@ -2388,182 +2389,8 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   return res.redirect(getGroupBasePath(group));
 });
 
-function parseLeaderboardStoredValue(question, raw) {
-  if (!raw) return null;
-  const text = String(raw).trim();
-  const type = question.type || "text";
-  if (
-    type === "ranking" ||
-    type === "multi_select" ||
-    type === "multi_select_limited" ||
-    type === "teammate_battle" ||
-    type === "boolean_with_optional_driver" ||
-    type === "numeric_with_driver" ||
-    type === "single_choice_with_driver"
-  ) {
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      return null;
-    }
-  }
-  if (text.startsWith("[") || text.startsWith("{")) {
-    try {
-      return JSON.parse(text);
-    } catch (err) {}
-  }
-  return raw;
-}
-
-function leaderboardValuesMatch(actualValue, predictedValue) {
-  if (actualValue == null || predictedValue == null) return false;
-  if (Array.isArray(actualValue)) return actualValue.includes(predictedValue);
-  return String(actualValue) === String(predictedValue);
-}
-
-function scoreLeaderboardQuestion(question, predictedRaw, actualRaw) {
-  if (actualRaw == null || predictedRaw == null) return 0;
-  const type = question.type || "text";
-  if (type === "ranking") {
-    const points = question.points || {};
-    let score = 0;
-    const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
-    const count = Number(question.count) || 3;
-    for (let i = 0; i < count; i += 1) {
-      const actual = actualRaw[i];
-      const predicted = predictedRaw[i];
-      const key = positionLabels[i] || String(i + 1);
-      const value = Number(points[key] || 0);
-      if (actual == null || predicted == null) continue;
-      if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
-        score += value;
-      }
-    }
-    return score;
-  }
-  if (type === "single_choice" || type === "text" || type === "boolean") {
-    if (
-      type === "single_choice" &&
-      question.special_case === "all_podiums_bonus" &&
-      String(actualRaw) === String(question.bonus_value)
-    ) {
-      return String(predictedRaw) === String(question.bonus_value)
-        ? Number(question.bonus_points || 0)
-        : 0;
-    }
-    return leaderboardValuesMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
-  }
-  if (type === "multi_select") {
-    const points = Number(question.points || 0);
-    const penalty = Number(question.penalty ?? points);
-    const minimum = Number(question.minimum ?? 0);
-    const actualSet = new Set(actualRaw || []);
-    const predictedSet = new Set(predictedRaw || []);
-    let correct = 0;
-    let wrong = 0;
-    let missing = 0;
-    predictedSet.forEach((item) => {
-      if (actualSet.has(item)) correct += 1;
-      else wrong += 1;
-    });
-    actualSet.forEach((item) => {
-      if (!predictedSet.has(item)) missing += 1;
-    });
-    return Math.max(minimum, correct * points - (wrong + missing) * penalty);
-  }
-  if (type === "teammate_battle") {
-    const base = Number(question.points || 0);
-    const tieBonus = Number(question.tie_bonus || 0);
-    const actualWinner = actualRaw?.winner;
-    const actualDiff = Number(actualRaw?.diff);
-    const predictedWinner = predictedRaw?.winner;
-    const predictedDiff = Number(predictedRaw?.diff);
-    if (!actualWinner) return 0;
-    if (actualWinner === "tie") return predictedWinner === "tie" ? tieBonus : 0;
-    if (predictedWinner !== actualWinner) return 0;
-    if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
-    return Math.max(0, base - Math.abs(predictedDiff - actualDiff));
-  }
-  if (type === "boolean_with_optional_driver") {
-    const base = Number(question.points || 0);
-    const bonus = Number(question.bonus_points || 0);
-    const actualChoice = actualRaw?.choice;
-    const actualDriver = actualRaw?.driver;
-    const predictedChoice = predictedRaw?.choice;
-    const predictedDriver = predictedRaw?.driver;
-    if (actualChoice == null || predictedChoice == null) return 0;
-    let score = 0;
-    if (String(actualChoice) === String(predictedChoice)) {
-      score += base;
-      if (
-        String(actualChoice) === "yes" &&
-        actualDriver &&
-        String(actualDriver) === String(predictedDriver)
-      ) {
-        score += bonus;
-      }
-    }
-    return score;
-  }
-  if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
-    const points = question.points || {};
-    const actualValue = actualRaw?.value;
-    const predictedValue = predictedRaw?.value;
-    const actualDriver = actualRaw?.driver;
-    const predictedDriver = predictedRaw?.driver;
-    let score = 0;
-    if (actualValue != null && predictedValue != null) {
-      if (leaderboardValuesMatch(actualValue, predictedValue)) {
-        score += Number(points.position || 0);
-      } else if (
-        type === "single_choice_with_driver" &&
-        question.position_nearby_points &&
-        typeof question.position_nearby_points === "object"
-      ) {
-        const toGridNumber = (value) => {
-          if (value == null) return null;
-          const raw = String(value).trim().toLowerCase();
-          if (!raw) return null;
-          if (raw === "pitlane" || raw === "pit lane") return 23;
-          const numeric = Number(raw);
-          return Number.isFinite(numeric) ? numeric : null;
-        };
-        const actualGrid = toGridNumber(actualValue);
-        const predictedGrid = toGridNumber(predictedValue);
-        if (actualGrid != null && predictedGrid != null) {
-          const diff = Math.abs(actualGrid - predictedGrid);
-          score += Number(question.position_nearby_points[String(diff)] || 0);
-        }
-      }
-    }
-    if (actualDriver && predictedDriver && leaderboardValuesMatch(actualDriver, predictedDriver)) {
-      score += Number(points.driver || 0);
-    }
-    return score;
-  }
-  if (type === "multi_select_limited") {
-    const points = Number(question.points || 0);
-    const dnfByRace = actualRaw?.dnf_by_race || {};
-    let total = 0;
-    (predictedRaw || []).forEach((race) => {
-      total += Number(dnfByRace[race] || 0) * points;
-    });
-    return total;
-  }
-  if (type === "numeric") {
-    return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
-  }
-  return 0;
-}
-
-function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, options = {}) {
+function getGroupLeaderboardInputs(groupId, options = {}) {
   const excludeHiddenAdmins = Boolean(options.excludeHiddenAdmins);
-  const includeDetails = Boolean(options.includeDetails);
-  const questionMap = questions.reduce((acc, question) => {
-    acc[question.id] = question;
-    return acc;
-  }, {});
-
   const members = db
     .prepare(
       `
@@ -2588,17 +2415,6 @@ function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, option
       `
     )
     .all(groupId, groupId);
-
-  const scoreByUser = {};
-  members.forEach((member) => {
-    scoreByUser[member.participant_id] = {
-      userId: member.participant_id,
-      name: member.user_name,
-      total: 0,
-      byQuestion: includeDetails ? {} : undefined,
-      answersByQuestion: includeDetails ? {} : undefined
-    };
-  });
 
   const responses = db
     .prepare(
@@ -2630,42 +2446,45 @@ function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, option
     )
     .all(groupId, groupId);
 
-  responses.forEach((row) => {
-    const question = questionMap[row.question_id];
-    const scoreRow = scoreByUser[row.participant_id];
-    if (!question || !scoreRow) return;
-    const actual = parseLeaderboardStoredValue(question, actualsByQuestion[question.id]);
-    const predicted = parseLeaderboardStoredValue(question, row.answer);
-    const points = scoreLeaderboardQuestion(question, predicted, actual);
-    scoreRow.total += points;
-    if (includeDetails) {
-      scoreRow.byQuestion[row.question_id] = points;
-      scoreRow.answersByQuestion[row.question_id] = row.answer;
-    }
-  });
+  return { members, responses };
+}
 
-  return Object.values(scoreByUser).sort(
-    (a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name))
-  );
+function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, options = {}) {
+  const { members, responses } = getGroupLeaderboardInputs(groupId, options);
+  return leaderboardModel.buildLeaderboardRows({
+    members,
+    responses,
+    questions,
+    actualsByQuestion,
+    includeDetails: Boolean(options.includeDetails)
+  });
 }
 
 function buildLeaderboardPreviewRows(leaderboard, currentParticipantId, limit = 5) {
-  const safeLimit = Math.max(1, Number(limit) || 5);
-  const rankedRows = leaderboard.map((row, index) => ({
-    rank: index + 1,
-    ...row
-  }));
-  if (rankedRows.length <= safeLimit) {
-    return rankedRows;
-  }
-  const currentId = String(currentParticipantId || "");
-  const currentIndex = currentId
-    ? rankedRows.findIndex((row) => String(row.userId) === currentId)
-    : -1;
-  if (currentIndex < 0 || currentIndex < safeLimit) {
-    return rankedRows.slice(0, safeLimit);
-  }
-  return [...rankedRows.slice(0, safeLimit - 1), rankedRows[currentIndex]];
+  return leaderboardModel.buildLeaderboardPreviewRows(leaderboard, currentParticipantId, limit);
+}
+
+function fetchSnapshotValuesBySnapshotIds(snapshotIds) {
+  const ids = (snapshotIds || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  if (ids.length === 0) return {};
+  const placeholders = ids.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+      SELECT snapshot_id, question_id, value
+      FROM actual_snapshot_values
+      WHERE snapshot_id IN (${placeholders})
+      `
+    )
+    .all(...ids);
+  return rows.reduce((acc, row) => {
+    const snapshotId = Number(row.snapshot_id);
+    if (!acc[snapshotId]) acc[snapshotId] = {};
+    acc[snapshotId][row.question_id] = row.value;
+    return acc;
+  }, {});
 }
 
 function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
@@ -4090,10 +3909,78 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
         }
       : null;
 
-  const leaderboard = buildGroupLeaderboardRows(groupId, questions, scoringActuals, {
-    excludeHiddenAdmins,
+  const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
+  const leaderboard = leaderboardModel.buildLeaderboardRows({
+    ...leaderboardInputs,
+    questions,
+    actualsByQuestion: scoringActuals,
     includeDetails: true
   });
+  const selectedParticipantId = leaderboardModel.resolveSelectedParticipantId(
+    leaderboard,
+    req.query.participant,
+    user?.id
+  );
+  const selectedLeaderboardRow =
+    leaderboard.find(
+      (row) => leaderboardModel.normalizeParticipantId(row.userId) === selectedParticipantId
+    ) || null;
+  const focusParticipantIds = leaderboardModel.buildLeaderboardFocusSet({
+    leaderboard,
+    currentParticipantId: user?.id,
+    selectedParticipantId
+  });
+  const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(
+    actualSnapshots.map((snapshot) => snapshot.id)
+  );
+  const leaderboardHistory = leaderboardModel.buildSnapshotHistory({
+    snapshots: actualSnapshots,
+    snapshotValuesById,
+    ...leaderboardInputs,
+    questions,
+    focusParticipantIds
+  });
+  const previousTrendRound =
+    leaderboardHistory.rounds.length >= 2
+      ? leaderboardHistory.rounds[leaderboardHistory.rounds.length - 2]
+      : null;
+  const latestTrendRound =
+    leaderboardHistory.rounds.length >= 1
+      ? leaderboardHistory.rounds[leaderboardHistory.rounds.length - 1]
+      : null;
+  const roundMovers =
+    previousTrendRound && latestTrendRound
+      ? leaderboardModel.buildRoundMovers({
+          latestRows: leaderboardHistory.rankedRowsBySnapshotId[latestTrendRound.id] || [],
+          previousRows: leaderboardHistory.rankedRowsBySnapshotId[previousTrendRound.id] || [],
+          latestRound: latestTrendRound,
+          previousRound: previousTrendRound
+        })
+      : { isAvailable: false, latestRound: latestTrendRound, previousRound: previousTrendRound, items: [] };
+  const participantInsights = leaderboardModel.buildSelectedParticipantInsights({
+    leaderboard,
+    questions,
+    selectedParticipantId
+  });
+  const breakdownMode = String(req.query.breakdown || "").trim().toLowerCase() === "all"
+    ? "all"
+    : "scored";
+  const selectedBreakdown = leaderboardModel.buildSelectedParticipantBreakdown({
+    questions,
+    selectedRow: selectedLeaderboardRow,
+    actualsByQuestion: scoringActuals,
+    mode: breakdownMode
+  });
+  const leaderboardQueryParams = new URLSearchParams();
+  if (selectedActualSnapshotId) {
+    leaderboardQueryParams.set("snapshot", String(selectedActualSnapshotId));
+  }
+  if (selectedParticipantId) {
+    leaderboardQueryParams.set("participant", selectedParticipantId);
+  }
+  if (breakdownMode === "all") {
+    leaderboardQueryParams.set("breakdown", "all");
+  }
   const leaderboardPerPage = 10;
   const requestedLeaderboardPage = Number(req.query.page || 1);
   const currentLeaderboardPage =
@@ -4125,14 +4012,20 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     currentActualsReview,
     selectedActualSnapshotId,
     selectedActualSnapshotMeta,
+    selectedParticipantId,
+    selectedLeaderboardRow,
+    leaderboardHistory,
+    leaderboardFocusParticipantIds: focusParticipantIds,
+    roundMovers,
+    participantInsights,
+    selectedBreakdown,
+    breakdownMode,
     leaderboardTotal: leaderboard.length,
     leaderboardPerPage,
     currentLeaderboardPage: safeLeaderboardPage,
     totalLeaderboardPages,
     leaderboardBasePath: `${getGroupBasePath(group)}/leaderboard`,
-    leaderboardQuery: selectedActualSnapshotId
-      ? `snapshot=${encodeURIComponent(String(selectedActualSnapshotId))}`
-      : ""
+    leaderboardQuery: leaderboardQueryParams.toString()
   });
 });
 
