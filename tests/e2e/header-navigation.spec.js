@@ -2,7 +2,7 @@
 
 const { expect, test } = require("@playwright/test");
 
-test("desktop header uses compact account/admin actions and full dashboard label", async ({ page }) => {
+test("desktop header shows dashboard and admin labels while keeping account compact", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/dashboard");
 
@@ -19,7 +19,7 @@ test("desktop header uses compact account/admin actions and full dashboard label
   const accountLink = header.locator(".header-link-account");
   await expect(adminLink).toBeVisible();
   await expect(accountLink).toBeVisible();
-  await expect(adminLink.locator(".header-link-label")).toBeHidden();
+  await expect(adminLink.locator(".header-link-label")).toBeVisible();
   await expect(accountLink.locator(".header-link-label")).toBeHidden();
   await expect(accountLink.locator(".header-nav-icon-account")).toBeVisible();
 
