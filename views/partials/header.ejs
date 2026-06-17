@@ -4,6 +4,10 @@
 <% const devMode = user
   ? (user.is_admin ? 'admin' : 'member')
   : (devSessionMode === 'named_guest' ? 'guest' : 'visitor'); %>
+<% const activePath = String(typeof currentPath === 'string' ? currentPath : ''); %>
+<% const isAdminActive = activePath.startsWith('/admin'); %>
+<% const isDashboardActive = activePath.startsWith('/dashboard'); %>
+<% const isAccountActive = activePath.startsWith('/account'); %>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -118,21 +122,21 @@
             <div class="header-main-links">
               <% if (user) { %>
                 <% if (user.is_admin) { %>
-                  <a class="link" href="/admin/overview">
+                  <a class="link header-action-link header-link-admin header-link-compact <%= isAdminActive ? 'is-active' : '' %>" href="/admin/overview" aria-label="<%= t('header.admin') %>" title="<%= t('header.admin') %>">
                     <span class="header-nav-icon header-nav-icon-admin" aria-hidden="true"></span>
                     <span class="header-link-label"><%= t('header.admin') %></span>
                   </a>
                 <% } %>
-                <a class="link header-link-dashboard" href="/dashboard">
+                <a class="link header-action-link header-link-dashboard <%= isDashboardActive ? 'is-active' : '' %>" href="/dashboard" aria-label="<%= t('header.dashboard') %>" title="<%= t('header.dashboard') %>">
                   <span class="header-nav-icon header-nav-icon-dashboard" aria-hidden="true"></span>
                   <span class="header-link-label"><%= t('header.dashboard') %></span>
                 </a>
-                <span class="muted">
-                  <%= t('header.signed_in_as') %>
-                  <a class="account-name-link" href="/account"><strong><%= user.name %></strong></a>
-                </span>
+                <a class="link header-action-link header-link-account header-link-compact <%= isAccountActive ? 'is-active' : '' %>" href="/account" aria-label="<%= t('account.page_title') %>" title="<%= `${t('account.page_title')}: ${user.name}` %>">
+                  <span class="header-nav-icon header-nav-icon-account" aria-hidden="true"></span>
+                  <span class="header-link-label"><%= t('account.page_title') %></span>
+                </a>
               <% } else { %>
-                <a class="link" href="/login">
+                <a class="link header-action-link header-link-login" href="/login">
                   <span class="header-nav-icon header-nav-icon-login" aria-hidden="true"></span>
                   <span class="header-link-label"><%= t('header.login') %></span>
                 </a>

@@ -951,7 +951,7 @@ const initHeaderMenu = () => {
     if (!isCollapsed()) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const closeTrigger = target.closest('a.link, .account-name-link, [data-theme-toggle]');
+    const closeTrigger = target.closest('a.link, [data-theme-toggle]');
     if (!closeTrigger) return;
     closeMenu();
   });
