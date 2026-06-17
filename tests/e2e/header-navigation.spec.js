@@ -22,6 +22,32 @@ test("desktop header uses compact account/admin actions and full dashboard label
   await expect(adminLink.locator(".header-link-label")).toBeHidden();
   await expect(accountLink.locator(".header-link-label")).toBeHidden();
   await expect(accountLink.locator(".header-nav-icon-account")).toBeVisible();
+
+  const iconMetrics = await page.evaluate(() =>
+    [
+      ".header-link-admin .header-nav-icon",
+      ".header-link-dashboard .header-nav-icon",
+      ".header-link-account .header-nav-icon",
+      ".lang-menu > summary svg",
+      ".theme-toggle .theme-icon"
+    ].map((selector) => {
+      const element = document.querySelector(selector);
+      const rect = element.getBoundingClientRect();
+      return {
+        selector,
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      };
+    })
+  );
+
+  expect(iconMetrics).toEqual([
+    { selector: ".header-link-admin .header-nav-icon", width: 24, height: 24 },
+    { selector: ".header-link-dashboard .header-nav-icon", width: 24, height: 24 },
+    { selector: ".header-link-account .header-nav-icon", width: 24, height: 24 },
+    { selector: ".lang-menu > summary svg", width: 24, height: 24 },
+    { selector: ".theme-toggle .theme-icon", width: 24, height: 24 }
+  ]);
 });
 
 test("collapsed admin header menu orders actions and keeps dark selected state subtle", async ({ page }) => {

@@ -1,51 +1,63 @@
 <%- include('partials/header', { title: t('account.page_title'), user }) %>
 
-<section class="hero">
+<section class="account-page">
   <% if (error) { %>
     <div class="alert"><%= error %></div>
   <% } %>
   <% if (success) { %>
-    <div class="alert" style="background:#eef8f0;border-color:#c8e6d0;color:#2d6a3a;"><%= success %></div>
+    <div class="alert success-alert"><%= success %></div>
   <% } %>
 
-  <div class="card">
-    <h1><%= t('account.heading') %></h1>
-    <p class="muted"><%= t('account.signed_in_as') %> <strong><%= user.name %></strong></p>
-    <p class="muted"><%= t('common.email') %>: <strong><%= user.email %></strong></p>
-    <form method="post" action="/logout" style="margin-top:10px;">
+  <div class="card account-profile-card">
+    <div class="account-profile-main">
+      <h1><%= t('account.heading') %></h1>
+      <div class="account-meta-list">
+        <div class="account-meta-item">
+          <span class="account-meta-label"><%= t('common.name') %></span>
+          <strong><%= user.name %></strong>
+        </div>
+        <div class="account-meta-item">
+          <span class="account-meta-label"><%= t('common.email') %></span>
+          <strong><%= user.email %></strong>
+        </div>
+      </div>
+    </div>
+    <form class="account-logout-form" method="post" action="/logout">
       <button class="secondary" type="submit"><%= t('header.logout') %></button>
     </form>
   </div>
 
-  <div class="card">
-    <h2><%= t('account.change_password') %></h2>
-    <form method="post" action="/account/password">
-      <label>
-        <%= t('account.current_password') %>
-        <input type="password" name="currentPassword" required />
-      </label>
-      <label>
-        <%= t('account.new_password') %>
-        <input type="password" name="newPassword" minlength="6" required />
-      </label>
-      <label>
-        <%= t('account.confirm_new_password') %>
-        <input type="password" name="newPasswordConfirm" minlength="6" required />
-      </label>
-      <button type="submit"><%= t('account.update_password') %></button>
-    </form>
-  </div>
+  <div class="account-settings-grid">
+    <div class="card account-panel-card">
+      <h2><%= t('account.change_password') %></h2>
+      <form method="post" action="/account/password">
+        <label>
+          <%= t('account.current_password') %>
+          <input type="password" name="currentPassword" required />
+        </label>
+        <label>
+          <%= t('account.new_password') %>
+          <input type="password" name="newPassword" minlength="6" required />
+        </label>
+        <label>
+          <%= t('account.confirm_new_password') %>
+          <input type="password" name="newPasswordConfirm" minlength="6" required />
+        </label>
+        <button type="submit"><%= t('account.update_password') %></button>
+      </form>
+    </div>
 
-  <div class="card">
-    <h2><%= t('account.delete_account') %></h2>
-    <p class="muted"><%= t('account.delete_warning') %></p>
-    <form method="post" action="/account/delete" onsubmit='return confirm(<%- JSON.stringify(t("account.delete_confirm")) %>);'>
-      <label>
-        <%= t('account.current_password') %>
-        <input type="password" name="currentPassword" required />
-      </label>
-      <button class="secondary" type="submit"><%= t('account.delete_account') %></button>
-    </form>
+    <div class="card account-panel-card account-danger-card">
+      <h2><%= t('account.delete_account') %></h2>
+      <p class="muted"><%= t('account.delete_warning') %></p>
+      <form method="post" action="/account/delete" onsubmit='return confirm(<%- JSON.stringify(t("account.delete_confirm")) %>);'>
+        <label>
+          <%= t('account.current_password') %>
+          <input type="password" name="currentPassword" required />
+        </label>
+        <button class="secondary" type="submit"><%= t('account.delete_account') %></button>
+      </form>
+    </div>
   </div>
 </section>
 

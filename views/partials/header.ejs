@@ -123,21 +123,36 @@
               <% if (user) { %>
                 <% if (user.is_admin) { %>
                   <a class="link header-action-link header-link-admin header-link-compact <%= isAdminActive ? 'is-active' : '' %>" href="/admin/overview" aria-label="<%= t('header.admin') %>" title="<%= t('header.admin') %>">
-                    <span class="header-nav-icon header-nav-icon-admin" aria-hidden="true"></span>
+                    <svg class="header-nav-icon header-nav-icon-admin" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M12 3.5 18.5 6v5.2c0 3.9-2.6 7.6-6.5 9.3-3.9-1.7-6.5-5.4-6.5-9.3V6L12 3.5Z"></path>
+                      <path d="M12 8.2 13.1 10.4l2.4.3-1.7 1.7.4 2.4-2.2-1.2-2.2 1.2.4-2.4-1.7-1.7 2.4-.3L12 8.2Z"></path>
+                    </svg>
                     <span class="header-link-label"><%= t('header.admin') %></span>
                   </a>
                 <% } %>
                 <a class="link header-action-link header-link-dashboard <%= isDashboardActive ? 'is-active' : '' %>" href="/dashboard" aria-label="<%= t('header.dashboard') %>" title="<%= t('header.dashboard') %>">
-                  <span class="header-nav-icon header-nav-icon-dashboard" aria-hidden="true"></span>
+                  <svg class="header-nav-icon header-nav-icon-dashboard" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4.5 4.5h5.7v5.7H4.5V4.5Z"></path>
+                    <path d="M13.8 4.5h5.7v5.7h-5.7V4.5Z"></path>
+                    <path d="M4.5 13.8h5.7v5.7H4.5v-5.7Z"></path>
+                    <path d="M13.8 13.8h5.7v5.7h-5.7v-5.7Z"></path>
+                  </svg>
                   <span class="header-link-label"><%= t('header.dashboard') %></span>
                 </a>
                 <a class="link header-action-link header-link-account header-link-compact <%= isAccountActive ? 'is-active' : '' %>" href="/account" aria-label="<%= t('account.page_title') %>" title="<%= `${t('account.page_title')}: ${user.name}` %>">
-                  <span class="header-nav-icon header-nav-icon-account" aria-hidden="true"></span>
+                  <svg class="header-nav-icon header-nav-icon-account" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="8" r="3.5"></circle>
+                    <path d="M5.5 19.5c.9-3.6 3.2-5.5 6.5-5.5s5.6 1.9 6.5 5.5"></path>
+                  </svg>
                   <span class="header-link-label"><%= t('account.page_title') %></span>
                 </a>
               <% } else { %>
                 <a class="link header-action-link header-link-login" href="/login">
-                  <span class="header-nav-icon header-nav-icon-login" aria-hidden="true"></span>
+                  <svg class="header-nav-icon header-nav-icon-login" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"></path>
+                    <path d="M10 12h9"></path>
+                    <path d="m16 8 4 4-4 4"></path>
+                  </svg>
                   <span class="header-link-label"><%= t('header.login') %></span>
                 </a>
               <% } %>

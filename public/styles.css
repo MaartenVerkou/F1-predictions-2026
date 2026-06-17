@@ -300,35 +300,13 @@ header .header-menu-toggle.icon-btn {
 
 .header-nav-icon {
   display: none;
-  width: 18px;
-  height: 18px;
-  background-color: currentColor;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-}
-
-.header-nav-icon-dashboard {
-  -webkit-mask-image: url("/assets/icons/dashboard.svg");
-  mask-image: url("/assets/icons/dashboard.svg");
-}
-
-.header-nav-icon-admin {
-  -webkit-mask-image: url("/assets/icons/admin.svg");
-  mask-image: url("/assets/icons/admin.svg");
-}
-
-.header-nav-icon-login {
-  -webkit-mask-image: url("/assets/icons/login.svg");
-  mask-image: url("/assets/icons/login.svg");
-}
-
-.header-nav-icon-account {
-  -webkit-mask-image: url("/assets/icons/account.svg");
-  mask-image: url("/assets/icons/account.svg");
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 header.is-time-compact .countdown .muted {
@@ -459,8 +437,8 @@ header a {
 }
 
 .header-action-link .header-nav-icon {
-  display: inline-block;
-  flex: 0 0 18px;
+  display: block;
+  flex: 0 0 24px;
 }
 
 .header-link-dashboard {
@@ -522,8 +500,8 @@ summary.icon-btn {
 
 .icon-btn svg {
   display: block;
-  width: 23px;
-  height: 23px;
+  width: 24px;
+  height: 24px;
 }
 
 .header-icon-actions .icon-btn:hover,
@@ -538,11 +516,6 @@ summary.icon-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
-}
-
-.lang-menu .icon-btn svg {
-  width: 28px;
-  height: 28px;
 }
 
 .lang-menu > summary {
@@ -597,8 +570,8 @@ summary.icon-btn {
 
 .theme-icon {
   display: inline-flex;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   align-items: center;
   justify-content: center;
 }
@@ -1593,6 +1566,211 @@ button:disabled {
 
 .page-title-actions {
   margin: 0 0 10px;
+}
+
+.success-alert {
+  background: #eef8f0;
+  border-color: #c8e6d0;
+  color: #2d6a3a;
+}
+
+:root[data-theme="dark"] .success-alert {
+  background: rgba(45, 106, 58, 0.24);
+  border-color: rgba(109, 188, 126, 0.42);
+  color: #b9efc4;
+}
+
+.account-page,
+.about-page {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 980px);
+  margin: 0 auto;
+}
+
+.account-page .card,
+.about-page .card {
+  border-radius: 14px;
+  padding: clamp(18px, 2vw, 24px);
+}
+
+.account-profile-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.account-profile-main {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.account-profile-main h1 {
+  margin: 0;
+}
+
+.account-meta-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.account-meta-item {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--rules-bg) 70%, var(--card));
+}
+
+.account-meta-item strong {
+  overflow-wrap: anywhere;
+}
+
+.account-meta-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.account-logout-form {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.account-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(280px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.account-panel-card h2 {
+  margin-bottom: 14px;
+}
+
+.account-panel-card form {
+  gap: 14px;
+}
+
+.account-danger-card {
+  border-color: color-mix(in srgb, var(--alert-border) 72%, var(--border));
+  background: color-mix(in srgb, var(--card) 88%, var(--alert-bg));
+}
+
+.account-danger-card p {
+  margin: 0 0 14px;
+}
+
+.about-page {
+  width: min(100%, 960px);
+}
+
+.about-page-hero {
+  display: grid;
+  gap: 10px;
+}
+
+.about-page-hero h1,
+.about-page-hero p {
+  margin: 0;
+}
+
+.about-page-nav {
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.about-page-nav .link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  line-height: 1;
+  text-decoration: none;
+}
+
+.about-page-nav .link:hover,
+.about-page-nav .link:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border-color: color-mix(in srgb, var(--text) 15%, var(--border));
+  text-decoration: none;
+}
+
+.about-section-card {
+  scroll-margin-top: calc(var(--header-offset) + var(--dev-toolbar-offset) + 16px);
+}
+
+.about-section-card h2 {
+  margin-bottom: 12px;
+}
+
+.about-section-card h3 {
+  margin: 22px 0 7px;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.about-section-card p,
+.about-section-card li {
+  max-width: 78ch;
+  line-height: 1.65;
+}
+
+.about-section-card p {
+  margin: 0 0 10px;
+}
+
+.about-section-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-left: 1.25rem;
+}
+
+.about-section-card > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 720px) {
+  .account-page,
+  .about-page {
+    gap: 14px;
+  }
+
+  .account-profile-card {
+    display: grid;
+  }
+
+  .account-meta-list,
+  .account-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .account-logout-form,
+  .account-logout-form button,
+  .account-panel-card button {
+    width: 100%;
+  }
+
+  .about-page-nav {
+    align-items: stretch;
+  }
+
+  .about-page-nav .link {
+    justify-content: center;
+  }
 }
 
 .about-donate-copy {
@@ -4454,8 +4632,8 @@ button.theme-toggle:focus-visible {
 }
 
 .theme-toggle .theme-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 
 :root[data-theme="dark"] .lang-option:hover {
@@ -4587,14 +4765,14 @@ header.is-collapsed .header-link-compact .header-link-label {
 }
 
 header.is-collapsed .header-nav-icon {
-  display: inline-block;
-  flex: 0 0 18px;
+  display: block;
+  flex: 0 0 24px;
 }
 
 header.is-collapsed .header-menu-row svg,
 header.is-collapsed .header-menu-row .theme-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 
 header.is-collapsed .lang-menu {
