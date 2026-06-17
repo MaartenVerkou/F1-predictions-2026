@@ -1103,11 +1103,12 @@ button:disabled {
 }
 
 .leaderboard-preview-delta {
-  min-width: 28px;
+  min-width: 22px;
   color: color-mix(in srgb, var(--muted) 78%, transparent);
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  opacity: 0.72;
   text-align: left;
   white-space: nowrap;
 }
@@ -3232,22 +3233,24 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 .leaderboard-position-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
 }
 
 .leaderboard-position-number {
   min-width: 2ch;
   text-align: right;
+  font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .leaderboard-position-delta {
-  min-width: 26px;
+  min-width: 20px;
   color: color-mix(in srgb, var(--muted) 76%, transparent);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  opacity: 0.72;
   text-align: left;
 }
 
@@ -3775,12 +3778,12 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   }
 
   .leaderboard-position-wrap {
-    gap: 5px;
+    gap: 4px;
   }
 
   .leaderboard-position-delta {
-    min-width: 22px;
-    font-size: 12px;
+    min-width: 18px;
+    font-size: 10px;
   }
 }
 

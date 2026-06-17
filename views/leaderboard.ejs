@@ -224,7 +224,7 @@
   <% const formatRankDeltaCompact = (value) => {
     const number = Number(value || 0);
     if (!Number.isFinite(number) || number === 0) return '-';
-    return `${number > 0 ? '↑' : '↓'}${Math.abs(number)}`;
+    return `${number > 0 ? '^' : 'v'}${Math.abs(number)}`;
   }; %>
   <% const formatRankDeltaLabel = (value) => {
     const number = Number(value || 0);
