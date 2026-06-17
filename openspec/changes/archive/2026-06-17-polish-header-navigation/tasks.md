@@ -16,5 +16,5 @@
 
 ## 4. Release
 
-- [ ] 4.1 Archive the completed OpenSpec change.
-- [ ] 4.2 Merge to main, push, and verify GitHub Actions deployment.
+- [x] 4.1 Archive the completed OpenSpec change.
+- [x] 4.2 Merge to main, push, and verify GitHub Actions deployment.
