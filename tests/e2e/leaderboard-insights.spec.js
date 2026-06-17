@@ -556,7 +556,10 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       legendWidth: Math.round(document.querySelector(".leaderboard-chart-legend").getBoundingClientRect().width),
       mainHeight: Math.round(document.querySelector(".leaderboard-main-column").getBoundingClientRect().height),
       checkedControls: document.querySelectorAll(".leaderboard-chart-legend input[type='checkbox']:checked").length,
-      detailTop: Math.round(document.querySelector(".leaderboard-detail-card").getBoundingClientRect().top)
+      detailTop: Math.round(document.querySelector(".leaderboard-detail-card").getBoundingClientRect().top),
+      positionColumnWidth: Math.round(document.querySelector(".leaderboard-main-card tbody td:first-child").getBoundingClientRect().width),
+      pointsTextAlign: getComputedStyle(document.querySelector(".leaderboard-main-card tbody td:nth-child(3)")).textAlign,
+      deltaFontSize: Number.parseFloat(getComputedStyle(document.querySelector(".leaderboard-position-delta")).fontSize)
     }));
 
     expect(metrics.theme).toBe(testCase.theme);
@@ -576,16 +579,20 @@ test("leaderboard presentation fits desktop and phone in light and dark mode", a
       expect(metrics.chartSvgHeight).toBeGreaterThanOrEqual(250);
       expect(metrics.chartBottom).toBeLessThanOrEqual(metrics.mainTop);
       expect(metrics.detailLeft).toBeGreaterThanOrEqual(metrics.mainRight);
-      expect(metrics.mainWidth).toBeLessThanOrEqual(460);
+      expect(metrics.mainWidth).toBeGreaterThanOrEqual(420);
+      expect(metrics.mainWidth).toBeLessThanOrEqual(500);
       expect(metrics.detailWidth / metrics.mainWidth).toBeGreaterThanOrEqual(1.2);
       expect(Math.abs(metrics.detailTop - metrics.mainTop)).toBeLessThanOrEqual(8);
       expect(Math.abs(metrics.snapshotWidth - metrics.tableWidth)).toBeLessThanOrEqual(2);
+      expect(metrics.positionColumnWidth).toBeGreaterThanOrEqual(74);
     } else {
       expect(metrics.legendTop).toBeGreaterThanOrEqual(metrics.chartWrapBottom);
       expect(metrics.mainTop).toBeGreaterThanOrEqual(metrics.chartBottom);
       expect(metrics.detailTop).toBeGreaterThanOrEqual(metrics.mainTop);
       expect(metrics.snapshotWidth).toBeLessThanOrEqual(metrics.mainWidth);
     }
+    expect(metrics.pointsTextAlign).toBe("center");
+    expect(metrics.deltaFontSize).toBeLessThanOrEqual(9);
     expect(metrics.checkedControls).toBeGreaterThan(0);
   }
 });

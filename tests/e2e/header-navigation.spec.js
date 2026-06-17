@@ -2,6 +2,51 @@
 
 const { expect, test } = require("@playwright/test");
 
+const measureHeaderBootstrap = async (page, width) => {
+  let releaseApp;
+  let resolveAppRequested;
+  const appRequested = new Promise((resolve) => {
+    resolveAppRequested = resolve;
+  });
+  const appRelease = new Promise((resolve) => {
+    releaseApp = resolve;
+  });
+
+  await page.setViewportSize({ width, height: 844 });
+  await page.route("**/app.js", async (route) => {
+    resolveAppRequested();
+    await appRelease;
+    await route.continue();
+  });
+
+  await page.goto("/dashboard", { waitUntil: "commit" });
+  await appRequested;
+  await page.waitForSelector("header", { state: "attached" });
+  await page.waitForFunction(() => getComputedStyle(document.body).paddingTop !== "0px");
+
+  const beforeApp = await page.evaluate(() => {
+    const main = document.querySelector("main").getBoundingClientRect();
+    return {
+      mainTop: Math.round(main.top),
+      menuDisplay: getComputedStyle(document.querySelector("[data-header-menu]")).display
+    };
+  });
+
+  releaseApp();
+  await page.waitForLoadState("domcontentloaded");
+  await page.waitForTimeout(50);
+
+  const afterApp = await page.evaluate(() => {
+    const main = document.querySelector("main").getBoundingClientRect();
+    return {
+      mainTop: Math.round(main.top),
+      menuDisplay: getComputedStyle(document.querySelector("[data-header-menu]")).display
+    };
+  });
+
+  return { beforeApp, afterApp };
+};
+
 test("desktop header shows dashboard and admin labels while keeping account compact", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/dashboard");
@@ -48,6 +93,24 @@ test("desktop header shows dashboard and admin labels while keeping account comp
     { selector: ".lang-menu > summary svg", width: 24, height: 24 },
     { selector: ".theme-toggle .theme-icon", width: 24, height: 24 }
   ]);
+});
+
+test("header reserves the same page offset before app bootstrap", async ({ page }) => {
+  const desktop = await measureHeaderBootstrap(page, 1280);
+  expect(Math.abs(desktop.afterApp.mainTop - desktop.beforeApp.mainTop)).toBeLessThanOrEqual(2);
+  expect(desktop.beforeApp.menuDisplay).toBe("flex");
+
+  const compactTimerPage = await page.context().newPage();
+  const compactTimer = await measureHeaderBootstrap(compactTimerPage, 990);
+  expect(Math.abs(compactTimer.afterApp.mainTop - compactTimer.beforeApp.mainTop)).toBeLessThanOrEqual(2);
+  expect(compactTimer.beforeApp.menuDisplay).toBe("flex");
+  await compactTimerPage.close();
+
+  const mobilePage = await page.context().newPage();
+  const mobile = await measureHeaderBootstrap(mobilePage, 390);
+  expect(Math.abs(mobile.afterApp.mainTop - mobile.beforeApp.mainTop)).toBeLessThanOrEqual(2);
+  expect(mobile.beforeApp.menuDisplay).toBe("none");
+  await mobilePage.close();
 });
 
 test("collapsed admin header menu orders actions and keeps dark selected state subtle", async ({ page }) => {

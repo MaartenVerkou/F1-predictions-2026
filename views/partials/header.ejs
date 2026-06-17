@@ -8,6 +8,27 @@
 <% const isAdminActive = activePath.startsWith('/admin'); %>
 <% const isDashboardActive = activePath.startsWith('/dashboard'); %>
 <% const isAccountActive = activePath.startsWith('/account'); %>
+<% const countdownCloseAt = closeAt || '2026-03-05T23:59:59'; %>
+<% const countdownCloseDate = new Date(countdownCloseAt); %>
+<% const countdownTotalSeconds = Number.isFinite(countdownCloseDate.getTime())
+  ? Math.max(0, Math.floor((countdownCloseDate.getTime() - Date.now()) / 1000))
+  : null; %>
+<% const countdownInitiallyClosed = countdownTotalSeconds !== null && countdownTotalSeconds <= 0; %>
+<% const countdownInitialText = (() => {
+  if (countdownTotalSeconds === null) return '--';
+  if (countdownInitiallyClosed) return t('header.countdown_closed');
+  if (countdownTotalSeconds < 24 * 60 * 60) {
+    const hours = Math.floor(countdownTotalSeconds / 3600);
+    const minutes = Math.floor((countdownTotalSeconds % 3600) / 60);
+    const seconds = countdownTotalSeconds % 60;
+    return `${hours}H ${String(minutes).padStart(2, '0')}M ${String(seconds).padStart(2, '0')}S`;
+  }
+  const totalMinutes = Math.floor(countdownTotalSeconds / 60);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  return `${days}d ${hours}h ${minutes}m`;
+})(); %>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -33,10 +54,10 @@
     <link rel="icon" type="image/png" href="/assets/brand/logo-header.png?v=header" />
     <link rel="shortcut icon" type="image/png" href="/assets/brand/logo-header.png?v=header" />
     <link rel="apple-touch-icon" href="/assets/brand/logo-header.png?v=header" />
-    <link rel="stylesheet" href="/styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css" />
     <script src="/app.js" defer></script>
   </head>
   <body class="<%= isDevelopment ? 'has-dev-toolbar' : '' %>">
@@ -94,14 +115,21 @@
         </div>
         <div class="header-center" data-header-center>
           <div
-            class="countdown"
-            data-close-date="<%= closeAt || '2026-03-05T23:59:59' %>"
+            class="countdown <%= countdownInitiallyClosed ? 'is-closed' : '' %>"
+            data-close-date="<%= countdownCloseAt %>"
             data-countdown-prefix="<%= t('header.countdown_prefix') %>"
             data-countdown-closed="<%= t('header.countdown_closed') %>"
             data-countdown-closed-compact="<%= t('header.countdown_closed_short') %>"
           >
             <span class="muted"><%= t('header.countdown_prefix') %></span>
-            <strong class="countdown-value">--</strong>
+            <strong class="countdown-value">
+              <% if (countdownInitiallyClosed) { %>
+                <span class="countdown-closed-full"><%= t('header.countdown_closed') %></span>
+                <span class="countdown-closed-compact"><%= t('header.countdown_closed_short') %></span>
+              <% } else { %>
+                <%= countdownInitialText %>
+              <% } %>
+            </strong>
           </div>
         </div>
         <div class="header-right" data-header-right>

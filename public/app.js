@@ -959,6 +959,10 @@ const initHeaderMenu = () => {
   window.addEventListener('resize', syncLayout);
   window.addEventListener('load', syncLayout);
   syncLayout();
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(syncLayout).catch(() => {});
+  }
 };
 
 const initHeaderOffsets = () => {
@@ -979,6 +983,10 @@ const initHeaderOffsets = () => {
   syncOffsets();
   window.addEventListener('resize', syncOffsets);
   window.addEventListener('load', syncOffsets);
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(syncOffsets).catch(() => {});
+  }
 
   if (typeof ResizeObserver !== 'undefined') {
     const observer = new ResizeObserver(() => syncOffsets());
