@@ -92,3 +92,48 @@ test("collapsed admin header menu orders actions and keeps dark selected state s
   expect(activeLanguageStyle.color).not.toBe("rgb(255, 45, 69)");
   expect(activeLanguageStyle.backgroundColor).not.toContain("255, 45, 69");
 });
+
+test("collapsed header hover states stay neutral in light and dark mode", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard");
+
+  const toggle = page.getByRole("button", { name: "Toggle menu" });
+  await toggle.hover();
+  const lightToggleStyle = await toggle.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      color: style.color
+    };
+  });
+  expect(lightToggleStyle.backgroundColor).not.toContain("214, 11, 34");
+
+  await toggle.click();
+  const adminLink = page.locator(".header-link-admin");
+  await adminLink.hover();
+  const lightMenuStyle = await adminLink.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      color: style.color,
+      textDecoration: style.textDecorationLine
+    };
+  });
+  expect(lightMenuStyle.backgroundColor).not.toContain("214, 11, 34");
+  expect(lightMenuStyle.textDecoration).toBe("none");
+
+  await page.addInitScript(() => {
+    localStorage.setItem("theme", "dark");
+  });
+  await page.goto("/dashboard");
+  const darkToggle = page.getByRole("button", { name: "Toggle menu" });
+  await darkToggle.hover();
+  const darkToggleStyle = await darkToggle.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      color: style.color
+    };
+  });
+  expect(darkToggleStyle.backgroundColor).not.toContain("255, 45, 69");
+});

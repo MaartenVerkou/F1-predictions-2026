@@ -4790,6 +4790,37 @@ header.is-collapsed .lang-popover {
   border-radius: 10px;
 }
 
+header .header-menu-toggle:hover:not(:disabled),
+header .header-menu-toggle:focus-visible,
+header.is-collapsed .header-menu-toggle:hover:not(:disabled),
+header.is-collapsed .header-menu-toggle:focus-visible {
+  color: var(--text);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+header .header-action-link:hover,
+header .header-action-link:focus-visible,
+header .header-action-link.is-active,
+header .header-menu-row:hover,
+header .header-menu-row:focus-visible,
+header .lang-menu[open] > .header-menu-row,
+header.is-collapsed .header-main-links > .link:hover,
+header.is-collapsed .header-main-links > .link:focus-visible,
+header.is-collapsed .header-main-links > .link.is-active,
+header.is-collapsed .header-menu-row:hover,
+header.is-collapsed .header-menu-row:focus-visible,
+header.is-collapsed .lang-menu[open] > .header-menu-row {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-color: color-mix(in srgb, var(--text) 10%, transparent);
+  box-shadow: none;
+  text-decoration: none;
+  transform: none;
+}
+
 header.is-center-hidden .header-center {
   display: none;
 }
