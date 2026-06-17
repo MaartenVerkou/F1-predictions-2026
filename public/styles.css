@@ -1103,12 +1103,18 @@ button:disabled {
 }
 
 .leaderboard-preview-delta {
-  min-width: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  min-width: 20px;
+  height: 14px;
   color: color-mix(in srgb, var(--muted) 78%, transparent);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  opacity: 0.72;
+  line-height: 1;
+  opacity: 0.74;
   text-align: left;
   white-space: nowrap;
 }
@@ -1119,6 +1125,23 @@ button:disabled {
 
 .leaderboard-preview-delta.is-negative {
   color: var(--accent);
+}
+
+.leaderboard-delta-icon {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.leaderboard-delta-value,
+.leaderboard-delta-steady {
+  display: inline-block;
+  line-height: 1;
 }
 
 .leaderboard-preview-row.is-top-1 {
@@ -3233,24 +3256,36 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
 .leaderboard-position-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  line-height: 1;
 }
 
 .leaderboard-position-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   min-width: 2ch;
+  height: 18px;
   text-align: right;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
   font-weight: 900;
+  line-height: 1;
 }
 
 .leaderboard-position-delta {
-  min-width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  min-width: 19px;
+  height: 18px;
   color: color-mix(in srgb, var(--muted) 76%, transparent);
   font-size: 10px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  opacity: 0.72;
+  line-height: 1;
+  opacity: 0.74;
   text-align: left;
 }
 
@@ -3778,11 +3813,11 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   }
 
   .leaderboard-position-wrap {
-    gap: 4px;
+    gap: 5px;
   }
 
   .leaderboard-position-delta {
-    min-width: 18px;
+    min-width: 17px;
     font-size: 10px;
   }
 }

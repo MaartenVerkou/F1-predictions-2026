@@ -11,17 +11,26 @@
       <% leaderboardCard.rows.forEach((row) => { %>
         <% const delta = row.latestRoundDelta || null; %>
         <% const rankDelta = delta ? Number(delta.rankDelta || 0) : null; %>
-        <% const deltaClass = rankDelta > 0 ? 'is-positive' : (rankDelta < 0 ? 'is-negative' : ''); %>
+        <% const deltaClass = rankDelta > 0 ? 'is-positive' : (rankDelta < 0 ? 'is-negative' : 'is-empty'); %>
+        <% const deltaDirection = rankDelta == null ? 'none' : (rankDelta > 0 ? 'up' : (rankDelta < 0 ? 'down' : 'steady')); %>
         <% const deltaLabel = rankDelta == null
           ? t('leaderboard.no_movement_data')
           : (rankDelta === 0 ? t('leaderboard.no_rank_change') : `${t('leaderboard.rank_change_aria')}: ${rankDelta > 0 ? '+' : ''}${rankDelta}`); %>
-        <% const deltaText = rankDelta == null || rankDelta === 0 ? '-' : `${rankDelta > 0 ? '^' : 'v'}${Math.abs(rankDelta)}`; %>
         <div
           class="leaderboard-preview-row <%= row.rank <= 3 ? `is-top-${row.rank}` : '' %>"
           role="listitem"
         >
           <div class="leaderboard-preview-rank"><%= row.rank %></div>
-          <div class="leaderboard-preview-delta <%= deltaClass %>" aria-label="<%= deltaLabel %>"><%= deltaText %></div>
+          <div class="leaderboard-preview-delta <%= deltaClass %>" data-rank-delta-direction="<%= deltaDirection %>" aria-label="<%= deltaLabel %>">
+            <% if (rankDelta && Number.isFinite(rankDelta)) { %>
+              <svg class="leaderboard-delta-icon" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+                <path d="<%= rankDelta > 0 ? 'M2 6.4 5 3.4l3 3' : 'M2 3.6 5 6.6l3-3' %>"></path>
+              </svg>
+              <span class="leaderboard-delta-value"><%= Math.abs(rankDelta) %></span>
+            <% } else { %>
+              <span class="leaderboard-delta-steady">-</span>
+            <% } %>
+          </div>
           <div class="leaderboard-preview-name"><strong><%= row.name %></strong></div>
           <div class="leaderboard-preview-points"><strong><%= row.total %></strong></div>
         </div>

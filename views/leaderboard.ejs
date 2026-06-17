@@ -221,10 +221,10 @@
     if (!Number.isFinite(number) || number === 0) return '0';
     return number > 0 ? `+${number}` : String(number);
   }; %>
-  <% const formatRankDeltaCompact = (value) => {
+  <% const rankDeltaAbs = (value) => {
     const number = Number(value || 0);
-    if (!Number.isFinite(number) || number === 0) return '-';
-    return `${number > 0 ? '^' : 'v'}${Math.abs(number)}`;
+    if (!Number.isFinite(number) || number === 0) return '';
+    return String(Math.abs(number));
   }; %>
   <% const formatRankDeltaLabel = (value) => {
     const number = Number(value || 0);
@@ -389,6 +389,7 @@
                 <% const rowDelta = hasRoundDeltaColumn ? row.latestRoundDelta : null; %>
                 <% const rowRankDelta = rowDelta ? Number(rowDelta.rankDelta || 0) : null; %>
                 <% const rowDeltaClass = rowRankDelta > 0 ? 'is-positive' : (rowRankDelta < 0 ? 'is-negative' : 'is-empty'); %>
+                <% const rowDeltaDirection = rowRankDelta == null ? 'none' : (rowRankDelta > 0 ? 'up' : (rowRankDelta < 0 ? 'down' : 'steady')); %>
                 <% const rowDeltaLabel = rowRankDelta == null
                   ? t('leaderboard.no_movement_data')
                   : (rowRankDelta === 0 ? t('leaderboard.no_rank_change') : `${t('leaderboard.rank_change_aria')}: ${rowRankDelta > 0 ? '+' : ''}${rowRankDelta}`); %>
@@ -401,7 +402,16 @@
                     <span class="leaderboard-position-wrap">
                       <span class="leaderboard-position-number"><%= row.rank %></span>
                       <% if (hasRoundDeltaColumn) { %>
-                        <span class="leaderboard-position-delta <%= rowDeltaClass %>" aria-label="<%= rowDeltaLabel %>"><%= formatRankDeltaCompact(rowRankDelta) %></span>
+                        <span class="leaderboard-position-delta <%= rowDeltaClass %>" data-rank-delta-direction="<%= rowDeltaDirection %>" aria-label="<%= rowDeltaLabel %>">
+                          <% if (rowRankDelta && Number.isFinite(rowRankDelta)) { %>
+                            <svg class="leaderboard-delta-icon" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+                              <path d="<%= rowRankDelta > 0 ? 'M2 6.4 5 3.4l3 3' : 'M2 3.6 5 6.6l3-3' %>"></path>
+                            </svg>
+                            <span class="leaderboard-delta-value"><%= rankDeltaAbs(rowRankDelta) %></span>
+                          <% } else { %>
+                            <span class="leaderboard-delta-steady">-</span>
+                          <% } %>
+                        </span>
                       <% } %>
                     </span>
                   </td>

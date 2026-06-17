@@ -252,7 +252,8 @@ test("leaderboard shows trend chart, latest-race movement, selected insights, an
   expect(paginationText).not.toContain(">>");
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
   await expect(flowRow.locator("td")).toHaveCount(3);
-  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveText("^5");
+  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveText("5");
+  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveAttribute("data-rank-delta-direction", "up");
   await expect(flowRow.locator(".leaderboard-position-delta")).toHaveAttribute(
     "aria-label",
     "Rank change since previous saved race: +5"
@@ -382,7 +383,8 @@ test("leaderboard defaults to latest saved race and keeps historical race moveme
   await page.goto(`/global/leaderboard?snapshot=${snapshotIds.round2}`);
   await expect(page.locator("#snapshot-select")).toHaveValue(String(snapshotIds.round2));
   const flowRow = page.locator(".leaderboard-main-card tbody tr", { hasText: "E2E Insight Flow" });
-  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveText("^5");
+  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveText("5");
+  await expect(flowRow.locator(".leaderboard-position-delta")).toHaveAttribute("data-rank-delta-direction", "up");
 
   const selectedRoundMarker = await page.locator(".leaderboard-trend-chart").evaluate((chart) => {
     const marker = chart.querySelector("[data-chart-selected-round-marker]");
@@ -476,7 +478,8 @@ test("anonymous home preview opens the public global leaderboard without login",
   const flowPreviewRow = page.locator(".home-leaderboard-preview .leaderboard-preview-row", {
     hasText: "E2E Insight Flow"
   });
-  await expect(flowPreviewRow.locator(".leaderboard-preview-delta")).toHaveText("^5");
+  await expect(flowPreviewRow.locator(".leaderboard-preview-delta")).toHaveText("5");
+  await expect(flowPreviewRow.locator(".leaderboard-preview-delta")).toHaveAttribute("data-rank-delta-direction", "up");
   const previewColumnOrder = await flowPreviewRow.locator(":scope > div").evaluateAll((nodes) =>
     nodes.map((node) => String(node.className).split(/\s+/)[0])
   );
