@@ -810,8 +810,7 @@ const initSignupPasswordMatch = () => {
 
 const initThemeToggle = () => {
   const toggle = document.querySelector('[data-theme-toggle]');
-  const logos = Array.from(document.querySelectorAll('[data-logo-light][data-logo-dark]'));
-  if (!toggle && logos.length === 0) return;
+  if (!toggle) return;
 
   const root = document.documentElement;
   const labelEl = toggle ? toggle.querySelector('[data-theme-toggle-label]') : null;
@@ -834,16 +833,6 @@ const initThemeToggle = () => {
     }
     return getPreferredTheme();
   };
-  const syncLogos = (theme) => {
-    logos.forEach((img) => {
-      const lightSrc = img.dataset.logoLight;
-      const darkSrc = img.dataset.logoDark;
-      const nextSrc = theme === 'dark' ? darkSrc : lightSrc;
-      if (nextSrc && img.getAttribute('src') !== nextSrc) {
-        img.setAttribute('src', nextSrc);
-      }
-    });
-  };
   const setTheme = (theme) => {
     root.setAttribute('data-theme', theme);
     try {
@@ -851,7 +840,6 @@ const initThemeToggle = () => {
     } catch (err) {
       // ignore storage errors
     }
-    syncLogos(theme);
     const nextLabel = theme === 'dark' ? labelLight : labelDark;
     if (toggle) {
       toggle.setAttribute('aria-label', nextLabel);

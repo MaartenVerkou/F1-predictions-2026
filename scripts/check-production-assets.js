@@ -10,6 +10,14 @@ const requiredFontAssets = [
   "public/assets/fonts/sora-latin-var.woff2",
   "public/assets/fonts/sora-latin-ext-var.woff2"
 ];
+const criticalFontPreloadAssets = [
+  "public/assets/fonts/manrope-latin-var.woff2",
+  "public/assets/fonts/sora-latin-var.woff2"
+];
+const requiredLogoAssets = [
+  "public/assets/brand/logo-header-light-96.png",
+  "public/assets/brand/logo-header-dark-96.png"
+];
 const requiredFiles = [
   "server.js",
   "data/questions.json",
@@ -22,8 +30,7 @@ const requiredFiles = [
   "views/partials/footer.ejs",
   "public/styles.css",
   "public/app.js",
-  "public/assets/brand/logo-header-light-96.png",
-  "public/assets/brand/logo-header-dark-96.png",
+  ...requiredLogoAssets,
   ...requiredFontAssets
 ];
 
@@ -52,6 +59,8 @@ const headerPath = path.join(ROOT, "views/partials/header.ejs");
 const headerTemplate = fs.existsSync(headerPath) ? fs.readFileSync(headerPath, "utf8") : "";
 const stylesPath = path.join(ROOT, "public/styles.css");
 const styles = fs.existsSync(stylesPath) ? fs.readFileSync(stylesPath, "utf8") : "";
+const appPath = path.join(ROOT, "public/app.js");
+const appScript = fs.existsSync(appPath) ? fs.readFileSync(appPath, "utf8") : "";
 
 const requiredHeaderPatterns = [
   {
@@ -62,21 +71,27 @@ const requiredHeaderPatterns = [
     pattern: /assetPath\(["']\/app\.js["']\)/,
     message: "Shared script must use the assetPath versioning helper."
   },
-  {
-    pattern: /assetPath\(["']\/assets\/brand\/logo-header-light-96\.png["']\)/,
-    message: "Header light logo must use the optimized versioned asset."
-  },
-  {
-    pattern: /assetPath\(["']\/assets\/brand\/logo-header-dark-96\.png["']\)/,
-    message: "Header dark logo must use the optimized versioned asset."
-  }
 ];
 
-for (const fontAsset of requiredFontAssets) {
+for (const logoAsset of requiredLogoAssets) {
+  const publicPath = `/${logoAsset.replace(/^public\//, "")}`;
+  requiredHeaderPatterns.push({
+    pattern: new RegExp(`assetPath\\(["']${publicPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']\\)`),
+    message: `Header logo must use the optimized versioned asset: ${publicPath}`
+  });
+  requiredHeaderPatterns.push({
+    pattern: new RegExp(
+      `<link[^>]+rel=["']preload["'][^>]+href=["']<%= assetPath\\(["']${publicPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']\\) %>["'][^>]+as=["']image["']`
+    ),
+    message: `Header logo must be preloaded as an image: ${publicPath}`
+  });
+}
+
+for (const fontAsset of criticalFontPreloadAssets) {
   const publicPath = `/${fontAsset.replace(/^public\//, "")}`;
   requiredHeaderPatterns.push({
     pattern: new RegExp(`assetPath\\(["']${publicPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']\\)`),
-    message: `Font preload must use the assetPath versioning helper: ${publicPath}`
+    message: `Critical font preload must use the assetPath versioning helper: ${publicPath}`
   });
 }
 
@@ -92,6 +107,11 @@ if (/fonts\.(googleapis|gstatic)\.com/i.test(`${headerTemplate}\n${styles}`)) {
   console.error("Shared head must not depend on external Google Font delivery.");
 }
 
+if (/\bdata-logo-(light|dark)\b/.test(headerTemplate) || /syncLogos/.test(appScript)) {
+  failed = true;
+  console.error("Theme logo selection must not depend on a client-side src swap.");
+}
+
 const fontFaceBlocks = styles.match(/@font-face\s*\{[^}]*\}/g) || [];
 const requiredFontFaces = [
   { family: "Manrope", file: "manrope-latin-var.woff2" },
@@ -104,7 +124,7 @@ for (const { family, file } of requiredFontFaces) {
   const hasFontFace = fontFaceBlocks.some((block) =>
     block.includes(`font-family: "${family}"`) &&
     block.includes(`url("/assets/fonts/${file}")`) &&
-    /font-display:\s*optional/.test(block)
+    /font-display:\s*block/.test(block)
   );
   if (!hasFontFace) {
     failed = true;

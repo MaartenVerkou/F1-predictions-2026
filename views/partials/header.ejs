@@ -54,10 +54,10 @@
     <link rel="icon" type="image/png" href="<%= assetPath('/assets/brand/logo-header.png') %>" />
     <link rel="shortcut icon" type="image/png" href="<%= assetPath('/assets/brand/logo-header.png') %>" />
     <link rel="apple-touch-icon" href="<%= assetPath('/assets/brand/logo-header.png') %>" />
+    <link rel="preload" href="<%= assetPath('/assets/brand/logo-header-light-96.png') %>" as="image" fetchpriority="high" />
+    <link rel="preload" href="<%= assetPath('/assets/brand/logo-header-dark-96.png') %>" as="image" fetchpriority="high" />
     <link rel="preload" href="<%= assetPath('/assets/fonts/manrope-latin-var.woff2') %>" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="<%= assetPath('/assets/fonts/manrope-latin-ext-var.woff2') %>" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="<%= assetPath('/assets/fonts/sora-latin-var.woff2') %>" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="<%= assetPath('/assets/fonts/sora-latin-ext-var.woff2') %>" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="<%= assetPath('/styles.css') %>" />
     <script src="<%= assetPath('/app.js') %>" defer></script>
   </head>
@@ -96,15 +96,28 @@
         <div class="header-left">
           <a class="header-brand" href="/" aria-label="<%= companyName %>">
             <span class="brand-lockup">
-              <img
-                class="brand-logo"
-                src="<%= assetPath('/assets/brand/logo-header-light-96.png') %>"
-                data-logo-light="<%= assetPath('/assets/brand/logo-header-light-96.png') %>"
-                data-logo-dark="<%= assetPath('/assets/brand/logo-header-dark-96.png') %>"
-                alt="Wheel of Knowledge logo"
-                width="50"
-                height="50"
-              />
+              <span class="brand-logo-frame" aria-hidden="true">
+                <img
+                  class="brand-logo brand-logo-light"
+                  src="<%= assetPath('/assets/brand/logo-header-light-96.png') %>"
+                  alt=""
+                  width="50"
+                  height="50"
+                  loading="eager"
+                  decoding="sync"
+                  fetchpriority="high"
+                />
+                <img
+                  class="brand-logo brand-logo-dark"
+                  src="<%= assetPath('/assets/brand/logo-header-dark-96.png') %>"
+                  alt=""
+                  width="50"
+                  height="50"
+                  loading="eager"
+                  decoding="sync"
+                  fetchpriority="high"
+                />
+              </span>
               <span class="brand-text">
                 <span class="brand-line brand-line-top">WHEEL OF</span>
                 <span class="brand-line brand-line-knowledge">KNOWLEDGE</span>

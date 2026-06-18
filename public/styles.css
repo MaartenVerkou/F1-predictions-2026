@@ -2,7 +2,7 @@
   font-family: "Manrope";
   font-style: normal;
   font-weight: 400 800;
-  font-display: optional;
+  font-display: block;
   src: url("/assets/fonts/manrope-latin-var.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
@@ -11,7 +11,7 @@
   font-family: "Manrope";
   font-style: normal;
   font-weight: 400 800;
-  font-display: optional;
+  font-display: block;
   src: url("/assets/fonts/manrope-latin-ext-var.woff2") format("woff2");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
@@ -20,7 +20,7 @@
   font-family: "Sora";
   font-style: normal;
   font-weight: 500 800;
-  font-display: optional;
+  font-display: block;
   src: url("/assets/fonts/sora-latin-var.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
@@ -29,7 +29,7 @@
   font-family: "Sora";
   font-style: normal;
   font-weight: 500 800;
-  font-display: optional;
+  font-display: block;
   src: url("/assets/fonts/sora-latin-ext-var.woff2") format("woff2");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
@@ -121,6 +121,7 @@ body {
   margin: 0;
   min-width: 250px;
   font-family: var(--font-body);
+  line-height: 1.5;
   color: var(--text);
   background-color: var(--page-grad-start);
   background:
@@ -235,13 +236,35 @@ body.has-dev-toolbar {
   gap: 8px;
 }
 
-.brand-logo {
+.brand-logo-frame {
   flex: 0 0 auto;
+  position: relative;
+  display: block;
   width: 50px;
   height: 50px;
-  object-fit: cover;
   border-radius: 12px;
   border: none;
+  overflow: hidden;
+  background: #ffffff;
+  contain: strict;
+}
+
+.brand-logo {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  visibility: hidden;
+}
+
+:root:not([data-theme="dark"]) .brand-logo-light,
+:root[data-theme="light"] .brand-logo-light,
+:root[data-theme="dark"] .brand-logo-dark {
+  opacity: 1;
+  visibility: visible;
 }
 
 .brand-text {
@@ -446,6 +469,10 @@ header.is-time-compact .countdown.is-closed .countdown-closed-compact {
   min-width: 11ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.countdown.is-closed .countdown-value {
+  min-width: 160px;
 }
 
 .countdown-segment {
@@ -700,6 +727,7 @@ h1, h2, h3 {
   margin-top: 0;
   font-family: var(--font-heading);
   letter-spacing: 0.01em;
+  line-height: 1.25;
 }
 
 h2[id] {
@@ -5140,7 +5168,7 @@ header.is-collapsed .lang-menu[open] > .header-menu-row {
     gap: 8px;
   }
 
-  .brand-logo {
+  .brand-logo-frame {
     width: 50px;
     height: 50px;
   }
