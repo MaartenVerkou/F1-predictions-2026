@@ -3,6 +3,7 @@
     "site_title": "{company_name}",
     "countdown_prefix": "Predictions close in",
     "countdown_closed": "Predictions are closed!",
+    "countdown_closed_header": "Predictions closed",
     "countdown_closed_short": "Closed!",
     "language": "Language",
     "signed_in_as": "Signed in as",

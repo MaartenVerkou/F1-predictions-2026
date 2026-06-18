@@ -80,6 +80,15 @@
   --input-border: #c9d5ee;
   --header-bg: rgba(255, 255, 255, 0.85);
   --header-border: rgba(15, 26, 51, 0.12);
+  --header-item-color: #52617e;
+  --header-item-strong: #17223d;
+  --header-item-hover-bg: rgba(15, 26, 51, 0.055);
+  --header-item-hover-border: rgba(15, 26, 51, 0.12);
+  --header-item-active-bg: rgba(214, 11, 34, 0.075);
+  --header-item-active-border: rgba(214, 11, 34, 0.2);
+  --header-logo-bg: rgba(255, 255, 255, 0.95);
+  --header-logo-border: rgba(15, 26, 51, 0.08);
+  --header-popover-bg: #ffffff;
   --shadow-soft: 0 16px 36px rgba(8, 17, 39, 0.08);
   --shadow-strong: 0 18px 34px rgba(214, 11, 34, 0.24);
   --glow-a: rgba(214, 11, 34, 0.12);
@@ -110,6 +119,15 @@
   --input-border: #2f4672;
   --header-bg: rgba(6, 11, 26, 0.82);
   --header-border: rgba(255, 255, 255, 0.14);
+  --header-item-color: #aebad5;
+  --header-item-strong: #f6f8ff;
+  --header-item-hover-bg: rgba(255, 255, 255, 0.075);
+  --header-item-hover-border: rgba(255, 255, 255, 0.14);
+  --header-item-active-bg: rgba(255, 45, 69, 0.12);
+  --header-item-active-border: rgba(255, 111, 127, 0.28);
+  --header-logo-bg: rgba(5, 9, 17, 0.68);
+  --header-logo-border: rgba(255, 255, 255, 0.14);
+  --header-popover-bg: rgba(11, 18, 38, 0.98);
   --shadow-soft: 0 22px 46px rgba(0, 0, 0, 0.42);
   --shadow-strong: 0 20px 36px rgba(255, 45, 69, 0.28);
   --glow-a: rgba(255, 45, 69, 0.18);
@@ -265,9 +283,9 @@ body.has-dev-toolbar {
   width: 50px;
   height: 50px;
   border-radius: 12px;
-  border: none;
+  border: 1px solid var(--header-logo-border);
   overflow: hidden;
-  background: #ffffff;
+  background: var(--header-logo-bg);
   contain: strict;
 }
 
@@ -531,7 +549,7 @@ header a {
   padding: 0 11px;
   border: 1px solid transparent;
   border-radius: 999px;
-  color: var(--muted);
+  color: var(--header-item-color);
   font-family: var(--font-heading);
   font-size: 14px;
   font-weight: 700;
@@ -542,10 +560,6 @@ header a {
 .header-action-link .header-nav-icon {
   display: block;
   flex: 0 0 24px;
-}
-
-.header-link-dashboard {
-  color: var(--text);
 }
 
 .header-link-compact {
@@ -559,14 +573,19 @@ header a {
 
 .header-action-link:hover,
 .header-action-link:focus-visible,
-.header-action-link.is-active,
 .header-menu-row:hover,
 .header-menu-row:focus-visible,
 .lang-menu[open] > .header-menu-row {
-  color: var(--text);
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  border-color: color-mix(in srgb, var(--text) 15%, transparent);
+  color: var(--header-item-strong);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
   outline: none;
+}
+
+.header-action-link.is-active {
+  color: var(--header-item-strong);
+  background: var(--header-item-active-bg);
+  border-color: var(--header-item-active-border);
 }
 
 .icon-btn {
@@ -580,7 +599,7 @@ header a {
   padding: 0;
   line-height: 0;
   border: none;
-  color: var(--muted);
+  color: var(--header-item-color);
   transition: color 0.2s ease, background-color 0.2s ease;
 }
 
@@ -609,9 +628,9 @@ summary.icon-btn {
 
 .header-icon-actions .icon-btn:hover,
 .header-icon-actions .icon-btn:focus-visible {
-  color: var(--text);
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  border-color: color-mix(in srgb, var(--text) 15%, transparent);
+  color: var(--header-item-strong);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
   outline: none;
 }
 
@@ -633,7 +652,7 @@ summary.icon-btn {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  background: var(--card);
+  background: var(--header-popover-bg);
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 8px;
@@ -659,15 +678,15 @@ summary.icon-btn {
 }
 
 .lang-option:hover {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  border-color: color-mix(in srgb, var(--text) 15%, var(--border));
-  color: var(--text);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
 }
 
 .lang-option.is-active {
-  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
-  color: var(--text);
-  background: color-mix(in srgb, var(--text) 9%, transparent);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
+  background: var(--header-item-hover-bg);
   font-weight: 800;
 }
 
@@ -4719,24 +4738,24 @@ button[data-predictions-save-button][data-state="failed"] {
 button.theme-toggle {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--muted);
+  color: var(--header-item-color);
   box-shadow: none;
 }
 
 button.theme-toggle:hover:not(:disabled),
 button.theme-toggle:focus-visible {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  border-color: color-mix(in srgb, var(--text) 15%, transparent);
-  color: var(--text);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
   transform: none;
   box-shadow: none;
 }
 
 :root[data-theme="dark"] button.theme-toggle:hover:not(:disabled),
 :root[data-theme="dark"] button.theme-toggle:focus-visible {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  border-color: color-mix(in srgb, var(--text) 15%, transparent);
-  color: var(--text);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
   transform: none;
   box-shadow: none;
 }
@@ -4747,19 +4766,19 @@ button.theme-toggle:focus-visible {
 }
 
 :root[data-theme="dark"] .lang-option:hover {
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-  border-color: color-mix(in srgb, var(--text) 17%, var(--border));
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
 }
 
 :root[data-theme="dark"] .lang-option.is-active {
-  border-color: color-mix(in srgb, var(--text) 24%, var(--border));
-  color: var(--text);
-  background: color-mix(in srgb, var(--text) 10%, transparent);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
+  background: var(--header-item-hover-bg);
 }
 
 header.is-collapsed .header-menu-toggle {
   display: inline-flex;
-  color: var(--text);
+  color: var(--header-item-strong);
   background: transparent;
   z-index: 121;
 }
@@ -4788,7 +4807,7 @@ header.is-collapsed .header-actions {
   white-space: normal;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: var(--card);
+  background: var(--header-popover-bg);
   box-shadow: var(--shadow-soft);
   z-index: 120;
 }
@@ -4826,7 +4845,7 @@ header.is-collapsed .header-menu-row {
   border-radius: 10px;
   border: 1px solid transparent;
   line-height: 1.2;
-  color: var(--text);
+  color: var(--header-item-strong);
   background: transparent;
 }
 
@@ -4836,9 +4855,9 @@ header.is-collapsed .header-main-links > .link.is-active,
 header.is-collapsed .header-menu-row:hover,
 header.is-collapsed .header-menu-row:focus-visible,
 header.is-collapsed .lang-menu[open] > .header-menu-row {
-  background: color-mix(in srgb, var(--text) 7%, transparent);
-  border-color: color-mix(in srgb, var(--text) 15%, transparent);
-  color: var(--text);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
 }
 
 header.is-collapsed .dev-switcher {
@@ -4904,9 +4923,9 @@ header .header-menu-toggle:hover:not(:disabled),
 header .header-menu-toggle:focus-visible,
 header.is-collapsed .header-menu-toggle:hover:not(:disabled),
 header.is-collapsed .header-menu-toggle:focus-visible {
-  color: var(--text);
-  background: transparent;
-  border-color: transparent;
+  color: var(--header-item-strong);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
   box-shadow: none;
   transform: none;
 }
@@ -4923,11 +4942,44 @@ header.is-collapsed .header-main-links > .link.is-active,
 header.is-collapsed .header-menu-row:hover,
 header.is-collapsed .header-menu-row:focus-visible,
 header.is-collapsed .lang-menu[open] > .header-menu-row {
-  color: var(--text);
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  border-color: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--header-item-strong);
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
   box-shadow: none;
   text-decoration: none;
+  transform: none;
+}
+
+header .header-action-link.is-active,
+header.is-collapsed .header-main-links > .link.is-active {
+  color: var(--header-item-strong);
+  background: var(--header-item-active-bg);
+  border-color: var(--header-item-active-border);
+}
+
+button.lang-option:hover:not(:disabled),
+button.lang-option:focus-visible,
+button.lang-option.is-active {
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
+  box-shadow: none;
+  transform: none;
+}
+
+button.lang-option.is-active {
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
+  font-weight: 800;
+}
+
+:root[data-theme="dark"] button.lang-option:hover:not(:disabled),
+:root[data-theme="dark"] button.lang-option:focus-visible,
+:root[data-theme="dark"] button.lang-option.is-active {
+  background: var(--header-item-hover-bg);
+  border-color: var(--header-item-hover-border);
+  color: var(--header-item-strong);
+  box-shadow: none;
   transform: none;
 }
 
@@ -4936,7 +4988,7 @@ header.is-collapsed .lang-menu[open] > .header-menu-row {
   header button.header-menu-toggle,
   header .header-menu-toggle.icon-btn {
     display: inline-flex;
-    color: var(--text);
+    color: var(--header-item-strong);
     background: transparent;
     z-index: 121;
   }
@@ -4960,7 +5012,7 @@ header.is-collapsed .lang-menu[open] > .header-menu-row {
     white-space: normal;
     border: 1px solid var(--border);
     border-radius: 14px;
-    background: var(--card);
+    background: var(--header-popover-bg);
     box-shadow: var(--shadow-soft);
     z-index: 120;
   }
@@ -4998,7 +5050,7 @@ header.is-collapsed .lang-menu[open] > .header-menu-row {
     border-radius: 10px;
     border: 1px solid transparent;
     line-height: 1.2;
-    color: var(--text);
+    color: var(--header-item-strong);
     background: transparent;
   }
 

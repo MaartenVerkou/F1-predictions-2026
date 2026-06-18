@@ -87,6 +87,7 @@ const initCountdown = () => {
   const prefixEl = el.querySelector('.muted');
   const prefixText = el.dataset.countdownPrefix || prefixEl?.textContent || '';
   const closedText = el.dataset.countdownClosed || 'Predictions are closed!';
+  const closedDisplayText = el.dataset.countdownClosedDisplay || closedText;
   const compactClosedText = el.dataset.countdownClosedCompact || 'Closed!';
   const headerEl = document.querySelector('header');
   const rawDate = el.dataset.closeDate;
@@ -98,7 +99,7 @@ const initCountdown = () => {
     el.classList.toggle('is-closed', isClosed);
   };
   const getClosedDisplayText = () =>
-    headerEl?.classList.contains('is-time-compact') ? compactClosedText : closedText;
+    headerEl?.classList.contains('is-time-compact') ? compactClosedText : closedDisplayText;
   const setPrefixText = (text) => {
     if (prefixEl) prefixEl.textContent = text;
   };
@@ -111,6 +112,9 @@ const initCountdown = () => {
   const applyClosedState = () => {
     syncClosedClass();
     setPrefixText('');
+    el.setAttribute('aria-label', closedText);
+    el.setAttribute('title', closedText);
+    valueEl.setAttribute('title', closedText);
     setTimerText(getClosedDisplayText());
   };
   const formatHmsMarkup = (totalSeconds) => {

@@ -3,6 +3,7 @@
     "site_title": "{company_name}",
     "countdown_prefix": "Tippschluss in",
     "countdown_closed": "Tipps sind geschlossen!",
+    "countdown_closed_header": "Tipps geschlossen",
     "countdown_closed_short": "Geschlossen!",
     "language": "Sprache",
     "signed_in_as": "Angemeldet als",

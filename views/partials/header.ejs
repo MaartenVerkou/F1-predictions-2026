@@ -16,7 +16,7 @@
 <% const countdownInitiallyClosed = countdownTotalSeconds !== null && countdownTotalSeconds <= 0; %>
 <% const countdownInitialText = (() => {
   if (countdownTotalSeconds === null) return '--';
-  if (countdownInitiallyClosed) return t('header.countdown_closed');
+  if (countdownInitiallyClosed) return t('header.countdown_closed_header');
   if (countdownTotalSeconds < 24 * 60 * 60) {
     const hours = Math.floor(countdownTotalSeconds / 3600);
     const minutes = Math.floor((countdownTotalSeconds % 3600) / 60);
@@ -133,12 +133,17 @@
             data-close-date="<%= countdownCloseAt %>"
             data-countdown-prefix="<%= t('header.countdown_prefix') %>"
             data-countdown-closed="<%= t('header.countdown_closed') %>"
+            data-countdown-closed-display="<%= t('header.countdown_closed_header') %>"
             data-countdown-closed-compact="<%= t('header.countdown_closed_short') %>"
+            <% if (countdownInitiallyClosed) { %>
+              aria-label="<%= t('header.countdown_closed') %>"
+              title="<%= t('header.countdown_closed') %>"
+            <% } %>
           >
             <span class="muted"><%= t('header.countdown_prefix') %></span>
             <strong class="countdown-value">
               <% if (countdownInitiallyClosed) { %>
-                <span class="countdown-closed-full"><%= t('header.countdown_closed') %></span>
+                <span class="countdown-closed-full"><%= t('header.countdown_closed_header') %></span>
                 <span class="countdown-closed-compact"><%= t('header.countdown_closed_short') %></span>
               <% } else { %>
                 <%= countdownInitialText %>

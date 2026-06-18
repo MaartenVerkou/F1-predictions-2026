@@ -3,6 +3,7 @@
     "site_title": "{company_name}",
     "countdown_prefix": "Cloture des pronostics dans",
     "countdown_closed": "Les pronostics sont fermes !",
+    "countdown_closed_header": "Pronostics fermes",
     "countdown_closed_short": "Ferme !",
     "language": "Langue",
     "signed_in_as": "Compte",

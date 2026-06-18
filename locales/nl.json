@@ -3,6 +3,7 @@
     "site_title": "{company_name}",
     "countdown_prefix": "Voorspellingen sluiten over",
     "countdown_closed": "Voorspellingen zijn gesloten!",
+    "countdown_closed_header": "Voorspellingen gesloten",
     "countdown_closed_short": "Gesloten!",
     "language": "Taal",
     "signed_in_as": "Ingelogd als",

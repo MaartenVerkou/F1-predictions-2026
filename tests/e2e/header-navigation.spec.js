@@ -253,3 +253,81 @@ test("collapsed header hover states stay neutral in light and dark mode", async 
   });
   expect(darkToggleStyle.backgroundColor).not.toContain("255, 45, 69");
 });
+
+test("header theme polish keeps language menu, dark logo, and Dutch closed countdown stable", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  await page.request.post("/language", {
+    form: {
+      locale: "nl",
+      redirectTo: "/dashboard"
+    }
+  });
+
+  await page.goto("/dashboard");
+  await expect(page.locator(".countdown-value")).toContainText("Voorspellingen gesloten");
+
+  const closedCountdown = await page.locator(".countdown").evaluate((element) => {
+    const value = element.querySelector(".countdown-value");
+    return {
+      label: element.getAttribute("aria-label"),
+      title: element.getAttribute("title"),
+      text: value.textContent.trim(),
+      valueWidth: Math.ceil(value.getBoundingClientRect().width),
+      valueScrollWidth: value.scrollWidth
+    };
+  });
+  expect(closedCountdown.label).toBe("Voorspellingen zijn gesloten!");
+  expect(closedCountdown.title).toBe("Voorspellingen zijn gesloten!");
+  expect(closedCountdown.text).toBe("Voorspellingen gesloten");
+  expect(closedCountdown.valueScrollWidth).toBeLessThanOrEqual(closedCountdown.valueWidth + 1);
+
+  await page.locator(".lang-menu > summary").click();
+  const dutchOption = page.locator(".lang-option.is-active");
+  await dutchOption.hover();
+  const lightLanguageStyle = await dutchOption.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      boxShadow: style.boxShadow,
+      transform: style.transform
+    };
+  });
+  expect(lightLanguageStyle.backgroundColor).not.toContain("214, 11, 34");
+  expect(lightLanguageStyle.backgroundColor).not.toContain("185, 8, 28");
+  expect(lightLanguageStyle.boxShadow).toBe("none");
+  expect(lightLanguageStyle.transform).toBe("none");
+
+  await page.addInitScript(() => {
+    localStorage.setItem("theme", "dark");
+  });
+  await page.goto("/dashboard");
+  await expect(page.locator(".brand-logo-dark")).toBeVisible();
+  await page.locator(".lang-menu > summary").click();
+  await dutchOption.hover();
+
+  const darkLanguageStyle = await dutchOption.evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+      boxShadow: style.boxShadow,
+      transform: style.transform
+    };
+  });
+  expect(darkLanguageStyle.backgroundColor).toBe("rgba(255, 255, 255, 0.075)");
+  expect(darkLanguageStyle.borderColor).toBe("rgba(255, 255, 255, 0.14)");
+  expect(darkLanguageStyle.boxShadow).toBe("none");
+  expect(darkLanguageStyle.transform).toBe("none");
+
+  const darkLogoStyle = await page.locator(".brand-logo-frame").evaluate((element) => {
+    const style = window.getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor
+    };
+  });
+  expect(darkLogoStyle.backgroundColor).not.toBe("rgb(255, 255, 255)");
+  expect(darkLogoStyle.backgroundColor).not.toBe("rgba(255, 255, 255, 0.95)");
+  expect(darkLogoStyle.borderColor).not.toBe("rgba(15, 26, 51, 0.08)");
+});
