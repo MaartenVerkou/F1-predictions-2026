@@ -103,7 +103,7 @@ The workflow keeps the current server contract:
 - refreshes only repo-managed runtime paths under `/opt/F1-predictions-2026` by default, including JSON config in `data/`
 - runs `bash scripts/deploy-app.sh`
 - rebuilds only the Docker Compose `app` service
-- waits for `GET /healthz` before marking the deploy successful
+- waits for `GET /healthz` and a rendered `GET /login` before marking the deploy successful
 - does not overwrite host-managed `.env`, SQLite state, `/var/lib/wheelofknowledge/state`, or the external Restic/R2 backup setup
 
 Required GitHub secrets:
@@ -122,6 +122,7 @@ Optional GitHub repository or environment variables/secrets:
 - `DEPLOY_PATH` (default `/opt/F1-predictions-2026`)
 - `DEPLOY_COMPOSE_FILES` (default `docker-compose.yml`; set `docker-compose.yml:docker-compose.server.yml` when the server should use the override)
 - `DEPLOY_HEALTH_URL` (default `http://127.0.0.1:3000/healthz`)
+- `DEPLOY_RENDER_PROBE_URL` (default `http://127.0.0.1:3000/login`; set empty to disable)
 
 To generate `DEPLOY_KNOWN_HOSTS` safely:
 

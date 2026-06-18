@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 compose_files_raw="${DEPLOY_COMPOSE_FILES:-docker-compose.yml}"
 health_url="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3000/healthz}"
+render_probe_url="${DEPLOY_RENDER_PROBE_URL:-http://127.0.0.1:3000/login}"
 health_retries="${DEPLOY_HEALTH_RETRIES:-40}"
 health_sleep_seconds="${DEPLOY_HEALTH_SLEEP_SECONDS:-3}"
 
@@ -34,12 +35,23 @@ health_probe() {
   wget -q -O - "$health_url" >/dev/null
 }
 
+render_probe() {
+  if [[ -z "$render_probe_url" ]]; then
+    return 0
+  fi
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS "$render_probe_url" >/dev/null
+    return
+  fi
+  wget -q -O - "$render_probe_url" >/dev/null
+}
+
 docker compose "${compose_args[@]}" config -q
 docker compose "${compose_args[@]}" up -d --build --no-deps app
 
 for ((attempt = 1; attempt <= health_retries; attempt += 1)); do
-  if health_probe; then
-    echo "Deploy healthy via $health_url"
+  if health_probe && render_probe; then
+    echo "Deploy healthy via $health_url and render probe ${render_probe_url:-disabled}"
     exit 0
   fi
   sleep "$health_sleep_seconds"
@@ -52,5 +64,5 @@ else
   docker compose "${compose_args[@]}" ps || true
 fi
 
-echo "Deploy health check failed for $health_url" >&2
+echo "Deploy health check failed for $health_url and render probe ${render_probe_url:-disabled}" >&2
 exit 1

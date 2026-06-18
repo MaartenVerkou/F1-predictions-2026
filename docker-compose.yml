@@ -40,12 +40,6 @@ services:
     volumes:
       - ${STATE_DIR:-f1_state}:/app/state
       - ./data:/app/config:ro
-      - ./server.js:/app/server.js
-      - ./src:/app/src
-      - ./views:/app/views
-      - ./public:/app/public
-      - ./locales:/app/locales
-      - ./package.json:/app/package.json:ro
     restart: unless-stopped
 
   tunnel:
