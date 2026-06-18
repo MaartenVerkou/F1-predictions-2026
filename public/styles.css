@@ -380,6 +380,7 @@ header.is-time-compact .countdown.is-closed {
 }
 
 header.is-time-compact .countdown.is-closed .countdown-value {
+  width: auto;
   min-width: 0;
   text-align: left;
 }
@@ -472,7 +473,9 @@ header.is-time-compact .countdown.is-closed .countdown-closed-compact {
 }
 
 .countdown.is-closed .countdown-value {
-  min-width: 160px;
+  width: 13.6em;
+  min-width: 13.6em;
+  text-align: center;
 }
 
 .countdown-segment {
@@ -5044,6 +5047,7 @@ header.is-collapsed .lang-menu[open] > .header-menu-row {
   }
 
   header .countdown.is-closed .countdown-value {
+    width: auto;
     min-width: 0;
     text-align: left;
   }
