@@ -13,7 +13,7 @@ const measureHeaderBootstrap = async (page, width) => {
   });
 
   await page.setViewportSize({ width, height: 844 });
-  await page.route("**/app.js", async (route) => {
+  await page.route("**/app.js*", async (route) => {
     resolveAppRequested();
     await appRelease;
     await route.continue();

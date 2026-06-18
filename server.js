@@ -53,6 +53,7 @@ loadDotEnvIfPresent();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
+const PUBLIC_DIR = path.join(__dirname, "public");
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questions.json");
 const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json");
 const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
@@ -154,6 +155,7 @@ const LOG_LEVEL = String(process.env.LOG_LEVEL || "info").trim().toLowerCase();
 const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS || (IS_DEVELOPMENT ? 0 : 1));
 const MAX_PRIVILEGED_GROUPS = 3;
 const LOCALES_DIR = path.join(__dirname, "locales");
+const STATIC_ASSET_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365;
 const SUPPORTED_LOCALES = ["en", "de", "fr", "nl", "es"];
 const DEFAULT_LOCALE = "en";
 const LOCALE_LABELS = {
@@ -968,9 +970,61 @@ function sanitizeRedirectPath(rawValue) {
   }
 }
 
+const assetVersionCache = new Map();
+
+function resolvePublicAsset(assetUrl) {
+  const raw = String(assetUrl || "").trim();
+  if (!raw || raw.includes("\0")) return null;
+
+  const pathOnly = raw.split("#")[0].split("?")[0].replace(/^\/+/, "");
+  if (!pathOnly) return null;
+
+  const filePath = path.resolve(PUBLIC_DIR, pathOnly);
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(`${PUBLIC_DIR}${path.sep}`)) {
+    return null;
+  }
+
+  return {
+    publicPath: `/${pathOnly.replace(/\\/g, "/")}`,
+    filePath
+  };
+}
+
+function getAssetVersion(assetUrl) {
+  const asset = resolvePublicAsset(assetUrl);
+  if (!asset) return "";
+
+  const cached = assetVersionCache.get(asset.filePath);
+  if (cached !== undefined) return cached;
+
+  let version = "";
+  try {
+    const buffer = fs.readFileSync(asset.filePath);
+    version = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 12);
+  } catch (err) {
+    version = "";
+  }
+
+  assetVersionCache.set(asset.filePath, version);
+  return version;
+}
+
+function assetPath(assetUrl) {
+  const raw = String(assetUrl || "");
+  const version = getAssetVersion(raw);
+  if (!version) return raw;
+
+  const hashIndex = raw.indexOf("#");
+  const urlWithoutHash = hashIndex === -1 ? raw : raw.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : raw.slice(hashIndex);
+  const separator = urlWithoutHash.includes("?") ? "&" : "?";
+  return `${urlWithoutHash}${separator}v=${version}${hash}`;
+}
+
 const app = express();
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+app.locals.assetPath = assetPath;
 if (Number.isFinite(TRUST_PROXY_HOPS) && TRUST_PROXY_HOPS > 0) {
   app.set("trust proxy", TRUST_PROXY_HOPS);
 }
@@ -1029,7 +1083,20 @@ app.get("/healthz", (req, res) => {
   }
 });
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use(
+  express.static(PUBLIC_DIR, {
+    etag: true,
+    immutable: true,
+    lastModified: true,
+    maxAge: STATIC_ASSET_CACHE_MAX_AGE_MS
+  })
+);
+app.use((req, res, next) => {
+  if (req.method === "GET") {
+    res.setHeader("Cache-Control", "private, no-store");
+  }
+  next();
+});
 app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
@@ -1073,6 +1140,7 @@ app.use((req, res, next) => {
   res.locals.baseUrl = BASE_URL;
   res.locals.companyName = COMPANY_NAME;
   res.locals.closeAt = PREDICTIONS_CLOSE_AT;
+  res.locals.assetPath = assetPath;
   res.locals.isDevelopment = IS_DEVELOPMENT;
   res.locals.devIdentityMode = String(req.session?.devIdentityMode || "")
     .trim()
