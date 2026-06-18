@@ -78,14 +78,21 @@ test("shared head assets are versioned and cacheable", async ({ page }) => {
   const assets = await page.evaluate(() => ({
     stylesheet: document.querySelector('link[rel="stylesheet"][href*="styles.css"]')?.getAttribute("href") || "",
     script: document.querySelector('script[src*="app.js"]')?.getAttribute("src") || "",
-    logo: document.querySelector(".brand-logo")?.getAttribute("src") || ""
+    logo: document.querySelector(".brand-logo")?.getAttribute("src") || "",
+    fontPreloads: Array.from(document.querySelectorAll('link[rel="preload"][as="font"]'))
+      .map((link) => link.getAttribute("href") || "")
+      .filter((href) => href.includes("/assets/fonts/"))
   }));
 
   expect(assets.stylesheet).toContain("v=");
   expect(assets.script).toContain("v=");
   expect(assets.logo).toContain("v=");
+  expect(assets.fontPreloads).toHaveLength(4);
+  for (const fontUrl of assets.fontPreloads) {
+    expect(fontUrl).toContain("v=");
+  }
 
-  for (const assetUrl of Object.values(assets)) {
+  for (const assetUrl of [assets.stylesheet, assets.script, assets.logo, ...assets.fontPreloads]) {
     const response = await page.request.get(assetUrl);
     expect(response.ok()).toBeTruthy();
     const cacheControl = response.headers()["cache-control"] || "";

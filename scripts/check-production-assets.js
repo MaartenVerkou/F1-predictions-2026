@@ -4,6 +4,12 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
+const requiredFontAssets = [
+  "public/assets/fonts/manrope-latin-var.woff2",
+  "public/assets/fonts/manrope-latin-ext-var.woff2",
+  "public/assets/fonts/sora-latin-var.woff2",
+  "public/assets/fonts/sora-latin-ext-var.woff2"
+];
 const requiredFiles = [
   "server.js",
   "data/questions.json",
@@ -17,7 +23,8 @@ const requiredFiles = [
   "public/styles.css",
   "public/app.js",
   "public/assets/brand/logo-header-light-96.png",
-  "public/assets/brand/logo-header-dark-96.png"
+  "public/assets/brand/logo-header-dark-96.png",
+  ...requiredFontAssets
 ];
 
 let failed = false;
@@ -65,6 +72,14 @@ const requiredHeaderPatterns = [
   }
 ];
 
+for (const fontAsset of requiredFontAssets) {
+  const publicPath = `/${fontAsset.replace(/^public\//, "")}`;
+  requiredHeaderPatterns.push({
+    pattern: new RegExp(`assetPath\\(["']${publicPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']\\)`),
+    message: `Font preload must use the assetPath versioning helper: ${publicPath}`
+  });
+}
+
 for (const { pattern, message } of requiredHeaderPatterns) {
   if (!pattern.test(headerTemplate)) {
     failed = true;
@@ -72,14 +87,29 @@ for (const { pattern, message } of requiredHeaderPatterns) {
   }
 }
 
-if (/fonts\.(googleapis|gstatic)\.com/i.test(headerTemplate)) {
+if (/fonts\.(googleapis|gstatic)\.com/i.test(`${headerTemplate}\n${styles}`)) {
   failed = true;
   console.error("Shared head must not depend on external Google Font delivery.");
 }
 
-if (/"(Sora|Manrope)"/.test(styles)) {
-  failed = true;
-  console.error("Core typography must use the deliberate system font stack.");
+const fontFaceBlocks = styles.match(/@font-face\s*\{[^}]*\}/g) || [];
+const requiredFontFaces = [
+  { family: "Manrope", file: "manrope-latin-var.woff2" },
+  { family: "Manrope", file: "manrope-latin-ext-var.woff2" },
+  { family: "Sora", file: "sora-latin-var.woff2" },
+  { family: "Sora", file: "sora-latin-ext-var.woff2" }
+];
+
+for (const { family, file } of requiredFontFaces) {
+  const hasFontFace = fontFaceBlocks.some((block) =>
+    block.includes(`font-family: "${family}"`) &&
+    block.includes(`url("/assets/fonts/${file}")`) &&
+    /font-display:\s*optional/.test(block)
+  );
+  if (!hasFontFace) {
+    failed = true;
+    console.error(`Missing stable self-hosted ${family} font-face for ${file}.`);
+  }
 }
 
 if (failed) {

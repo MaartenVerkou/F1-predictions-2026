@@ -874,11 +874,9 @@ const initThemeToggle = () => {
 
 const initHeaderMenu = () => {
   const header = document.querySelector('header');
-  const headerInner = header?.querySelector('.header-inner');
   const toggle = document.querySelector('[data-header-menu-toggle]');
-  const headerCenter = document.querySelector('[data-header-center]');
   const menu = document.querySelector('[data-header-menu]');
-  if (!header || !headerInner || !toggle || !menu) return;
+  if (!header || !toggle || !menu) return;
 
   const LAYOUT_COLLAPSE_WIDTH = 980;
   const TIMER_COMPACT_WIDTH = 1000;
@@ -907,14 +905,6 @@ const initHeaderMenu = () => {
 
     header.classList.toggle('is-collapsed', shouldCollapseMenu);
     header.classList.toggle('is-time-compact', shouldCompactTimer);
-    header.classList.remove('is-center-hidden');
-
-    if (headerCenter) {
-      const hasOverflow = headerInner.scrollWidth > headerInner.clientWidth + 1;
-      if (hasOverflow) {
-        header.classList.add('is-center-hidden');
-      }
-    }
 
     if (!shouldCollapseMenu) {
       closeMenu();

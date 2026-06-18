@@ -47,6 +47,38 @@ const measureHeaderBootstrap = async (page, width) => {
   return { beforeApp, afterApp };
 };
 
+const measureHeaderAnchor = async (page, path) => {
+  await page.goto(path, { waitUntil: "networkidle" });
+  await page.waitForSelector(".countdown", { state: "visible" });
+
+  return page.evaluate(() => {
+    const header = document.querySelector("header");
+    const inner = document.querySelector(".header-inner");
+    const countdown = document.querySelector(".countdown");
+    const main = document.querySelector("main");
+    const headerRect = header.getBoundingClientRect();
+    const innerRect = inner.getBoundingClientRect();
+    const countdownRect = countdown.getBoundingClientRect();
+    const mainRect = main.getBoundingClientRect();
+
+    return {
+      headerClass: header.className,
+      headerLeft: Math.round(headerRect.left),
+      headerWidth: Math.round(headerRect.width),
+      innerLeft: Math.round(innerRect.left),
+      innerWidth: Math.round(innerRect.width),
+      innerCenterX: Math.round(innerRect.left + innerRect.width / 2),
+      countdownCenterX: Math.round(countdownRect.left + countdownRect.width / 2),
+      countdownTop: Math.round(countdownRect.top),
+      mainTop: Math.round(mainRect.top),
+      viewportWidth: document.documentElement.clientWidth,
+      bodyWidth: Math.round(document.body.getBoundingClientRect().width),
+      scrollbarGutter: getComputedStyle(document.documentElement).scrollbarGutter,
+      overflowY: getComputedStyle(document.documentElement).overflowY
+    };
+  });
+};
+
 test("desktop header shows dashboard and admin labels while keeping account compact", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/dashboard");
@@ -93,6 +125,27 @@ test("desktop header shows dashboard and admin labels while keeping account comp
     { selector: ".lang-menu > summary svg", width: 24, height: 24 },
     { selector: ".theme-toggle .theme-icon", width: 24, height: 24 }
   ]);
+});
+
+test("countdown header anchor stays stable across admin content pages", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  const analysis = await measureHeaderAnchor(page, "/admin/testing");
+  const ideas = await measureHeaderAnchor(page, "/admin/ideas");
+
+  expect(analysis.headerClass).not.toContain("is-center-hidden");
+  expect(ideas.headerClass).not.toContain("is-center-hidden");
+  expect(Math.abs(analysis.countdownCenterX - analysis.innerCenterX)).toBeLessThanOrEqual(1);
+  expect(Math.abs(ideas.countdownCenterX - ideas.innerCenterX)).toBeLessThanOrEqual(1);
+  expect(Math.abs(analysis.countdownCenterX - ideas.countdownCenterX)).toBeLessThanOrEqual(1);
+  expect(Math.abs(analysis.countdownTop - ideas.countdownTop)).toBeLessThanOrEqual(1);
+  expect(Math.abs(analysis.mainTop - ideas.mainTop)).toBeLessThanOrEqual(1);
+  expect(analysis.innerLeft).toBe(ideas.innerLeft);
+  expect(analysis.innerWidth).toBe(ideas.innerWidth);
+  expect(analysis.viewportWidth).toBe(ideas.viewportWidth);
+  expect(analysis.bodyWidth).toBe(ideas.bodyWidth);
+  expect(analysis.overflowY).toBe("scroll");
+  expect(analysis.scrollbarGutter).toContain("stable");
 });
 
 test("header reserves the same page offset before app bootstrap", async ({ page }) => {
