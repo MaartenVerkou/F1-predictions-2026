@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "f1-predictions-2026",
   "version": "0.1.0",
   "description": "Group-based F1 2026 prediction game",
@@ -27,7 +27,7 @@
     "express": "^4.19.2",
     "express-session": "^1.17.3",
     "helmet": "^8.2.0",
-    "nodemailer": "^8.0.10"
+    "nodemailer": "^9.0.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0"
