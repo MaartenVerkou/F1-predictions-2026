@@ -133,6 +133,7 @@
                     type="checkbox"
                     name="hideFromGlobal"
                     value="1"
+                    aria-label="Hide <%= row.name %> from global results"
                     <%= Number(row.hide_from_global || 0) === 1 ? 'checked' : '' %>
                     onchange="this.form.submit()"
                   />
@@ -174,6 +175,7 @@
       <tr>
         <th>Name</th>
         <th>Email</th>
+        <th>Hide from global</th>
         <th>Created</th>
         <th>Actions</th>
       </tr>
@@ -194,6 +196,22 @@
                   <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-user-<%= row.id %>')">View</button>
                 </form>
               <% } %>
+            </td>
+            <td>
+              <form method="post" action="/admin/users/<%= row.id %>/hide-from-global">
+                <input type="hidden" name="returnTo" value="<%= usersReturn %>">
+                <input type="hidden" name="hideFromGlobal" value="0">
+                <label class="muted admin-inline-checkbox">
+                  <input
+                    type="checkbox"
+                    name="hideFromGlobal"
+                    value="1"
+                    aria-label="Hide <%= row.name %> from global results"
+                    <%= Number(row.hide_from_global || 0) === 1 ? 'checked' : '' %>
+                    onchange="this.form.submit()"
+                  />
+                </label>
+              </form>
             </td>
             <td><%= formatAdminDate(row.created_at) %></td>
             <td>

@@ -423,6 +423,37 @@ test("global leaderboard is public while private group leaderboard stays protect
   await expect(page).toHaveURL(/\/login/);
 });
 
+test("admin can hide regular users from global results", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  seedLeaderboardInsights(db);
+  const hiddenUser = db
+    .prepare("SELECT id, name FROM users WHERE email = ?")
+    .get("e2e-insight-apex@example.local");
+  db.close();
+
+  expect(hiddenUser).toBeTruthy();
+
+  await page.goto("/global/leaderboard");
+  await expect(page.locator(".leaderboard-main-card")).toContainText(hiddenUser.name);
+
+  await page.request.post(`/admin/users/${hiddenUser.id}/hide-from-global`, {
+    form: {
+      hideFromGlobal: "1",
+      returnTo: "/admin/overview#admin-users"
+    }
+  });
+
+  await page.goto("/global/leaderboard");
+  await expect(page.locator(".leaderboard-main-card")).not.toContainText(hiddenUser.name);
+  await expect(page.locator(".leaderboard-chart-legend")).not.toContainText(hiddenUser.name);
+
+  await page.getByRole("button", { name: "Visitor" }).click();
+  await page.goto("/global/responses");
+  await expect(page.locator("body")).not.toContainText(hiddenUser.name);
+});
+
 test("Dutch leaderboard renders localized insight copy", async ({ page }) => {
   await page.goto("/");
 

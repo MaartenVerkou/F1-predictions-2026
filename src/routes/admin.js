@@ -2873,7 +2873,7 @@ function registerAdminRoutes(app, deps) {
     const users = db
       .prepare(
         `
-        SELECT id, name, email, created_at, is_admin
+        SELECT id, name, email, created_at, is_admin, COALESCE(hide_from_global, 0) as hide_from_global
         FROM users
         WHERE is_simulated = 0
           AND is_admin = 0
@@ -4094,7 +4094,7 @@ function registerAdminRoutes(app, deps) {
     if (target.is_admin !== 1) {
       return res.redirect(withQueryParam(returnTo, "success", "User is not an admin."));
     }
-    db.prepare("UPDATE users SET is_admin = 0, hide_from_global = 0 WHERE id = ?").run(userId);
+    db.prepare("UPDATE users SET is_admin = 0 WHERE id = ?").run(userId);
     return res.redirect(withQueryParam(returnTo, "success", "Admin rights removed."));
   });
 
@@ -4112,9 +4112,6 @@ function registerAdminRoutes(app, deps) {
     if (!target) {
       return res.redirect(withQueryParam(returnTo, "error", "User not found."));
     }
-    if (Number(target.is_admin) !== 1) {
-      return res.redirect(withQueryParam(returnTo, "error", "Only admins can be hidden from global."));
-    }
 
     const hideFromGlobalRaw = req.body.hideFromGlobal;
     const hideFromGlobalValue = Array.isArray(hideFromGlobalRaw)
@@ -4127,8 +4124,8 @@ function registerAdminRoutes(app, deps) {
         returnTo,
         "success",
         hideFromGlobal === 1
-          ? "Admin hidden from global responses and leaderboard."
-          : "Admin shown in global responses and leaderboard."
+          ? "User hidden from global responses and leaderboard."
+          : "User shown in global responses and leaderboard."
       )
     );
   });

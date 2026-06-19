@@ -3907,7 +3907,10 @@ app.get("/global/responses", (req, res, next) => {
 
   const guestId = getGuestIdFromSession(req, { create: true });
   const questions = getQuestions(locale);
-  const responses = getResponsesForGroup(Number(group.id), { includeNamedGuests: false });
+  const responses = getResponsesForGroup(Number(group.id), {
+    includeNamedGuests: false,
+    excludeHiddenAdmins: true
+  });
   const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
   const showMineOnly = req.query.mine === "1";
 
