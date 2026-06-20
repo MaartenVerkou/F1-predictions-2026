@@ -16,11 +16,10 @@
       <% const globalAnswerItems = safeGlobalAnswerPreview && Array.isArray(safeGlobalAnswerPreview.items) ? safeGlobalAnswerPreview.items : []; %>
       <% const hasGlobalAnswers = Boolean(safeGlobalAnswerPreview && safeGlobalAnswerPreview.hasAnyAnswer); %>
       <% const podiumOrder = [2, 1, 3]; %>
-      <section class="card dashboard-global-answers-card" aria-labelledby="dashboard-global-answers-title">
+      <section class="card dashboard-global-answers-card" aria-label="<%= t('dashboard.global_group_title') %>">
         <div class="dashboard-global-answers-head">
           <div class="dashboard-global-answers-title">
             <span class="badge dashboard-global-answers-badge"><%= t('dashboard.global_group_title') %></span>
-            <h2 id="dashboard-global-answers-title"><%= t('dashboard.global_answers_title') %></h2>
           </div>
           <% if (safeFeaturedGlobalGroup.dashboardPosition) { %>
             <a class="dashboard-global-position-link" href="<%= `${globalGroupBasePath}/leaderboard` %>">
@@ -56,7 +55,7 @@
 
         <div class="dashboard-global-answer-actions">
           <a class="button-link" href="<%= `${globalGroupBasePath}/responses` %>"><%= t('dashboard.view_all_global_answers') %></a>
-          <a class="link" href="<%= `${globalGroupBasePath}/leaderboard` %>"><%= t('dashboard.view_global_leaderboard') %></a>
+          <a class="link dashboard-global-leaderboard-action" href="<%= `${globalGroupBasePath}/leaderboard` %>"><%= t('dashboard.view_global_leaderboard') %></a>
         </div>
       </section>
     <% } %>

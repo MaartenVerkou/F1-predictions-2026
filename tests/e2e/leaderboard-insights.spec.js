@@ -584,8 +584,9 @@ test("dashboard previews Global answers as podium picks and keeps phone layout c
 
   const card = page.locator(".dashboard-global-answers-card");
   await expect(card).toBeVisible();
-  await expect(card).toContainText("Your Global top 3");
-  await expect(card.locator(".dashboard-global-position-link")).toContainText(/Position \d+ of \d+/);
+  await expect(card).not.toContainText("Your Global top 3");
+  await expect(card.locator(".dashboard-global-position-link")).toBeHidden();
+  await expect(card.locator(".dashboard-global-leaderboard-action")).toBeHidden();
   await expect(card.getByRole("link", { name: "View all answers" })).toHaveAttribute(
     "href",
     "/global/responses"
@@ -600,6 +601,28 @@ test("dashboard previews Global answers as podium picks and keeps phone layout c
   await expect(driverPanel.locator('[data-position="1"]')).toContainText("Lewis Hamilton");
   await expect(driverPanel.locator('[data-position="2"]')).toContainText("Max Verstappen");
   await expect(driverPanel.locator('[data-position="3"]')).toContainText("Kimi Antonelli");
+  const podiumNameMetrics = await driverPanel.locator(".dashboard-podium-name").evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const style = window.getComputedStyle(node);
+      const lineHeight = Number.parseFloat(style.lineHeight);
+      return {
+        textAlign: style.textAlign,
+        whiteSpace: style.whiteSpace,
+        lineClamp: style.webkitLineClamp,
+        height: node.getBoundingClientRect().height,
+        maxTwoLineHeight: lineHeight * 2 + 2,
+        scrollWidth: node.scrollWidth,
+        width: node.getBoundingClientRect().width
+      };
+    })
+  );
+  podiumNameMetrics.forEach((metric) => {
+    expect(metric.textAlign).toBe("center");
+    expect(metric.whiteSpace).toBe("normal");
+    expect(metric.lineClamp).toBe("2");
+    expect(metric.height).toBeLessThanOrEqual(metric.maxTwoLineHeight);
+    expect(metric.scrollWidth).toBeLessThanOrEqual(metric.width + 1);
+  });
 
   const constructorPanel = card.locator('[data-dashboard-answer-question="constructors_championship_top_3"]');
   await expect(constructorPanel.locator('[data-position="1"]')).toContainText("Ferrari");
@@ -613,7 +636,8 @@ test("dashboard previews Global answers as podium picks and keeps phone layout c
   const mobileCard = page.locator(".dashboard-global-answers-card");
   await expect(mobileCard).toBeVisible();
   await expect(mobileCard.locator(".dashboard-global-position-link")).toContainText(/Position \d+ of \d+/);
-  await expect(mobileCard.locator('a[href="/global/leaderboard"]').first()).toBeVisible();
+  await expect(mobileCard.locator(".dashboard-global-position-link")).toBeVisible();
+  await expect(mobileCard.locator(".dashboard-global-leaderboard-action")).toBeVisible();
   await expect(page.locator(".dashboard-desktop-global-preview")).toBeHidden();
   expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
 });

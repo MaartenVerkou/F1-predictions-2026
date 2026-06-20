@@ -4580,7 +4580,7 @@ button[data-predictions-save-button][data-state="failed"] {
 
 .dashboard-global-position-link {
   flex: 0 0 auto;
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   min-height: 34px;
@@ -4632,17 +4632,17 @@ button[data-predictions-save-button][data-state="failed"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: end;
   gap: 8px;
-  min-height: 68px;
+  min-height: 88px;
 }
 
 .dashboard-podium-pick {
   min-width: 0;
-  height: 54px;
+  height: 74px;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 3px;
-  padding: 7px 8px;
+  padding: 8px 7px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background:
@@ -4651,7 +4651,7 @@ button[data-predictions-save-button][data-state="failed"] {
 }
 
 .dashboard-podium-pick.is-position-1 {
-  height: 66px;
+  height: 86px;
   border-color: color-mix(in srgb, var(--accent) 34%, #c89b2b);
   background:
     linear-gradient(135deg, rgba(214, 11, 34, 0.1) 0%, rgba(200, 155, 43, 0.2) 100%);
@@ -4706,14 +4706,17 @@ button[data-predictions-save-button][data-state="failed"] {
 }
 
 .dashboard-podium-name {
-  display: block;
+  display: -webkit-box;
   max-width: 100%;
   overflow: hidden;
   color: var(--text);
   font-size: 0.92rem;
-  line-height: 1.12;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.1;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .dashboard-podium-pick.is-empty .dashboard-podium-name {
@@ -4726,6 +4729,10 @@ button[data-predictions-save-button][data-state="failed"] {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
+}
+
+.dashboard-global-leaderboard-action {
+  display: none;
 }
 
 .dashboard-global-answers-empty {
@@ -5391,9 +5398,14 @@ button.lang-option.is-active {
   }
 
   .dashboard-global-position-link {
+    display: inline-flex;
     width: max-content;
     max-width: 100%;
     justify-content: flex-start;
+  }
+
+  .dashboard-global-leaderboard-action {
+    display: inline-flex;
   }
 
   .dashboard-global-answer-grid {
@@ -5402,16 +5414,16 @@ button.lang-option.is-active {
   }
 
   .dashboard-podium-preview {
-    min-height: 58px;
+    min-height: 82px;
   }
 
   .dashboard-podium-pick {
-    height: 48px;
-    padding: 6px;
+    height: 70px;
+    padding: 7px 6px;
   }
 
   .dashboard-podium-pick.is-position-1 {
-    height: 56px;
+    height: 80px;
   }
 
   h1 {
