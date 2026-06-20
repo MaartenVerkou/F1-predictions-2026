@@ -79,6 +79,43 @@ const measureHeaderAnchor = async (page, path) => {
   });
 };
 
+const measureHeaderOverlap = async (page, width) => {
+  await page.setViewportSize({ width, height: 844 });
+  await page.goto("/dashboard", { waitUntil: "networkidle" });
+  await page.waitForSelector(".countdown", { state: "visible" });
+
+  return page.evaluate(() => {
+    const readRect = (selector) => {
+      const element = document.querySelector(selector);
+      const rect = element.getBoundingClientRect();
+      return {
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+        text: element.textContent.trim().replace(/\s+/g, " ")
+      };
+    };
+
+    const brand = readRect(".header-brand");
+    const countdown = readRect(".countdown");
+    const toggle = readRect("[data-header-menu-toggle]");
+    const actions = readRect("[data-header-menu]");
+    const rightEdge = toggle.width > 0 ? toggle.left : actions.left;
+
+    return {
+      viewportWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      headerClass: document.querySelector("header").className,
+      brand,
+      countdown,
+      toggle,
+      actions,
+      brandCountdownGap: countdown.left - brand.right,
+      countdownRightGap: rightEdge - countdown.right
+    };
+  });
+};
+
 test("desktop header shows dashboard and admin labels while keeping account compact", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/dashboard");
@@ -164,6 +201,23 @@ test("header reserves the same page offset before app bootstrap", async ({ page 
   expect(Math.abs(mobile.afterApp.mainTop - mobile.beforeApp.mainTop)).toBeLessThanOrEqual(2);
   expect(mobile.beforeApp.menuDisplay).toBe("none");
   await mobilePage.close();
+});
+
+test("closed countdown stays between brand and header actions on narrow screens", async ({ page }) => {
+  await page.request.post("/language", {
+    form: {
+      locale: "nl",
+      redirectTo: "/dashboard"
+    }
+  });
+
+  for (const width of [980, 720, 600, 460, 420, 390, 360, 320]) {
+    const metrics = await measureHeaderOverlap(page, width);
+
+    expect(metrics.brandCountdownGap, JSON.stringify(metrics)).toBeGreaterThanOrEqual(8);
+    expect(metrics.countdownRightGap, JSON.stringify(metrics)).toBeGreaterThanOrEqual(8);
+    expect(metrics.scrollWidth, JSON.stringify(metrics)).toBeLessThanOrEqual(metrics.viewportWidth);
+  }
 });
 
 test("collapsed admin header menu orders actions and keeps dark selected state subtle", async ({ page }) => {

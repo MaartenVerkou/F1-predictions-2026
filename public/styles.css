@@ -5009,6 +5009,15 @@ header.is-collapsed .header-right {
   position: relative;
 }
 
+header.is-collapsed .header-inner {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+header.is-collapsed .header-center {
+  width: 100%;
+  justify-self: stretch;
+}
+
 header.is-collapsed .header-actions {
   position: absolute;
   right: 0;
@@ -5212,6 +5221,15 @@ button.lang-option.is-active {
 
   header .header-right {
     position: relative;
+  }
+
+  header .header-inner {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  header .header-center {
+    width: 100%;
+    justify-self: stretch;
   }
 
   header .header-actions {
@@ -5549,6 +5567,16 @@ button.lang-option.is-active {
 
   .dashboard-podium-position {
     font-size: 0.68rem;
+  }
+}
+
+@media (max-width: 340px) {
+  .brand-text {
+    display: none;
+  }
+
+  .header-inner {
+    gap: 8px;
   }
 }
 
