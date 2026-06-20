@@ -4547,6 +4547,223 @@ button[data-predictions-save-button][data-state="failed"] {
   display: none;
 }
 
+.dashboard-global-answers-card {
+  display: grid;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.dashboard-global-answers-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.dashboard-global-answers-title {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-global-answers-title h2 {
+  margin: 0;
+  font-size: 1.36rem;
+  letter-spacing: 0;
+}
+
+.dashboard-global-answers-badge {
+  margin-bottom: 0;
+  width: max-content;
+  max-width: 100%;
+}
+
+.dashboard-global-position-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 6px 11px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, var(--accent));
+  border-radius: 999px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--card) 88%, var(--accent));
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+}
+
+.dashboard-global-position-link:hover,
+.dashboard-global-position-link:focus-visible {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--card) 78%, var(--accent));
+  text-decoration: none;
+}
+
+.dashboard-global-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-global-answer-panel {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-global-answer-label {
+  min-width: 0;
+  color: color-mix(in srgb, var(--text) 78%, var(--muted));
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.dashboard-podium-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-height: 68px;
+}
+
+.dashboard-podium-pick {
+  min-width: 0;
+  height: 54px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, white) 0%, color-mix(in srgb, var(--rules-bg) 76%, var(--card)) 100%);
+  text-align: center;
+}
+
+.dashboard-podium-pick.is-position-1 {
+  height: 66px;
+  border-color: color-mix(in srgb, var(--accent) 34%, #c89b2b);
+  background:
+    linear-gradient(135deg, rgba(214, 11, 34, 0.1) 0%, rgba(200, 155, 43, 0.2) 100%);
+  box-shadow: 0 12px 24px rgba(200, 155, 43, 0.12);
+}
+
+.dashboard-podium-pick.is-position-2 {
+  border-color: color-mix(in srgb, var(--border) 48%, #9aa7ba);
+  background:
+    linear-gradient(135deg, rgba(128, 146, 182, 0.14) 0%, rgba(210, 216, 226, 0.24) 100%);
+}
+
+.dashboard-podium-pick.is-position-3 {
+  border-color: color-mix(in srgb, var(--border) 42%, #b5743f);
+  background:
+    linear-gradient(135deg, rgba(181, 116, 63, 0.15) 0%, rgba(232, 199, 170, 0.22) 100%);
+}
+
+.dashboard-podium-pick.is-empty {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--rules-bg) 66%, var(--card));
+  box-shadow: none;
+}
+
+.dashboard-podium-position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #111827;
+  font-family: var(--font-heading);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.dashboard-podium-pick.is-position-1 .dashboard-podium-position {
+  background: var(--accent);
+}
+
+.dashboard-podium-pick.is-position-2 .dashboard-podium-position {
+  background: #6b7280;
+}
+
+.dashboard-podium-pick.is-position-3 .dashboard-podium-position {
+  background: #9a5a2e;
+}
+
+.dashboard-podium-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-podium-pick.is-empty .dashboard-podium-name {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.dashboard-global-answer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.dashboard-global-answers-empty {
+  margin: 0;
+}
+
+:root[data-theme="dark"] .dashboard-global-position-link {
+  background: rgba(255, 111, 127, 0.08);
+}
+
+:root[data-theme="dark"] .dashboard-podium-pick {
+  background:
+    linear-gradient(180deg, rgba(18, 28, 46, 0.92) 0%, rgba(11, 18, 32, 0.96) 100%);
+}
+
+:root[data-theme="dark"] .dashboard-global-answer-label {
+  color: color-mix(in srgb, var(--text) 86%, var(--muted));
+}
+
+:root[data-theme="dark"] .dashboard-podium-pick.is-position-1 {
+  border-color: rgba(214, 170, 73, 0.46);
+  background:
+    linear-gradient(135deg, rgba(91, 55, 9, 0.66) 0%, rgba(36, 24, 10, 0.94) 100%);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+:root[data-theme="dark"] .dashboard-podium-pick.is-position-2 {
+  border-color: rgba(157, 171, 194, 0.42);
+  background:
+    linear-gradient(135deg, rgba(52, 64, 84, 0.74) 0%, rgba(20, 27, 39, 0.94) 100%);
+}
+
+:root[data-theme="dark"] .dashboard-podium-pick.is-position-3 {
+  border-color: rgba(177, 118, 74, 0.44);
+  background:
+    linear-gradient(135deg, rgba(94, 49, 23, 0.74) 0%, rgba(31, 18, 13, 0.94) 100%);
+}
+
 :root[data-theme="dark"] .dashboard-group-item:hover {
   border-color: rgba(255, 111, 127, 0.45);
   background: #132246;
@@ -5145,6 +5362,40 @@ button.lang-option.is-active {
     display: none;
   }
 
+  .dashboard-global-answers-card {
+    gap: 14px;
+  }
+
+  .dashboard-global-answers-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dashboard-global-position-link {
+    width: max-content;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dashboard-global-answer-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .dashboard-podium-preview {
+    min-height: 58px;
+  }
+
+  .dashboard-podium-pick {
+    height: 48px;
+    padding: 6px;
+  }
+
+  .dashboard-podium-pick.is-position-1 {
+    height: 56px;
+  }
+
   h1 {
     font-size: 1.75rem;
     line-height: 1.08;
@@ -5284,6 +5535,20 @@ button.lang-option.is-active {
   .admin-analysis-table-scroll .table.compact td {
     padding: 6px;
     font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .dashboard-podium-preview {
+    gap: 6px;
+  }
+
+  .dashboard-podium-name {
+    font-size: 0.82rem;
+  }
+
+  .dashboard-podium-position {
+    font-size: 0.68rem;
   }
 }
 

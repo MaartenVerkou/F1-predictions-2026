@@ -45,6 +45,13 @@
   "dashboard": {
     "page_title": "Dashboard",
     "global_group_title": "Global league",
+    "global_answers_title": "Deine Global Top 3",
+    "drivers_championship_preview": "Fahrermeisterschaft",
+    "constructors_championship_preview": "Konstrukteursmeisterschaft",
+    "answer_missing": "Nicht ausgefuellt",
+    "global_answers_empty": "Noch keine globalen Tipps gespeichert.",
+    "view_all_global_answers": "Alle Antworten ansehen",
+    "view_global_leaderboard": "Leaderboard ansehen",
     "my_groups": "Meine Gruppen",
     "create_group": "Gruppe erstellen",
     "join_group": "Gruppe beitreten",

@@ -7,39 +7,58 @@
   <% if (success) { %>
     <div class="alert" style="background:#eef8f0;border-color:#c8e6d0;color:#2d6a3a;"><%= success %></div>
   <% } %>
+  <% const safeFeaturedGlobalGroup = (typeof featuredGlobalGroup !== 'undefined' && featuredGlobalGroup) ? featuredGlobalGroup : null; %>
+  <% const safeGlobalAnswerPreview = (typeof globalAnswerPreview !== 'undefined' && globalAnswerPreview) ? globalAnswerPreview : null; %>
 
   <div class="hero-main-column">
-    <% if (featuredGlobalGroup) { %>
-      <div class="card dashboard-mobile-global-card dashboard-group-item dashboard-group-item-featured">
-        <div class="dashboard-group-link">
-          <div class="dashboard-group-row">
-            <div class="dashboard-group-meta">
-              <div class="dashboard-group-header-line">
-                <strong><%= t('dashboard.global_group_title') %></strong>
-                <% if (featuredGlobalGroup.dashboardPosition) { %>
-                  <span class="muted dashboard-group-position">
-                    <%= t('dashboard.position_summary', { rank: featuredGlobalGroup.dashboardPosition.rank, total: featuredGlobalGroup.dashboardPosition.total }) %>
-                  </span>
-                <% } %>
-              </div>
-              <div class="inline-actions dashboard-group-actions">
-                <a class="dashboard-group-view-label" href="<%= `${groupPath(featuredGlobalGroup)}/responses` %>"><%= t('responses.page_title') %></a>
-                <a class="dashboard-group-view-label" href="<%= `${groupPath(featuredGlobalGroup)}/leaderboard` %>"><%= t('leaderboard.page_title') %></a>
-              </div>
-            </div>
-            <a
-              class="dashboard-group-open-btn"
-              href="<%= groupPath(featuredGlobalGroup) %>"
-              aria-label="<%= `${t('dashboard.view_group')}: ${featuredGlobalGroup.name}` %>"
-              title="<%= t('dashboard.view_group') %>"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
-              </svg>
-            </a>
+    <% if (safeFeaturedGlobalGroup) { %>
+      <% const globalGroupBasePath = groupPath(safeFeaturedGlobalGroup); %>
+      <% const globalAnswerItems = safeGlobalAnswerPreview && Array.isArray(safeGlobalAnswerPreview.items) ? safeGlobalAnswerPreview.items : []; %>
+      <% const hasGlobalAnswers = Boolean(safeGlobalAnswerPreview && safeGlobalAnswerPreview.hasAnyAnswer); %>
+      <% const podiumOrder = [2, 1, 3]; %>
+      <section class="card dashboard-global-answers-card" aria-labelledby="dashboard-global-answers-title">
+        <div class="dashboard-global-answers-head">
+          <div class="dashboard-global-answers-title">
+            <span class="badge dashboard-global-answers-badge"><%= t('dashboard.global_group_title') %></span>
+            <h2 id="dashboard-global-answers-title"><%= t('dashboard.global_answers_title') %></h2>
           </div>
+          <% if (safeFeaturedGlobalGroup.dashboardPosition) { %>
+            <a class="dashboard-global-position-link" href="<%= `${globalGroupBasePath}/leaderboard` %>">
+              <%= t('dashboard.position_summary', { rank: safeFeaturedGlobalGroup.dashboardPosition.rank, total: safeFeaturedGlobalGroup.dashboardPosition.total }) %>
+            </a>
+          <% } %>
         </div>
-      </div>
+
+        <% if (globalAnswerItems.length > 0 && hasGlobalAnswers) { %>
+          <div class="dashboard-global-answer-grid">
+            <% globalAnswerItems.forEach(item => { %>
+              <div class="dashboard-global-answer-panel" data-dashboard-answer-question="<%= item.questionId %>">
+                <div class="dashboard-podium-preview" role="list" aria-label="<%= t(item.titleKey) %>">
+                  <% podiumOrder.forEach(position => { %>
+                    <% const pick = (item.picks || []).find(entry => Number(entry.position) === Number(position)); %>
+                    <div
+                      class="dashboard-podium-pick is-position-<%= position %> <%= pick ? '' : 'is-empty' %>"
+                      role="listitem"
+                      data-position="<%= position %>"
+                    >
+                      <span class="dashboard-podium-position" aria-label="<%= t('responses.position_label', { n: position }) %>">P<%= position %></span>
+                      <strong class="dashboard-podium-name"><%= pick ? pick.label : t('dashboard.answer_missing') %></strong>
+                    </div>
+                  <% }) %>
+                </div>
+                <div class="dashboard-global-answer-label"><%= t(item.titleKey) %></div>
+              </div>
+            <% }) %>
+          </div>
+        <% } else { %>
+          <p class="muted dashboard-global-answers-empty"><%= t('dashboard.global_answers_empty') %></p>
+        <% } %>
+
+        <div class="dashboard-global-answer-actions">
+          <a class="button-link" href="<%= `${globalGroupBasePath}/responses` %>"><%= t('dashboard.view_all_global_answers') %></a>
+          <a class="link" href="<%= `${globalGroupBasePath}/leaderboard` %>"><%= t('dashboard.view_global_leaderboard') %></a>
+        </div>
+      </section>
     <% } %>
 
     <section class="card dashboard-my-groups-section">

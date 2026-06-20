@@ -126,6 +126,13 @@
   "dashboard": {
     "page_title": "Dashboard",
     "global_group_title": "Algemene competitie",
+    "global_answers_title": "Jouw Global top 3",
+    "drivers_championship_preview": "Coureurskampioenschap",
+    "constructors_championship_preview": "Constructeurskampioenschap",
+    "answer_missing": "Nog niet ingevuld",
+    "global_answers_empty": "Nog geen algemene voorspellingen opgeslagen.",
+    "view_all_global_answers": "Alle antwoorden bekijken",
+    "view_global_leaderboard": "Klassement bekijken",
     "my_groups": "Mijn groepen",
     "create_group": "Groep maken",
     "join_group": "Lid worden van groep",

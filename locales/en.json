@@ -126,6 +126,13 @@
   "dashboard": {
     "page_title": "Dashboard",
     "global_group_title": "Global league",
+    "global_answers_title": "Your Global top 3",
+    "drivers_championship_preview": "Drivers' Championship",
+    "constructors_championship_preview": "Constructors' Championship",
+    "answer_missing": "Not filled in",
+    "global_answers_empty": "No Global predictions saved yet.",
+    "view_all_global_answers": "View all answers",
+    "view_global_leaderboard": "View leaderboard",
     "my_groups": "My groups",
     "create_group": "Create group",
     "join_group": "Join group",

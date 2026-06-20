@@ -13,6 +13,14 @@ const QUESTIONS = [
   "races_before_title_decided"
 ];
 
+const getHorizontalOverflow = async (page) =>
+  page.evaluate(() =>
+    Math.max(
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      document.body.scrollWidth - document.body.clientWidth
+    )
+  );
+
 function upsertUser(db, { name, email, isAdmin = 0 }) {
   const now = new Date().toISOString();
   db.prepare(
@@ -188,6 +196,41 @@ function seedLeaderboardInsights(db, { includeThirdSnapshot = false } = {}) {
   ).run(devAdmin.id, privateGroupId, now);
 
   return { devAdminId: Number(devAdmin.id), privateGroupId, snapshotIds };
+}
+
+function seedGlobalDashboardAnswers(db) {
+  const now = new Date().toISOString();
+  const devAdmin = db.prepare("SELECT id FROM users WHERE email = ?").get("dev@example.com");
+  const globalGroup = db.prepare("SELECT id FROM groups WHERE is_global = 1 LIMIT 1").get();
+  if (!devAdmin || !globalGroup) {
+    throw new Error("Expected dashboard seed users and global group to exist.");
+  }
+
+  const insertResponse = db.prepare(
+    `
+    INSERT INTO responses (user_id, group_id, question_id, answer, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(user_id, group_id, question_id) DO UPDATE SET
+      answer = excluded.answer,
+      updated_at = excluded.updated_at
+    `
+  );
+  insertResponse.run(
+    devAdmin.id,
+    globalGroup.id,
+    "drivers_championship_top_3",
+    JSON.stringify(["Lewis Hamilton", "Max Verstappen", "Kimi Antonelli"]),
+    now,
+    now
+  );
+  insertResponse.run(
+    devAdmin.id,
+    globalGroup.id,
+    "constructors_championship_top_3",
+    JSON.stringify(["Ferrari", "McLaren", "Mercedes"]),
+    now,
+    now
+  );
 }
 
 test("leaderboard shows trend chart, latest-race movement, selected insights, and breakdown modes", async ({ page }) => {
@@ -526,6 +569,53 @@ test("anonymous home preview opens the public global leaderboard without login",
   await expect(page).toHaveURL(/\/global\/leaderboard/);
   await expect(page.getByRole("heading", { name: /Global: Leaderboard/i })).toBeVisible();
   await expect(page.locator("form[action='/login']")).toHaveCount(0);
+});
+
+test("dashboard previews Global answers as podium picks and keeps phone layout compact", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  seedLeaderboardInsights(db);
+  seedGlobalDashboardAnswers(db);
+  db.close();
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/dashboard");
+
+  const card = page.locator(".dashboard-global-answers-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("Your Global top 3");
+  await expect(card.locator(".dashboard-global-position-link")).toContainText(/Position \d+ of \d+/);
+  await expect(card.getByRole("link", { name: "View all answers" })).toHaveAttribute(
+    "href",
+    "/global/responses"
+  );
+
+  const driverPanel = card.locator('[data-dashboard-answer-question="drivers_championship_top_3"]');
+  await expect(driverPanel).toContainText("Drivers' Championship");
+  const driverPositionOrder = await driverPanel.locator(".dashboard-podium-pick").evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("data-position"))
+  );
+  expect(driverPositionOrder).toEqual(["2", "1", "3"]);
+  await expect(driverPanel.locator('[data-position="1"]')).toContainText("Lewis Hamilton");
+  await expect(driverPanel.locator('[data-position="2"]')).toContainText("Max Verstappen");
+  await expect(driverPanel.locator('[data-position="3"]')).toContainText("Kimi Antonelli");
+
+  const constructorPanel = card.locator('[data-dashboard-answer-question="constructors_championship_top_3"]');
+  await expect(constructorPanel.locator('[data-position="1"]')).toContainText("Ferrari");
+  await expect(constructorPanel.locator('[data-position="2"]')).toContainText("McLaren");
+  await expect(page.locator(".dashboard-desktop-global-preview")).toBeVisible();
+  expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard");
+
+  const mobileCard = page.locator(".dashboard-global-answers-card");
+  await expect(mobileCard).toBeVisible();
+  await expect(mobileCard.locator(".dashboard-global-position-link")).toContainText(/Position \d+ of \d+/);
+  await expect(mobileCard.locator('a[href="/global/leaderboard"]').first()).toBeVisible();
+  await expect(page.locator(".dashboard-desktop-global-preview")).toBeHidden();
+  expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
 });
 
 test("leaderboard presentation fits desktop and phone in light and dark mode", async ({ page }) => {

@@ -32,6 +32,16 @@ function registerAuthRoutes(app, deps) {
   const EMAIL_SENDER = String(SMTP_FROM || "").trim()
     || (SMTP_USER ? `${BRAND_NAME} <${SMTP_USER}>` : BRAND_NAME);
   const PREVIEW_SEASON = Number(CURRENT_SEASON || process.env.F1_SEASON || 2026);
+  const DASHBOARD_GLOBAL_ANSWER_ITEMS = [
+    {
+      questionId: "drivers_championship_top_3",
+      titleKey: "dashboard.drivers_championship_preview"
+    },
+    {
+      questionId: "constructors_championship_top_3",
+      titleKey: "dashboard.constructors_championship_preview"
+    }
+  ];
 
   const escapeHtml = (value) =>
     String(value || "")
@@ -481,6 +491,63 @@ function registerAuthRoutes(app, deps) {
       rows
     };
   }
+
+  const parseDashboardRankingAnswer = (rawValue) => {
+    if (rawValue == null || rawValue === "") return [];
+    try {
+      const parsed = JSON.parse(String(rawValue));
+      return Array.isArray(parsed)
+        ? parsed
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+            .slice(0, 3)
+        : [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const getDashboardGlobalAnswerPreview = (userId, globalGroup) => {
+    const safeUserId = Number(userId || 0);
+    const globalGroupId = Number(globalGroup?.id || 0);
+    if (!Number.isFinite(safeUserId) || safeUserId <= 0) return null;
+    if (!Number.isFinite(globalGroupId) || globalGroupId <= 0) return null;
+
+    const rows = db
+      .prepare(
+        `
+        SELECT question_id, answer
+        FROM responses
+        WHERE user_id = ?
+          AND group_id = ?
+          AND question_id IN (${DASHBOARD_GLOBAL_ANSWER_ITEMS.map(() => "?").join(", ")})
+        `
+      )
+      .all(
+        safeUserId,
+        globalGroupId,
+        ...DASHBOARD_GLOBAL_ANSWER_ITEMS.map((item) => item.questionId)
+      );
+    const answersByQuestion = rows.reduce((acc, row) => {
+      acc[row.question_id] = row.answer;
+      return acc;
+    }, {});
+
+    const items = DASHBOARD_GLOBAL_ANSWER_ITEMS.map((item) => ({
+      ...item,
+      picks: parseDashboardRankingAnswer(answersByQuestion[item.questionId]).map(
+        (label, index) => ({
+          position: index + 1,
+          label
+        })
+      )
+    }));
+
+    return {
+      items,
+      hasAnyAnswer: items.some((item) => item.picks.length > 0)
+    };
+  };
 
   app.get("/", (req, res) => {
     const user = getCurrentUser(req);
@@ -1476,6 +1543,7 @@ function registerAuthRoutes(app, deps) {
     }));
     const featuredGlobalGroup =
       groupsWithPositions.find((group) => Number(group.is_global) === 1) || null;
+    const globalAnswerPreview = getDashboardGlobalAnswerPreview(user.id, featuredGlobalGroup);
     const regularGroups = groupsWithPositions.filter((group) => Number(group.is_global) !== 1);
     const requestedGroupsPage = Number(req.query.groupsPage || 1);
     const currentGroupsPage =
@@ -1517,6 +1585,7 @@ function registerAuthRoutes(app, deps) {
       user,
       groups: groupsWithPositions,
       featuredGlobalGroup,
+      globalAnswerPreview,
       regularGroups: pagedRegularGroups,
       currentGroupsPage: safeGroupsPage,
       totalGroupsPages,

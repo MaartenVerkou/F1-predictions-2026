@@ -45,6 +45,13 @@
   "dashboard": {
     "page_title": "Panel",
     "global_group_title": "Global league",
+    "global_answers_title": "Tu Top 3 Global",
+    "drivers_championship_preview": "Campeonato de pilotos",
+    "constructors_championship_preview": "Campeonato de constructores",
+    "answer_missing": "Sin completar",
+    "global_answers_empty": "Aun no hay predicciones globales guardadas.",
+    "view_all_global_answers": "Ver todas las respuestas",
+    "view_global_leaderboard": "Ver clasificacion",
     "my_groups": "Mis grupos",
     "create_group": "Crear grupo",
     "join_group": "Unirse al grupo",
