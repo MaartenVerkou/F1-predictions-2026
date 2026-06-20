@@ -87,7 +87,6 @@
   --header-item-active-bg: rgba(214, 11, 34, 0.075);
   --header-item-active-border: rgba(214, 11, 34, 0.2);
   --header-logo-bg: rgba(255, 255, 255, 0.95);
-  --header-logo-border: rgba(15, 26, 51, 0.08);
   --header-popover-bg: #ffffff;
   --shadow-soft: 0 16px 36px rgba(8, 17, 39, 0.08);
   --shadow-strong: 0 18px 34px rgba(214, 11, 34, 0.24);
@@ -126,7 +125,6 @@
   --header-item-active-bg: rgba(255, 45, 69, 0.12);
   --header-item-active-border: rgba(255, 111, 127, 0.28);
   --header-logo-bg: rgba(5, 9, 17, 0.68);
-  --header-logo-border: rgba(255, 255, 255, 0.14);
   --header-popover-bg: rgba(11, 18, 38, 0.98);
   --shadow-soft: 0 22px 46px rgba(0, 0, 0, 0.42);
   --shadow-strong: 0 20px 36px rgba(255, 45, 69, 0.28);
@@ -283,7 +281,7 @@ body.has-dev-toolbar {
   width: 50px;
   height: 50px;
   border-radius: 12px;
-  border: 1px solid var(--header-logo-border);
+  border: 0;
   overflow: hidden;
   background: var(--header-logo-bg);
   contain: strict;
