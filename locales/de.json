@@ -286,6 +286,8 @@
     "subtitle": "Beantworte 23 F1-Fragen, die dein Racing-Wissen testen.",
     "global_leaderboard_badge": "Global leaderboard",
     "global_leaderboard_cta": "Vollstaendige Leaderboard",
+    "predictions_teaser_badge": "Alle Tipps",
+    "predictions_teaser_empty": "Noch keine Tipps fuer diese Vorschau.",
     "create_account": "Konto erstellen",
     "or_login": "oder einloggen",
     "start_predicting": "Jetzt tippen",

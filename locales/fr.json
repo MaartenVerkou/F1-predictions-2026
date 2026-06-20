@@ -286,6 +286,8 @@
     "subtitle": "Repondez a 23 questions F1 originales qui testent vos connaissances.",
     "global_leaderboard_badge": "Classement global",
     "global_leaderboard_cta": "Classement complet",
+    "predictions_teaser_badge": "Tous les pronostics",
+    "predictions_teaser_empty": "Aucun pronostic a afficher pour le moment.",
     "create_account": "Creer un compte",
     "or_login": "ou se connecter",
     "start_predicting": "Commencer les pronostics",

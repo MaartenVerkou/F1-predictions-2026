@@ -1154,6 +1154,63 @@ button:disabled {
   margin-top: 0;
 }
 
+.home-predictions-teaser {
+  display: grid;
+  gap: 14px;
+}
+
+.home-predictions-teaser-head {
+  display: grid;
+  gap: 8px;
+}
+
+.home-predictions-teaser-head h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.home-predictions-teaser-summary {
+  margin: 0;
+}
+
+.home-predictions-teaser .responses-ranking-splits {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 10px;
+}
+
+.home-predictions-teaser .responses-ranking-place {
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--card) 94%, white) 0%, color-mix(in srgb, var(--rules-bg) 74%, var(--card)) 100%);
+}
+
+.home-predictions-teaser .responses-bars {
+  --responses-value-col: 84px;
+}
+
+.home-predictions-teaser .responses-ranking-place .responses-bars-item {
+  padding: 4px 0;
+}
+
+.home-predictions-teaser .responses-ranking-place .responses-bars-label {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.home-predictions-teaser-empty {
+  margin: 0;
+}
+
+.home-predictions-teaser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .leaderboard-preview-card {
   display: grid;
   gap: 12px;

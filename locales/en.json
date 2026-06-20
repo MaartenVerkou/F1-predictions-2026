@@ -367,6 +367,8 @@
     "subtitle": "Answer 23 F1 questions that test your racing knowledge.",
     "global_leaderboard_badge": "Global leaderboard",
     "global_leaderboard_cta": "Full leaderboard",
+    "predictions_teaser_badge": "All predictions",
+    "predictions_teaser_empty": "No predictions to preview yet.",
     "create_account": "Create an account",
     "or_login": "or log in",
     "start_predicting": "Start predicting",

@@ -233,6 +233,45 @@ function seedGlobalDashboardAnswers(db) {
   );
 }
 
+function seedHomePredictionTeaser(db) {
+  const now = new Date().toISOString();
+  const globalGroup = db.prepare("SELECT id FROM groups WHERE is_global = 1 LIMIT 1").get();
+  if (!globalGroup) throw new Error("Expected Playwright dev server to create the global group.");
+
+  db.prepare("DELETE FROM responses WHERE group_id = ? AND question_id = ?").run(
+    globalGroup.id,
+    "drivers_championship_top_3"
+  );
+
+  const participants = [
+    ["E2E Home Apex", "e2e-home-apex@example.local", ["Max Verstappen", "Lewis Hamilton", "Kimi Antonelli"]],
+    ["E2E Home Brake", "e2e-home-brake@example.local", ["Max Verstappen", "Lewis Hamilton", "Charles Leclerc"]],
+    ["E2E Home Chicane", "e2e-home-chicane@example.local", ["George Russell", "Lewis Hamilton", "Kimi Antonelli"]],
+    ["E2E Home Drift", "e2e-home-drift@example.local", ["Max Verstappen", "George Russell", "Charles Leclerc"]],
+    ["E2E Home Esses", "e2e-home-esses@example.local", ["Lewis Hamilton", "George Russell", "Kimi Antonelli"]],
+    ["E2E Home Flow", "e2e-home-flow@example.local", ["Lando Norris", "Lewis Hamilton", "Oscar Piastri"]]
+  ];
+
+  const insertMember = db.prepare(
+    "INSERT OR REPLACE INTO group_members (user_id, group_id, role, joined_at, coupled_to_global) VALUES (?, ?, 'member', ?, 1)"
+  );
+  const insertResponse = db.prepare(
+    `
+    INSERT INTO responses (user_id, group_id, question_id, answer, created_at, updated_at)
+    VALUES (?, ?, 'drivers_championship_top_3', ?, ?, ?)
+    ON CONFLICT(user_id, group_id, question_id) DO UPDATE SET
+      answer = excluded.answer,
+      updated_at = excluded.updated_at
+    `
+  );
+
+  participants.forEach(([name, email, picks]) => {
+    const user = upsertUser(db, { name, email });
+    insertMember.run(user.id, globalGroup.id, now);
+    insertResponse.run(user.id, globalGroup.id, JSON.stringify(picks), now, now);
+  });
+}
+
 test("leaderboard shows trend chart, latest-race movement, selected insights, and breakdown modes", async ({ page }) => {
   await page.goto("/");
 
@@ -569,6 +608,36 @@ test("anonymous home preview opens the public global leaderboard without login",
   await expect(page).toHaveURL(/\/global\/leaderboard/);
   await expect(page.getByRole("heading", { name: /Global: Leaderboard/i })).toBeVisible();
   await expect(page.locator("form[action='/login']")).toHaveCount(0);
+});
+
+test("closed home replaces quick steps with a public predictions teaser", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  seedHomePredictionTeaser(db);
+  db.close();
+
+  await page.getByRole("button", { name: "Visitor" }).click();
+  await page.goto("/");
+
+  const teaser = page.locator(".home-predictions-teaser");
+  await expect(teaser).toBeVisible();
+  await expect(teaser).toContainText("All predictions");
+  await expect(teaser).toContainText("Drivers' Championship: pick your Top 3");
+  await expect(teaser.getByRole("link", { name: "View all predictions" })).toHaveAttribute(
+    "href",
+    "/global/responses"
+  );
+  await expect(page.locator(".home-flow-card")).toHaveCount(0);
+
+  const placeOne = teaser.locator(".responses-ranking-place").first();
+  await expect(placeOne).toContainText("Position 1");
+  await expect(placeOne).toContainText("Max Verstappen");
+
+  const displayedRows = await teaser.locator(".responses-bars-item").count();
+  expect(displayedRows).toBeGreaterThan(0);
+  expect(displayedRows).toBeLessThanOrEqual(15);
+  expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
 });
 
 test("dashboard previews Global answers as podium picks and keeps phone layout compact", async ({ page }) => {

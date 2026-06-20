@@ -32,6 +32,7 @@ function registerAuthRoutes(app, deps) {
   const EMAIL_SENDER = String(SMTP_FROM || "").trim()
     || (SMTP_USER ? `${BRAND_NAME} <${SMTP_USER}>` : BRAND_NAME);
   const PREVIEW_SEASON = Number(CURRENT_SEASON || process.env.F1_SEASON || 2026);
+  const HOME_PREDICTION_TEASER_QUESTION_ID = "drivers_championship_top_3";
   const DASHBOARD_GLOBAL_ANSWER_ITEMS = [
     {
       questionId: "drivers_championship_top_3",
@@ -507,6 +508,88 @@ function registerAuthRoutes(app, deps) {
     }
   };
 
+  const parseRankingAnswerByPosition = (rawValue, placeCount) => {
+    const safePlaceCount = Math.max(1, Number(placeCount) || 3);
+    if (rawValue == null || rawValue === "") return Array.from({ length: safePlaceCount }, () => "");
+    try {
+      const parsed = JSON.parse(String(rawValue));
+      if (!Array.isArray(parsed)) return Array.from({ length: safePlaceCount }, () => "");
+      return Array.from({ length: safePlaceCount }, (_, index) =>
+        String(parsed[index] || "").trim()
+      );
+    } catch (err) {
+      return Array.from({ length: safePlaceCount }, () => "");
+    }
+  };
+
+  const summarizeRankingRowsByPlace = (rows, placeCount, limit = 5) => {
+    const safePlaceCount = Math.max(1, Number(placeCount) || 3);
+    const safeLimit = Math.max(1, Number(limit) || 5);
+    const total = Array.isArray(rows) ? rows.length : 0;
+    const buckets = Array.from({ length: safePlaceCount }, () => new Map());
+
+    (rows || []).forEach((row) => {
+      const picks = parseRankingAnswerByPosition(row.answer, safePlaceCount);
+      picks.forEach((pick, index) => {
+        if (!pick) return;
+        buckets[index].set(pick, (buckets[index].get(pick) || 0) + 1);
+      });
+    });
+
+    return buckets
+      .map((bucket, index) => ({
+        position: index + 1,
+        items: Array.from(bucket.entries())
+          .map(([label, count]) => ({
+            label,
+            count,
+            percent: total > 0 ? (count * 100) / total : 0
+          }))
+          .sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            return a.label.localeCompare(b.label);
+          })
+          .slice(0, safeLimit)
+      }))
+      .filter((place) => place.items.length > 0);
+  };
+
+  const getHomePredictionTeaser = (locale) => {
+    const globalGroup = db.prepare("SELECT id FROM groups WHERE is_global = 1 LIMIT 1").get();
+    if (!globalGroup) return null;
+
+    const questions = typeof getQuestions === "function" ? getQuestions(locale) : [];
+    const question = Array.isArray(questions)
+      ? questions.find((item) => item.id === HOME_PREDICTION_TEASER_QUESTION_ID)
+      : null;
+    const placeCount = Math.min(3, Math.max(1, Number(question?.count || 3)));
+
+    const rows = db
+      .prepare(
+        `
+        SELECT r.answer
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+          AND r.question_id = ?
+          AND COALESCE(u.hide_from_global, 0) = 0
+        ORDER BY u.name ASC
+        `
+      )
+      .all(Number(globalGroup.id), HOME_PREDICTION_TEASER_QUESTION_ID);
+    if (rows.length === 0) return null;
+
+    const positions = summarizeRankingRowsByPlace(rows, placeCount, 5);
+    if (positions.length === 0) return null;
+
+    return {
+      questionId: HOME_PREDICTION_TEASER_QUESTION_ID,
+      title: String(question?.prompt || "Drivers' Championship: pick your Top 3"),
+      responseCount: rows.length,
+      positions
+    };
+  };
+
   const getDashboardGlobalAnswerPreview = (userId, globalGroup) => {
     const safeUserId = Number(userId || 0);
     const globalGroupId = Number(globalGroup?.id || 0);
@@ -552,9 +635,11 @@ function registerAuthRoutes(app, deps) {
   app.get("/", (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
+    const isClosed = typeof predictionsClosed === "function" ? predictionsClosed() : false;
     res.render("home", {
       user,
-      predictionsClosed: typeof predictionsClosed === "function" ? predictionsClosed() : false,
+      predictionsClosed: isClosed,
+      homePredictionTeaser: isClosed ? getHomePredictionTeaser(locale) : null,
       globalLeaderboard: getHomeGlobalLeaderboard(locale, user ? user.id : null),
       globalLeaderboardHref: "/global/leaderboard"
     });
