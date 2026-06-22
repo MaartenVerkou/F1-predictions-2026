@@ -378,10 +378,68 @@ test("header theme polish keeps language menu, dark logo, and Dutch closed count
     const style = window.getComputedStyle(element);
     return {
       backgroundColor: style.backgroundColor,
-      borderColor: style.borderColor
+      borderTopWidth: style.borderTopWidth
     };
   });
   expect(darkLogoStyle.backgroundColor).not.toBe("rgb(255, 255, 255)");
   expect(darkLogoStyle.backgroundColor).not.toBe("rgba(255, 255, 255, 0.95)");
-  expect(darkLogoStyle.borderColor).not.toBe("rgba(15, 26, 51, 0.08)");
+  expect(darkLogoStyle.borderTopWidth).toBe("0px");
+
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll(".brand-logo")).every(
+      (image) => image.complete && image.naturalWidth > 0
+    )
+  );
+  const logoAlphaBounds = await page.evaluate(() => {
+    const readBounds = (selector) => {
+      const image = document.querySelector(selector);
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      context.drawImage(image, 0, 0);
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height).data;
+
+      const thresholds = [1, 32, 128, 240];
+      return {
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+        bounds: thresholds.map((threshold) => {
+          let minX = canvas.width;
+          let minY = canvas.height;
+          let maxX = -1;
+          let maxY = -1;
+          let pixels = 0;
+
+          for (let y = 0; y < canvas.height; y += 1) {
+            for (let x = 0; x < canvas.width; x += 1) {
+              const alpha = imageData[(y * canvas.width + x) * 4 + 3];
+              if (alpha >= threshold) {
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+                pixels += 1;
+              }
+            }
+          }
+
+          return {
+            threshold,
+            x: minX,
+            y: minY,
+            width: maxX - minX + 1,
+            height: maxY - minY + 1,
+            pixels
+          };
+        })
+      };
+    };
+
+    return {
+      light: readBounds(".brand-logo-light"),
+      dark: readBounds(".brand-logo-dark")
+    };
+  });
+  expect(logoAlphaBounds.dark).toEqual(logoAlphaBounds.light);
 });
