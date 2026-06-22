@@ -55,6 +55,28 @@ docker compose down
 docker compose down -v
 ```
 
+## Production-parity local test
+
+Use this before deploy when a UI change depends on real production-mode behavior, sessions, cookies, Docker packaging, or the SQLite state volume.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-production-parity.ps1
+```
+
+This starts the app through Docker with `NODE_ENV=production`, waits for `/healthz`, and prints the local app URL. It does not start Caddy or the Cloudflare tunnel by default. To include the built-in Caddy edge profile:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/start-production-parity.ps1 -WithEdge
+```
+
+Stop the local production-parity stack when finished:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/stop-production-parity.ps1
+```
+
+Volumes are preserved by default. Only use `-RemoveVolumes` when the local database/session state is disposable.
+
 On server behind an already running shared Caddy, run with server override:
 
 ```powershell
