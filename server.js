@@ -192,6 +192,40 @@ function serializeError(err) {
   };
 }
 
+const SAFE_CSRF_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function escapeHtmlAttribute(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function getSessionCsrfToken(req) {
+  if (!req.session) return "";
+  const existing = String(req.session.csrfToken || "").trim();
+  if (/^[a-f0-9]{64}$/i.test(existing)) return existing;
+  const token = crypto.randomBytes(32).toString("hex");
+  req.session.csrfToken = token;
+  return token;
+}
+
+function getRequestCsrfToken(req) {
+  const bodyToken = req.body?._csrf || req.body?.csrfToken;
+  const headerToken = req.get("x-csrf-token") || req.get("csrf-token");
+  return String(bodyToken || headerToken || "").trim();
+}
+
+function csrfTokensMatch(left, right) {
+  const leftValue = String(left || "");
+  const rightValue = String(right || "");
+  if (!leftValue || !rightValue || leftValue.length !== rightValue.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(leftValue), Buffer.from(rightValue));
+}
+
 function logEvent(level, event, fields = {}) {
   if (!shouldLog(level)) return;
   const record = {
@@ -408,6 +442,7 @@ db.exec(`
     guest_id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     source_group_id INTEGER,
+    resume_token_hash TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(source_group_id) REFERENCES groups(id)
@@ -581,6 +616,16 @@ function ensureUserColumns() {
 }
 
 ensureUserColumns();
+
+function ensureNamedGuestProfileColumns() {
+  const columns = db.prepare("PRAGMA table_info(named_guest_profiles);").all();
+  const names = new Set(columns.map((col) => col.name));
+  if (!names.has("resume_token_hash")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN resume_token_hash TEXT;");
+  }
+}
+
+ensureNamedGuestProfileColumns();
 
 function ensureQuestionSettingsColumns() {
   const columns = db.prepare("PRAGMA table_info(question_settings);").all();
@@ -1152,7 +1197,30 @@ app.use((req, res, next) => {
     if (!tail) return base;
     return tail.startsWith("/") ? `${base}${tail}` : `${base}/${tail}`;
   };
+  const csrfToken = getSessionCsrfToken(req);
+  res.locals.csrfToken = csrfToken;
+  res.locals.csrfField = () =>
+    `<input type="hidden" name="_csrf" value="${escapeHtmlAttribute(csrfToken)}">`;
   next();
+});
+
+app.use((req, res, next) => {
+  if (SAFE_CSRF_METHODS.has(String(req.method || "").toUpperCase())) {
+    return next();
+  }
+  const expectedToken = String(req.session?.csrfToken || "");
+  const requestToken = getRequestCsrfToken(req);
+  if (csrfTokensMatch(expectedToken, requestToken)) {
+    return next();
+  }
+  const acceptsJson = String(req.get("accept") || "").includes("application/json");
+  if (acceptsJson || String(req.get("x-join-ajax") || "").trim() === "1") {
+    return res.status(403).json({
+      ok: false,
+      error: "Invalid or expired form token."
+    });
+  }
+  return sendError(req, res, 403, "Invalid or expired form token.");
 });
 
 app.post("/language", (req, res) => {
@@ -1583,11 +1651,13 @@ function getNamedGuestAccessFromSession(req) {
   const inviteCode = String(raw.inviteCode || "").trim();
   const groupId = Number(raw.groupId || 0);
   const displayName = String(raw.displayName || "").trim();
+  const resumeToken = String(raw.resumeToken || "").trim();
   if (!inviteCode || !groupId || !displayName) return null;
   return {
     inviteCode,
     groupId,
-    displayName
+    displayName,
+    resumeToken
   };
 }
 
@@ -1618,7 +1688,32 @@ function hasNamedGuestAccess(req, inviteCode, groupId) {
   return !!member;
 }
 
-function upsertNamedGuestProfile(guestId, displayName, groupId) {
+function getNamedGuestResumeTokenFromSession(req, inviteCode, groupId) {
+  const access = getNamedGuestAccessFromSession(req);
+  if (!access) return "";
+  if (
+    String(access.inviteCode || "") !== String(inviteCode || "").trim()
+    || Number(access.groupId || 0) !== Number(groupId || 0)
+  ) {
+    return "";
+  }
+  return String(access.resumeToken || "").trim();
+}
+
+function generateGuestResumeToken() {
+  return crypto.randomBytes(18).toString("base64url");
+}
+
+function doesHashedSecretMatch(storedHash, token) {
+  const expected = String(storedHash || "").trim();
+  const supplied = String(token || "").trim();
+  if (!expected || !supplied) return false;
+  const suppliedHash = hashToken(supplied);
+  if (expected.length !== suppliedHash.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(suppliedHash));
+}
+
+function upsertNamedGuestProfile(guestId, displayName, groupId, resumeTokenHash = null) {
   const normalizedGuestId = String(guestId || "").trim();
   const normalizedDisplayName = normalizeDisplayName(displayName);
   const normalizedGroupId = Number(groupId || 0);
@@ -1626,17 +1721,35 @@ function upsertNamedGuestProfile(guestId, displayName, groupId) {
     return;
   }
   const now = new Date().toISOString();
+  const normalizedResumeTokenHash = resumeTokenHash
+    ? String(resumeTokenHash).trim()
+    : null;
   db.prepare(
     `
-    INSERT INTO named_guest_profiles (guest_id, display_name, source_group_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO named_guest_profiles (
+      guest_id,
+      display_name,
+      source_group_id,
+      resume_token_hash,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(guest_id)
     DO UPDATE SET
       display_name = excluded.display_name,
       source_group_id = excluded.source_group_id,
+      resume_token_hash = COALESCE(excluded.resume_token_hash, named_guest_profiles.resume_token_hash),
       updated_at = excluded.updated_at
     `
-  ).run(normalizedGuestId, normalizedDisplayName, normalizedGroupId, now, now);
+  ).run(
+    normalizedGuestId,
+    normalizedDisplayName,
+    normalizedGroupId,
+    normalizedResumeTokenHash,
+    now,
+    now
+  );
 }
 
 function upsertNamedGuestGroupMember(guestId, groupId, displayName) {
@@ -1708,12 +1821,19 @@ function setNamedGuestAccess(req, { inviteCode, groupId, displayName }) {
     return null;
   }
   const guestId = getGuestIdFromSession(req, { create: true });
-  upsertNamedGuestProfile(guestId, normalizedDisplayName, normalizedGroupId);
+  const resumeToken = generateGuestResumeToken();
+  upsertNamedGuestProfile(
+    guestId,
+    normalizedDisplayName,
+    normalizedGroupId,
+    hashToken(resumeToken)
+  );
   upsertNamedGuestGroupMember(guestId, normalizedGroupId, normalizedDisplayName);
   req.session.namedGuestAccess = {
     inviteCode: normalizedInviteCode,
     groupId: normalizedGroupId,
     displayName: normalizedDisplayName,
+    resumeToken,
     grantedAt: new Date().toISOString()
   };
   return req.session.namedGuestAccess;
@@ -1738,6 +1858,7 @@ function resumeNamedGuestAccess(req, { inviteCode, groupId, displayName, guestId
     inviteCode: normalizedInviteCode,
     groupId: normalizedGroupId,
     displayName: normalizedDisplayName,
+    resumeToken: "",
     grantedAt: new Date().toISOString()
   };
   return req.session.namedGuestAccess;
@@ -2253,6 +2374,112 @@ function serializeAnswerFromRequest(question, body) {
   }
   return String(answer).trim();
 }
+
+const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+const sensitiveActionAttempts = new Map();
+
+function getThrottleClientKey(req) {
+  return String(req.ip || req.socket?.remoteAddress || "unknown").trim();
+}
+
+function createSensitiveActionThrottle(name, { max = 10, keyParts = null } = {}) {
+  return (req, res, next) => {
+    const now = Date.now();
+    for (const [key, bucket] of sensitiveActionAttempts.entries()) {
+      if (!bucket || bucket.resetAt <= now) {
+        sensitiveActionAttempts.delete(key);
+      }
+    }
+
+    const extraParts = typeof keyParts === "function" ? keyParts(req) : [];
+    const throttleKey = [
+      name,
+      getThrottleClientKey(req),
+      ...(Array.isArray(extraParts) ? extraParts : [extraParts])
+    ]
+      .map((part) => String(part || "").trim().toLowerCase())
+      .join(":");
+    const current = sensitiveActionAttempts.get(throttleKey);
+    const bucket =
+      current && current.resetAt > now
+        ? current
+        : { count: 0, resetAt: now + THROTTLE_WINDOW_MS };
+    bucket.count += 1;
+    sensitiveActionAttempts.set(throttleKey, bucket);
+
+    if (bucket.count <= max) {
+      return next();
+    }
+
+    const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+    const acceptsJson = String(req.get("accept") || "").includes("application/json");
+    if (acceptsJson || String(req.get("x-join-ajax") || "").trim() === "1") {
+      return res.status(429).json({
+        ok: false,
+        error: "Too many attempts. Please try again later."
+      });
+    }
+    return sendError(req, res, 429, "Too many attempts. Please try again later.");
+  };
+}
+
+app.post(
+  "/login",
+  createSensitiveActionThrottle("login", {
+    max: 8,
+    keyParts: (req) => [req.body?.email]
+  })
+);
+app.post(
+  "/resend-verification",
+  createSensitiveActionThrottle("resend-verification", {
+    max: 4,
+    keyParts: (req) => [req.body?.email]
+  })
+);
+app.post(
+  "/forgot-password",
+  createSensitiveActionThrottle("forgot-password", {
+    max: 4,
+    keyParts: (req) => [req.body?.email]
+  })
+);
+app.post(
+  "/reset-password",
+  createSensitiveActionThrottle("reset-password", {
+    max: 8,
+    keyParts: (req) => [req.body?.token]
+  })
+);
+app.post(
+  "/groups/join",
+  createSensitiveActionThrottle("group-code-password", {
+    max: 8,
+    keyParts: (req) => [req.body?.code]
+  })
+);
+app.post(
+  "/join/:code",
+  createSensitiveActionThrottle("invite-member-password", {
+    max: 8,
+    keyParts: (req) => [req.params?.code]
+  })
+);
+app.post(
+  "/join/:code/guest",
+  createSensitiveActionThrottle("named-guest-join-password", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.body?.guestName]
+  })
+);
+app.post(
+  "/join/:code/guest/return",
+  createSensitiveActionThrottle("named-guest-return", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.body?.returnGuestName]
+  })
+);
 
 registerAuthRoutes(app, {
   db,
@@ -2874,6 +3101,30 @@ function renderJoinGuestPage(req, res, { group, code, displayName = "", returnNa
   });
 }
 
+function getJoinConfirmMembers(groupId) {
+  return db
+    .prepare(
+      `
+      SELECT u.id, u.name, gm.role
+      FROM group_members gm
+      JOIN users u ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+      ORDER BY gm.joined_at ASC
+      `
+    )
+    .all(groupId);
+}
+
+function renderJoinConfirmPage(req, res, { user, group, code, error = null }) {
+  return res.render("join_confirm", {
+    user,
+    group,
+    members: getJoinConfirmMembers(Number(group.id)),
+    code,
+    error
+  });
+}
+
 function isJoinGuestAjaxRequest(req) {
   return String(req.get("x-join-ajax") || "").trim() === "1";
 }
@@ -2893,6 +3144,7 @@ function respondJoinGuestError(req, res, {
       error: String(error || "Something went wrong.")
     });
   }
+  res.status(status);
   return renderJoinGuestPage(req, res, {
     group,
     code,
@@ -2952,14 +3204,7 @@ app.get("/join/:code", (req, res) => {
   if (isMember(user.id, invite.group_id)) {
     return res.redirect(`${getGroupBasePath(group)}/questions`);
   }
-  if (!isMember(user.id, invite.group_id)) {
-    const now = new Date().toISOString();
-    db.prepare(
-      "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-    ).run(user.id, invite.group_id, "member", now);
-    syncFromGlobalIfCoupled(user.id, invite.group_id, now);
-  }
-  return res.redirect(`${getGroupBasePath(group)}/questions`);
+  return renderJoinConfirmPage(req, res, { user, group, code });
 });
 
 app.get("/join/:code/responses", (req, res) => {
@@ -2983,11 +3228,7 @@ app.get("/join/:code/responses", (req, res) => {
   const user = getCurrentUser(req);
   if (user) {
     if (!isMember(user.id, invite.group_id)) {
-      const now = new Date().toISOString();
-      db.prepare(
-        "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-      ).run(user.id, invite.group_id, "member", now);
-      syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+      return res.redirect(`/join/${code}`);
     }
     return res.redirect(`${getGroupBasePath(group)}/responses`);
   }
@@ -3159,21 +3400,26 @@ app.post("/join/:code/guest/return", async (req, res) => {
   const existingNamedGuest = db
     .prepare(
       `
-      SELECT guest_id, display_name
-      FROM named_guest_group_members
-      WHERE group_id = ?
-        AND display_name = ? COLLATE NOCASE
+      SELECT
+        ngm.guest_id,
+        ngm.display_name,
+        ngp.resume_token_hash
+      FROM named_guest_group_members ngm
+      JOIN named_guest_profiles ngp ON ngp.guest_id = ngm.guest_id
+      WHERE ngm.group_id = ?
+        AND ngm.display_name = ? COLLATE NOCASE
       LIMIT 1
       `
     )
     .get(Number(group.id), returnName);
 
-  if (!existingNamedGuest) {
+  const resumeToken = String(req.body.resumeToken || "").trim();
+  if (!existingNamedGuest || !doesHashedSecretMatch(existingNamedGuest.resume_token_hash, resumeToken)) {
     return respondJoinGuestError(req, res, {
       group,
       code,
       returnName,
-      error: translate(locale, "join_guest.error_name_not_found"),
+      error: translate(locale, "join_guest.error_resume_token_invalid"),
       activeMode: "returning"
     });
   }
@@ -3208,11 +3454,7 @@ app.get("/join/:code/questions", (req, res) => {
   const user = getCurrentUser(req);
   if (user) {
     if (!isMember(user.id, invite.group_id)) {
-      const now = new Date().toISOString();
-      db.prepare(
-        "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-      ).run(user.id, invite.group_id, "member", now);
-      syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+      return res.redirect(`/join/${code}`);
     }
     const groupBasePath = getGroupBasePath(group);
     if (predictionsClosed()) {
@@ -3255,6 +3497,7 @@ app.get("/join/:code/questions", (req, res) => {
     isNamedGuestMode: true,
     guestSignupRedirectPath: `/join/${code}`,
     namedGuestDisplayName: String(getNamedGuestAccessFromSession(req)?.displayName || "").trim(),
+    namedGuestResumeToken: getNamedGuestResumeTokenFromSession(req, code, Number(group.id)),
     namedGuestShowBottomHint: req.query.saved === "1"
   });
 });

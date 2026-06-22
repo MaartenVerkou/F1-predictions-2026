@@ -1,4 +1,4 @@
-﻿<%- include('partials/header', { title: 'Admin login', user }) %>
+<%- include('partials/header', { title: 'Admin login', user }) %>
 
 <div class="card" style="max-width:480px; margin: 0 auto;">
   <h1>Admin login</h1>
@@ -6,6 +6,7 @@
     <div class="alert"><%= error %></div>
   <% } %>
   <form method="post" action="/admin/login">
+    <%- csrfField() %>
     <label>
       Admin password
       <input type="password" name="password" required />

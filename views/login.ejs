@@ -9,12 +9,14 @@
     <div class="alert"><%= error %></div>
     <% if (unverifiedEmail) { %>
       <form method="post" action="/resend-verification" class="auth-links" style="margin: 6px 0 14px;">
+    <%- csrfField() %>
         <input type="hidden" name="email" value="<%= unverifiedEmail %>" />
         <button type="submit" class="link underlined-link link-button"><%= t('verify_notice.resend_verification_email') %></button>
       </form>
     <% } %>
   <% } %>
   <form method="post" action="/login">
+    <%- csrfField() %>
     <label>
       <%= t('common.email') %>
       <input type="email" name="email" value="<%= email || '' %>" placeholder="you@team.com" required />

@@ -12,6 +12,7 @@
     class="join-guest-form <%= activeMode === 'returning' ? 'is-hidden' : '' %>"
     data-join-mode="new"
   >
+    <%- csrfField() %>
     <label>
       <%= t('join_guest.account_name_label') %>
       <input
@@ -48,6 +49,7 @@
     class="join-guest-form <%= activeMode === 'returning' ? '' : 'is-hidden' %>"
     data-join-mode="returning"
   >
+    <%- csrfField() %>
     <label>
       <%= t('join_guest.returning_name_label') %>
       <input
@@ -67,6 +69,18 @@
         <input type="password" name="password" required autocomplete="current-password" />
       </label>
     <% } %>
+
+    <label>
+      <%= t('join_guest.resume_token_label') %>
+      <input
+        type="text"
+        name="resumeToken"
+        required
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="<%= t('join_guest.resume_token_placeholder') %>"
+      />
+    </label>
 
     <div class="join-guest-actions">
       <button type="submit"><%= t('join_guest.continue_as_guest') %></button>

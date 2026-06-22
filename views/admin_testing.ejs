@@ -19,6 +19,7 @@
 
   <h2>Create test group</h2>
   <form method="post" action="/admin/test-group" class="admin-actions admin-analysis-create-form">
+    <%- csrfField() %>
     <label class="muted admin-field">
       Group name
       <input type="text" name="groupName" placeholder="Test Group Sprint 1" />
@@ -59,6 +60,7 @@
               </td>
               <td>
                 <form method="post" action="/admin/groups/<%= row.id %>/delete?from=analysis" onsubmit="return confirm('Delete this test group and all related data?')">
+                  <%- csrfField() %>
                   <button class="secondary no-wrap-btn" type="submit">Delete group</button>
                 </form>
               </td>

@@ -61,6 +61,7 @@
             <div class="table-actions">
               <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
               <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= groupsReturn %>">
                 <button class="secondary" type="submit">Delete group</button>
               </form>
@@ -118,6 +119,7 @@
               <span><%= showAdminEmail ? row.email : maskEmail(row.email) %></span>
               <% if (!showAdminEmail) { %>
                 <form id="reveal-email-admin-<%= row.id %>" method="post" action="/admin/users/<%= row.id %>/reveal-email" style="display:inline;">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                   <input type="hidden" name="adminPassword" value="">
                   <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-admin-<%= row.id %>')">View</button>
@@ -126,6 +128,7 @@
             </td>
             <td>
               <form method="post" action="/admin/users/<%= row.id %>/hide-from-global">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                 <input type="hidden" name="hideFromGlobal" value="0">
                 <label class="muted admin-inline-checkbox">
@@ -144,10 +147,12 @@
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/remove-admin">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                   <button class="secondary admin-toggle-btn" type="submit">Remove admin</button>
                 </form>
                 <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                   <button class="secondary" type="submit">Delete user</button>
                 </form>
@@ -191,6 +196,7 @@
               <span><%= showUserEmail ? row.email : maskEmail(row.email) %></span>
               <% if (!showUserEmail) { %>
                 <form id="reveal-email-user-<%= row.id %>" method="post" action="/admin/users/<%= row.id %>/reveal-email" style="display:inline;">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= usersReturn %>">
                   <input type="hidden" name="adminPassword" value="">
                   <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-user-<%= row.id %>')">View</button>
@@ -199,6 +205,7 @@
             </td>
             <td>
               <form method="post" action="/admin/users/<%= row.id %>/hide-from-global">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= usersReturn %>">
                 <input type="hidden" name="hideFromGlobal" value="0">
                 <label class="muted admin-inline-checkbox">
@@ -217,10 +224,12 @@
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/make-admin">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= usersReturn %>">
                   <button class="secondary admin-toggle-btn" type="submit">Make admin</button>
                 </form>
                 <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= usersReturn %>">
                   <button class="secondary" type="submit">Delete user</button>
                 </form>
@@ -294,6 +303,7 @@
             <td><%= formatAdminDate(row.last_seen_at) %></td>
             <td>
               <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= namedGuestsReturn %>">
                 <button class="secondary" type="submit">Delete guest</button>
               </form>
@@ -361,6 +371,7 @@
             <td><%= formatAdminDate(row.last_seen_at) %></td>
             <td>
               <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= visitorsReturn %>">
                 <button class="secondary" type="submit">Delete guest</button>
               </form>

@@ -13,6 +13,23 @@ const QUESTIONS = [
   "races_before_title_decided"
 ];
 
+const getCsrfToken = async (page, path = "/") => {
+  await page.goto(path);
+  const token = await page.locator('input[name="_csrf"]').first().getAttribute("value");
+  expect(token).toBeTruthy();
+  return token;
+};
+
+const postWithCsrf = async (page, path, { form, tokenPath = "/" } = {}) => {
+  const csrfToken = await getCsrfToken(page, tokenPath);
+  return page.request.post(path, {
+    form: {
+      _csrf: csrfToken,
+      ...(form || {})
+    }
+  });
+};
+
 const getHorizontalOverflow = async (page) =>
   page.evaluate(() =>
     Math.max(
@@ -520,7 +537,8 @@ test("admin can hide regular users from global results", async ({ page }) => {
   await page.goto("/global/leaderboard");
   await expect(page.locator(".leaderboard-main-card")).toContainText(hiddenUser.name);
 
-  await page.request.post(`/admin/users/${hiddenUser.id}/hide-from-global`, {
+  await postWithCsrf(page, `/admin/users/${hiddenUser.id}/hide-from-global`, {
+    tokenPath: "/admin/overview",
     form: {
       hideFromGlobal: "1",
       returnTo: "/admin/overview#admin-users"
@@ -547,7 +565,7 @@ test("Dutch leaderboard renders localized insight copy", async ({ page }) => {
   );
   db.close();
 
-  await page.request.post("/language", {
+  await postWithCsrf(page, "/language", {
     form: {
       locale: "nl",
       redirectTo: "/"

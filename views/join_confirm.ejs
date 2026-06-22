@@ -15,6 +15,7 @@
   </ul>
 
   <form method="post" action="/join/<%= code %>" style="margin-top:16px;">
+    <%- csrfField() %>
     <% if (!group.is_public) { %>
       <label>
         <%= t('group.group_password') %>

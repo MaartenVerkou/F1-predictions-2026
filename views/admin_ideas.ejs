@@ -45,6 +45,7 @@
             <% ['open', 'resolved', 'ignored'].forEach((nextStatus) => { %>
               <% if (nextStatus !== idea.status) { %>
                 <form method="post" action="/admin/ideas/<%= idea.id %>/status">
+                  <%- csrfField() %>
                   <input type="hidden" name="status" value="<%= nextStatus %>" />
                   <button type="submit" class="secondary"><%= statusActionLabel(nextStatus) %></button>
                 </form>
@@ -75,6 +76,7 @@
   <section class="admin-page-section">
     <h2><%= t('admin_ideas.add_heading') %></h2>
     <form method="post" action="/admin/ideas" class="admin-idea-form">
+    <%- csrfField() %>
       <label>
         <%= t('admin_ideas.type_label') %>
         <select name="type">

@@ -23,6 +23,7 @@
       </div>
     </div>
     <form class="account-logout-form" method="post" action="/logout">
+    <%- csrfField() %>
       <button class="secondary" type="submit"><%= t('header.logout') %></button>
     </form>
   </div>
@@ -31,6 +32,7 @@
     <div class="card account-panel-card">
       <h2><%= t('account.change_password') %></h2>
       <form method="post" action="/account/password">
+    <%- csrfField() %>
         <label>
           <%= t('account.current_password') %>
           <input type="password" name="currentPassword" required />
@@ -51,6 +53,7 @@
       <h2><%= t('account.delete_account') %></h2>
       <p class="muted"><%= t('account.delete_warning') %></p>
       <form method="post" action="/account/delete" onsubmit='return confirm(<%- JSON.stringify(t("account.delete_confirm")) %>);'>
+        <%- csrfField() %>
         <label>
           <%= t('account.current_password') %>
           <input type="password" name="currentPassword" required />

@@ -39,6 +39,7 @@
             action="/groups/<%= group.id %>/rules"
             hidden
           >
+            <%- csrfField() %>
             <label>
               <%= t('group.rules_text') %>
               <textarea name="rulesText" rows="6"><%= group.rules_text || '' %></textarea>
@@ -101,6 +102,7 @@
         <% if (role === 'owner' || role === 'admin') { %>
           <div class="inline-actions" style="margin-top:12px;">
             <form method="post" action="/groups/<%= group.id %>/invite-link/toggle">
+              <%- csrfField() %>
               <input type="hidden" name="open" value="<%= Number(group.invite_link_open ?? 1) === 1 ? 0 : 1 %>" />
               <button class="secondary" type="submit">
                 <%= Number(group.invite_link_open ?? 1) === 1 ? t('group.close_link') : t('group.open_link') %>
@@ -131,21 +133,25 @@
               <div class="group-member-actions">
                 <% if (isNamedGuestMember && member.guest_id) { %>
                   <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/named-guests/<%= encodeURIComponent(String(member.guest_id)) %>/kick">
+                    <%- csrfField() %>
                     <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
                   </form>
                 <% } else { %>
                   <% if (member.role !== 'owner') { %>
                     <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/kick">
+                      <%- csrfField() %>
                       <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>
                     </form>
                   <% } %>
                   <% if (member.role === 'member') { %>
                     <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/promote">
+                      <%- csrfField() %>
                       <button class="secondary group-member-action-btn" type="submit"><%= t('group.make_admin') %></button>
                     </form>
                   <% } %>
                   <% if (member.role === 'admin') { %>
                     <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/members/<%= member.id %>/demote">
+                      <%- csrfField() %>
                       <button class="secondary group-member-action-btn" type="submit"><%= t('group.remove_admin') %></button>
                     </form>
                   <% } %>
@@ -175,6 +181,7 @@
       <div class="card">
         <h2><%= t('group.group_password') %></h2>
         <form method="post" action="/groups/<%= group.id %>/password">
+          <%- csrfField() %>
           <label>
             <%= t('group.set_new_password') %>
             <input type="password" name="joinPassword" required minlength="4" />
@@ -187,6 +194,7 @@
     <% if (!group.is_global && user) { %>
       <div class="card">
         <form method="post" action="/groups/<%= group.id %>/leave" onsubmit="return confirm('<%= t('group.leave_confirm') %>');" style="margin:0;">
+          <%- csrfField() %>
           <button class="secondary" type="submit"><%= t('group.leave_group') %></button>
         </form>
       </div>

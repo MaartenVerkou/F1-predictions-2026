@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <% const brandTagline = "Predict the Formula 1 Season"; %>
 <% const devSessionMode = String(typeof devIdentityMode === 'string' ? devIdentityMode : '').trim().toLowerCase(); %>
 <% const devMode = user
@@ -68,21 +68,25 @@
           <span class="dev-toolbar-label">Dev</span>
           <div class="dev-switcher">
             <form method="post" action="/dev/switch-user">
+    <%- csrfField() %>
               <input type="hidden" name="mode" value="admin" />
               <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
               <button type="submit" class="secondary dev-switch-btn <%= devMode === 'admin' ? 'is-active' : '' %>">Admin</button>
             </form>
             <form method="post" action="/dev/switch-user">
+    <%- csrfField() %>
               <input type="hidden" name="mode" value="member" />
               <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
               <button type="submit" class="secondary dev-switch-btn <%= devMode === 'member' ? 'is-active' : '' %>">Member</button>
             </form>
             <form method="post" action="/dev/switch-user">
+    <%- csrfField() %>
               <input type="hidden" name="mode" value="visitor" />
               <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
               <button type="submit" class="secondary dev-switch-btn <%= devMode === 'visitor' ? 'is-active' : '' %>">Visitor</button>
             </form>
             <form method="post" action="/dev/switch-user">
+    <%- csrfField() %>
               <input type="hidden" name="mode" value="guest" />
               <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
               <button type="submit" class="secondary dev-switch-btn <%= devMode === 'guest' ? 'is-active' : '' %>">Guest</button>
@@ -215,6 +219,7 @@
               </summary>
               <div class="lang-popover">
                 <form method="post" action="/language" class="lang-list-form">
+    <%- csrfField() %>
                   <input type="hidden" name="redirectTo" value="<%= currentPath %>" />
                   <% supportedLocales.forEach(({ code, label }) => { %>
                     <button

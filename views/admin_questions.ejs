@@ -22,6 +22,7 @@
   }; %>
 
   <form method="post" action="/admin/questions">
+    <%- csrfField() %>
     <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Question settings table" tabindex="0">
     <table class="table compact admin-question-table">
       <thead>

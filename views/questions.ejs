@@ -1,4 +1,4 @@
-﻿<%- include('partials/header', { title: t('questions.page_title'), user }) %>
+<%- include('partials/header', { title: t('questions.page_title'), user }) %>
 
 <div class="card survey-page-card">
   <% const currentGroupPath = (typeof groupBasePath === 'string' && groupBasePath) ? groupBasePath : groupPath(group); %>
@@ -38,10 +38,17 @@
   <% if (namedGuestMode) { %>
     <% const guestAccountLink = `<a class="guest-cta-link" href="${guestSignupPath}">${t('home.create_account')}</a>`; %>
     <% const namedGuestName = (typeof namedGuestDisplayName === 'string' && namedGuestDisplayName.trim()) ? namedGuestDisplayName.trim() : t('questions.named_guest_fallback_name'); %>
+    <% const safeNamedGuestResumeToken = (typeof namedGuestResumeToken === 'string' && namedGuestResumeToken.trim()) ? namedGuestResumeToken.trim() : ''; %>
     <p class="muted named-guest-inline">
       <span class="named-guest-inline-label"><%= t('questions.named_guest_label') %></span>
       : <span class="named-guest-inline-name"><%= namedGuestName %></span>
     </p>
+    <% if (safeNamedGuestResumeToken) { %>
+      <p class="muted named-guest-inline" data-named-guest-resume-token="<%= safeNamedGuestResumeToken %>">
+        <span class="named-guest-inline-label"><%= t('questions.named_guest_resume_token_label') %></span>
+        : <code><%= safeNamedGuestResumeToken %></code>
+      </p>
+    <% } %>
     <p class="muted named-guest-inline-note"><%- t('questions.named_guest_account_notice_html', { create_account_link: guestAccountLink }) %></p>
   <% } %>
 
@@ -58,6 +65,7 @@
   <% } %>
 
   <form id="predictions-form" method="post" action="<%= `${currentGroupPath}/questions` %>">
+    <%- csrfField() %>
     <% const showNamedGuestBottomHint = namedGuestMode && (typeof namedGuestShowBottomHint !== 'undefined') && Boolean(namedGuestShowBottomHint); %>
     <% if (canCoupleToGlobal) { %>
       <div class="questions-couple-toggle">

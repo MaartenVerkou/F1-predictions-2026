@@ -159,6 +159,7 @@
                   <% } %>
                 </div>
                 <form class="dashboard-public-group-join" method="post" action="/groups/<%= group.id %>/join-public" style="margin:0;">
+                  <%- csrfField() %>
                   <button type="submit"><%= group.is_global ? t('dashboard.join_free') : t('dashboard.join') %></button>
                 </form>
               </div>
@@ -183,6 +184,7 @@
       <h2><%= t('dashboard.private_groups') %></h2>
       <p class="muted"><%= t('dashboard.private_groups_help') %></p>
       <form method="post" action="/groups/join">
+    <%- csrfField() %>
         <label>
           <%= t('dashboard.group_code') %>
           <input type="text" name="code" required />
@@ -198,6 +200,7 @@
     <div class="card" id="create-group">
       <h2><%= t('dashboard.create_new_group') %></h2>
       <form method="post" action="/groups">
+    <%- csrfField() %>
         <label>
           <%= t('dashboard.group_name') %>
           <input

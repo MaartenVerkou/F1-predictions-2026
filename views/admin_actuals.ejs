@@ -60,6 +60,7 @@ const pendingReviewSummary =
       </div>
       <% if (actualsTarget === 'current' && liveActualsReview.reviewStatus === 'pending') { %>
         <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-status-action">
+    <%- csrfField() %>
           <input type="hidden" name="snapshotId" value="<%= liveActualsReview.snapshotId %>" />
           <input type="hidden" name="target" value="current" />
           <button type="submit" class="secondary"><%= t('admin_actuals.mark_latest_reviewed') %></button>
@@ -71,9 +72,11 @@ const pendingReviewSummary =
   <% if (actualsTarget === 'current') { %>
     <div class="admin-actions admin-actuals-actions">
       <form method="post" action="/admin/actuals/autofill-current-season" class="admin-inline-form">
+    <%- csrfField() %>
         <button type="submit" class="secondary"><%= t('admin_actuals.preview_autofill') %></button>
       </form>
       <form method="post" action="/admin/actuals/run-auto-update" class="admin-inline-form">
+    <%- csrfField() %>
         <button type="submit" class="secondary"><%= t('admin_actuals.run_sync_now') %></button>
       </form>
       <span class="muted admin-actions-help"><%= t('admin_actuals.sync_help') %></span>
@@ -132,6 +135,7 @@ const pendingReviewSummary =
         </p>
         <% if (selectedSnapshotMeta.review_status === 'pending') { %>
           <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-status-action">
+    <%- csrfField() %>
             <input type="hidden" name="snapshotId" value="<%= selectedSnapshotMeta.id %>" />
             <input type="hidden" name="target" value="<%= actualsTarget %>" />
             <% if (selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
@@ -147,6 +151,7 @@ const pendingReviewSummary =
   <% } %>
 
   <form method="post" action="/admin/actuals" data-admin-actuals-form data-initial-dirty="<%= hasDraft ? 'true' : 'false' %>">
+    <%- csrfField() %>
     <input type="hidden" name="actualsTarget" value="<%= actualsTarget %>" />
     <% if (selectedRaceTarget && selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
       <input type="hidden" name="unlockPast" value="1" />

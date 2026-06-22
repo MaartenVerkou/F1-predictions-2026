@@ -2,6 +2,24 @@
 
 const { expect, test } = require("@playwright/test");
 
+const getCsrfToken = async (page, path = "/") => {
+  await page.goto(path);
+  const token = await page.locator('input[name="_csrf"]').first().getAttribute("value");
+  expect(token).toBeTruthy();
+  return token;
+};
+
+const postLanguage = async (page, { locale, redirectTo }) => {
+  const csrfToken = await getCsrfToken(page);
+  return page.request.post("/language", {
+    form: {
+      _csrf: csrfToken,
+      locale,
+      redirectTo
+    }
+  });
+};
+
 const measureHeaderBootstrap = async (page, width) => {
   let releaseApp;
   let resolveAppRequested;
@@ -204,11 +222,9 @@ test("header reserves the same page offset before app bootstrap", async ({ page 
 });
 
 test("closed countdown stays between brand and header actions on narrow screens", async ({ page }) => {
-  await page.request.post("/language", {
-    form: {
-      locale: "nl",
-      redirectTo: "/dashboard"
-    }
+  await postLanguage(page, {
+    locale: "nl",
+    redirectTo: "/dashboard"
   });
 
   for (const width of [980, 720, 600, 460, 420, 390, 360, 320]) {
@@ -310,12 +326,9 @@ test("collapsed header hover states stay neutral in light and dark mode", async 
 
 test("header theme polish keeps language menu, dark logo, and Dutch closed countdown stable", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto("/");
-  await page.request.post("/language", {
-    form: {
-      locale: "nl",
-      redirectTo: "/dashboard"
-    }
+  await postLanguage(page, {
+    locale: "nl",
+    redirectTo: "/dashboard"
   });
 
   await page.goto("/dashboard");

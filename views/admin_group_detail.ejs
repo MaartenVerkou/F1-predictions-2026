@@ -16,6 +16,7 @@
       <a class="link" href="<%= Number(group.is_global) === 1 ? '/global' : `/groups/${group.id}` %>">Open group page</a>
       <a class="link" href="<%= Number(group.is_global) === 1 ? '/global/leaderboard' : `/groups/${group.id}/leaderboard` %>">Leaderboard</a>
       <form method="post" action="/admin/groups/<%= group.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+        <%- csrfField() %>
         <input type="hidden" name="returnTo" value="<%= returnTo %>">
         <button class="secondary" type="submit">Delete group</button>
       </form>
