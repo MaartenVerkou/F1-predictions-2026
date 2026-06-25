@@ -4,6 +4,38 @@ Domain language for the F1 predictions game.
 
 ## Language
 
+**Visitor**:
+A person using public parts of the game without a named guest slot or registered account.
+_Avoid_: Anonymous user, unauthenticated user, guest
+
+**Named Guest**:
+A person who has joined one or more friend groups with a display name, appears in those groups' rosters and answers, but has not created a verified account.
+_Avoid_: Guest account, anonymous user, temporary user
+
+**Guest Recovery Secret**:
+A private secret chosen by a Named Guest that proves they can resume or convert that Named Guest later across all groups they joined from a fresh browser. It is a Recovery PIN by default, or an answer to a playful F1-themed prompt when the guest chooses recovery-question mode. A first-time Named Guest can skip self-recovery, but then fresh-browser recovery requires owner/admin help.
+_Avoid_: Claim secret in user-facing copy, security question, verification question, password
+
+**Named Guest Claim**:
+The act of proving control of a Named Guest by selecting that guest within an accessible group and entering the Guest Recovery Secret.
+_Avoid_: Login, name lookup, guest verification
+
+**Guest Conversion**:
+The transfer of all of a Named Guest's group memberships and predictions into a Registered Member, after which the Named Guest no longer exists as a separate participant.
+_Avoid_: Guest upgrade, merge account, claim account
+
+**Group Predictions**:
+A participant's saved predictions for one specific friend group.
+_Avoid_: Group answers, private answers
+
+**Global League Predictions**:
+A participant's saved predictions for the site-wide competition, which may be reused as a baseline for friend groups.
+_Avoid_: Global answers, main answers
+
+**Registered Member**:
+A person with a verified account who can own durable predictions and memberships across sessions.
+_Avoid_: Account user, dedicated account, real user
+
 **Leaderboard**:
 The ranked score view for a group or the global game, calculated from participants' predictions against a chosen set of actual outcomes.
 _Avoid_: Standings, table

@@ -132,6 +132,16 @@
             <% if (role === 'owner' || role === 'admin') { %>
               <div class="group-member-actions">
                 <% if (isNamedGuestMember && member.guest_id) { %>
+                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/named-guests/<%= encodeURIComponent(String(member.guest_id)) %>/transfer">
+                    <%- csrfField() %>
+                    <input type="email" name="targetEmail" placeholder="<%= t('group.guest_transfer_email_placeholder') %>" required />
+                    <button class="secondary group-member-action-btn" type="submit"><%= t('group.propose_guest_transfer') %></button>
+                  </form>
+                  <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/named-guests/<%= encodeURIComponent(String(member.guest_id)) %>/reset-secret">
+                    <%- csrfField() %>
+                    <input type="email" name="targetEmail" placeholder="<%= t('group.guest_reset_email_placeholder') %>" required />
+                    <button class="secondary group-member-action-btn" type="submit"><%= t('group.reset_guest_secret') %></button>
+                  </form>
                   <form class="group-member-action-form" method="post" action="/groups/<%= group.id %>/named-guests/<%= encodeURIComponent(String(member.guest_id)) %>/kick">
                     <%- csrfField() %>
                     <button class="secondary group-member-action-btn" type="submit"><%= t('group.kick') %></button>

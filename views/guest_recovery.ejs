@@ -1,0 +1,120 @@
+<%- include('partials/header', { title: t('guest_recovery.page_title'), user }) %>
+
+<div class="card guest-recovery-card">
+  <h1><%= t('guest_recovery.heading') %></h1>
+
+  <% if (success) { %>
+    <div class="alert"><%= success %></div>
+  <% } else { %>
+    <p class="muted">
+      <%= t('guest_recovery.intro', {
+        guest_name: recovery.display_name,
+        group_name: recovery.group_name
+      }) %>
+    </p>
+    <% if (error) { %>
+      <div class="alert"><%= error %></div>
+    <% } %>
+
+    <% if (recovery.action === 'reset_secret') { %>
+      <form method="post" action="/guest-recovery/<%= token %>">
+        <%- csrfField() %>
+        <fieldset class="join-guest-claim-secret">
+          <legend><%= t('join_guest.claim_secret_legend') %></legend>
+          <label>
+            <input type="radio" name="claimSecretMode" value="pin" checked data-claim-secret-mode="pin" />
+            <span><%= t('join_guest.claim_pin_option') %></span>
+          </label>
+          <label>
+            <%= t('join_guest.claim_pin_label') %>
+            <input
+              type="text"
+              name="claimPin"
+              inputmode="numeric"
+              pattern="[0-9]{4,6}"
+              minlength="4"
+              maxlength="6"
+              required
+              autocomplete="off"
+              placeholder="<%= t('join_guest.claim_pin_placeholder') %>"
+            />
+          </label>
+          <label>
+            <input type="radio" name="claimSecretMode" value="passphrase" data-claim-secret-mode="passphrase" />
+            <span><%= t('join_guest.claim_passphrase_option') %></span>
+          </label>
+          <div data-claim-passphrase-fields hidden>
+            <label>
+              <%= t('join_guest.claim_prompt_label') %>
+              <input
+                type="text"
+                name="claimPrompt"
+                maxlength="160"
+                value="<%= defaultClaimPrompt || '' %>"
+                autocomplete="off"
+              />
+            </label>
+            <label>
+              <%= t('join_guest.claim_passphrase_answer_label') %>
+              <input
+                type="text"
+                name="claimPassphraseAnswer"
+                maxlength="160"
+                autocomplete="off"
+                placeholder="<%= t('join_guest.claim_passphrase_answer_placeholder') %>"
+              />
+            </label>
+          </div>
+        </fieldset>
+        <button type="submit"><%= t('guest_recovery.confirm_reset') %></button>
+      </form>
+    <% } else if (recovery.action === 'transfer' && plan) { %>
+      <form method="post" action="/guest-recovery/<%= token %>">
+        <%- csrfField() %>
+        <% plan.groups.forEach((group) => { %>
+          <fieldset class="guest-conversion-group">
+            <legend>
+              <%= group.isGlobal ? t('guest_conversion.global_league') : group.groupName %>
+            </legend>
+            <% if (group.hasConflict) { %>
+              <p class="muted"><%= t('guest_conversion.conflict_notice') %></p>
+            <% } else { %>
+              <p class="muted"><%= t('guest_conversion.no_conflict_notice') %></p>
+            <% } %>
+            <label>
+              <input type="radio" name="group_<%= group.groupId %>" value="account" <%= group.hasConflict ? 'checked' : '' %> />
+              <span><%= group.isGlobal ? t('guest_conversion.keep_account_global') : t('guest_conversion.keep_account_group') %></span>
+            </label>
+            <label>
+              <input type="radio" name="group_<%= group.groupId %>" value="guest" <%= group.hasConflict ? '' : 'checked' %> />
+              <span><%= group.isGlobal ? t('guest_conversion.use_guest_global') : t('guest_conversion.use_guest_group') %></span>
+            </label>
+          </fieldset>
+        <% }) %>
+        <button type="submit"><%= t('guest_recovery.confirm_transfer') %></button>
+      </form>
+    <% } %>
+  <% } %>
+</div>
+
+<script>
+  (() => {
+    const form = document.querySelector(".guest-recovery-card form");
+    if (!form) return;
+    const radios = form.querySelectorAll("[data-claim-secret-mode]");
+    const passphraseFields = form.querySelector("[data-claim-passphrase-fields]");
+    const pinInput = form.querySelector('input[name="claimPin"]');
+    const passphraseInput = form.querySelector('input[name="claimPassphraseAnswer"]');
+    const updateMode = () => {
+      const selectedMode = form.querySelector('input[name="claimSecretMode"]:checked')?.value || "pin";
+      const usePassphrase = selectedMode === "passphrase";
+      if (passphraseFields) passphraseFields.hidden = !usePassphrase;
+      if (pinInput) pinInput.required = !usePassphrase;
+      if (passphraseInput) passphraseInput.required = usePassphrase;
+    };
+    radios.forEach((input) => input.addEventListener("change", updateMode));
+    updateMode();
+  })();
+</script>
+
+<%- include('partials/footer') %>

@@ -979,7 +979,8 @@ function registerAuthRoutes(app, deps) {
 
   app.get(["/signup", "/register"], (req, res) => {
     const namedGuestDisplayName = String(req.session?.namedGuestAccess?.displayName || "");
-    const suggestedName = buildAvailableUserNameSuggestion(namedGuestDisplayName);
+    const requestedName = String(req.query.name || "").trim();
+    const suggestedName = buildAvailableUserNameSuggestion(namedGuestDisplayName || requestedName);
     renderSignup(res, {
       form: {
         name: suggestedName,
@@ -1103,12 +1104,16 @@ function registerAuthRoutes(app, deps) {
         "UPDATE users SET is_verified = 1, verified_at = COALESCE(verified_at, ?) WHERE id = ?"
       ).run(now, userId);
       req.session.userId = userId;
+      req.session.devIdentityMode = shouldBeAdmin ? "admin" : "member";
       const pendingGuestClaim = db
         .prepare("SELECT guest_id FROM pending_guest_claims WHERE user_id = ?")
         .get(userId);
       const fallbackGuestId = String(pendingGuestClaim?.guest_id || "").trim();
       if (typeof claimGuestResponsesForUser === "function") {
-        claimGuestResponsesForUser(req, userId, { fallbackGuestId });
+        const conversionResult = claimGuestResponsesForUser(req, userId, { fallbackGuestId });
+        if (conversionResult?.needsReview) {
+          return res.redirect("/guest-conversion");
+        }
       }
       db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(userId);
       if (req.session) {
@@ -1204,8 +1209,12 @@ function registerAuthRoutes(app, deps) {
       });
     }
     req.session.userId = user.id;
+    req.session.devIdentityMode = user.is_admin ? "admin" : "member";
     if (typeof claimGuestResponsesForUser === "function") {
-      claimGuestResponsesForUser(req, user.id);
+      const conversionResult = claimGuestResponsesForUser(req, user.id);
+      if (conversionResult?.needsReview) {
+        return res.redirect("/guest-conversion");
+      }
     }
     db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(user.id);
     return res.redirect("/dashboard");
@@ -1477,14 +1486,21 @@ function registerAuthRoutes(app, deps) {
       verification.user_id
     );
     req.session.userId = verification.user_id;
+    const verifiedUser = db
+      .prepare("SELECT is_admin FROM users WHERE id = ?")
+      .get(verification.user_id);
+    req.session.devIdentityMode = verifiedUser?.is_admin ? "admin" : "member";
     const pendingGuestClaim = db
       .prepare("SELECT guest_id FROM pending_guest_claims WHERE user_id = ?")
       .get(verification.user_id);
     const fallbackGuestId = String(pendingGuestClaim?.guest_id || "").trim();
     if (typeof claimGuestResponsesForUser === "function") {
-      claimGuestResponsesForUser(req, verification.user_id, {
+      const conversionResult = claimGuestResponsesForUser(req, verification.user_id, {
         fallbackGuestId
       });
+      if (conversionResult?.needsReview) {
+        return res.redirect("/guest-conversion");
+      }
     }
     db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(
       verification.user_id

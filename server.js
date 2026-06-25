@@ -61,6 +61,8 @@ const LAST_SEASON_RESULTS_PATH =
   process.env.LAST_SEASON_RESULTS_PATH ||
   path.join(DATA_DIR, "last-season-results.json");
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
+const SESSION_COOKIE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const GUEST_REMEMBER_DEVICE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_FROM = process.env.SMTP_FROM || "";
 const COMPANY_NAME = process.env.COMPANY_NAME || "Wheel of Knowledge";
@@ -443,6 +445,10 @@ db.exec(`
     display_name TEXT NOT NULL,
     source_group_id INTEGER,
     resume_token_hash TEXT,
+    claim_secret_hash TEXT,
+    claim_secret_mode TEXT,
+    claim_secret_prompt TEXT,
+    claim_secret_set_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(source_group_id) REFERENCES groups(id)
@@ -525,6 +531,24 @@ db.exec(`
     guest_id TEXT NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS named_guest_recovery_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guest_id TEXT NOT NULL,
+    group_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    action TEXT NOT NULL,
+    target_email TEXT NOT NULL,
+    target_user_id INTEGER,
+    created_by_user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    FOREIGN KEY(group_id) REFERENCES groups(id),
+    FOREIGN KEY(target_user_id) REFERENCES users(id),
+    FOREIGN KEY(created_by_user_id) REFERENCES users(id),
+    CHECK(action IN ('transfer', 'reset_secret'))
   );
 
   CREATE TABLE IF NOT EXISTS admin_ideas (
@@ -622,6 +646,18 @@ function ensureNamedGuestProfileColumns() {
   const names = new Set(columns.map((col) => col.name));
   if (!names.has("resume_token_hash")) {
     db.exec("ALTER TABLE named_guest_profiles ADD COLUMN resume_token_hash TEXT;");
+  }
+  if (!names.has("claim_secret_hash")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_hash TEXT;");
+  }
+  if (!names.has("claim_secret_mode")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_mode TEXT;");
+  }
+  if (!names.has("claim_secret_prompt")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_prompt TEXT;");
+  }
+  if (!names.has("claim_secret_set_at")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_set_at TEXT;");
   }
 }
 
@@ -1147,7 +1183,7 @@ app.use(
   session({
     store: new BetterSqliteSessionStore({
       filename: path.join(DATA_DIR, "sessions.db"),
-      ttlMs: 1000 * 60 * 60 * 24 * 7
+      ttlMs: SESSION_COOKIE_TTL_MS
     }),
     secret: SESSION_SECRET,
     resave: false,
@@ -1156,7 +1192,7 @@ app.use(
       httpOnly: true,
       sameSite: "lax",
       secure: IS_DEVELOPMENT ? false : "auto",
-      maxAge: 1000 * 60 * 60 * 24 * 7
+      maxAge: SESSION_COOKIE_TTL_MS
     }
   })
 );
@@ -1639,10 +1675,141 @@ function getGuestIdFromSession(req, { create = false } = {}) {
   return guestId;
 }
 
+function shouldRememberGuestDevice(body) {
+  const raw = body?.rememberDevice;
+  if (Array.isArray(raw)) {
+    return raw.map((value) => String(value).trim()).includes("1");
+  }
+  if (raw == null) return true;
+  return String(raw).trim() !== "0";
+}
+
+function applyPersistentGuestDeviceCookie(req) {
+  if (!req?.session?.cookie) return;
+  req.session.cookie.maxAge = GUEST_REMEMBER_DEVICE_TTL_MS;
+}
+
+function regenerateSession(req) {
+  if (!req?.session || typeof req.session.regenerate !== "function") {
+    return Promise.resolve();
+  }
+  const preserved = {
+    locale: req.session.locale,
+    devIdentityMode: req.session.devIdentityMode,
+    devAutoLoginSkipOnce: req.session.devAutoLoginSkipOnce,
+    joinGroupAccess: req.session.joinGroupAccess
+  };
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((err) => {
+      if (err) return reject(err);
+      Object.entries(preserved).forEach(([key, value]) => {
+        if (value !== undefined) req.session[key] = value;
+      });
+      return resolve();
+    });
+  });
+}
+
+async function prepareGuestDeviceMemorySession(req, rememberDevice) {
+  if (rememberDevice) {
+    applyPersistentGuestDeviceCookie(req);
+    return;
+  }
+  await regenerateSession(req);
+  if (req?.session?.cookie) {
+    req.session.cookie.maxAge = null;
+  }
+}
+
 function normalizeDisplayName(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+const CLAIM_SECRET_MODE_PIN = "pin";
+const CLAIM_SECRET_MODE_PASSPHRASE = "passphrase";
+const CLAIM_SECRET_PROMPTS = [
+  "What is your all-time favorite F1 team livery?",
+  "If you could attend only one Grand Prix in person, which is it?",
+  "Which driver got you into F1?",
+  "What is your dream F1 team name?"
+];
+
+function normalizeClaimSecretMode(value) {
+  return String(value || "").trim().toLowerCase() === CLAIM_SECRET_MODE_PASSPHRASE
+    ? CLAIM_SECRET_MODE_PASSPHRASE
+    : CLAIM_SECRET_MODE_PIN;
+}
+
+function normalizeClaimSecretValue(mode, value) {
+  const normalizedMode = normalizeClaimSecretMode(mode);
+  const raw = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalizedMode === CLAIM_SECRET_MODE_PIN) return raw;
+  return raw.toLowerCase();
+}
+
+function hashClaimSecret(mode, normalizedSecret) {
+  return hashToken(`named-guest-claim:${normalizeClaimSecretMode(mode)}:${normalizedSecret}`);
+}
+
+function buildClaimSecretFromRequest(body) {
+  const mode = normalizeClaimSecretMode(body?.claimSecretMode);
+  if (mode === CLAIM_SECRET_MODE_PIN) {
+    const pin = String(body?.claimPin || body?.claimSecret || "").trim();
+    if (!/^\d{4,6}$/.test(pin)) {
+      return {
+        ok: false,
+        errorKey: "join_guest.error_claim_pin_invalid"
+      };
+    }
+    return {
+      ok: true,
+      mode,
+      prompt: null,
+      hash: hashClaimSecret(mode, normalizeClaimSecretValue(mode, pin)),
+      setAt: new Date().toISOString()
+    };
+  }
+
+  const prompt = normalizeDisplayName(
+    body?.claimPrompt || CLAIM_SECRET_PROMPTS[0]
+  );
+  const answer = normalizeClaimSecretValue(mode, body?.claimPassphraseAnswer || body?.claimSecret);
+  if (prompt.length < 4 || prompt.length > 160 || answer.length < 2 || answer.length > 160) {
+    return {
+      ok: false,
+      errorKey: "join_guest.error_claim_passphrase_invalid"
+    };
+  }
+  return {
+    ok: true,
+    mode,
+    prompt,
+    hash: hashClaimSecret(mode, answer),
+    setAt: new Date().toISOString()
+  };
+}
+
+function doesClaimSecretMatch(profile, suppliedSecret) {
+  const claimHash = String(profile?.claim_secret_hash || "").trim();
+  const mode = normalizeClaimSecretMode(profile?.claim_secret_mode);
+  const supplied = normalizeClaimSecretValue(mode, suppliedSecret);
+  if (claimHash && supplied) {
+    const suppliedHash = hashClaimSecret(mode, supplied);
+    if (claimHash.length !== suppliedHash.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(claimHash), Buffer.from(suppliedHash));
+  }
+  return false;
+}
+
+function requiresClaimSecretSetup(guestId) {
+  const normalizedGuestId = String(guestId || "").trim();
+  if (!normalizedGuestId) return true;
+  const row = db
+    .prepare("SELECT claim_secret_hash FROM named_guest_profiles WHERE guest_id = ?")
+    .get(normalizedGuestId);
+  return !String(row?.claim_secret_hash || "").trim();
 }
 
 function getNamedGuestAccessFromSession(req) {
@@ -1657,7 +1824,8 @@ function getNamedGuestAccessFromSession(req) {
     inviteCode,
     groupId,
     displayName,
-    resumeToken
+    resumeToken,
+    requiresClaimSecretSetup: raw.requiresClaimSecretSetup === true
   };
 }
 
@@ -1713,7 +1881,7 @@ function doesHashedSecretMatch(storedHash, token) {
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(suppliedHash));
 }
 
-function upsertNamedGuestProfile(guestId, displayName, groupId, resumeTokenHash = null) {
+function upsertNamedGuestProfile(guestId, displayName, groupId, options = {}) {
   const normalizedGuestId = String(guestId || "").trim();
   const normalizedDisplayName = normalizeDisplayName(displayName);
   const normalizedGroupId = Number(groupId || 0);
@@ -1721,8 +1889,21 @@ function upsertNamedGuestProfile(guestId, displayName, groupId, resumeTokenHash 
     return;
   }
   const now = new Date().toISOString();
-  const normalizedResumeTokenHash = resumeTokenHash
-    ? String(resumeTokenHash).trim()
+  const profileOptions = options && typeof options === "object"
+    ? options
+    : { resumeTokenHash: options };
+  const normalizedResumeTokenHash = profileOptions.resumeTokenHash
+    ? String(profileOptions.resumeTokenHash).trim()
+    : null;
+  const claimSecretHash = String(profileOptions.claimSecretHash || "").trim() || null;
+  const claimSecretMode = claimSecretHash
+    ? normalizeClaimSecretMode(profileOptions.claimSecretMode)
+    : null;
+  const claimSecretPrompt = claimSecretMode === CLAIM_SECRET_MODE_PASSPHRASE
+    ? normalizeDisplayName(profileOptions.claimSecretPrompt || CLAIM_SECRET_PROMPTS[0])
+    : null;
+  const claimSecretSetAt = claimSecretHash
+    ? String(profileOptions.claimSecretSetAt || now)
     : null;
   db.prepare(
     `
@@ -1731,15 +1912,23 @@ function upsertNamedGuestProfile(guestId, displayName, groupId, resumeTokenHash 
       display_name,
       source_group_id,
       resume_token_hash,
+      claim_secret_hash,
+      claim_secret_mode,
+      claim_secret_prompt,
+      claim_secret_set_at,
       created_at,
       updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(guest_id)
     DO UPDATE SET
       display_name = excluded.display_name,
       source_group_id = excluded.source_group_id,
       resume_token_hash = COALESCE(excluded.resume_token_hash, named_guest_profiles.resume_token_hash),
+      claim_secret_hash = COALESCE(excluded.claim_secret_hash, named_guest_profiles.claim_secret_hash),
+      claim_secret_mode = COALESCE(excluded.claim_secret_mode, named_guest_profiles.claim_secret_mode),
+      claim_secret_prompt = COALESCE(excluded.claim_secret_prompt, named_guest_profiles.claim_secret_prompt),
+      claim_secret_set_at = COALESCE(excluded.claim_secret_set_at, named_guest_profiles.claim_secret_set_at),
       updated_at = excluded.updated_at
     `
   ).run(
@@ -1747,6 +1936,10 @@ function upsertNamedGuestProfile(guestId, displayName, groupId, resumeTokenHash 
     normalizedDisplayName,
     normalizedGroupId,
     normalizedResumeTokenHash,
+    claimSecretHash,
+    claimSecretMode,
+    claimSecretPrompt,
+    claimSecretSetAt,
     now,
     now
   );
@@ -1812,7 +2005,7 @@ function isDisplayNameTakenInGroup(groupId, displayName, { excludeGuestId = "" }
   return !!namedGuestConflict;
 }
 
-function setNamedGuestAccess(req, { inviteCode, groupId, displayName }) {
+function setNamedGuestAccess(req, { inviteCode, groupId, displayName, claimSecret = null }) {
   if (!req?.session) return null;
   const normalizedInviteCode = String(inviteCode || "").trim();
   const normalizedGroupId = Number(groupId || 0);
@@ -1821,19 +2014,24 @@ function setNamedGuestAccess(req, { inviteCode, groupId, displayName }) {
     return null;
   }
   const guestId = getGuestIdFromSession(req, { create: true });
-  const resumeToken = generateGuestResumeToken();
   upsertNamedGuestProfile(
     guestId,
     normalizedDisplayName,
     normalizedGroupId,
-    hashToken(resumeToken)
+    claimSecret
+      ? {
+          claimSecretHash: claimSecret.hash,
+          claimSecretMode: claimSecret.mode,
+          claimSecretPrompt: claimSecret.prompt,
+          claimSecretSetAt: claimSecret.setAt
+        }
+      : {}
   );
   upsertNamedGuestGroupMember(guestId, normalizedGroupId, normalizedDisplayName);
   req.session.namedGuestAccess = {
     inviteCode: normalizedInviteCode,
     groupId: normalizedGroupId,
     displayName: normalizedDisplayName,
-    resumeToken,
     grantedAt: new Date().toISOString()
   };
   return req.session.namedGuestAccess;
@@ -1858,7 +2056,6 @@ function resumeNamedGuestAccess(req, { inviteCode, groupId, displayName, guestId
     inviteCode: normalizedInviteCode,
     groupId: normalizedGroupId,
     displayName: normalizedDisplayName,
-    resumeToken: "",
     grantedAt: new Date().toISOString()
   };
   return req.session.namedGuestAccess;
@@ -2013,12 +2210,103 @@ function getResponsesForGroup(groupId, { includeNamedGuests = true, excludeHidde
     .all(normalizedGroupId, normalizedGroupId);
 }
 
+function buildGuestConversionPlan(guestId, userId) {
+  const normalizedGuestId = String(guestId || "").trim();
+  const normalizedUserId = Number(userId || 0);
+  if (!normalizedGuestId || !normalizedUserId) {
+    return {
+      guestId: normalizedGuestId,
+      userId: normalizedUserId,
+      groups: [],
+      hasConflicts: false
+    };
+  }
+  const globalGroup = ensureGlobalGroup(normalizedUserId);
+  const rows = db
+    .prepare(
+      "SELECT group_id, question_id, answer FROM guest_responses WHERE guest_id = ?"
+    )
+    .all(normalizedGuestId);
+  const grouped = new Map();
+  for (const row of rows) {
+    const groupId = Number(row.group_id || 0);
+    if (!groupId) continue;
+    if (!grouped.has(groupId)) grouped.set(groupId, []);
+    grouped.get(groupId).push(row);
+  }
+
+  const globalGroupId = Number(globalGroup?.id || 0);
+  if (globalGroupId && !grouped.has(globalGroupId)) {
+    const sourceGroupEntry = Array.from(grouped.entries()).find(
+      ([groupId, groupRows]) => Number(groupId) !== globalGroupId && Array.isArray(groupRows) && groupRows.length > 0
+    );
+    if (sourceGroupEntry) {
+      const [, sourceRows] = sourceGroupEntry;
+      grouped.set(
+        globalGroupId,
+        sourceRows.map((row) => ({
+          ...row,
+          group_id: globalGroupId
+        }))
+      );
+    }
+  }
+
+  const groups = Array.from(grouped.entries())
+    .map(([groupId, groupRows]) => {
+      const group = getGroupById(groupId);
+      if (!group) return null;
+      const accountResponses = db
+        .prepare("SELECT COUNT(*) AS count FROM responses WHERE user_id = ? AND group_id = ?")
+        .get(normalizedUserId, groupId);
+      const accountCount = Number(accountResponses?.count || 0);
+      const guestCount = Array.isArray(groupRows) ? groupRows.length : 0;
+      return {
+        groupId,
+        groupName: String(group.name || "").trim() || `Group ${groupId}`,
+        isGlobal: Number(group.is_global || 0) === 1,
+        guestCount,
+        accountCount,
+        hasConflict: guestCount > 0 && accountCount > 0
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.isGlobal !== b.isGlobal) return a.isGlobal ? -1 : 1;
+      return a.groupName.localeCompare(b.groupName);
+    });
+
+  return {
+    guestId: normalizedGuestId,
+    userId: normalizedUserId,
+    groups,
+    hasConflicts: groups.some((group) => group.hasConflict)
+  };
+}
+
 function claimGuestResponsesForUser(req, userId, options = {}) {
   const sessionGuestId = getGuestIdFromSession(req, { create: false });
   const fallbackGuestId = String(options?.fallbackGuestId || "").trim();
   const guestId = sessionGuestId || fallbackGuestId;
   const normalizedUserId = Number(userId || 0);
   if (!guestId || !normalizedUserId) return;
+  const plan = buildGuestConversionPlan(guestId, normalizedUserId);
+  const conflictChoices = options?.conflictChoices && typeof options.conflictChoices === "object"
+    ? options.conflictChoices
+    : null;
+  if (plan.hasConflicts && !conflictChoices && !options?.force) {
+    if (req?.session) {
+      req.session.pendingGuestConversion = {
+        guestId,
+        userId: normalizedUserId,
+        createdAt: new Date().toISOString()
+      };
+    }
+    return {
+      needsReview: true,
+      plan
+    };
+  }
   const globalGroup = ensureGlobalGroup(normalizedUserId);
   const rows = db
     .prepare(
@@ -2077,7 +2365,20 @@ function claimGuestResponsesForUser(req, userId, options = {}) {
     for (const [groupId, groupRows] of grouped.entries()) {
       const group = getGroupById(groupId);
       if (!group) continue;
+      const choiceKey = String(groupId);
+      const selectedChoice = String(
+        conflictChoices?.groups?.[choiceKey]
+        || (Number(group.is_global || 0) === 1 ? conflictChoices?.global : "")
+        || "guest"
+      ).trim();
       addMember.run(normalizedUserId, groupId, now);
+      if (selectedChoice === "account") {
+        continue;
+      }
+      db.prepare("DELETE FROM responses WHERE user_id = ? AND group_id = ?").run(
+        normalizedUserId,
+        groupId
+      );
       for (const row of groupRows) {
         upsert.run(
           normalizedUserId,
@@ -2091,12 +2392,18 @@ function claimGuestResponsesForUser(req, userId, options = {}) {
     }
     db.prepare("DELETE FROM guest_responses WHERE guest_id = ?").run(guestId);
     db.prepare("DELETE FROM named_guest_group_members WHERE guest_id = ?").run(guestId);
+    db.prepare("DELETE FROM named_guest_profiles WHERE guest_id = ?").run(guestId);
   });
   tx();
   if (req?.session && sessionGuestId) {
     req.session.guestId = null;
     req.session.namedGuestAccess = null;
+    req.session.pendingGuestConversion = null;
   }
+  return {
+    converted: true,
+    plan
+  };
 }
 
 function isCoupledToGlobal(userId, groupId) {
@@ -2251,6 +2558,106 @@ function getMailer() {
       pass: SMTP_PASS
     }
   });
+}
+
+function createNamedGuestRecoveryToken({ guestId, groupId, action, targetEmail, targetUserId = null, createdByUserId }) {
+  const normalizedGuestId = String(guestId || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  const normalizedAction = String(action || "").trim();
+  const normalizedEmail = String(targetEmail || "").trim().toLowerCase();
+  const normalizedCreatedBy = Number(createdByUserId || 0);
+  if (
+    !normalizedGuestId
+    || !normalizedGroupId
+    || !["transfer", "reset_secret"].includes(normalizedAction)
+    || !normalizedEmail
+    || !normalizedCreatedBy
+  ) {
+    return null;
+  }
+  const token = generateToken();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+  const info = db
+    .prepare(
+      `
+      INSERT INTO named_guest_recovery_tokens (
+        guest_id, group_id, token_hash, action, target_email, target_user_id,
+        created_by_user_id, created_at, expires_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(
+      normalizedGuestId,
+      normalizedGroupId,
+      hashToken(token),
+      normalizedAction,
+      normalizedEmail,
+      targetUserId ? Number(targetUserId) : null,
+      normalizedCreatedBy,
+      now,
+      expiresAt
+    );
+  return {
+    id: info.lastInsertRowid,
+    token,
+    url: `${BASE_URL}/guest-recovery/${token}`
+  };
+}
+
+function getNamedGuestRecoveryByToken(token) {
+  const normalizedToken = String(token || "").trim();
+  if (!normalizedToken) return null;
+  return db
+    .prepare(
+      `
+      SELECT
+        ngrt.*,
+        ngp.display_name,
+        g.name AS group_name,
+        u.name AS created_by_name
+      FROM named_guest_recovery_tokens ngrt
+      JOIN named_guest_profiles ngp ON ngp.guest_id = ngrt.guest_id
+      JOIN groups g ON g.id = ngrt.group_id
+      JOIN users u ON u.id = ngrt.created_by_user_id
+      WHERE ngrt.token_hash = ?
+        AND ngrt.used_at IS NULL
+        AND ngrt.expires_at > ?
+      LIMIT 1
+      `
+    )
+    .get(hashToken(normalizedToken), new Date().toISOString());
+}
+
+async function sendNamedGuestRecoveryEmail(recovery, url) {
+  const mailer = getMailer();
+  if (!mailer) return { ok: false, reason: "smtp_missing" };
+  const targetEmail = String(recovery?.target_email || "").trim();
+  if (!targetEmail) return { ok: false, reason: "missing_email" };
+  const ownerName = String(recovery?.created_by_name || "A group admin").trim();
+  const guestName = String(recovery?.display_name || "this guest").trim();
+  const groupName = String(recovery?.group_name || "this group").trim();
+  const isTransfer = String(recovery?.action || "") === "transfer";
+  const actionText = isTransfer
+    ? `transfer the Named Guest "${guestName}" in "${groupName}" to your account`
+    : `reset guest recovery for the Named Guest "${guestName}" in "${groupName}"`;
+  const body =
+    `${ownerName} wants to ${actionText}.\n\n` +
+    `If this is you, confirm here:\n${url}\n\n` +
+    "If you did not expect this, you can ignore this email.";
+  try {
+    await mailer.sendMail({
+      from: SMTP_FROM || SMTP_USER || "Wheel of Knowledge",
+      to: targetEmail,
+      subject: isTransfer ? "Confirm Named Guest transfer" : "Reset Named Guest recovery",
+      text: body
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error("Failed to send named guest recovery email:", err);
+    return { ok: false, reason: "send_failed" };
+  }
 }
 
 function generateToken() {
@@ -2467,6 +2874,13 @@ app.post(
   })
 );
 app.post(
+  "/join/:code/access",
+  createSensitiveActionThrottle("invite-group-access", {
+    max: 8,
+    keyParts: (req) => [req.params?.code]
+  })
+);
+app.post(
   "/join/:code/guest",
   createSensitiveActionThrottle("named-guest-join-password", {
     max: 8,
@@ -2474,10 +2888,31 @@ app.post(
   })
 );
 app.post(
+  "/join/:code/guest/continue-current",
+  createSensitiveActionThrottle("named-guest-continue-current", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.session?.guestId]
+  })
+);
+app.post(
+  "/join/:code/guest/switch",
+  createSensitiveActionThrottle("named-guest-switch", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.session?.guestId]
+  })
+);
+app.post(
   "/join/:code/guest/return",
   createSensitiveActionThrottle("named-guest-return", {
     max: 8,
-    keyParts: (req) => [req.params?.code, req.body?.returnGuestName]
+    keyParts: (req) => [req.params?.code, req.body?.returnGuestId || req.body?.returnGuestName]
+  })
+);
+app.post(
+  "/join/:code/claim-secret",
+  createSensitiveActionThrottle("named-guest-claim-secret-setup", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.session?.guestId]
   })
 );
 
@@ -3086,13 +3521,67 @@ app.post("/groups/:id/invite-link/toggle", requireAuth, (req, res) => {
   res.redirect(`/groups/${groupId}`);
 });
 
+function getNamedGuestOptionsForGroup(groupId) {
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedGroupId) return [];
+  return db
+    .prepare(
+      `
+      SELECT guest_id, display_name
+      FROM named_guest_group_members
+      WHERE group_id = ?
+      ORDER BY display_name COLLATE NOCASE ASC, joined_at ASC
+      `
+    )
+    .all(normalizedGroupId)
+    .map((row) => ({
+      guestId: String(row.guest_id || "").trim(),
+      displayName: String(row.display_name || "").trim()
+    }))
+    .filter((row) => row.guestId && row.displayName);
+}
+
+function hasJoinGroupAccess(req, code, groupId) {
+  const normalizedCode = String(code || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedCode || !normalizedGroupId) return false;
+  const access = req?.session?.joinGroupAccess;
+  return Number(access?.[normalizedCode] || 0) === normalizedGroupId;
+}
+
+function setJoinGroupAccess(req, code, groupId) {
+  if (!req?.session) return;
+  const normalizedCode = String(code || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedCode || !normalizedGroupId) return;
+  req.session.joinGroupAccess = {
+    ...(req.session.joinGroupAccess || {}),
+    [normalizedCode]: normalizedGroupId
+  };
+}
+
 function renderJoinGuestPage(req, res, { group, code, displayName = "", returnName = "", error = null, activeMode = "new" }) {
   const mode = String(activeMode || "").toLowerCase() === "returning" ? "returning" : "new";
+  const requirePassword = !group.is_public && !!group.join_password_hash;
+  const canShowNamedGuestPicker = !requirePassword || hasJoinGroupAccess(req, code, Number(group.id));
+  const currentAccess = getNamedGuestAccessFromSession(req);
+  const currentNamedGuest = currentAccess
+    && String(req.session?.guestId || "").trim()
+    && Number(currentAccess.groupId || 0) !== Number(group.id)
+      ? {
+          displayName: String(currentAccess.displayName || "").trim()
+        }
+      : null;
   return res.render("join_guest", {
     user: null,
     group,
     code,
-    requirePassword: !group.is_public && !!group.join_password_hash,
+    requirePassword,
+    canShowNamedGuestPicker,
+    namedGuestOptions: canShowNamedGuestPicker ? getNamedGuestOptionsForGroup(Number(group.id)) : [],
+    defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0],
+    claimSecretPrompts: CLAIM_SECRET_PROMPTS,
+    currentNamedGuest,
     displayName,
     returnName,
     error,
@@ -3165,6 +3654,17 @@ function respondJoinGuestRedirect(req, res, redirectPath) {
   return res.redirect(redirectPath);
 }
 
+function renderClaimSecretSetupPage(req, res, { group, code, error = null }) {
+  return res.render("claim_secret", {
+    user: null,
+    group,
+    code,
+    error,
+    defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0],
+    claimSecretPrompts: CLAIM_SECRET_PROMPTS
+  });
+}
+
 app.get("/join/:code", (req, res) => {
   const code = req.params.code.trim();
   const user = getCurrentUser(req);
@@ -3205,6 +3705,110 @@ app.get("/join/:code", (req, res) => {
     return res.redirect(`${getGroupBasePath(group)}/questions`);
   }
   return renderJoinConfirmPage(req, res, { user, group, code });
+});
+
+app.post("/join/:code/access", async (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+  if (!group.is_public && group.join_password_hash) {
+    const ok = await bcrypt.compare(String(req.body.password || ""), group.join_password_hash);
+    if (!ok) {
+      return respondJoinGuestError(req, res, {
+        group,
+        code,
+        error: translate(locale, "join_guest.error_password_invalid"),
+        activeMode: "returning"
+      });
+    }
+  }
+  setJoinGroupAccess(req, code, Number(group.id));
+  return res.redirect(`/join/${code}?mode=returning`);
+});
+
+app.post("/join/:code/guest/switch", (req, res) => {
+  if (req.session) {
+    req.session.guestId = crypto.randomBytes(12).toString("hex");
+    req.session.namedGuestAccess = null;
+  }
+  return res.redirect(`/join/${req.params.code.trim()}`);
+});
+
+app.post("/join/:code/guest/continue-current", async (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const user = getCurrentUser(req);
+  if (user) {
+    return res.redirect(`/join/${code}`);
+  }
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+  if (!group.is_public && group.join_password_hash && !hasJoinGroupAccess(req, code, Number(group.id))) {
+    const ok = await bcrypt.compare(String(req.body.password || ""), group.join_password_hash);
+    if (!ok) {
+      return respondJoinGuestError(req, res, {
+        group,
+        code,
+        error: translate(locale, "join_guest.error_password_invalid"),
+        activeMode: "new"
+      });
+    }
+    setJoinGroupAccess(req, code, Number(group.id));
+  }
+
+  const access = getNamedGuestAccessFromSession(req);
+  const guestId = getGuestIdFromSession(req, { create: false });
+  const displayName = normalizeDisplayName(access?.displayName || "");
+  if (!guestId || !displayName) {
+    return res.redirect(`/join/${code}`);
+  }
+  if (
+    Number(group.is_global || 0) !== 1
+    && isDisplayNameTakenInGroup(Number(group.id), displayName, { excludeGuestId: guestId })
+  ) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      error: translate(locale, "join_guest.error_name_taken"),
+      activeMode: "new"
+    });
+  }
+  upsertNamedGuestProfile(guestId, displayName, Number(group.id));
+  upsertNamedGuestGroupMember(guestId, Number(group.id), displayName);
+  resumeNamedGuestAccess(req, {
+    inviteCode: code,
+    groupId: Number(group.id),
+    displayName,
+    guestId
+  });
+  return res.redirect(`/join/${code}/questions`);
 });
 
 app.get("/join/:code/responses", (req, res) => {
@@ -3318,6 +3922,9 @@ app.post("/join/:code/guest", async (req, res) => {
     }
   }
 
+  const rememberDevice = shouldRememberGuestDevice(req.body);
+  await prepareGuestDeviceMemorySession(req, rememberDevice);
+
   const guestIdForJoin = getGuestIdFromSession(req, { create: true });
   if (
     Number(group.is_global || 0) !== 1
@@ -3332,10 +3939,23 @@ app.post("/join/:code/guest", async (req, res) => {
     });
   }
 
+  const skipsRecoverySecret = String(req.body.skipRecoverySecret || "").trim() === "1";
+  const claimSecret = skipsRecoverySecret ? null : buildClaimSecretFromRequest(req.body);
+  if (!skipsRecoverySecret && !claimSecret.ok) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      displayName,
+      error: translate(locale, claimSecret.errorKey),
+      activeMode: "new"
+    });
+  }
+
   setNamedGuestAccess(req, {
     inviteCode: code,
     groupId: Number(group.id),
-    displayName
+    displayName,
+    claimSecret
   });
   return respondJoinGuestRedirect(req, res, `/join/${code}/questions`);
 });
@@ -3363,8 +3983,9 @@ app.post("/join/:code/guest/return", async (req, res) => {
     return sendError(req, res, 403, "Invite link is closed.");
   }
 
+  const returnGuestId = String(req.body.returnGuestId || "").trim();
   const returnName = normalizeDisplayName(req.body.returnGuestName || "");
-  if (returnName.length < 2 || returnName.length > 40) {
+  if (!returnGuestId && (returnName.length < 2 || returnName.length > 40)) {
     return respondJoinGuestError(req, res, {
       group,
       code,
@@ -3403,23 +4024,52 @@ app.post("/join/:code/guest/return", async (req, res) => {
       SELECT
         ngm.guest_id,
         ngm.display_name,
-        ngp.resume_token_hash
+        ngp.resume_token_hash,
+        ngp.claim_secret_hash,
+        ngp.claim_secret_mode,
+        ngp.claim_secret_prompt
       FROM named_guest_group_members ngm
       JOIN named_guest_profiles ngp ON ngp.guest_id = ngm.guest_id
       WHERE ngm.group_id = ?
-        AND ngm.display_name = ? COLLATE NOCASE
+        AND (
+          (? <> '' AND ngm.guest_id = ?)
+          OR (? = '' AND ngm.display_name = ? COLLATE NOCASE)
+        )
       LIMIT 1
       `
     )
-    .get(Number(group.id), returnName);
+    .get(
+      Number(group.id),
+      returnGuestId,
+      returnGuestId,
+      returnGuestId,
+      returnName
+    );
 
-  const resumeToken = String(req.body.resumeToken || "").trim();
-  if (!existingNamedGuest || !doesHashedSecretMatch(existingNamedGuest.resume_token_hash, resumeToken)) {
+  const suppliedClaimSecret = String(req.body.claimSecret || req.body.resumeToken || "").trim();
+  const hasSelfRecoverySecret = !!String(existingNamedGuest?.claim_secret_hash || "").trim();
+  const hasLegacyResumeToken = !!String(existingNamedGuest?.resume_token_hash || "").trim();
+  const matchesClaimSecret = existingNamedGuest
+    ? doesClaimSecretMatch(existingNamedGuest, suppliedClaimSecret)
+    : false;
+  const matchesLegacyResumeToken = existingNamedGuest
+    && !hasSelfRecoverySecret
+    && doesHashedSecretMatch(existingNamedGuest.resume_token_hash, suppliedClaimSecret);
+  if (existingNamedGuest && !hasSelfRecoverySecret && !hasLegacyResumeToken) {
     return respondJoinGuestError(req, res, {
       group,
       code,
       returnName,
-      error: translate(locale, "join_guest.error_resume_token_invalid"),
+      error: translate(locale, "join_guest.error_recovery_not_set"),
+      activeMode: "returning"
+    });
+  }
+  if (!existingNamedGuest || (!matchesClaimSecret && !matchesLegacyResumeToken)) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      returnName,
+      error: translate(locale, "join_guest.error_claim_secret_invalid"),
       activeMode: "returning"
     });
   }
@@ -3430,7 +4080,80 @@ app.post("/join/:code/guest/return", async (req, res) => {
     displayName: String(existingNamedGuest.display_name || returnName).trim(),
     guestId: String(existingNamedGuest.guest_id || "").trim()
   });
+  if (matchesLegacyResumeToken) {
+    if (req.session?.namedGuestAccess) {
+      req.session.namedGuestAccess.requiresClaimSecretSetup = true;
+    }
+    return respondJoinGuestRedirect(req, res, `/join/${code}/claim-secret`);
+  }
   return respondJoinGuestRedirect(req, res, `/join/${code}`);
+});
+
+app.get("/join/:code/claim-secret", (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (!hasNamedGuestAccess(req, code, Number(group.id))) {
+    return res.redirect(`/join/${code}`);
+  }
+  const guestId = getGuestIdFromSession(req, { create: false });
+  if (!requiresClaimSecretSetup(guestId)) {
+    return res.redirect(`/join/${code}`);
+  }
+  return renderClaimSecretSetupPage(req, res, {
+    group,
+    code,
+    error: req.query.error ? translate(locale, String(req.query.error)) : null
+  });
+});
+
+app.post("/join/:code/claim-secret", (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (!hasNamedGuestAccess(req, code, Number(group.id))) {
+    return res.redirect(`/join/${code}`);
+  }
+  const guestId = getGuestIdFromSession(req, { create: false });
+  const access = getNamedGuestAccessFromSession(req);
+  const claimSecret = buildClaimSecretFromRequest(req.body);
+  if (!claimSecret.ok) {
+    res.status(400);
+    return renderClaimSecretSetupPage(req, res, {
+      group,
+      code,
+      error: translate(locale, claimSecret.errorKey)
+    });
+  }
+  upsertNamedGuestProfile(guestId, access.displayName, Number(group.id), {
+    claimSecretHash: claimSecret.hash,
+    claimSecretMode: claimSecret.mode,
+    claimSecretPrompt: claimSecret.prompt,
+    claimSecretSetAt: claimSecret.setAt
+  });
+  return res.redirect(`/join/${code}/questions`);
 });
 
 app.get("/join/:code/questions", (req, res) => {
@@ -3465,6 +4188,11 @@ app.get("/join/:code/questions", (req, res) => {
 
   if (!hasNamedGuestAccess(req, code, Number(group.id))) {
     return res.redirect(`/join/${code}`);
+  }
+  const access = getNamedGuestAccessFromSession(req);
+  const guestIdForClaimSecret = getGuestIdFromSession(req, { create: false });
+  if (access?.requiresClaimSecretSetup && requiresClaimSecretSetup(guestIdForClaimSecret)) {
+    return res.redirect(`/join/${code}/claim-secret`);
   }
   if (predictionsClosed()) {
     return res.redirect(`/join/${code}`);
@@ -3564,6 +4292,141 @@ app.post("/join/:code/questions", (req, res) => {
   });
   tx();
   return res.redirect(`/join/${code}/questions?saved=1`);
+});
+
+app.get("/guest-conversion", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const pending = req.session?.pendingGuestConversion;
+  const guestId = String(pending?.guestId || req.session?.guestId || "").trim();
+  if (!guestId) {
+    return res.redirect("/dashboard");
+  }
+  const plan = buildGuestConversionPlan(guestId, user.id);
+  if (plan.groups.length === 0) {
+    claimGuestResponsesForUser(req, user.id, {
+      fallbackGuestId: guestId,
+      conflictChoices: { groups: {}, global: "account" },
+      force: true
+    });
+    return res.redirect("/dashboard");
+  }
+  return res.render("guest_conversion", {
+    user,
+    plan,
+    guestId
+  });
+});
+
+app.post("/guest-conversion", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const pending = req.session?.pendingGuestConversion;
+  const guestId = String(req.body.guestId || pending?.guestId || req.session?.guestId || "").trim();
+  if (!guestId) {
+    return res.redirect("/dashboard");
+  }
+  const plan = buildGuestConversionPlan(guestId, user.id);
+  const groupChoices = {};
+  for (const group of plan.groups) {
+    const rawChoice = String(req.body[`group_${group.groupId}`] || "").trim();
+    groupChoices[String(group.groupId)] = rawChoice === "guest" ? "guest" : "account";
+  }
+  claimGuestResponsesForUser(req, user.id, {
+    fallbackGuestId: guestId,
+    conflictChoices: {
+      groups: groupChoices,
+      global: String(req.body.globalChoice || "") === "guest" ? "guest" : "account"
+    },
+    force: true
+  });
+  return res.redirect("/dashboard");
+});
+
+app.get("/guest-recovery/:token", (req, res) => {
+  const recovery = getNamedGuestRecoveryByToken(req.params.token);
+  if (!recovery) {
+    return sendError(req, res, 400, "Invalid or expired recovery link.");
+  }
+  const plan = recovery.action === "transfer" && recovery.target_user_id
+    ? buildGuestConversionPlan(recovery.guest_id, recovery.target_user_id)
+    : null;
+  return res.render("guest_recovery", {
+    user: getCurrentUser(req),
+    token: req.params.token,
+    recovery,
+    plan,
+    error: null,
+    success: null,
+    defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+  });
+});
+
+app.post("/guest-recovery/:token", (req, res) => {
+  const recovery = getNamedGuestRecoveryByToken(req.params.token);
+  if (!recovery) {
+    return sendError(req, res, 400, "Invalid or expired recovery link.");
+  }
+  if (recovery.action === "reset_secret") {
+    const locale = res.locals.locale || DEFAULT_LOCALE;
+    const claimSecret = buildClaimSecretFromRequest(req.body);
+    if (!claimSecret.ok) {
+      res.status(400);
+      return res.render("guest_recovery", {
+        user: getCurrentUser(req),
+        token: req.params.token,
+        recovery,
+        plan: null,
+        error: translate(locale, claimSecret.errorKey),
+        success: null,
+        defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+      });
+    }
+    upsertNamedGuestProfile(recovery.guest_id, recovery.display_name, recovery.group_id, {
+      claimSecretHash: claimSecret.hash,
+      claimSecretMode: claimSecret.mode,
+      claimSecretPrompt: claimSecret.prompt,
+      claimSecretSetAt: claimSecret.setAt
+    });
+    db.prepare("UPDATE named_guest_recovery_tokens SET used_at = ? WHERE id = ?")
+      .run(new Date().toISOString(), recovery.id);
+    return res.render("guest_recovery", {
+      user: getCurrentUser(req),
+      token: req.params.token,
+      recovery,
+      plan: null,
+      error: null,
+      success: "Guest recovery updated.",
+      defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+    });
+  }
+
+  if (recovery.action === "transfer" && recovery.target_user_id) {
+    const plan = buildGuestConversionPlan(recovery.guest_id, recovery.target_user_id);
+    const groupChoices = {};
+    for (const group of plan.groups) {
+      const rawChoice = String(req.body[`group_${group.groupId}`] || "").trim();
+      groupChoices[String(group.groupId)] = rawChoice === "guest" ? "guest" : "account";
+    }
+    claimGuestResponsesForUser(req, recovery.target_user_id, {
+      fallbackGuestId: recovery.guest_id,
+      conflictChoices: {
+        groups: groupChoices,
+        global: String(req.body.globalChoice || "") === "guest" ? "guest" : "account"
+      },
+      force: true
+    });
+    db.prepare("UPDATE named_guest_recovery_tokens SET used_at = ? WHERE id = ?")
+      .run(new Date().toISOString(), recovery.id);
+    return res.render("guest_recovery", {
+      user: getCurrentUser(req),
+      token: req.params.token,
+      recovery,
+      plan,
+      error: null,
+      success: "Named Guest transferred.",
+      defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+    });
+  }
+  return sendError(req, res, 400, "Recovery link is incomplete.");
 });
 
 app.post("/join/:code", requireAuth, async (req, res) => {
@@ -3760,6 +4623,72 @@ app.post("/groups/:id/named-guests/:guestId/kick", requireAuth, (req, res) => {
     }
   });
   tx();
+  return res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/named-guests/:guestId/transfer", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const guestId = String(req.params.guestId || "").trim();
+  const targetEmail = String(req.body.targetEmail || "").trim().toLowerCase();
+  if (!isGroupAdmin(user.id, groupId)) {
+    return sendError(req, res, 403, "Admin access only.");
+  }
+  const target = targetEmail
+    ? db.prepare("SELECT id, email FROM users WHERE email = ? AND is_verified = 1").get(targetEmail)
+    : null;
+  if (!target) {
+    return sendError(req, res, 400, "Transfer target must be an existing verified account email.");
+  }
+  const member = db
+    .prepare("SELECT 1 FROM named_guest_group_members WHERE group_id = ? AND guest_id = ?")
+    .get(groupId, guestId);
+  if (!member) {
+    return sendError(req, res, 404, "Named Guest not found.");
+  }
+  const created = createNamedGuestRecoveryToken({
+    guestId,
+    groupId,
+    action: "transfer",
+    targetEmail,
+    targetUserId: target.id,
+    createdByUserId: user.id
+  });
+  const recovery = created ? getNamedGuestRecoveryByToken(created.token) : null;
+  if (recovery) {
+    await sendNamedGuestRecoveryEmail(recovery, created.url);
+  }
+  return res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/named-guests/:guestId/reset-secret", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const guestId = String(req.params.guestId || "").trim();
+  const targetEmail = String(req.body.targetEmail || "").trim().toLowerCase();
+  if (!isGroupAdmin(user.id, groupId)) {
+    return sendError(req, res, 403, "Admin access only.");
+  }
+  if (!targetEmail) {
+    return sendError(req, res, 400, "Target email is required.");
+  }
+  const member = db
+    .prepare("SELECT 1 FROM named_guest_group_members WHERE group_id = ? AND guest_id = ?")
+    .get(groupId, guestId);
+  if (!member) {
+    return sendError(req, res, 404, "Named Guest not found.");
+  }
+  const created = createNamedGuestRecoveryToken({
+    guestId,
+    groupId,
+    action: "reset_secret",
+    targetEmail,
+    createdByUserId: user.id
+  });
+  const recovery = created ? getNamedGuestRecoveryByToken(created.token) : null;
+  if (recovery) {
+    await sendNamedGuestRecoveryEmail(recovery, created.url);
+  }
   return res.redirect(`/groups/${groupId}`);
 });
 
