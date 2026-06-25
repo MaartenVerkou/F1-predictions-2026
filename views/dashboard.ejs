@@ -8,6 +8,7 @@
     <div class="alert" style="background:#eef8f0;border-color:#c8e6d0;color:#2d6a3a;"><%= success %></div>
   <% } %>
   <% const safeFeaturedGlobalGroup = (typeof featuredGlobalGroup !== 'undefined' && featuredGlobalGroup) ? featuredGlobalGroup : null; %>
+  <% const safeIsCurrentUserHiddenFromGlobal = Boolean(typeof isCurrentUserHiddenFromGlobal !== 'undefined' && isCurrentUserHiddenFromGlobal); %>
   <% const safeGlobalAnswerPreview = (typeof globalAnswerPreview !== 'undefined' && globalAnswerPreview) ? globalAnswerPreview : null; %>
 
   <div class="hero-main-column">
@@ -22,9 +23,13 @@
             <span class="badge dashboard-global-answers-badge"><%= t('dashboard.global_group_title') %></span>
           </div>
           <% if (safeFeaturedGlobalGroup.dashboardPosition) { %>
-            <a class="dashboard-global-position-link" href="<%= `${globalGroupBasePath}/leaderboard` %>">
+            <a class="dashboard-global-status-pill dashboard-global-position-link" href="<%= `${globalGroupBasePath}/leaderboard` %>">
               <%= t('dashboard.position_summary', { rank: safeFeaturedGlobalGroup.dashboardPosition.rank, total: safeFeaturedGlobalGroup.dashboardPosition.total }) %>
             </a>
+          <% } else if (safeIsCurrentUserHiddenFromGlobal) { %>
+            <span class="dashboard-global-status-pill dashboard-global-hidden-status is-muted">
+              <%= t('dashboard.global_position_hidden') %>
+            </span>
           <% } %>
         </div>
 
@@ -61,9 +66,9 @@
     <% } %>
 
     <section class="card dashboard-my-groups-section">
-      <div class="inline-actions" style="justify-content: space-between; align-items: flex-start;">
-        <h1 style="margin:0 0 12px 0;"><%= t('dashboard.my_groups') %></h1>
-        <div class="inline-actions">
+      <div class="dashboard-section-head">
+        <h1 class="dashboard-section-title"><%= t('dashboard.my_groups') %></h1>
+        <div class="dashboard-section-actions">
           <a class="button-link dashboard-create-link" href="#create-group" aria-label="<%= t('dashboard.create_group') %>">
             <span class="dashboard-create-link-icon" aria-hidden="true">+</span>
             <span class="dashboard-create-link-label"><%= t('dashboard.create_group') %></span>

@@ -57,6 +57,7 @@
     "join_group": "Rejoindre un groupe",
     "no_groups": "Aucun groupe pour le moment. Creez-en un ci-dessous.",
     "position_summary": "Position {rank} sur {total}",
+    "global_position_hidden": "Hors classement",
     "view_group": "Voir le groupe",
     "public_groups": "Rejoindre un groupe public",
     "no_public_groups": "Aucun groupe public disponible.",

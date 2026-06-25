@@ -138,6 +138,7 @@
     "join_group": "Lid worden van groep",
     "no_groups": "Nog geen groepen. Maak er een aan of word lid van een groep.",
     "position_summary": "Positie {rank} van {total}",
+    "global_position_hidden": "Buiten klassement",
     "view_group": "Bekijk groep",
     "public_groups": "Word lid van een openbare groep",
     "no_public_groups": "Geen openbare groepen beschikbaar.",

@@ -1644,6 +1644,11 @@ function registerAuthRoutes(app, deps) {
     }));
     const featuredGlobalGroup =
       groupsWithPositions.find((group) => Number(group.is_global) === 1) || null;
+    const currentUserGlobalVisibility = db
+      .prepare("SELECT COALESCE(hide_from_global, 0) as hide_from_global FROM users WHERE id = ?")
+      .get(user.id);
+    const isCurrentUserHiddenFromGlobal =
+      Number(currentUserGlobalVisibility?.hide_from_global || 0) === 1;
     const globalAnswerPreview = getDashboardGlobalAnswerPreview(user.id, featuredGlobalGroup);
     const regularGroups = groupsWithPositions.filter((group) => Number(group.is_global) !== 1);
     const requestedGroupsPage = Number(req.query.groupsPage || 1);
@@ -1686,6 +1691,7 @@ function registerAuthRoutes(app, deps) {
       user,
       groups: groupsWithPositions,
       featuredGlobalGroup,
+      isCurrentUserHiddenFromGlobal,
       globalAnswerPreview,
       regularGroups: pagedRegularGroups,
       currentGroupsPage: safeGroupsPage,

@@ -138,6 +138,7 @@
     "join_group": "Join group",
     "no_groups": "No groups yet. Join or create one.",
     "position_summary": "Position {rank} of {total}",
+    "global_position_hidden": "Off leaderboard",
     "view_group": "View group",
     "public_groups": "Join a public group",
     "no_public_groups": "No public groups available.",

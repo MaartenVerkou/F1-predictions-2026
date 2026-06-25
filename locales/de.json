@@ -57,6 +57,7 @@
     "join_group": "Gruppe beitreten",
     "no_groups": "Noch keine Gruppen. Erstelle unten eine.",
     "position_summary": "Platz {rank} von {total}",
+    "global_position_hidden": "Ohne Wertung",
     "view_group": "Gruppe öffnen",
     "public_groups": "Einer öffentlichen Gruppe beitreten",
     "no_public_groups": "Keine öffentlichen Gruppen verfügbar.",

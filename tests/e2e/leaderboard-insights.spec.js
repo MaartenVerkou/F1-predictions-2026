@@ -714,7 +714,65 @@ test("dashboard previews Global answers as podium picks and keeps phone layout c
   const constructorPanel = card.locator('[data-dashboard-answer-question="constructors_championship_top_3"]');
   await expect(constructorPanel.locator('[data-position="1"]')).toContainText("Ferrari");
   await expect(constructorPanel.locator('[data-position="2"]')).toContainText("McLaren");
+  const championshipPanelGap = await card.evaluate(() => {
+    const driverThird = document.querySelector(
+      '[data-dashboard-answer-question="drivers_championship_top_3"] [data-position="3"]'
+    );
+    const constructorSecond = document.querySelector(
+      '[data-dashboard-answer-question="constructors_championship_top_3"] [data-position="2"]'
+    );
+    if (!driverThird || !constructorSecond) return 0;
+    return Math.round(constructorSecond.getBoundingClientRect().left - driverThird.getBoundingClientRect().right);
+  });
+  expect(championshipPanelGap).toBeGreaterThanOrEqual(24);
   await expect(page.locator(".dashboard-desktop-global-preview")).toBeVisible();
+  expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
+
+  await page.setViewportSize({ width: 840, height: 900 });
+  await page.goto("/dashboard");
+
+  const mediumCard = page.locator(".dashboard-global-answers-card");
+  const mediumDesktopPreview = page.locator(".dashboard-desktop-global-preview");
+  await expect(mediumCard).toBeVisible();
+  await expect(mediumDesktopPreview).toBeVisible();
+  await expect(mediumCard.locator(".dashboard-global-position-link")).toBeHidden();
+  await expect(mediumCard.locator(".dashboard-global-leaderboard-action")).toBeHidden();
+  const mediumLayout = await page.evaluate(() => {
+    const cardRect = document.querySelector(".dashboard-global-answers-card")?.getBoundingClientRect();
+    const previewRect = document.querySelector(".dashboard-desktop-global-preview")?.getBoundingClientRect();
+    const previewNameWidths = Array.from(
+      document.querySelectorAll(".dashboard-desktop-global-preview .leaderboard-preview-name")
+    ).map((node) => node.getBoundingClientRect().width);
+    const driverRect = document
+      .querySelector('[data-dashboard-answer-question="drivers_championship_top_3"]')
+      ?.getBoundingClientRect();
+    const constructorRect = document
+      .querySelector('[data-dashboard-answer-question="constructors_championship_top_3"]')
+      ?.getBoundingClientRect();
+    return {
+      answerPanelsStacked: Boolean(driverRect && constructorRect && constructorRect.top > driverRect.bottom),
+      minPreviewNameWidth: Math.min(...previewNameWidths),
+      previewBesideAnswers: Boolean(cardRect && previewRect && previewRect.left > cardRect.right),
+      previewStartsNearTop: Boolean(cardRect && previewRect && Math.abs(previewRect.top - cardRect.top) < 24)
+    };
+  });
+  expect(mediumLayout.answerPanelsStacked).toBe(true);
+  expect(mediumLayout.minPreviewNameWidth).toBeGreaterThanOrEqual(80);
+  expect(mediumLayout.previewBesideAnswers).toBe(true);
+  expect(mediumLayout.previewStartsNearTop).toBe(true);
+  expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
+
+  await page.setViewportSize({ width: 740, height: 900 });
+  await page.goto("/dashboard");
+  await expect(page.locator(".dashboard-desktop-global-preview")).toBeVisible();
+  await expect(page.locator(".dashboard-global-answers-card .dashboard-global-position-link")).toBeHidden();
+  const narrowMediumNameWidth = await page.evaluate(() => {
+    const widths = Array.from(
+      document.querySelectorAll(".dashboard-desktop-global-preview .leaderboard-preview-name")
+    ).map((node) => node.getBoundingClientRect().width);
+    return Math.min(...widths);
+  });
+  expect(narrowMediumNameWidth).toBeGreaterThanOrEqual(80);
   expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -724,8 +782,89 @@ test("dashboard previews Global answers as podium picks and keeps phone layout c
   await expect(mobileCard).toBeVisible();
   await expect(mobileCard.locator(".dashboard-global-position-link")).toContainText(/Position \d+ of \d+/);
   await expect(mobileCard.locator(".dashboard-global-position-link")).toBeVisible();
+  const mobileGlobalHeaderLayout = await mobileCard.evaluate((section) => {
+    const badge = section.querySelector(".dashboard-global-answers-badge")?.getBoundingClientRect();
+    const position = section.querySelector(".dashboard-global-position-link")?.getBoundingClientRect();
+    return {
+      positionBesideBadge: Boolean(
+        badge &&
+          position &&
+          Math.abs(position.top - badge.top) < 8 &&
+          position.left > badge.right
+      )
+    };
+  });
+  expect(mobileGlobalHeaderLayout.positionBesideBadge).toBe(true);
   await expect(mobileCard.locator(".dashboard-global-leaderboard-action")).toBeVisible();
   await expect(page.locator(".dashboard-desktop-global-preview")).toBeHidden();
+  expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
+
+  const hiddenDb = new Database(DB_PATH);
+  hiddenDb.prepare("UPDATE users SET hide_from_global = 1 WHERE email = ?").run("dev@example.com");
+  hiddenDb.close();
+
+  await page.goto("/dashboard");
+  await expect(mobileCard).toBeVisible();
+  await expect(mobileCard.locator(".dashboard-global-position-link")).toHaveCount(0);
+  await expect(mobileCard.locator(".dashboard-global-hidden-status")).toContainText("Off leaderboard");
+  const hiddenGlobalHeaderLayout = await mobileCard.evaluate((section) => {
+    const badge = section.querySelector(".dashboard-global-answers-badge")?.getBoundingClientRect();
+    const status = section.querySelector(".dashboard-global-hidden-status")?.getBoundingClientRect();
+    return {
+      statusBesideBadge: Boolean(
+        badge &&
+          status &&
+          Math.abs(status.top - badge.top) < 8 &&
+          status.left > badge.right
+      )
+    };
+  });
+  expect(hiddenGlobalHeaderLayout.statusBesideBadge).toBe(true);
+  expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
+});
+
+test("dashboard empty groups state keeps the create action readable on small screens", async ({ page }) => {
+  await page.goto("/");
+
+  const db = new Database(DB_PATH);
+  const devAdmin = db.prepare("SELECT id FROM users WHERE email = ?").get("dev@example.com");
+  if (!devAdmin) throw new Error("Expected dashboard seed user to exist.");
+  db.prepare(
+    `
+    DELETE FROM group_members
+    WHERE user_id = ?
+      AND group_id IN (SELECT id FROM groups WHERE COALESCE(is_global, 0) = 0)
+    `
+  ).run(devAdmin.id);
+  db.close();
+
+  await page.setViewportSize({ width: 520, height: 844 });
+  await page.goto("/dashboard");
+
+  const groupsSection = page.locator(".dashboard-my-groups-section");
+  const createLink = groupsSection.locator(".dashboard-create-link");
+  const emptyCard = groupsSection.locator(".dashboard-empty-card");
+  await expect(groupsSection).toBeVisible();
+  await expect(createLink).toContainText("Create group");
+  await expect(createLink.locator(".dashboard-create-link-label")).toBeVisible();
+  await expect(emptyCard).toContainText("No groups yet");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(createLink).toHaveAccessibleName("Create group");
+  await expect(createLink.locator(".dashboard-create-link-label")).toBeHidden();
+  const emptyLayout = await groupsSection.evaluate((section) => {
+    const heading = section.querySelector(".dashboard-section-title")?.getBoundingClientRect();
+    const create = section.querySelector(".dashboard-create-link")?.getBoundingClientRect();
+    const empty = section.querySelector(".dashboard-empty-card")?.getBoundingClientRect();
+    return {
+      createIsIconButton: Boolean(create && create.width <= 52 && create.height <= 52),
+      createStaysInHeaderRow: Boolean(heading && create && create.top < heading.bottom && create.left > heading.left),
+      emptyAfterHeader: Boolean(heading && create && empty && empty.top - Math.max(create.bottom, heading.bottom) >= 10)
+    };
+  });
+  expect(emptyLayout.createIsIconButton).toBe(true);
+  expect(emptyLayout.createStaysInHeaderRow).toBe(true);
+  expect(emptyLayout.emptyAfterHeader).toBe(true);
   expect(await getHorizontalOverflow(page)).toBeLessThanOrEqual(0);
 });
 
