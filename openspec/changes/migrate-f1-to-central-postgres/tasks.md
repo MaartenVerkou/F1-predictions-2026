@@ -15,11 +15,11 @@
 
 - [x] 3.1 Add a SQLite-to-PostgreSQL migration script that creates compatible schema and imports all F1 application tables.
 - [x] 3.2 Add row-count and smoke verification for migrated tables before cutover.
-- [ ] 3.3 Back up the production SQLite state and current F1 configuration before running the production migration.
+- [x] 3.3 Back up the production SQLite state and current F1 configuration before running the production migration.
 
 ## 4. Verification and Cutover
 
 - [x] 4.1 Run relevant local tests for health, auth/security flows, actuals snapshots, and leaderboard data behavior.
-- [ ] 4.2 Run production migration into the central F1 PostgreSQL database and verify row counts.
-- [ ] 4.3 Restart F1 against PostgreSQL and verify `/healthz`, `/login`, and a database-backed production route.
-- [ ] 4.4 Document rollback steps and keep the pre-migration SQLite state/config until the cutover is accepted.
+- [x] 4.2 Run production migration into the central F1 PostgreSQL database and verify row counts.
+- [x] 4.3 Restart F1 against PostgreSQL and verify `/healthz`, `/login`, and a database-backed production route.
+- [x] 4.4 Document rollback steps and keep the pre-migration SQLite state/config until the cutover is accepted.
