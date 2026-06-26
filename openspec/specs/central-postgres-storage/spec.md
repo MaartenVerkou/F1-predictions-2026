@@ -1,7 +1,7 @@
 # central-postgres-storage Specification
 
 ## Purpose
-TBD - created by archiving change migrate-f1-to-central-postgres. Update Purpose after archive.
+Define how the shared production server provides central PostgreSQL storage for apps while preserving per-app database and role isolation.
 ## Requirements
 ### Requirement: Central PostgreSQL service hosts app databases
 The production server SHALL host app databases through a central PostgreSQL service with per-app database and role isolation.
@@ -61,3 +61,18 @@ Rule: Production sessions SHALL be stored in PostgreSQL after the F1 database cu
 - **WHEN** the session pruning interval runs
 - **THEN** expired sessions SHALL be removed without affecting active sessions
 
+### Requirement: Central PostgreSQL uses MHV platform naming
+The production server SHALL expose central PostgreSQL through MHV-named platform infrastructure.
+
+#### Scenario: App connects to central PostgreSQL
+- **GIVEN** a production app uses the central PostgreSQL service
+- **WHEN** the app container starts
+- **THEN** it SHALL join the internal Docker network named `mhv-db`
+- **AND** it SHALL connect to PostgreSQL through the internal hostname `mhv-postgres`
+- **AND** PostgreSQL SHALL not expose a public host port
+
+#### Scenario: Operator inspects central PostgreSQL container
+- **GIVEN** central PostgreSQL is running on the production server
+- **WHEN** an operator lists Docker containers
+- **THEN** the central PostgreSQL container SHALL use the platform name `mhv-postgres`
+- **AND** app-specific database names and roles SHALL remain isolated per app

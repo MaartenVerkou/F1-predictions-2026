@@ -20,5 +20,5 @@
 ## 4. Verification And Release
 
 - [x] 4.1 Verify production Docker containers, networks, F1 health, and public routes for all hosted apps.
-- [ ] 4.2 Commit and push the implementation changes.
-- [ ] 4.3 Sync specs, archive the OpenSpec change, validate all specs, and commit the archive.
+- [x] 4.2 Commit and push the implementation changes.
+- [x] 4.3 Sync specs, archive the OpenSpec change, validate all specs, and commit the archive.
