@@ -3,15 +3,17 @@ services:
     ports: !reset []
     networks:
       default: {}
-      proxy:
+      web:
         aliases:
           - f1-app
   caddy:
+    profiles: !override
+      - legacy-edge
     networks:
       default: {}
-      proxy: {}
+      web: {}
 
 networks:
-  proxy:
+  web:
     external: true
-    name: proxy
+    name: wok-web
