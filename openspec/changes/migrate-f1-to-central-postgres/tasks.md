@@ -1,8 +1,8 @@
 ## 1. Central PostgreSQL Infrastructure
 
-- [ ] 1.1 Create `/srv/infra/postgres` stack with private Docker networking, persistent volume, and root/admin credentials stored outside app repos.
-- [ ] 1.2 Create F1-specific PostgreSQL database, role, password, and internal `DATABASE_URL`.
-- [ ] 1.3 Add backup/restore commands or documentation for the central PostgreSQL service.
+- [x] 1.1 Create `/srv/infra/postgres` stack with private Docker networking, persistent volume, and root/admin credentials stored outside app repos.
+- [x] 1.2 Create F1-specific PostgreSQL database, role, password, and internal `DATABASE_URL`.
+- [x] 1.3 Add backup/restore commands or documentation for the central PostgreSQL service.
 
 ## 2. Application PostgreSQL Support
 
