@@ -66,7 +66,7 @@ jobs:
             echo "DEPLOY_USER=$deploy_user"
             echo "DEPLOY_PORT=${deploy_port:-22}"
             echo "DEPLOY_PATH=${deploy_path:-/opt/F1-predictions-2026}"
-            echo "DEPLOY_COMPOSE_FILES=${deploy_compose_files:-docker-compose.yml}"
+            echo "DEPLOY_COMPOSE_FILES=${deploy_compose_files:-docker-compose.yml:docker-compose.server.yml}"
             echo "DEPLOY_HEALTH_URL=${deploy_health_url:-http://127.0.0.1:3000/healthz}"
             echo "REMOTE_BUNDLE=/tmp/f1predictions-${DEPLOY_SOURCE_SHA}.tgz"
           } >> "$GITHUB_ENV"
