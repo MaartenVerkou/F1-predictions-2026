@@ -1,6 +1,6 @@
 # F1 PostgreSQL Operations
 
-F1 production now uses the central PostgreSQL stack on `wok-server`.
+F1 production now uses the central PostgreSQL stack on `mhv-server`.
 
 ## Runtime Layout
 
@@ -8,10 +8,14 @@ F1 production now uses the central PostgreSQL stack on `wok-server`.
 - App state backup source: `/var/lib/wheelofknowledge/state`
 - Central PostgreSQL stack: `/srv/infra/postgres/current`
 - Central PostgreSQL backups: `/srv/infra/postgres/backups`
-- F1 app connects through the internal Docker network `wok-db`.
-- F1 remains reachable by central Caddy through `wok-web` with alias `f1-app`.
+- F1 app connects through the internal Docker network `mhv-db`.
+- F1 remains reachable by central Caddy through `mhv-web` with alias `f1-app`.
 
 The F1 database connection string is host-managed in `/srv/f1-predictions/current/.env` as `DATABASE_URL`.
+
+Central PostgreSQL backup dumps are written under `/srv/infra/postgres/backups`.
+The active host-level encrypted backup entrypoints are `/usr/local/sbin/mhv-backup`
+and `/usr/local/sbin/mhv-backup-prune`.
 
 ## Migration Command
 

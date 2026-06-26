@@ -17,7 +17,7 @@ services:
 networks:
   web:
     external: true
-    name: wok-web
+    name: mhv-web
   db:
     external: true
-    name: wok-db
+    name: mhv-db

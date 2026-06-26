@@ -106,14 +106,15 @@ The deployed server uses an external Restic backup workflow for Cloudflare R2. I
 Current server shape:
 
 - State directory: `/var/lib/wheelofknowledge/state`
-- Databases backed up: `app.db` and `sessions.db`
-- Cron: `/etc/cron.d/wok-backup`
-- Backup command: `/usr/local/sbin/wok-backup`
-- Prune command: `/usr/local/sbin/wok-backup-prune`
-- Secret/config file: `/etc/wok-backup.env`
-- Log file: `/var/log/wok-backup.log`
+- F1 database: central PostgreSQL through `mhv-db` and `mhv-postgres`
+- Central PostgreSQL dumps: `/srv/infra/postgres/backups`
+- Cron: `/etc/cron.d/mhv-backup`
+- Backup command: `/usr/local/sbin/mhv-backup`
+- Prune command: `/usr/local/sbin/mhv-backup-prune`
+- Secret/config file: `/etc/mhv-backup.env`
+- Log file: `/var/log/mhv-backup.log`
 
-The backup command performs SQLite online backups with integrity checks before sending snapshots to the Restic repository. Do not replace this with a repo-local backup script unless the host-level R2 setup is being retired deliberately.
+The backup command sends central backup outputs to the Restic repository. Do not replace this with a repo-local backup script unless the host-level R2 setup is being retired deliberately.
 
 ## GitHub deploy workflow
 
@@ -126,7 +127,7 @@ The workflow keeps the current server contract:
 - runs `bash scripts/deploy-app.sh`
 - rebuilds only the Docker Compose `app` service
 - waits for `GET /healthz` and a rendered `GET /login` before marking the deploy successful
-- does not overwrite host-managed `.env`, SQLite state, `/var/lib/wheelofknowledge/state`, or the external Restic/R2 backup setup
+- does not overwrite host-managed `.env`, PostgreSQL connection settings, `/var/lib/wheelofknowledge/state`, or the external Restic/R2 backup setup
 
 Required GitHub secrets:
 

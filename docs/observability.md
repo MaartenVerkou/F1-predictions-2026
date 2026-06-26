@@ -39,7 +39,7 @@ For deployed apps, add a cheap health endpoint or smoke-check route that confirm
 
 Current endpoint: `GET /healthz`
 
-It verifies the process is running and SQLite can answer a trivial query. Docker, CI smoke checks, and the production deploy workflow use this endpoint.
+It verifies the process is running and the active database backend can answer a trivial query. Docker, CI smoke checks, and the production deploy workflow use this endpoint.
 
 ## Audit Logs
 
@@ -49,8 +49,11 @@ Add audit logs when the app has accounts, permissions, billing, admin actions, d
 
 The server uses host-level Restic backups to Cloudflare R2. Cron and credentials live outside the repo:
 
-- `/etc/cron.d/wok-backup`
-- `/usr/local/sbin/wok-backup`
-- `/usr/local/sbin/wok-backup-prune`
-- `/etc/wok-backup.env`
-- `/var/log/wok-backup.log`
+- `/etc/cron.d/mhv-backup`
+- `/usr/local/sbin/mhv-backup`
+- `/usr/local/sbin/mhv-backup-prune`
+- `/etc/mhv-backup.env`
+- `/var/log/mhv-backup.log`
+
+Central PostgreSQL dumps are created under `/srv/infra/postgres/backups` before
+the encrypted host-level backup captures central backup outputs.
