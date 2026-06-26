@@ -103,5 +103,6 @@ test("health endpoint reports readiness and echoes request id", async (t) => {
   assert.equal(response.headers["x-request-id"], "test-request-1");
   assert.equal(response.body.status, "ok");
   assert.equal(response.body.checks.database, "ok");
+  assert.equal(response.body.databaseBackend, "sqlite");
   assert.equal(response.body.service, "f1-predictions-2026");
 });

@@ -9,6 +9,7 @@ const SCRIPT_PATH = path.join(ROOT, "scripts", "backfill-actuals-2026.js");
 function runActualsAutoUpdate({
   season,
   dbPath,
+  databaseUrl,
   dataDir,
   questionsPath,
   rosterPath,
@@ -33,6 +34,7 @@ function runActualsAutoUpdate({
       cwd: ROOT,
       env: {
         ...process.env,
+        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
         ...(dbPath ? { DB_PATH: dbPath } : {}),
         ...(dataDir ? { DATA_DIR: dataDir } : {}),
         ...(questionsPath ? { QUESTIONS_PATH: questionsPath } : {}),

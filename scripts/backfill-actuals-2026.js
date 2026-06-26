@@ -10,6 +10,8 @@ const {
   normalizeReviewStatus,
   snapshotValuesEqual
 } = require("../src/actuals-snapshots");
+const { createAppDatabase } = require("../src/app-database");
+const { ensurePostgresSchema } = require("../src/postgres-schema");
 const { resolveConfiguredRaceName } = require("../src/race-names");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -96,6 +98,7 @@ function parseArgs(argv) {
     apply: false,
     dryRun: true,
     dbPath: process.env.DB_PATH || path.join(DATA_DIR, "app.db"),
+    databaseUrl: String(process.env.DATABASE_URL || "").trim(),
     season: SEASON,
     maxRound: null
   };
@@ -109,6 +112,8 @@ function parseArgs(argv) {
       args.dryRun = true;
     } else if (arg.startsWith("--db=")) {
       args.dbPath = path.resolve(arg.slice("--db=".length));
+    } else if (arg.startsWith("--database-url=")) {
+      args.databaseUrl = String(arg.slice("--database-url=".length)).trim();
     } else if (arg.startsWith("--season=")) {
       args.season = Number(arg.slice("--season=".length));
     } else if (arg.startsWith("--max-round=")) {
@@ -761,6 +766,11 @@ function loadExistingActuals(db) {
 }
 
 function ensureActualsSchema(db) {
+  if (db.dialect === "postgres") {
+    ensurePostgresSchema(db);
+    return;
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS actuals (
       question_id TEXT PRIMARY KEY,
@@ -936,23 +946,32 @@ async function main() {
   let existingActuals = {};
 
   if (args.apply) {
-    const Database = require("better-sqlite3");
-    const db = new Database(args.dbPath);
-    db.pragma("busy_timeout = 5000");
-    ensureActualsSchema(db);
-    existingActuals = loadExistingActuals(db);
-    latestValues = { ...existingActuals, ...latestSnapshot.values };
-    const result = writeActualsAndSnapshots(db, {
-      season: args.season,
-      rounds: completedRounds,
-      latestValues,
-      snapshots
+    const db = createAppDatabase({
+      databaseUrl: args.databaseUrl,
+      sqlitePath: args.dbPath
     });
-    db.close();
+    let result;
+    try {
+      if (db.dialect === "sqlite") {
+        db.pragma("busy_timeout = 5000");
+      }
+      ensureActualsSchema(db);
+      existingActuals = loadExistingActuals(db);
+      latestValues = { ...existingActuals, ...latestSnapshot.values };
+      result = writeActualsAndSnapshots(db, {
+        season: args.season,
+        rounds: completedRounds,
+        latestValues,
+        snapshots
+      });
+    } finally {
+      db.close?.();
+    }
     console.log(
       JSON.stringify(
         {
           mode: "apply",
+          database: args.databaseUrl ? "postgres" : "sqlite",
           dbPath: args.dbPath,
           updatedAt: result.updatedAt,
           changedSnapshotCount: result.changedSnapshotCount,
@@ -978,6 +997,7 @@ async function main() {
     JSON.stringify(
       {
         mode: "dry-run",
+        database: args.databaseUrl ? "postgres" : "sqlite",
         dbPath: args.dbPath,
         completedRounds,
         cancelledRacesHandledAsZeroDnf: CANCELLED_RACES_2026,

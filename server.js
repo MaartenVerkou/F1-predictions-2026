@@ -5,9 +5,10 @@ const express = require("express");
 const helmet = require("helmet");
 const session = require("express-session");
 const bcrypt = require("bcrypt");
-const Database = require("better-sqlite3");
 const nodemailer = require("nodemailer");
-const { BetterSqliteSessionStore } = require("./src/session-store");
+const { createAppDatabase } = require("./src/app-database");
+const { BetterSqliteSessionStore, PostgresSessionStore } = require("./src/session-store");
+const { ensurePostgresSchema } = require("./src/postgres-schema");
 const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
 const leaderboardModel = require("./src/leaderboard-model");
 const {
@@ -53,6 +54,7 @@ loadDotEnvIfPresent();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
+const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
 const PUBLIC_DIR = path.join(__dirname, "public");
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questions.json");
 const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json");
@@ -372,10 +374,10 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const db = new Database(DB_PATH);
-db.pragma("busy_timeout = 5000");
-
-db.exec(`
+const db = createAppDatabase({ databaseUrl: DATABASE_URL, sqlitePath: DB_PATH });
+if (db.dialect === "sqlite") {
+  db.pragma("busy_timeout = 5000");
+  db.exec(`
   PRAGMA journal_mode = WAL;
 
   CREATE TABLE IF NOT EXISTS users (
@@ -570,7 +572,10 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_admin_ideas_status_updated
     ON admin_ideas(status, updated_at);
-`);
+  `);
+} else {
+  ensurePostgresSchema(db);
+}
 
 function ensureGroupColumns() {
   const columns = db.prepare("PRAGMA table_info(groups);").all();
@@ -1147,7 +1152,8 @@ app.get("/healthz", (req, res) => {
       uptimeSeconds: Number(process.uptime().toFixed(3)),
       checks: {
         database: "ok"
-      }
+      },
+      databaseBackend: db.dialect || "sqlite"
     });
   } catch (err) {
     logEvent("error", "health_check_failed", {
@@ -1159,7 +1165,8 @@ app.get("/healthz", (req, res) => {
       service: SERVICE_NAME,
       checks: {
         database: "error"
-      }
+      },
+      databaseBackend: db.dialect || "sqlite"
     });
   }
 });
@@ -1179,12 +1186,18 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.urlencoded({ extended: true }));
-app.use(
-  session({
-    store: new BetterSqliteSessionStore({
+const sessionStore = DATABASE_URL
+  ? new PostgresSessionStore({
+      connectionString: DATABASE_URL,
+      ttlMs: SESSION_COOKIE_TTL_MS
+    })
+  : new BetterSqliteSessionStore({
       filename: path.join(DATA_DIR, "sessions.db"),
       ttlMs: SESSION_COOKIE_TTL_MS
-    }),
+    });
+app.use(
+  session({
+    store: sessionStore,
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
@@ -5375,6 +5388,7 @@ registerAdminRoutes(app, {
   generateUniqueGroupId,
   dataDir: DATA_DIR,
   dbPath: DB_PATH,
+  databaseUrl: DATABASE_URL,
   questionsPath: QUESTIONS_PATH,
   rosterPath: ROSTER_PATH,
   racesPath: RACES_PATH,
@@ -5418,6 +5432,7 @@ async function executeActualsAutoUpdate(reason) {
     const result = await runActualsAutoUpdate({
       season: CURRENT_SEASON,
       dbPath: DB_PATH,
+      databaseUrl: DATABASE_URL,
       dataDir: DATA_DIR,
       questionsPath: QUESTIONS_PATH,
       rosterPath: ROSTER_PATH,

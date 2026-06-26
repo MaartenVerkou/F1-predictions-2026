@@ -20,6 +20,7 @@ services:
       - CONTACT_EMAIL=${CONTACT_EMAIL:-}
       - DATA_DIR=/app/state
       - DB_PATH=/app/state/app.db
+      - DATABASE_URL=${DATABASE_URL:-}
       - QUESTIONS_PATH=/app/config/questions.json
       - ROSTER_PATH=/app/config/roster.json
       - RACES_PATH=/app/config/races.json

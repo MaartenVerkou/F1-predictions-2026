@@ -25,6 +25,7 @@ function registerAdminRoutes(app, deps) {
     generateUniqueGroupId,
     dataDir,
     dbPath,
+    databaseUrl,
     questionsPath,
     rosterPath,
     racesPath,
@@ -2574,6 +2575,7 @@ function registerAdminRoutes(app, deps) {
       const result = await runActualsAutoUpdate({
         season: CURRENT_SEASON,
         dbPath,
+        databaseUrl,
         dataDir,
         questionsPath,
         rosterPath,
