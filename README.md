@@ -155,6 +155,10 @@ ssh-keyscan -H your-server.example.com
 
 For guarded production rollouts, configure the GitHub `production` environment with required reviewers.
 
+## Server Codex Environment
+
+F1 Codex work on `mhv-server` uses a dedicated per-app environment rather than the live production checkout. See [F1 Codex Server Environment](docs/f1-codex-server-environment.md).
+
 If you previously used `./data:/app/data` and want to keep that old database, run this once before first start with the new setup (Linux/macOS shell):
 
 ```bash
