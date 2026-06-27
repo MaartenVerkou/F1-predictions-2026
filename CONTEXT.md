@@ -71,3 +71,19 @@ _Avoid_: Admin fill, import
 **Actual Review**:
 An admin confirmation that an autofilled actual snapshot has been checked and accepted, or manually corrected after review.
 _Avoid_: Approval, audit
+
+**Admin Idea**:
+An admin-recorded future question, feature, improvement, or reported problem that can be triaged before it becomes planned work.
+_Avoid_: Ticket, task, backlog item
+
+**Resolution Run**:
+An auditable attempt to investigate or solve an Admin Idea, including its objective, outcome, review state, and follow-up iterations.
+_Avoid_: AI job, Codex session, task run
+
+**Preview Environment**:
+A temporary admin-only place to inspect a Resolution Run's candidate behavior before it is approved for production.
+_Avoid_: Staging when referring to a single run preview, test page
+
+**Deploy Candidate**:
+A Resolution Run that has passed required validation and has been explicitly marked by an admin as eligible for production deployment.
+_Avoid_: Finished fix, auto deploy, release
