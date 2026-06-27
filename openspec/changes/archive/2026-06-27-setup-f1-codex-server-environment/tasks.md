@@ -19,5 +19,5 @@
 
 ## 4. Release
 
-- [ ] 4.1 Commit and push implementation documentation and task status.
-- [ ] 4.2 Sync specs, archive the OpenSpec change, validate all specs, and commit the archive.
+- [x] 4.1 Commit and push implementation documentation and task status.
+- [x] 4.2 Sync specs, archive the OpenSpec change, validate all specs, and commit the archive.
