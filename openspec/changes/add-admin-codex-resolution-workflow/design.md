@@ -73,17 +73,17 @@ Alternatives considered:
 - Point preview at production Postgres: rejected because a candidate build could mutate real data.
 - Use an empty preview database: safer but too weak for validating admin/user workflows.
 
-### 4a. Preview is server-hosted behind a central HTTPS preview domain
+### 4a. Preview is server-hosted behind central MHV HTTPS routing
 
-Production previews SHALL run on the MHV server from the resolution run's candidate worktree, normally as a disposable Docker Compose project with an app container and an isolated preview database clone. The admin-facing preview SHOULD be an HTTPS URL routed by central Caddy, preferably under a reusable preview domain such as:
+Production previews SHALL run on the MHV server from the resolution run's candidate worktree, normally as a disposable Docker Compose project with an app container and an isolated preview database clone. The admin-facing preview SHOULD be an HTTPS URL routed by central Caddy using the reusable first-level `*.mhvmade.com` DNS wildcard, such as:
 
 ```text
-https://f1-run-<run-id>.preview.mhvmade.com
+https://f1-preview-<run-id>.mhvmade.com
 ```
 
-The preview app may bind to an internal server port or Docker network alias, but admins should not need to SSH or open `localhost:3000`. Localhost-style URLs are acceptable only for local developer testing or internal health checks, not as the production admin preview experience.
+The preview app may bind to an internal server port or Docker network alias, but admins should not need to SSH or open `localhost:3000`. Localhost-style URLs are acceptable only for local developer testing or internal health checks, not as the production admin preview experience. Caddy routing remains explicit for known apps and active preview runs so random wildcard hostnames fail closed.
 
-Rationale: The user needs a click-through preview from the website. A server-hosted URL works from any admin machine, can be protected centrally, and matches the future multi-app MHV pattern.
+Rationale: The user needs a click-through preview from the website. A server-hosted URL works from any admin machine, can be protected centrally, avoids per-app Cloudflare DNS changes, and stays within Cloudflare Universal SSL's first-level subdomain coverage.
 
 ### 5. Validation gates deploy eligibility
 

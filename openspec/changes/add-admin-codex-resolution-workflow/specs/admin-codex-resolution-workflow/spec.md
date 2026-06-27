@@ -98,6 +98,7 @@ The system SHALL provide admin-only preview access for eligible resolution runs 
 - **THEN** the run SHALL record a preview URL
 - **AND** the preview SHALL use a database snapshot or clone instead of the live production database
 - **AND** the preview URL SHALL be reachable by admins over HTTPS without SSH access
+- **AND** the preview URL SHALL use a first-level MHV hostname such as `f1-preview-<run-id>.mhvmade.com`
 - **AND** the run detail page SHALL show that the candidate is ready to test only when required validation checks have passed
 
 #### Scenario: Preview is restricted to admins

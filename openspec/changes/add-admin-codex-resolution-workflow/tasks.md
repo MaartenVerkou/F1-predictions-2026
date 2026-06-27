@@ -39,7 +39,7 @@
 - [ ] 5.4 Add preview lifecycle cleanup for expired previews, worktrees, and logs.
 - [ ] 5.5 Add Playwright coverage for the admin run review and preview link flow.
 - [ ] 5.6 Add a visible "Ready to test" state only after required validation passes and an admin-only preview URL is available.
-- [ ] 5.7 Configure central Caddy/DNS preview routing for server-hosted HTTPS previews such as `f1-run-<id>.preview.mhvmade.com`.
+- [ ] 5.7 Configure central Caddy/DNS preview routing for server-hosted HTTPS previews such as `f1-preview-<id>.mhvmade.com` using the reusable `*.mhvmade.com` wildcard.
 - [ ] 5.8 Add retention cleanup for 7-day previews, 14-day inactive worktrees, and 30-day admin-visible logs.
 
 ## 6. Deploy Candidate Flow
