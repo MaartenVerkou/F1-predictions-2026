@@ -78,7 +78,7 @@ Alternatives considered:
 Production previews SHALL run on the MHV server from the resolution run's candidate worktree, normally as a disposable Docker Compose project with an app container and an isolated preview database clone. The admin-facing preview SHOULD be an HTTPS URL routed by central Caddy using the reusable first-level `*.mhvmade.com` DNS wildcard, such as:
 
 ```text
-https://f1-preview-<run-id>.mhvmade.com
+https://wok-preview-<run-id>.mhvmade.com
 ```
 
 The preview app may bind to an internal server port or Docker network alias, but admins should not need to SSH or open `localhost:3000`. Localhost-style URLs are acceptable only for local developer testing or internal health checks, not as the production admin preview experience. Caddy routing remains explicit for known apps and active preview runs so random wildcard hostnames fail closed.
