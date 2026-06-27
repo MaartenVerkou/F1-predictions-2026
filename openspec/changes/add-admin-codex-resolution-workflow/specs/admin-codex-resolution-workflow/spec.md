@@ -16,6 +16,13 @@ The system SHALL allow authenticated admins to request a Codex resolution run fr
 - **THEN** the system SHALL create a resolution run with type `attempt_fix`
 - **AND** the run SHALL store the submitted structured fields for audit
 
+#### Scenario: Admin captures and starts in one flow
+- **GIVEN** an authenticated admin has a new reported problem or idea
+- **WHEN** the admin submits it with the "save and try with Codex" action
+- **THEN** the system SHALL create the idea and a linked resolution run
+- **AND** the admin SHALL be redirected to the new run detail page
+- **AND** the run detail page SHALL show the current state and next expected step
+
 #### Scenario: Non-admin cannot request a run
 - **GIVEN** a visitor or non-admin user submits a resolution-run request
 - **WHEN** the request is handled
@@ -29,7 +36,7 @@ The system SHALL track each resolution run through durable status, events, runne
 - **GIVEN** a queued resolution run exists
 - **WHEN** the runner starts processing it
 - **THEN** the run status SHALL change to `running`
-- **AND** the run SHALL record the branch name, worktree path, runner identity, and start time
+- **AND** the run SHALL record the branch name, worktree path, runner identity, current phase, heartbeat time, and start time
 
 #### Scenario: Runner records completion summary
 - **GIVEN** a resolution run is running
@@ -43,6 +50,18 @@ The system SHALL track each resolution run through durable status, events, runne
 - **THEN** the run status SHALL change to `failed`
 - **AND** the admin UI SHALL show the failure reason and last sanitized log lines
 
+#### Scenario: Running run shows current progress
+- **GIVEN** a resolution run is queued or running
+- **WHEN** an authenticated admin opens the run detail page
+- **THEN** the page SHALL show the admin-facing phase label, last activity time, and current runner phase
+- **AND** the page SHALL indicate whether the runner is actively working, waiting, or stale
+
+#### Scenario: Run list highlights work needing attention
+- **GIVEN** resolution runs exist in queued, running, failed, needs-review, ready-to-test, and scheduled states
+- **WHEN** an authenticated admin opens the resolution-run list
+- **THEN** the list SHALL group or filter runs so work needing admin attention is visible without opening every run
+- **AND** each row SHALL show the latest status and last activity time
+
 ### Requirement: Admins can review and iterate on Codex output
 The system SHALL provide a run detail view where admins can review output, request follow-up iterations, cancel work, or reject a run.
 
@@ -50,6 +69,13 @@ The system SHALL provide a run detail view where admins can review output, reque
 - **GIVEN** a resolution run has status `needs_review`
 - **WHEN** an authenticated admin opens the run detail page
 - **THEN** the page SHALL show the linked idea, objective, status timeline, Codex summary, changed files, validation state, and available next actions
+
+#### Scenario: Admin sees safe CLI takeover details
+- **GIVEN** a resolution run has a branch and worktree
+- **WHEN** an authenticated admin opens the run detail page
+- **THEN** the page SHALL show the branch and worktree path
+- **AND** the page SHALL show a copyable CLI command for a trusted operator to continue the run manually
+- **AND** the command SHALL target only the app-scoped Codex worktree
 
 #### Scenario: Admin requests an iteration
 - **GIVEN** a resolution run has status `needs_review` or `failed`
@@ -71,12 +97,20 @@ The system SHALL provide admin-only preview access for eligible resolution runs 
 - **WHEN** the preview build succeeds
 - **THEN** the run SHALL record a preview URL
 - **AND** the preview SHALL use a database snapshot or clone instead of the live production database
+- **AND** the run detail page SHALL show that the candidate is ready to test only when required validation checks have passed
 
 #### Scenario: Preview is restricted to admins
 - **GIVEN** a preview URL exists for a resolution run
 - **WHEN** a visitor or non-admin requests the preview
 - **THEN** the system SHALL deny access
 - **AND** the preview SHALL remain available to authenticated admins
+
+#### Scenario: Admin opens ready-to-test candidate
+- **GIVEN** a resolution run has a passing validation checklist and an admin-only preview URL
+- **WHEN** an authenticated admin opens the run detail page
+- **THEN** the page SHALL show a prominent ready-to-test state
+- **AND** the page SHALL show the preview URL, validation checklist, changed-files summary, and test notes
+- **AND** deployment approval actions SHALL remain separate from the preview test action
 
 ### Requirement: Validated runs can become deploy candidates
 The system SHALL allow admins to mark a resolution run as a deploy candidate only after required validation checks are recorded.

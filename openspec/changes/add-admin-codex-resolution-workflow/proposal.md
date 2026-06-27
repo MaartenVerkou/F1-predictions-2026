@@ -5,11 +5,13 @@ Admins can already capture future ideas, but there is no controlled path to turn
 ## What Changes
 
 - Add an admin-only Codex resolution workflow that starts from an existing idea or a new reported problem.
+- Provide a clear "Try with Codex" entry point from the ideas inbox and a one-step "capture and try" path for newly reported admin ideas.
 - Allow admins to request an AI attempt with a constrained objective, expected impact, and run mode instead of exposing arbitrary shell access.
-- Track each AI attempt as an auditable resolution run with status, logs, branch/worktree metadata, test results, preview URL, and final disposition.
+- Track each AI attempt as an auditable resolution run with current phase, last activity, logs, branch/worktree metadata, test results, preview URL, and final disposition.
+- Show admin-facing states that make the next step obvious, including queued, running, needs admin input, failed, ready to test, ready to approve, scheduled, and deployed.
 - Introduce a server-side runner boundary that invokes the existing F1 Codex environment outside the web request process.
 - Support iterative follow-up prompts on an existing run without losing the audit trail.
-- Require a passing validation checklist before a run can become a deploy candidate.
+- Require a passing validation checklist and preview link before a run is marked ready to test or can become a deploy candidate.
 - Let admins either deploy an approved candidate immediately or schedule it for an overnight deploy queue.
 - Treat this F1 implementation as the reference pattern for future apps on the same MHV server.
 

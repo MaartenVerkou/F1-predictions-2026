@@ -12,6 +12,8 @@
 - [ ] 2.3 Add a run detail page showing linked idea, objective, timeline, runner state, validation state, and next actions.
 - [ ] 2.4 Add CSRF-protected admin mutations for create, cancel, reject, and iterate actions.
 - [ ] 2.5 Add integration tests for non-admin denial and CSRF-protected admin run mutations.
+- [ ] 2.6 Add a one-step "save and try with Codex" path for new ideas and a post-submit redirect to the run detail page.
+- [ ] 2.7 Add admin-facing phase labels, last activity time, and recommended next-step copy to run list and detail pages.
 
 ## 3. Runner Abstraction
 
@@ -19,6 +21,7 @@
 - [ ] 3.2 Add prompt rendering from structured run data and repo workflow instructions.
 - [ ] 3.3 Add a runner loop command that claims queued runs, records heartbeats, writes sanitized logs, and handles timeout/failure.
 - [ ] 3.4 Add tests for runner claiming, event logging, failure handling, and iteration continuation.
+- [ ] 3.5 Record current runner phase and last heartbeat so the UI can distinguish active work from a stuck run.
 
 ## 4. F1 Server Runner
 
@@ -35,6 +38,7 @@
 - [ ] 5.3 Implement preview database snapshot or clone creation that never writes to the live production database.
 - [ ] 5.4 Add preview lifecycle cleanup for expired previews, worktrees, and logs.
 - [ ] 5.5 Add Playwright coverage for the admin run review and preview link flow.
+- [ ] 5.6 Add a visible "Ready to test" state only after required validation passes and an admin-only preview URL is available.
 
 ## 6. Deploy Candidate Flow
 

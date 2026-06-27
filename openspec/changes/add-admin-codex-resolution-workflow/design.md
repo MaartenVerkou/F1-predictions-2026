@@ -5,11 +5,13 @@ The app already has an admin-only ideas inbox with CSRF-protected mutations. The
 The requested workflow turns an idea or reported problem into an admin-controlled automation loop:
 
 1. Admin records or selects an idea.
-2. Admin asks Codex to investigate or attempt a fix.
-3. The server creates an isolated branch/worktree and runs Codex there.
-4. Tests and preview validation run against the candidate.
-5. Admin reviews the diff, logs, and preview.
-6. Admin iterates, rejects, or approves the candidate for deployment.
+2. Admin clicks a clear "Try with Codex" action or chooses "Save and try with Codex" while creating a new idea.
+3. Admin lands on a run detail page that immediately shows queued/running progress and the next expected step.
+4. The server creates an isolated branch/worktree and runs Codex there.
+5. Tests and preview validation run against the candidate.
+6. Admin sees an explicit ready-to-test state with a preview link, validation checklist, and changed-files summary.
+7. Admin reviews the diff, logs, and preview.
+8. Admin iterates, rejects, or approves the candidate for deployment.
 
 ## Goals / Non-Goals
 
@@ -87,15 +89,29 @@ Rationale: Git remains the source of truth. This avoids mystery production state
 The admin ideas page should show a compact automation status for each idea, while a dedicated run detail page shows:
 
 - objective and linked idea
+- admin-facing phase label and recommended next step
+- live/refreshing progress summary with last activity time
 - current state timeline
 - Codex summary
 - changed files and diff link
 - validation results
 - preview URL
+- CLI takeover command for trusted operators when the run needs manual work
 - iteration form
 - approve/reject/deploy actions when eligible
 
 Rationale: Admins need to scan the inbox, then drill into a single operational workflow when a run needs attention.
+
+The primary admin states should be intentionally plain:
+
+- `Queued`: the request is accepted but not started.
+- `Running`: Codex or validation is currently working.
+- `Needs input`: Codex stopped because the task needs admin clarification or manual operator help.
+- `Failed`: the run could not complete; show why and what can be retried.
+- `Ready to test`: a preview is available and required validation has passed.
+- `Ready to approve`: admin has tested the preview and can approve or reject deployment.
+- `Scheduled`: the candidate is approved for a later deployment window.
+- `Deployed`: the candidate reached production and health checks passed.
 
 ## Risks / Trade-offs
 
