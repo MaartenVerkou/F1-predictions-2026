@@ -1,0 +1,23 @@
+## 1. Repository Documentation
+
+- [ ] 1.1 Add F1 Codex server environment operations documentation.
+- [ ] 1.2 Validate the OpenSpec change before implementation.
+
+## 2. Server Provisioning
+
+- [ ] 2.1 Inspect the current MHV server Codex, F1 repo, and permission state without printing secrets.
+- [ ] 2.2 Create the `f1-codex` Unix user and `/srv/codex/f1` directory layout.
+- [ ] 2.3 Create the F1 repository mirror and initial disposable worktree under `/srv/codex/f1/worktrees`.
+- [ ] 2.4 Install helper commands for login, shell, worktree creation, interactive Codex, and non-interactive Codex exec.
+- [ ] 2.5 Configure permissions so `f1-codex` cannot read host-managed app or central infra secret files.
+
+## 3. Verification
+
+- [ ] 3.1 Verify helper commands, Codex version, app-scoped `CODEX_HOME`, and worktree creation.
+- [ ] 3.2 Verify `f1-codex` cannot read production secret files.
+- [ ] 3.3 Run a Codex smoke check when authentication is available, or document the remaining manual login step.
+
+## 4. Release
+
+- [ ] 4.1 Commit and push implementation documentation and task status.
+- [ ] 4.2 Sync specs, archive the OpenSpec change, validate all specs, and commit the archive.
