@@ -12,7 +12,7 @@ Admins can already capture future ideas, but there is no controlled path to turn
 - Introduce a server-side runner boundary that invokes the existing F1 Codex environment outside the web request process.
 - Support iterative follow-up prompts on an existing run without losing the audit trail.
 - Require a passing validation checklist and preview link before a run is marked ready to test or can become a deploy candidate.
-- Let admins either deploy an approved candidate immediately or schedule it for an overnight deploy queue.
+- Let admins schedule an approved candidate for an overnight deploy queue; direct immediate production deployment is intentionally excluded from v1.
 - Treat this F1 implementation as the reference pattern for future apps on the same MHV server.
 
 ## Capabilities

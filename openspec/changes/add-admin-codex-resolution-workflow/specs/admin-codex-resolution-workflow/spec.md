@@ -97,6 +97,7 @@ The system SHALL provide admin-only preview access for eligible resolution runs 
 - **WHEN** the preview build succeeds
 - **THEN** the run SHALL record a preview URL
 - **AND** the preview SHALL use a database snapshot or clone instead of the live production database
+- **AND** the preview URL SHALL be reachable by admins over HTTPS without SSH access
 - **AND** the run detail page SHALL show that the candidate is ready to test only when required validation checks have passed
 
 #### Scenario: Preview is restricted to admins
@@ -111,6 +112,12 @@ The system SHALL provide admin-only preview access for eligible resolution runs 
 - **THEN** the page SHALL show a prominent ready-to-test state
 - **AND** the page SHALL show the preview URL, validation checklist, changed-files summary, and test notes
 - **AND** deployment approval actions SHALL remain separate from the preview test action
+
+#### Scenario: Preview does not require local development setup
+- **GIVEN** a resolution run has a ready-to-test preview
+- **WHEN** an authenticated admin opens the preview link from a normal browser
+- **THEN** the preview SHALL load from the MHV server
+- **AND** the admin SHALL NOT need to run the app locally or open a localhost URL
 
 ### Requirement: Validated runs can become deploy candidates
 The system SHALL allow admins to mark a resolution run as a deploy candidate only after required validation checks are recorded.

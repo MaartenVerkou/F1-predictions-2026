@@ -39,12 +39,14 @@
 - [ ] 5.4 Add preview lifecycle cleanup for expired previews, worktrees, and logs.
 - [ ] 5.5 Add Playwright coverage for the admin run review and preview link flow.
 - [ ] 5.6 Add a visible "Ready to test" state only after required validation passes and an admin-only preview URL is available.
+- [ ] 5.7 Configure central Caddy/DNS preview routing for server-hosted HTTPS previews such as `f1-run-<id>.preview.mhvmade.com`.
+- [ ] 5.8 Add retention cleanup for 7-day previews, 14-day inactive worktrees, and 30-day admin-visible logs.
 
 ## 6. Deploy Candidate Flow
 
 - [ ] 6.1 Add deploy-candidate state and admin actions gated by passing validation checks.
-- [ ] 6.2 Add immediate deploy action that records the exact candidate ref and uses the established deploy path.
-- [ ] 6.3 Add scheduled overnight deploy queue with stale-validation checks before execution.
+- [ ] 6.2 Keep direct immediate production deploy out of v1 and ensure no immediate deploy action is exposed.
+- [ ] 6.3 Add scheduled overnight deploy queue with exact ref recording and stale-validation checks before execution.
 - [ ] 6.4 Add admin UI for deploy history, blocked deploy reasons, and revalidation prompts.
 - [ ] 6.5 Add tests for deploy gating, stale candidate blocking, and exact ref recording.
 

@@ -22,7 +22,7 @@ The requested workflow turns an idea or reported problem into an admin-controlle
 - Avoid arbitrary shell access from the website.
 - Support multiple iterations on complex problems.
 - Produce a preview environment with production-like data without granting Codex direct write access to production data.
-- Allow approved candidates to enter an immediate or scheduled deploy path.
+- Allow approved candidates to enter a scheduled deploy path.
 - Establish a reusable pattern for future MHV apps.
 
 **Non-Goals:**
@@ -32,6 +32,7 @@ The requested workflow turns an idea or reported problem into an admin-controlle
 - Codex editing the live production checkout.
 - Codex reading production `.env` files or central infrastructure secrets.
 - Fully autonomous deploys without an admin approval step.
+- Direct immediate production deployment in v1.
 - Replacing the existing GitHub Actions deployment path.
 
 ## Decisions
@@ -72,6 +73,18 @@ Alternatives considered:
 - Point preview at production Postgres: rejected because a candidate build could mutate real data.
 - Use an empty preview database: safer but too weak for validating admin/user workflows.
 
+### 4a. Preview is server-hosted behind a central HTTPS preview domain
+
+Production previews SHALL run on the MHV server from the resolution run's candidate worktree, normally as a disposable Docker Compose project with an app container and an isolated preview database clone. The admin-facing preview SHOULD be an HTTPS URL routed by central Caddy, preferably under a reusable preview domain such as:
+
+```text
+https://f1-run-<run-id>.preview.mhvmade.com
+```
+
+The preview app may bind to an internal server port or Docker network alias, but admins should not need to SSH or open `localhost:3000`. Localhost-style URLs are acceptable only for local developer testing or internal health checks, not as the production admin preview experience.
+
+Rationale: The user needs a click-through preview from the website. A server-hosted URL works from any admin machine, can be protected centrally, and matches the future multi-app MHV pattern.
+
 ### 5. Validation gates deploy eligibility
 
 A run SHALL become a deploy candidate only after required validations are recorded: lint/typecheck/build/unit tests where applicable, relevant Playwright smoke tests, Docker build or preview health, and an admin-visible diff summary.
@@ -80,7 +93,7 @@ Rationale: Codex output should be treated as a candidate change, not as a truste
 
 ### 6. Deployment remains Git-backed
 
-Approved deploy candidates SHALL deploy through the existing deployment mechanism. The candidate branch must be traceable and either merged/pushed through GitHub or deployed by a workflow that records the exact ref. Immediate deploy and overnight deploy are UI modes on top of the same deploy candidate state.
+Approved deploy candidates SHALL deploy through the existing deployment mechanism. The candidate branch must be traceable and either merged/pushed through GitHub or deployed by a workflow that records the exact ref. V1 SHALL support scheduled overnight deployment only; immediate production deployment can be added later after the workflow has proven reliable.
 
 Rationale: Git remains the source of truth. This avoids mystery production state and keeps rollback/debugging practical.
 
@@ -113,6 +126,18 @@ The primary admin states should be intentionally plain:
 - `Scheduled`: the candidate is approved for a later deployment window.
 - `Deployed`: the candidate reached production and health checks passed.
 
+### 8. Retention is short for generated environments and durable for deployment history
+
+Resolution run records and sanitized Codex logs SHALL remain visible to admins for 30 days by default. Preview database clones and preview containers SHALL expire after 7 days. Worktrees SHALL expire after 14 days unless the run is still open, waiting for review, scheduled, or explicitly pinned. Deploy records SHALL be kept durably.
+
+Rationale: Previews and worktrees are operational artifacts, while deploy records are production history.
+
+### 9. Future apps share a generic runner with app adapters
+
+F1 SHALL be the first adapter for a generic `mhv-codex-runner` shape. App-specific configuration covers repository, Unix user, Codex home, worktree path, preview domain label, validation commands, and deployment integration.
+
+Rationale: The server will host multiple apps. A generic runner with adapters avoids rebuilding orchestration from scratch while still keeping each app isolated.
+
 ## Risks / Trade-offs
 
 - **Runner gets stuck or loops too long** -> enforce per-run timeout, max iterations, status heartbeats, and cancel action.
@@ -129,13 +154,13 @@ The primary admin states should be intentionally plain:
 3. Implement a local runner adapter interface with a fake/test runner first.
 4. Add the F1 server runner using `/srv/codex/f1` and existing helper command patterns.
 5. Add preview environment lifecycle and cleanup.
-6. Add deploy-candidate actions that call the established deploy workflow.
+6. Add deploy-candidate actions that schedule the established deploy workflow for the overnight window.
 7. Roll out with `investigate` mode enabled first, then enable `attempt_fix`, then enable deploy actions.
 
 Rollback: disable the runner service and hide automation action buttons through configuration. Existing ideas remain usable because the ideas inbox is not replaced.
 
-## Open Questions
+## Resolved Product Decisions
 
-- Should direct production deployment be enabled in v1, or should v1 only allow preview plus scheduled deploy?
-- What retention period should apply to Codex logs, preview databases, and worktrees?
-- Should future apps share one generic `mhv-codex-runner` binary with app adapters, or separate runner services per app?
+- V1 supports preview plus scheduled deploy only; direct immediate production deployment is out of scope.
+- Codex logs/events are retained for 30 days, previews for 7 days, worktrees for 14 days unless active or pinned, and deploy records durably.
+- Future apps use the same generic runner pattern with app-specific adapters.

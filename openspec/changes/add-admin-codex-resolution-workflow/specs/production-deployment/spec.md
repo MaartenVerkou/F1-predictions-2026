@@ -9,11 +9,11 @@ Production deployment SHALL support admin-approved Codex deploy candidates witho
 - **THEN** the system SHALL record the candidate as scheduled
 - **AND** deployment SHALL use the established Git-backed production deploy path at the scheduled window
 
-#### Scenario: Admin deploys a candidate immediately
+#### Scenario: Immediate production deploy is unavailable in v1
 - **GIVEN** a deploy candidate is linked to a validated resolution run
-- **WHEN** an admin confirms immediate deployment
-- **THEN** the system SHALL trigger the established production deploy path for the candidate ref
-- **AND** the deploy record SHALL show the exact branch or commit ref
+- **WHEN** an admin views deployment actions in v1
+- **THEN** the system SHALL NOT expose an immediate production deploy action
+- **AND** the admin SHALL be able to schedule the candidate for the supported overnight deployment path
 
 #### Scenario: Candidate deploy is blocked by stale validation
 - **GIVEN** a deploy candidate is no longer based on the current deployable base or has stale validation
