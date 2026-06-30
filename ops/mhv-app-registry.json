@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-30",
+  "platform": {
+    "host": "mhv-server",
+    "domain": "mhvmade.com",
+    "wildcardDns": "*.mhvmade.com",
+    "edge": {
+      "path": "/srv/edge/current",
+      "container": "mhv-caddy",
+      "network": "mhv-web"
+    },
+    "postgres": {
+      "path": "/srv/infra/postgres/current",
+      "container": "mhv-postgres",
+      "network": "mhv-db",
+      "backupPath": "/srv/infra/postgres/backups"
+    }
+  },
+  "apps": [
+    {
+      "slug": "wok",
+      "displayName": "Wheel of Knowledge",
+      "repository": {
+        "url": "https://github.com/MaartenVerkou/F1-predictions-2026.git",
+        "branch": "main"
+      },
+      "paths": {
+        "currentProduction": "/srv/f1-predictions/current",
+        "targetProduction": "/srv/apps/wok/current",
+        "targetShared": "/srv/apps/wok/shared"
+      },
+      "hostnames": {
+        "canonical": "wheelofknowledge.com",
+        "redirects": [
+          "www.wheelofknowledge.com",
+          "wok.mhvmade.com"
+        ],
+        "aliases": []
+      },
+      "docker": {
+        "appContainer": "f1predictions-app-1",
+        "appService": "app",
+        "edgeUpstream": "f1-app:3000",
+        "networks": [
+          "f1predictions_default",
+          "mhv-db",
+          "mhv-web"
+        ],
+        "webAliases": [
+          "f1-app"
+        ]
+      },
+      "health": {
+        "url": "https://wheelofknowledge.com/healthz",
+        "expectedStatus": 200,
+        "expectedDatabaseBackend": "postgres"
+      },
+      "database": {
+        "usesPostgres": true,
+        "host": "mhv-postgres",
+        "network": "mhv-db",
+        "databaseKey": "f1_predictions",
+        "roleKey": "f1_predictions"
+      },
+      "state": {
+        "durableFilePaths": [
+          "/var/lib/wheelofknowledge/state"
+        ],
+        "disposablePaths": []
+      },
+      "backup": {
+        "postgresBackups": true,
+        "fileStateBackups": true,
+        "notes": "PostgreSQL dumps live under /srv/infra/postgres/backups; legacy SQLite/state path remains part of restore notes."
+      },
+      "codex": {
+        "enabled": true,
+        "user": "f1-codex",
+        "home": "/srv/codex/f1/home",
+        "repo": "/srv/codex/f1/repo",
+        "worktrees": "/srv/codex/f1/worktrees",
+        "logs": "/srv/codex/f1/logs",
+        "compatibilitySlug": "f1"
+      },
+      "preview": {
+        "hostnamePattern": "wok-preview-<run-id>.mhvmade.com",
+        "retentionDays": 7
+      },
+      "compatibilityNotes": [
+        "Public platform slug is wok, but existing production path and Codex path still use f1 naming.",
+        "Do not move to /srv/apps/wok until an app-specific migration checklist and rollback path are ready."
+      ]
+    },
+    {
+      "slug": "kinara",
+      "displayName": "Kinara",
+      "repository": {
+        "url": null,
+        "branch": null
+      },
+      "paths": {
+        "currentProduction": "/srv/kinara/current",
+        "targetProduction": "/srv/apps/kinara/current",
+        "targetShared": "/srv/apps/kinara/shared"
+      },
+      "hostnames": {
+        "canonical": "kinara.mhvmade.com",
+        "redirects": [],
+        "aliases": []
+      },
+      "docker": {
+        "appContainer": "kinara-app",
+        "appService": "app",
+        "edgeUpstream": "kinara-app:3000",
+        "networks": [
+          "kinara-internal",
+          "mhv-db",
+          "mhv-web"
+        ],
+        "webAliases": [
+          "kinara-app"
+        ],
+        "supportingContainers": [
+          "kinara-media"
+        ]
+      },
+      "health": {
+        "url": "https://kinara.mhvmade.com",
+        "expectedStatus": 200
+      },
+      "database": {
+        "usesPostgres": true,
+        "host": "mhv-postgres",
+        "network": "mhv-db",
+        "databaseKey": "kinara",
+        "roleKey": "kinara"
+      },
+      "state": {
+        "durableFilePaths": [
+          "/srv/kinara/shared"
+        ],
+        "disposablePaths": []
+      },
+      "backup": {
+        "postgresBackups": true,
+        "fileStateBackups": "needs-validation",
+        "notes": "Kinara media state must be validated before any path migration."
+      },
+      "codex": {
+        "enabled": false
+      },
+      "preview": {
+        "hostnamePattern": "kinara-preview-<run-id>.mhvmade.com",
+        "retentionDays": 7
+      },
+      "compatibilityNotes": [
+        "Repository origin was not discovered during read-only inventory.",
+        "Media storage via kinara-media needs explicit backup and restore validation."
+      ]
+    },
+    {
+      "slug": "apps",
+      "displayName": "MHV Apps Overview",
+      "repository": {
+        "url": null,
+        "branch": null
+      },
+      "paths": {
+        "currentProduction": "/srv/mhvmade-apps/current",
+        "targetProduction": "/srv/apps/apps/current",
+        "targetShared": "/srv/apps/apps/shared"
+      },
+      "hostnames": {
+        "canonical": "apps.mhvmade.com",
+        "redirects": [],
+        "aliases": []
+      },
+      "docker": {
+        "appContainer": "mhvmade-apps",
+        "appService": "app",
+        "edgeUpstream": "mhvmade-apps:3000",
+        "networks": [
+          "mhv-web"
+        ],
+        "webAliases": [
+          "mhvmade-apps"
+        ]
+      },
+      "health": {
+        "url": "https://apps.mhvmade.com",
+        "expectedStatus": 302
+      },
+      "database": {
+        "usesPostgres": false
+      },
+      "state": {
+        "durableFilePaths": [
+          "/srv/mhvmade-apps/shared"
+        ],
+        "disposablePaths": []
+      },
+      "backup": {
+        "postgresBackups": false,
+        "fileStateBackups": "needs-validation",
+        "notes": "Shared data path exists and needs explicit restore notes."
+      },
+      "codex": {
+        "enabled": false
+      },
+      "preview": {
+        "hostnamePattern": "apps-preview-<run-id>.mhvmade.com",
+        "retentionDays": 7
+      },
+      "compatibilityNotes": [
+        "Repository origin was not discovered during read-only inventory."
+      ]
+    },
+    {
+      "slug": "portfolio",
+      "displayName": "MHV Portfolio",
+      "repository": {
+        "url": null,
+        "branch": null
+      },
+      "paths": {
+        "currentProduction": "/srv/mhvmade-portfolio/current",
+        "targetProduction": "/srv/apps/portfolio/current",
+        "targetShared": "/srv/apps/portfolio/shared"
+      },
+      "hostnames": {
+        "canonical": "mhvmade.com",
+        "redirects": [
+          "www.mhvmade.com"
+        ],
+        "aliases": []
+      },
+      "docker": {
+        "appContainer": "mhvmade-portfolio",
+        "appService": "site",
+        "edgeUpstream": "mhvmade-portfolio:80",
+        "networks": [
+          "mhv-web"
+        ],
+        "webAliases": [
+          "mhvmade-portfolio"
+        ]
+      },
+      "health": {
+        "url": "https://mhvmade.com",
+        "expectedStatus": 200
+      },
+      "database": {
+        "usesPostgres": false
+      },
+      "state": {
+        "durableFilePaths": [],
+        "disposablePaths": []
+      },
+      "backup": {
+        "postgresBackups": false,
+        "fileStateBackups": false,
+        "notes": "Static portfolio container; source and deployment path still need repository origin documentation."
+      },
+      "codex": {
+        "enabled": false
+      },
+      "preview": {
+        "hostnamePattern": "portfolio-preview-<run-id>.mhvmade.com",
+        "retentionDays": 7
+      },
+      "compatibilityNotes": [
+        "Repository origin was not discovered during read-only inventory."
+      ]
+    }
+  ]
+}

@@ -12,6 +12,7 @@
     "test": "node --test tests/*.test.js",
     "test:e2e": "playwright test",
     "build": "node scripts/check-production-assets.js",
+    "platform:validate-registry": "node scripts/validate-mhv-app-registry.js",
     "db:migrate:postgres": "node scripts/migrate-sqlite-to-postgres.js",
     "actuals:auto-update": "node scripts/backfill-actuals-2026.js --dry-run",
     "actuals:auto-apply": "node scripts/backfill-actuals-2026.js --apply",
