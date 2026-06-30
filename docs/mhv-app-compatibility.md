@@ -11,7 +11,7 @@ This report compares the existing apps with the MHV app platform contract. It do
 | WOK | Yes | Yes | Yes | Yes | Yes, compatibility path | Non-standard | Needs migration checklist |
 | Kinara | Yes | Yes | Yes | Yes | No | Non-standard | Needs media backup validation |
 | Apps overview | Yes | Yes | Yes | No | No | Non-standard | Good low-risk candidate after backup check |
-| Portfolio | Yes | Yes | Yes | No | No | Non-standard | Best first path migration candidate |
+| Portfolio | Yes | Yes | Yes | No | No | Standard | Migrated; observe and keep rollback path |
 
 ## WOK
 
@@ -99,8 +99,8 @@ Registry slug: `portfolio`
 
 Current state:
 
-- Production path: `/srv/mhvmade-portfolio/current`
-- Target path: `/srv/apps/portfolio/current`
+- Production path: `/srv/apps/portfolio/current`
+- Previous rollback path: `/srv/mhvmade-portfolio/current`
 - Canonical hostname: `mhvmade.com`
 - Redirect: `www.mhvmade.com`
 - Container: `mhvmade-portfolio`
@@ -112,6 +112,6 @@ Compatibility exceptions:
 
 - Repository origin was not discovered during the read-only inventory.
 
-Recommended first migration candidate:
+Migration result:
 
-`portfolio` is the lowest-risk first `/srv/apps/<app>` migration candidate because it appears to be static, has no registered database, no registered durable file state, and a simple Caddy upstream. It still needs a documented repository origin and rollback path before moving.
+`portfolio` was migrated to `/srv/apps/portfolio/current` on 2026-06-30 because it was the lowest-risk registered app: static, no registered database, no registered durable file state, and a simple Caddy upstream. The previous `/srv/mhvmade-portfolio/current` path remains intact as rollback source.

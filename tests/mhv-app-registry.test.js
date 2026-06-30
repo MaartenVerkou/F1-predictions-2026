@@ -74,7 +74,10 @@ test("live snapshot validation accepts registered routes, containers, networks, 
       "f1predictions-app-1": { networks: ["f1predictions_default", "mhv-db", "mhv-web"] },
       "kinara-app": { networks: ["kinara-internal", "mhv-db", "mhv-web"] },
       "mhvmade-apps": { networks: ["mhv-web"] },
-      "mhvmade-portfolio": { networks: ["mhv-web"] }
+      "mhvmade-portfolio": {
+        networks: ["mhv-web"],
+        mountSources: ["/srv/apps/portfolio/current/site"]
+      }
     },
     health: {
       "https://wheelofknowledge.com/healthz": {
@@ -112,4 +115,28 @@ test("live snapshot validation reports missing Caddy routes and network drift", 
   assert.match(errors, /Container f1predictions-app-1 missing network mhv-db/);
   assert.match(errors, /Health check https:\/\/wheelofknowledge\.com\/healthz returned 503/);
   assert.match(errors, /Unknown wildcard hostname did not fail closed/);
+});
+
+test("live snapshot validation reports mount source drift when configured", () => {
+  const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+  const portfolio = registry.apps.find((app) => app.slug === "portfolio");
+  portfolio.docker.expectedMountSourcePrefixes = ["/srv/apps/portfolio/current"];
+  const snapshot = {
+    caddyfile: "mhvmade.com { reverse_proxy mhvmade-portfolio:80 }",
+    containers: {
+      "mhvmade-portfolio": {
+        networks: ["mhv-web"],
+        mountSources: ["/srv/mhvmade-portfolio/current/site"]
+      }
+    },
+    health: {
+      "https://mhvmade.com": { status: 200 }
+    },
+    unknownWildcard: { status: 525 }
+  };
+
+  assert.match(
+    validateLiveSnapshot(registry, snapshot).join("\n"),
+    /Container mhvmade-portfolio has no mount source under \/srv\/apps\/portfolio\/current/
+  );
 });

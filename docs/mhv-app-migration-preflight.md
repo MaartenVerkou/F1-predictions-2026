@@ -10,6 +10,8 @@ Recommended first candidate: `portfolio`.
 
 Reason: it is the lowest-risk registered app because it has no registered PostgreSQL database, no registered durable file state, and a simple Caddy upstream. This is still not approval to move it until the checklist below is complete.
 
+Status: completed on 2026-06-30. Portfolio now runs from `/srv/apps/portfolio/current`; `/srv/mhvmade-portfolio/current` remains available as rollback source.
+
 ## Preflight Checklist
 
 1. Confirm registry entry

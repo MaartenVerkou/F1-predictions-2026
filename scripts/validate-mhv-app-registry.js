@@ -151,6 +151,13 @@ function validateLiveSnapshot(registry, snapshot) {
           errors.push(`Container ${containerName} missing network ${expectedNetwork}`);
         }
       }
+
+      for (const expectedPrefix of app.docker?.expectedMountSourcePrefixes || []) {
+        const mountMatches = (container.mountSources || []).some((source) => source.startsWith(expectedPrefix));
+        if (!mountMatches) {
+          errors.push(`Container ${containerName} has no mount source under ${expectedPrefix}`);
+        }
+      }
     }
 
     const healthUrl = app.health?.url;
@@ -235,12 +242,14 @@ async function collectLiveSnapshot(registry, options = {}) {
     const containerName = app.docker?.appContainer;
     if (!containerName || containers[containerName]) continue;
 
-    const networkJson = run("ssh", [
+    const inspectJson = run("ssh", [
       host,
-      `docker inspect ${containerName} --format '{{json .NetworkSettings.Networks}}'`
+      `docker inspect ${containerName} --format '{{json .}}'`
     ]);
-    const networks = Object.keys(JSON.parse(networkJson));
-    containers[containerName] = { networks };
+    const inspect = JSON.parse(inspectJson);
+    const networks = Object.keys(inspect.NetworkSettings?.Networks || {});
+    const mountSources = (inspect.Mounts || []).map((mount) => mount.Source).filter(Boolean);
+    containers[containerName] = { networks, mountSources };
   }
 
   const health = {};

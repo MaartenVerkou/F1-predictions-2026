@@ -224,7 +224,7 @@
         "branch": null
       },
       "paths": {
-        "currentProduction": "/srv/mhvmade-portfolio/current",
+        "currentProduction": "/srv/apps/portfolio/current",
         "targetProduction": "/srv/apps/portfolio/current",
         "targetShared": "/srv/apps/portfolio/shared"
       },
@@ -244,6 +244,9 @@
         ],
         "webAliases": [
           "mhvmade-portfolio"
+        ],
+        "expectedMountSourcePrefixes": [
+          "/srv/apps/portfolio/current"
         ]
       },
       "health": {
@@ -270,7 +273,8 @@
         "retentionDays": 7
       },
       "compatibilityNotes": [
-        "Repository origin was not discovered during read-only inventory."
+        "Repository origin was not discovered during read-only inventory.",
+        "Migrated from /srv/mhvmade-portfolio/current to /srv/apps/portfolio/current on 2026-06-30; old path remains available as rollback source."
       ]
     }
   ]
