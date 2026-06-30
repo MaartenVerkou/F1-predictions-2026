@@ -73,7 +73,10 @@ test("live snapshot validation accepts registered routes, containers, networks, 
     containers: {
       "f1predictions-app-1": { networks: ["f1predictions_default", "mhv-db", "mhv-web"] },
       "kinara-app": { networks: ["kinara-internal", "mhv-db", "mhv-web"] },
-      "mhvmade-apps": { networks: ["mhv-web"] },
+      "mhvmade-apps": {
+        networks: ["mhv-web"],
+        mountSources: ["/srv/apps/apps/shared/data"]
+      },
       "mhvmade-portfolio": {
         networks: ["mhv-web"],
         mountSources: ["/srv/apps/portfolio/current/site"]

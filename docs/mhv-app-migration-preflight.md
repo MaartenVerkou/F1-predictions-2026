@@ -4,13 +4,14 @@ Use this before moving an existing app from its compatibility path to `/srv/apps
 
 Do not migrate more than one production app at a time.
 
-## Candidate
+## Completed Migrations
 
-Recommended first candidate: `portfolio`.
+- `portfolio`: completed on 2026-06-30. Portfolio now runs from `/srv/apps/portfolio/current`; `/srv/mhvmade-portfolio/current` remains available as rollback source.
+- `apps`: completed on 2026-06-30. Apps overview now runs from `/srv/apps/apps/current`; `/srv/mhvmade-apps/current` and `/srv/mhvmade-apps/shared` remain available as rollback sources.
 
-Reason: it is the lowest-risk registered app because it has no registered PostgreSQL database, no registered durable file state, and a simple Caddy upstream. This is still not approval to move it until the checklist below is complete.
+## Next Candidate
 
-Status: completed on 2026-06-30. Portfolio now runs from `/srv/apps/portfolio/current`; `/srv/mhvmade-portfolio/current` remains available as rollback source.
+There is no automatic next candidate. WOK has production user data, central PostgreSQL, and the app-scoped Codex environment. Kinara has media state through `kinara-media`. Both need app-specific backup, restore, and rollback validation before migration.
 
 ## Preflight Checklist
 

@@ -2,6 +2,7 @@
 
 Last read-only inventory: 2026-06-30.
 Portfolio path migration completed: 2026-06-30.
+Apps overview path migration completed: 2026-06-30.
 
 This inventory records what is currently running on `mhv-server`. It is intentionally descriptive: it does not imply that existing apps have already moved to the target `/srv/apps/<app>` layout.
 
@@ -68,7 +69,7 @@ Current Caddy routes:
 | --- | --- | --- |
 | `wok` | `/srv/f1-predictions/current` | `/srv/apps/wok/current` |
 | `kinara` | `/srv/kinara/current` | `/srv/apps/kinara/current` |
-| `apps` | `/srv/mhvmade-apps/current` | `/srv/apps/apps/current` |
+| `apps` | `/srv/apps/apps/current` | `/srv/apps/apps/current` |
 | `portfolio` | `/srv/apps/portfolio/current` | `/srv/apps/portfolio/current` |
 
 ## Current Health Checks
@@ -89,4 +90,5 @@ Current Caddy routes:
 - WOK Codex compatibility path remains `/srv/codex/f1`.
 - F1/WOK is the only app with a fully documented app-scoped Codex environment at inventory time.
 - Kinara currently has app-local media storage through `kinara-media` and should not be migrated without a separate media backup/restore check.
+- Apps overview now runs from `/srv/apps/apps/current`; `/srv/mhvmade-apps/current` and `/srv/mhvmade-apps/shared` remain available as rollback sources until file-state backup/restore is validated.
 - Portfolio now runs from `/srv/apps/portfolio/current`; `/srv/mhvmade-portfolio/current` remains available as a rollback source.

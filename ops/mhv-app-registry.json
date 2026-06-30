@@ -167,7 +167,7 @@
         "branch": null
       },
       "paths": {
-        "currentProduction": "/srv/mhvmade-apps/current",
+        "currentProduction": "/srv/apps/apps/current",
         "targetProduction": "/srv/apps/apps/current",
         "targetShared": "/srv/apps/apps/shared"
       },
@@ -185,6 +185,9 @@
         ],
         "webAliases": [
           "mhvmade-apps"
+        ],
+        "expectedMountSourcePrefixes": [
+          "/srv/apps/apps/shared"
         ]
       },
       "health": {
@@ -196,14 +199,14 @@
       },
       "state": {
         "durableFilePaths": [
-          "/srv/mhvmade-apps/shared"
+          "/srv/apps/apps/shared"
         ],
         "disposablePaths": []
       },
       "backup": {
         "postgresBackups": false,
         "fileStateBackups": "needs-validation",
-        "notes": "Shared data path exists and needs explicit restore notes."
+        "notes": "Shared data now lives under /srv/apps/apps/shared. The previous /srv/mhvmade-apps/shared path remains available as rollback source until file-state backup and restore notes are validated."
       },
       "codex": {
         "enabled": false
@@ -213,7 +216,8 @@
         "retentionDays": 7
       },
       "compatibilityNotes": [
-        "Repository origin was not discovered during read-only inventory."
+        "Repository origin was not discovered during read-only inventory.",
+        "Migrated from /srv/mhvmade-apps/current to /srv/apps/apps/current on 2026-06-30; old current and shared paths remain available as rollback sources."
       ]
     },
     {

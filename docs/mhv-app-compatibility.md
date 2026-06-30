@@ -2,7 +2,7 @@
 
 Last reviewed: 2026-06-30.
 
-This report compares the existing apps with the MHV app platform contract. It does not approve moving any app path yet.
+This report compares the existing apps with the MHV app platform contract and records completed compatibility migrations.
 
 ## Summary
 
@@ -10,7 +10,7 @@ This report compares the existing apps with the MHV app platform contract. It do
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | WOK | Yes | Yes | Yes | Yes | Yes, compatibility path | Non-standard | Needs migration checklist |
 | Kinara | Yes | Yes | Yes | Yes | No | Non-standard | Needs media backup validation |
-| Apps overview | Yes | Yes | Yes | No | No | Non-standard | Good low-risk candidate after backup check |
+| Apps overview | Yes | Yes | Yes | No | No | Standard | Migrated; validate file-state backup policy |
 | Portfolio | Yes | Yes | Yes | No | No | Standard | Migrated; observe and keep rollback path |
 
 ## WOK
@@ -74,8 +74,10 @@ Registry slug: `apps`
 
 Current state:
 
-- Production path: `/srv/mhvmade-apps/current`
-- Target path: `/srv/apps/apps/current`
+- Production path: `/srv/apps/apps/current`
+- Previous rollback path: `/srv/mhvmade-apps/current`
+- Shared path: `/srv/apps/apps/shared`
+- Previous shared rollback path: `/srv/mhvmade-apps/shared`
 - Canonical hostname: `apps.mhvmade.com`
 - Container: `mhvmade-apps`
 - Caddy upstream: `mhvmade-apps:3000`
@@ -84,14 +86,16 @@ Current state:
 Compatibility exceptions:
 
 - Repository origin was not discovered during the read-only inventory.
-- Shared path `/srv/mhvmade-apps/shared` exists and needs restore notes.
+- File-state backup and restore notes for `/srv/apps/apps/shared` still need validation before marking backup coverage complete.
 
-Required before migration:
+Migration result:
+
+`apps` was migrated to `/srv/apps/apps/current` on 2026-06-30. Shared data now mounts from `/srv/apps/apps/shared/data`. The previous `/srv/mhvmade-apps/current` and `/srv/mhvmade-apps/shared` paths remain intact as rollback sources.
+
+Remaining follow-up:
 
 - Document repository origin.
-- Confirm what `/srv/mhvmade-apps/shared` contains.
-- Confirm admin login/session behavior after migration.
-- Confirm rollback to `/srv/mhvmade-apps/current`.
+- Validate file-state backup and restore procedure for `/srv/apps/apps/shared`.
 
 ## MHV Portfolio
 
