@@ -71,3 +71,47 @@ Before a move:
 - Keep a rollback path to the previous checkout until the migrated app is healthy.
 
 Do not move multiple production apps in one migration step.
+
+## Deployment Rule
+
+Production deployment automation should read from the registry instead of hard-coding per-app assumptions:
+
+- Deploy to `paths.currentProduction`.
+- Use `docker.appService` and `docker.appContainer`.
+- Verify `health.url` and `health.expectedStatus`.
+- Run or explicitly skip the app's migration command from the repository contract.
+- Fail before modifying server state when the app slug is not registered.
+
+Path migrations are not normal deploys. A migration must pass the preflight in `docs/mhv-app-migration-preflight.md` before Caddy traffic is changed.
+
+## PostgreSQL Rule
+
+Apps using central PostgreSQL must declare:
+
+- `database.usesPostgres: true`
+- `database.host: mhv-postgres`
+- `database.network: mhv-db`
+- unique `database.databaseKey`
+- unique `database.roleKey`
+
+`npm run platform:validate-registry` checks that PostgreSQL database and role keys are not reused across registered apps.
+
+## Backup Rule
+
+Every durable state path in `state.durableFilePaths` needs one of:
+
+- central PostgreSQL backup coverage,
+- host-level file backup coverage,
+- or an explicit `needs-validation` note before migration.
+
+Apps with `needs-validation` backup status can stay registered, but they should not be path-migrated until restore notes exist.
+
+## Live Validation
+
+Run the read-only live validator after registry or Caddy changes:
+
+```bash
+npm run platform:validate-live
+```
+
+It checks that registered hostnames and upstreams appear in Caddy, registered containers are attached to expected Docker networks, health endpoints return expected statuses, and an unknown wildcard hostname fails closed.

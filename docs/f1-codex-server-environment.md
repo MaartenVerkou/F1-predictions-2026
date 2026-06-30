@@ -1,11 +1,13 @@
-# F1 Codex Server Environment
+# WOK/F1 Codex Server Environment
 
-F1 has a dedicated Codex CLI environment on `mhv-server`. It is intentionally separate from the live production checkout and from other future app environments.
+Wheel of Knowledge uses the public MHV app slug `wok`, while several existing server internals still use the historical F1 naming. The app has a dedicated Codex CLI environment on `mhv-server`. It is intentionally separate from the live production checkout and from other future app environments.
 
 ## Runtime Layout
 
 - Codex user: `f1-codex`
 - Codex app root: `/srv/codex/f1`
+- Registry slug: `wok`
+- Compatibility slug/path: `f1`
 - Codex home: `/srv/codex/f1/home`
 - Repository mirror: `/srv/codex/f1/repo` (bare Git repository)
 - Worktrees: `/srv/codex/f1/worktrees`
@@ -95,7 +97,15 @@ Repeat the same shape per app:
   logs/
 ```
 
-Each app should receive its own Unix user, Codex home, repository mirror, and helper commands. Do not reuse F1's `CODEX_HOME` for other apps.
+Each app should receive its own Unix user, Codex home, repository mirror, and helper commands. Do not reuse WOK/F1's `CODEX_HOME` for other apps.
+
+New apps should use their registry slug for Codex paths where possible:
+
+```text
+/srv/codex/<app>/
+```
+
+Existing compatibility paths, such as `/srv/codex/f1` for WOK, must be recorded in `ops/mhv-app-registry.json` so automation does not assume public slug and filesystem path are identical.
 
 ## SSH Operational Notes
 
