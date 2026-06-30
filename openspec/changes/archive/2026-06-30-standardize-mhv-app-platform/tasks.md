@@ -50,4 +50,4 @@
 - [x] 7.2 Run registry validation against the live server without changing server state.
 - [x] 7.3 Confirm existing public routes still work: `wheelofknowledge.com`, `wok.mhvmade.com`, `kinara.mhvmade.com`, `apps.mhvmade.com`, and `mhvmade.com`.
 - [x] 7.4 Commit proposal artifacts separately from implementation changes.
-- [ ] 7.5 After implementation and verification, archive the OpenSpec change and merge updated specs.
+- [x] 7.5 After implementation and verification, archive the OpenSpec change and merge updated specs.
