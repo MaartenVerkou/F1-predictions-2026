@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy production
 
 on:
   workflow_run:
@@ -9,11 +9,6 @@ on:
     branches:
       - main
   workflow_dispatch:
-    inputs:
-      ref:
-        description: Git ref to deploy
-        required: false
-        default: main
 
 permissions:
   contents: read
@@ -24,261 +19,48 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    name: Deploy via MHV server
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 30
-    env:
-      DEPLOY_SOURCE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-      DEPLOY_HOST_VAR: ${{ vars.DEPLOY_HOST }}
-      DEPLOY_HOST_SECRET: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER_VAR: ${{ vars.DEPLOY_USER }}
-      DEPLOY_USER_SECRET: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_PORT_VAR: ${{ vars.DEPLOY_PORT }}
-      DEPLOY_PORT_SECRET: ${{ secrets.DEPLOY_PORT }}
-      DEPLOY_PATH_VAR: ${{ vars.DEPLOY_PATH }}
-      DEPLOY_PATH_SECRET: ${{ secrets.DEPLOY_PATH }}
-      DEPLOY_COMPOSE_FILES_VAR: ${{ vars.DEPLOY_COMPOSE_FILES }}
-      DEPLOY_COMPOSE_FILES_SECRET: ${{ secrets.DEPLOY_COMPOSE_FILES }}
-      DEPLOY_HEALTH_URL_VAR: ${{ vars.DEPLOY_HEALTH_URL }}
-      DEPLOY_HEALTH_URL_SECRET: ${{ secrets.DEPLOY_HEALTH_URL }}
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.workflow_run.head_sha }}
-
-      - name: Resolve deploy settings
-        shell: bash
-        run: |
-          set -euo pipefail
-          deploy_host="${DEPLOY_HOST_VAR:-$DEPLOY_HOST_SECRET}"
-          deploy_user="${DEPLOY_USER_VAR:-$DEPLOY_USER_SECRET}"
-          deploy_port="${DEPLOY_PORT_VAR:-$DEPLOY_PORT_SECRET}"
-          deploy_path="${DEPLOY_PATH_VAR:-$DEPLOY_PATH_SECRET}"
-          deploy_compose_files="${DEPLOY_COMPOSE_FILES_VAR:-$DEPLOY_COMPOSE_FILES_SECRET}"
-          deploy_health_url="${DEPLOY_HEALTH_URL_VAR:-$DEPLOY_HEALTH_URL_SECRET}"
-
-          : "${deploy_host:?Set DEPLOY_HOST as a repo or environment variable/secret.}"
-          : "${deploy_user:?Set DEPLOY_USER as a repo or environment variable/secret.}"
-
-          {
-            echo "DEPLOY_HOST=$deploy_host"
-            echo "DEPLOY_USER=$deploy_user"
-            echo "DEPLOY_PORT=${deploy_port:-22}"
-            echo "DEPLOY_PATH=${deploy_path:-/opt/F1-predictions-2026}"
-            echo "DEPLOY_COMPOSE_FILES=${deploy_compose_files:-docker-compose.yml:docker-compose.server.yml}"
-            echo "DEPLOY_HEALTH_URL=${deploy_health_url:-http://127.0.0.1:3000/healthz}"
-            echo "REMOTE_BUNDLE=/tmp/f1predictions-${DEPLOY_SOURCE_SHA}.tgz"
-          } >> "$GITHUB_ENV"
-
-      - name: Build Docker image locally
-        run: docker build -t f1predictions-deploy-check:${{ github.run_id }} .
-
-      - name: Create deploy bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          required_paths=(
-            .dockerignore
-            Dockerfile
-            docker-compose.yml
-            package.json
-            package-lock.json
-            server.js
-            data/last-season-results.json
-            data/questions.json
-            data/races.json
-            data/roster.json
-            public
-            scripts
-            src
-            views
-          )
-          optional_paths=(
-            Caddyfile
-            docker-compose.server.yml
-            deploy
-            locales
-          )
-
-          bundle_paths=()
-          for path in "${required_paths[@]}"; do
-            if [[ ! -e "$path" ]]; then
-              echo "Missing required deploy path: $path" >&2
-              exit 1
-            fi
-            bundle_paths+=("$path")
-          done
-
-          for path in "${optional_paths[@]}"; do
-            if [[ -e "$path" ]]; then
-              bundle_paths+=("$path")
-            fi
-          done
-
-          printf 'Bundling %s\n' "${bundle_paths[@]}"
-          tar -czf deploy-bundle.tgz "${bundle_paths[@]}"
-
       - name: Configure SSH
         shell: bash
         env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          MHV_DEPLOY_HOST: ${{ secrets.MHV_DEPLOY_HOST }}
+          MHV_DEPLOY_PORT: ${{ secrets.MHV_DEPLOY_PORT }}
+          MHV_DEPLOY_USER: ${{ secrets.MHV_DEPLOY_USER }}
+          MHV_DEPLOY_SSH_KEY: ${{ secrets.MHV_DEPLOY_SSH_KEY }}
+          MHV_DEPLOY_KNOWN_HOSTS: ${{ secrets.MHV_DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          : "${DEPLOY_SSH_KEY:?Set DEPLOY_SSH_KEY secret.}"
-          : "${DEPLOY_KNOWN_HOSTS:?Set DEPLOY_KNOWN_HOSTS secret.}"
+          : "${MHV_DEPLOY_HOST:?Set MHV_DEPLOY_HOST repository secret.}"
+          : "${MHV_DEPLOY_SSH_KEY:?Set MHV_DEPLOY_SSH_KEY repository secret.}"
+          : "${MHV_DEPLOY_KNOWN_HOSTS:?Set MHV_DEPLOY_KNOWN_HOSTS repository secret.}"
+
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          printf '%s\n' "$MHV_DEPLOY_SSH_KEY" > ~/.ssh/mhv_deploy
+          printf '%s\n' "$MHV_DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/mhv_deploy ~/.ssh/known_hosts
 
-      - name: Check SSH reachability
+          {
+            echo "DEPLOY_HOST=$MHV_DEPLOY_HOST"
+            echo "DEPLOY_PORT=${MHV_DEPLOY_PORT:-22}"
+            echo "DEPLOY_USER=${MHV_DEPLOY_USER:-mhv-deploy}"
+          } >> "$GITHUB_ENV"
+
+      - name: Trigger production deploy
         shell: bash
         run: |
           set -euo pipefail
-
-          retry() {
-            local max_attempts="$1"
-            shift
-            local attempt=1
-            local delay=5
-            local status=0
-
-            until "$@"; do
-              status=$?
-              if (( attempt >= max_attempts )); then
-                echo "Command failed after $attempt attempts with exit $status: $*" >&2
-                return "$status"
-              fi
-
-              echo "Command failed with exit $status; retrying in ${delay}s ($attempt/$max_attempts): $*" >&2
-              sleep "$delay"
-              attempt=$((attempt + 1))
-              delay=$((delay * 2))
-              if (( delay > 30 )); then
-                delay=30
-              fi
-            done
-          }
-
           ssh_opts=(
+            -i "$HOME/.ssh/mhv_deploy"
+            -p "$DEPLOY_PORT"
             -o BatchMode=yes
-            -o ConnectTimeout=20
-            -o ConnectionAttempts=3
-            -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
+            -o IdentitiesOnly=yes
             -o StrictHostKeyChecking=yes
             -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
-          )
-
-          retry 5 ssh "${ssh_opts[@]}" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" "echo deploy-ssh-ready"
-
-      - name: Upload deploy bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          retry() {
-            local max_attempts="$1"
-            shift
-            local attempt=1
-            local delay=5
-            local status=0
-
-            until "$@"; do
-              status=$?
-              if (( attempt >= max_attempts )); then
-                echo "Command failed after $attempt attempts with exit $status: $*" >&2
-                return "$status"
-              fi
-
-              echo "Command failed with exit $status; retrying in ${delay}s ($attempt/$max_attempts): $*" >&2
-              sleep "$delay"
-              attempt=$((attempt + 1))
-              delay=$((delay * 2))
-              if (( delay > 30 )); then
-                delay=30
-              fi
-            done
-          }
-
-          ssh_opts=(
-            -o BatchMode=yes
             -o ConnectTimeout=20
-            -o ConnectionAttempts=3
-            -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
-            -o StrictHostKeyChecking=yes
-            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
           )
-
-          retry 5 scp "${ssh_opts[@]}" -P "$DEPLOY_PORT" deploy-bundle.tgz "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_BUNDLE"
-
-      - name: Roll out on server
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          retry() {
-            local max_attempts="$1"
-            shift
-            local attempt=1
-            local delay=5
-            local status=0
-
-            until "$@"; do
-              status=$?
-              if (( attempt >= max_attempts )); then
-                echo "Command failed after $attempt attempts with exit $status: $*" >&2
-                return "$status"
-              fi
-
-              echo "Command failed with exit $status; retrying in ${delay}s ($attempt/$max_attempts): $*" >&2
-              sleep "$delay"
-              attempt=$((attempt + 1))
-              delay=$((delay * 2))
-              if (( delay > 30 )); then
-                delay=30
-              fi
-            done
-          }
-
-          ssh_opts=(
-            -o BatchMode=yes
-            -o ConnectTimeout=20
-            -o ConnectionAttempts=3
-            -o ServerAliveInterval=15
-            -o ServerAliveCountMax=4
-            -o StrictHostKeyChecking=yes
-            -o "UserKnownHostsFile=$HOME/.ssh/known_hosts"
-          )
-
-          cat > remote-deploy.sh <<'EOF'
-          set -euo pipefail
-          mkdir -p "$DEPLOY_PATH"
-          cd "$DEPLOY_PATH"
-          for managed_path in \
-            .dockerignore \
-            Dockerfile \
-            docker-compose.yml \
-            package.json \
-            package-lock.json \
-            server.js \
-            data/last-season-results.json \
-            data/questions.json \
-            data/races.json \
-            data/roster.json \
-            public \
-            scripts \
-            src \
-            views; do
-            rm -rf "$DEPLOY_PATH/$managed_path"
-          done
-          tar -xzf "$DEPLOY_BUNDLE" -C "$DEPLOY_PATH"
-          bash scripts/deploy-app.sh
-          rm -f "$DEPLOY_BUNDLE"
-          EOF
-
-          retry 3 ssh "${ssh_opts[@]}" -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_BUNDLE='$REMOTE_BUNDLE' DEPLOY_COMPOSE_FILES='$DEPLOY_COMPOSE_FILES' DEPLOY_HEALTH_URL='$DEPLOY_HEALTH_URL' bash -s" < remote-deploy.sh
+          ssh "${ssh_opts[@]}" "$DEPLOY_USER@$DEPLOY_HOST" deploy
