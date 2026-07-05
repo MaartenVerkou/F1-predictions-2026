@@ -2,11 +2,20 @@
 const fs = require("fs");
 const crypto = require("crypto");
 const express = require("express");
+const helmet = require("helmet");
 const session = require("express-session");
-const SQLiteStore = require("connect-sqlite3")(session);
 const bcrypt = require("bcrypt");
-const Database = require("better-sqlite3");
 const nodemailer = require("nodemailer");
+const { createAppDatabase } = require("./src/app-database");
+const { BetterSqliteSessionStore, PostgresSessionStore } = require("./src/session-store");
+const { ensurePostgresSchema } = require("./src/postgres-schema");
+const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
+const leaderboardModel = require("./src/leaderboard-model");
+const {
+  REVIEW_STATUS_PENDING,
+  ensureActualSnapshotColumns,
+  listLatestSnapshotsForSeason
+} = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
 
@@ -45,6 +54,8 @@ loadDotEnvIfPresent();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_PATH = process.env.DB_PATH || path.join(DATA_DIR, "app.db");
+const DATABASE_URL = String(process.env.DATABASE_URL || "").trim();
+const PUBLIC_DIR = path.join(__dirname, "public");
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questions.json");
 const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json");
 const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
@@ -52,6 +63,8 @@ const LAST_SEASON_RESULTS_PATH =
   process.env.LAST_SEASON_RESULTS_PATH ||
   path.join(DATA_DIR, "last-season-results.json");
 const SESSION_SECRET = process.env.SESSION_SECRET || "dev-only-change-me";
+const SESSION_COOKIE_TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const GUEST_REMEMBER_DEVICE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const SMTP_USER = process.env.SMTP_USER || "";
 const SMTP_FROM = process.env.SMTP_FROM || "";
 const COMPANY_NAME = process.env.COMPANY_NAME || "Wheel of Knowledge";
@@ -131,8 +144,22 @@ const ADMIN_EMAILS = new Set(
 );
 const LEADERBOARD_ENABLED = process.env.LEADERBOARD_ENABLED === "1";
 const CURRENT_SEASON = Number(process.env.F1_SEASON || 2026);
+const ACTUALS_AUTO_UPDATE_ENABLED =
+  String(process.env.ACTUALS_AUTO_UPDATE_ENABLED || (IS_DEVELOPMENT ? "0" : "1")).trim() === "1";
+const ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES = Number(
+  process.env.ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES || 180
+);
+const ACTUALS_AUTO_UPDATE_ON_START =
+  String(process.env.ACTUALS_AUTO_UPDATE_ON_START || "1").trim() === "1";
+const ACTUALS_AUTO_UPDATE_START_DELAY_MS = Number(
+  process.env.ACTUALS_AUTO_UPDATE_START_DELAY_MS || 30000
+);
+const SERVICE_NAME = "f1-predictions-2026";
+const LOG_LEVEL = String(process.env.LOG_LEVEL || "info").trim().toLowerCase();
+const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS || (IS_DEVELOPMENT ? 0 : 1));
 const MAX_PRIVILEGED_GROUPS = 3;
 const LOCALES_DIR = path.join(__dirname, "locales");
+const STATIC_ASSET_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365;
 const SUPPORTED_LOCALES = ["en", "de", "fr", "nl", "es"];
 const DEFAULT_LOCALE = "en";
 const LOCALE_LABELS = {
@@ -143,6 +170,103 @@ const LOCALE_LABELS = {
   es: "Español"
 };
 const localeCache = new Map();
+
+const LOG_LEVELS = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+  silent: 100
+};
+
+function shouldLog(level) {
+  const configured = LOG_LEVELS[LOG_LEVEL] ?? LOG_LEVELS.info;
+  const requested = LOG_LEVELS[level] ?? LOG_LEVELS.info;
+  return requested >= configured;
+}
+
+function serializeError(err) {
+  if (!err || typeof err !== "object") {
+    return { message: String(err || "Unknown error") };
+  }
+  return {
+    name: err.name || "Error",
+    message: err.message || "Unknown error",
+    stack: IS_DEVELOPMENT ? err.stack : undefined
+  };
+}
+
+const SAFE_CSRF_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function escapeHtmlAttribute(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function getSessionCsrfToken(req) {
+  if (!req.session) return "";
+  const existing = String(req.session.csrfToken || "").trim();
+  if (/^[a-f0-9]{64}$/i.test(existing)) return existing;
+  const token = crypto.randomBytes(32).toString("hex");
+  req.session.csrfToken = token;
+  return token;
+}
+
+function getRequestCsrfToken(req) {
+  const bodyToken = req.body?._csrf || req.body?.csrfToken;
+  const headerToken = req.get("x-csrf-token") || req.get("csrf-token");
+  return String(bodyToken || headerToken || "").trim();
+}
+
+function csrfTokensMatch(left, right) {
+  const leftValue = String(left || "");
+  const rightValue = String(right || "");
+  if (!leftValue || !rightValue || leftValue.length !== rightValue.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(leftValue), Buffer.from(rightValue));
+}
+
+function logEvent(level, event, fields = {}) {
+  if (!shouldLog(level)) return;
+  const record = {
+    timestamp: new Date().toISOString(),
+    level,
+    service: SERVICE_NAME,
+    event,
+    ...fields
+  };
+  const line = JSON.stringify(record);
+  if (level === "error") {
+    console.error(line);
+  } else if (level === "warn") {
+    console.warn(line);
+  } else {
+    console.log(line);
+  }
+}
+
+function getRequestId(req) {
+  const raw = String(req.get("x-request-id") || "").trim();
+  if (/^[A-Za-z0-9._:-]{1,128}$/.test(raw)) return raw;
+  return crypto.randomUUID();
+}
+
+function validateProductionConfig() {
+  if (IS_DEVELOPMENT) return;
+  const normalizedSecret = String(SESSION_SECRET || "").trim().toLowerCase();
+  const isPlaceholderSecret =
+    !normalizedSecret ||
+    normalizedSecret === "change-me" ||
+    normalizedSecret === "dev-only-change-me" ||
+    normalizedSecret.includes("replace-with");
+  if (isPlaceholderSecret) {
+    throw new Error("SESSION_SECRET must be set to a strong non-placeholder value in production.");
+  }
+}
 
 function detectLocaleFromAcceptLanguage(headerValue) {
   const raw = String(headerValue || "").trim();
@@ -250,9 +374,10 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-const db = new Database(DB_PATH);
-
-db.exec(`
+const db = createAppDatabase({ databaseUrl: DATABASE_URL, sqlitePath: DB_PATH });
+if (db.dialect === "sqlite") {
+  db.pragma("busy_timeout = 5000");
+  db.exec(`
   PRAGMA journal_mode = WAL;
 
   CREATE TABLE IF NOT EXISTS users (
@@ -321,6 +446,11 @@ db.exec(`
     guest_id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
     source_group_id INTEGER,
+    resume_token_hash TEXT,
+    claim_secret_hash TEXT,
+    claim_secret_mode TEXT,
+    claim_secret_prompt TEXT,
+    claim_secret_set_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY(source_group_id) REFERENCES groups(id)
@@ -351,7 +481,11 @@ db.exec(`
     source_type TEXT NOT NULL,
     source_note TEXT,
     created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
     created_by_user_id INTEGER,
+    review_status TEXT NOT NULL DEFAULT 'reviewed',
+    reviewed_at TEXT,
+    reviewed_by_user_id INTEGER,
     FOREIGN KEY(created_by_user_id) REFERENCES users(id)
   );
 
@@ -400,7 +534,48 @@ db.exec(`
     created_at TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
-`);
+
+  CREATE TABLE IF NOT EXISTS named_guest_recovery_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    guest_id TEXT NOT NULL,
+    group_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    action TEXT NOT NULL,
+    target_email TEXT NOT NULL,
+    target_user_id INTEGER,
+    created_by_user_id INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used_at TEXT,
+    FOREIGN KEY(group_id) REFERENCES groups(id),
+    FOREIGN KEY(target_user_id) REFERENCES users(id),
+    FOREIGN KEY(created_by_user_id) REFERENCES users(id),
+    CHECK(action IN ('transfer', 'reset_secret'))
+  );
+
+  CREATE TABLE IF NOT EXISTS admin_ideas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL DEFAULT 'question',
+    title TEXT NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    seed_key TEXT UNIQUE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    created_by_user_id INTEGER,
+    updated_by_user_id INTEGER,
+    FOREIGN KEY(created_by_user_id) REFERENCES users(id),
+    FOREIGN KEY(updated_by_user_id) REFERENCES users(id),
+    CHECK(type IN ('question', 'feature', 'other')),
+    CHECK(status IN ('open', 'resolved', 'ignored'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_admin_ideas_status_updated
+    ON admin_ideas(status, updated_at);
+  `);
+} else {
+  ensurePostgresSchema(db);
+}
 
 function ensureGroupColumns() {
   const columns = db.prepare("PRAGMA table_info(groups);").all();
@@ -471,6 +646,28 @@ function ensureUserColumns() {
 
 ensureUserColumns();
 
+function ensureNamedGuestProfileColumns() {
+  const columns = db.prepare("PRAGMA table_info(named_guest_profiles);").all();
+  const names = new Set(columns.map((col) => col.name));
+  if (!names.has("resume_token_hash")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN resume_token_hash TEXT;");
+  }
+  if (!names.has("claim_secret_hash")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_hash TEXT;");
+  }
+  if (!names.has("claim_secret_mode")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_mode TEXT;");
+  }
+  if (!names.has("claim_secret_prompt")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_prompt TEXT;");
+  }
+  if (!names.has("claim_secret_set_at")) {
+    db.exec("ALTER TABLE named_guest_profiles ADD COLUMN claim_secret_set_at TEXT;");
+  }
+}
+
+ensureNamedGuestProfileColumns();
+
 function ensureQuestionSettingsColumns() {
   const columns = db.prepare("PRAGMA table_info(question_settings);").all();
   const names = new Set(columns.map((col) => col.name));
@@ -480,6 +677,34 @@ function ensureQuestionSettingsColumns() {
 }
 
 ensureQuestionSettingsColumns();
+ensureActualSnapshotColumns(db);
+
+function seedAdminIdeas() {
+  const now = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT OR IGNORE INTO admin_ideas (
+      type,
+      title,
+      notes,
+      status,
+      seed_key,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, 'open', ?, ?, ?)
+    `
+  ).run(
+    "question",
+    "Voorspel de totale hoeveelheid time penalties die in het seizoen uitgedeeld worden.",
+    "Idee voor een mogelijke vraag voor volgend seizoen.",
+    "next-year-time-penalties-question",
+    now,
+    now
+  );
+}
+
+seedAdminIdeas();
 
 function backfillNamedGuestGroupMembers() {
   db.exec(
@@ -831,22 +1056,156 @@ function sanitizeRedirectPath(rawValue) {
   }
 }
 
+const assetVersionCache = new Map();
+
+function resolvePublicAsset(assetUrl) {
+  const raw = String(assetUrl || "").trim();
+  if (!raw || raw.includes("\0")) return null;
+
+  const pathOnly = raw.split("#")[0].split("?")[0].replace(/^\/+/, "");
+  if (!pathOnly) return null;
+
+  const filePath = path.resolve(PUBLIC_DIR, pathOnly);
+  if (filePath !== PUBLIC_DIR && !filePath.startsWith(`${PUBLIC_DIR}${path.sep}`)) {
+    return null;
+  }
+
+  return {
+    publicPath: `/${pathOnly.replace(/\\/g, "/")}`,
+    filePath
+  };
+}
+
+function getAssetVersion(assetUrl) {
+  const asset = resolvePublicAsset(assetUrl);
+  if (!asset) return "";
+
+  const cached = assetVersionCache.get(asset.filePath);
+  if (cached !== undefined) return cached;
+
+  let version = "";
+  try {
+    const buffer = fs.readFileSync(asset.filePath);
+    version = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 12);
+  } catch (err) {
+    version = "";
+  }
+
+  assetVersionCache.set(asset.filePath, version);
+  return version;
+}
+
+function assetPath(assetUrl) {
+  const raw = String(assetUrl || "");
+  const version = getAssetVersion(raw);
+  if (!version) return raw;
+
+  const hashIndex = raw.indexOf("#");
+  const urlWithoutHash = hashIndex === -1 ? raw : raw.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : raw.slice(hashIndex);
+  const separator = urlWithoutHash.includes("?") ? "&" : "?";
+  return `${urlWithoutHash}${separator}v=${version}${hash}`;
+}
+
 const app = express();
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+app.locals.assetPath = assetPath;
+if (Number.isFinite(TRUST_PROXY_HOPS) && TRUST_PROXY_HOPS > 0) {
+  app.set("trust proxy", TRUST_PROXY_HOPS);
+}
+app.disable("x-powered-by");
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use((req, res, next) => {
+  const requestId = getRequestId(req);
+  const started = process.hrtime.bigint();
+  req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+  res.on("finish", () => {
+    const durationMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+    const statusCode = res.statusCode;
+    const level = statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
+    logEvent(level, "http_request", {
+      requestId,
+      method: req.method,
+      path: req.path,
+      statusCode,
+      durationMs: Number(durationMs.toFixed(1))
+    });
+  });
+  next();
+});
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false
+  })
+);
+
+app.get("/healthz", (req, res) => {
+  try {
+    db.prepare("SELECT 1 AS ok").get();
+    return res.json({
+      status: "ok",
+      service: SERVICE_NAME,
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Number(process.uptime().toFixed(3)),
+      checks: {
+        database: "ok"
+      },
+      databaseBackend: db.dialect || "sqlite"
+    });
+  } catch (err) {
+    logEvent("error", "health_check_failed", {
+      requestId: req.requestId,
+      error: serializeError(err)
+    });
+    return res.status(503).json({
+      status: "error",
+      service: SERVICE_NAME,
+      checks: {
+        database: "error"
+      },
+      databaseBackend: db.dialect || "sqlite"
+    });
+  }
+});
+
+app.use(
+  express.static(PUBLIC_DIR, {
+    etag: true,
+    immutable: true,
+    lastModified: true,
+    maxAge: STATIC_ASSET_CACHE_MAX_AGE_MS
+  })
+);
+app.use((req, res, next) => {
+  if (req.method === "GET") {
+    res.setHeader("Cache-Control", "private, no-store");
+  }
+  next();
+});
 app.use(express.urlencoded({ extended: true }));
+const sessionStore = DATABASE_URL
+  ? new PostgresSessionStore({
+      connectionString: DATABASE_URL,
+      ttlMs: SESSION_COOKIE_TTL_MS
+    })
+  : new BetterSqliteSessionStore({
+      filename: path.join(DATA_DIR, "sessions.db"),
+      ttlMs: SESSION_COOKIE_TTL_MS
+    });
 app.use(
   session({
-    store: new SQLiteStore({ db: "sessions.db", dir: DATA_DIR }),
+    store: sessionStore,
     secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      maxAge: 1000 * 60 * 60 * 24 * 7
+      secure: IS_DEVELOPMENT ? false : "auto",
+      maxAge: SESSION_COOKIE_TTL_MS
     }
   })
 );
@@ -875,6 +1234,7 @@ app.use((req, res, next) => {
   res.locals.baseUrl = BASE_URL;
   res.locals.companyName = COMPANY_NAME;
   res.locals.closeAt = PREDICTIONS_CLOSE_AT;
+  res.locals.assetPath = assetPath;
   res.locals.isDevelopment = IS_DEVELOPMENT;
   res.locals.devIdentityMode = String(req.session?.devIdentityMode || "")
     .trim()
@@ -886,7 +1246,30 @@ app.use((req, res, next) => {
     if (!tail) return base;
     return tail.startsWith("/") ? `${base}${tail}` : `${base}/${tail}`;
   };
+  const csrfToken = getSessionCsrfToken(req);
+  res.locals.csrfToken = csrfToken;
+  res.locals.csrfField = () =>
+    `<input type="hidden" name="_csrf" value="${escapeHtmlAttribute(csrfToken)}">`;
   next();
+});
+
+app.use((req, res, next) => {
+  if (SAFE_CSRF_METHODS.has(String(req.method || "").toUpperCase())) {
+    return next();
+  }
+  const expectedToken = String(req.session?.csrfToken || "");
+  const requestToken = getRequestCsrfToken(req);
+  if (csrfTokensMatch(expectedToken, requestToken)) {
+    return next();
+  }
+  const acceptsJson = String(req.get("accept") || "").includes("application/json");
+  if (acceptsJson || String(req.get("x-join-ajax") || "").trim() === "1") {
+    return res.status(403).json({
+      ok: false,
+      error: "Invalid or expired form token."
+    });
+  }
+  return sendError(req, res, 403, "Invalid or expired form token.");
 });
 
 app.post("/language", (req, res) => {
@@ -1305,10 +1688,141 @@ function getGuestIdFromSession(req, { create = false } = {}) {
   return guestId;
 }
 
+function shouldRememberGuestDevice(body) {
+  const raw = body?.rememberDevice;
+  if (Array.isArray(raw)) {
+    return raw.map((value) => String(value).trim()).includes("1");
+  }
+  if (raw == null) return true;
+  return String(raw).trim() !== "0";
+}
+
+function applyPersistentGuestDeviceCookie(req) {
+  if (!req?.session?.cookie) return;
+  req.session.cookie.maxAge = GUEST_REMEMBER_DEVICE_TTL_MS;
+}
+
+function regenerateSession(req) {
+  if (!req?.session || typeof req.session.regenerate !== "function") {
+    return Promise.resolve();
+  }
+  const preserved = {
+    locale: req.session.locale,
+    devIdentityMode: req.session.devIdentityMode,
+    devAutoLoginSkipOnce: req.session.devAutoLoginSkipOnce,
+    joinGroupAccess: req.session.joinGroupAccess
+  };
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((err) => {
+      if (err) return reject(err);
+      Object.entries(preserved).forEach(([key, value]) => {
+        if (value !== undefined) req.session[key] = value;
+      });
+      return resolve();
+    });
+  });
+}
+
+async function prepareGuestDeviceMemorySession(req, rememberDevice) {
+  if (rememberDevice) {
+    applyPersistentGuestDeviceCookie(req);
+    return;
+  }
+  await regenerateSession(req);
+  if (req?.session?.cookie) {
+    req.session.cookie.maxAge = null;
+  }
+}
+
 function normalizeDisplayName(value) {
   return String(value || "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+const CLAIM_SECRET_MODE_PIN = "pin";
+const CLAIM_SECRET_MODE_PASSPHRASE = "passphrase";
+const CLAIM_SECRET_PROMPTS = [
+  "What is your all-time favorite F1 team livery?",
+  "If you could attend only one Grand Prix in person, which is it?",
+  "Which driver got you into F1?",
+  "What is your dream F1 team name?"
+];
+
+function normalizeClaimSecretMode(value) {
+  return String(value || "").trim().toLowerCase() === CLAIM_SECRET_MODE_PASSPHRASE
+    ? CLAIM_SECRET_MODE_PASSPHRASE
+    : CLAIM_SECRET_MODE_PIN;
+}
+
+function normalizeClaimSecretValue(mode, value) {
+  const normalizedMode = normalizeClaimSecretMode(mode);
+  const raw = String(value || "").replace(/\s+/g, " ").trim();
+  if (normalizedMode === CLAIM_SECRET_MODE_PIN) return raw;
+  return raw.toLowerCase();
+}
+
+function hashClaimSecret(mode, normalizedSecret) {
+  return hashToken(`named-guest-claim:${normalizeClaimSecretMode(mode)}:${normalizedSecret}`);
+}
+
+function buildClaimSecretFromRequest(body) {
+  const mode = normalizeClaimSecretMode(body?.claimSecretMode);
+  if (mode === CLAIM_SECRET_MODE_PIN) {
+    const pin = String(body?.claimPin || body?.claimSecret || "").trim();
+    if (!/^\d{4,6}$/.test(pin)) {
+      return {
+        ok: false,
+        errorKey: "join_guest.error_claim_pin_invalid"
+      };
+    }
+    return {
+      ok: true,
+      mode,
+      prompt: null,
+      hash: hashClaimSecret(mode, normalizeClaimSecretValue(mode, pin)),
+      setAt: new Date().toISOString()
+    };
+  }
+
+  const prompt = normalizeDisplayName(
+    body?.claimPrompt || CLAIM_SECRET_PROMPTS[0]
+  );
+  const answer = normalizeClaimSecretValue(mode, body?.claimPassphraseAnswer || body?.claimSecret);
+  if (prompt.length < 4 || prompt.length > 160 || answer.length < 2 || answer.length > 160) {
+    return {
+      ok: false,
+      errorKey: "join_guest.error_claim_passphrase_invalid"
+    };
+  }
+  return {
+    ok: true,
+    mode,
+    prompt,
+    hash: hashClaimSecret(mode, answer),
+    setAt: new Date().toISOString()
+  };
+}
+
+function doesClaimSecretMatch(profile, suppliedSecret) {
+  const claimHash = String(profile?.claim_secret_hash || "").trim();
+  const mode = normalizeClaimSecretMode(profile?.claim_secret_mode);
+  const supplied = normalizeClaimSecretValue(mode, suppliedSecret);
+  if (claimHash && supplied) {
+    const suppliedHash = hashClaimSecret(mode, supplied);
+    if (claimHash.length !== suppliedHash.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(claimHash), Buffer.from(suppliedHash));
+  }
+  return false;
+}
+
+function requiresClaimSecretSetup(guestId) {
+  const normalizedGuestId = String(guestId || "").trim();
+  if (!normalizedGuestId) return true;
+  const row = db
+    .prepare("SELECT claim_secret_hash FROM named_guest_profiles WHERE guest_id = ?")
+    .get(normalizedGuestId);
+  return !String(row?.claim_secret_hash || "").trim();
 }
 
 function getNamedGuestAccessFromSession(req) {
@@ -1317,11 +1831,14 @@ function getNamedGuestAccessFromSession(req) {
   const inviteCode = String(raw.inviteCode || "").trim();
   const groupId = Number(raw.groupId || 0);
   const displayName = String(raw.displayName || "").trim();
+  const resumeToken = String(raw.resumeToken || "").trim();
   if (!inviteCode || !groupId || !displayName) return null;
   return {
     inviteCode,
     groupId,
-    displayName
+    displayName,
+    resumeToken,
+    requiresClaimSecretSetup: raw.requiresClaimSecretSetup === true
   };
 }
 
@@ -1352,7 +1869,32 @@ function hasNamedGuestAccess(req, inviteCode, groupId) {
   return !!member;
 }
 
-function upsertNamedGuestProfile(guestId, displayName, groupId) {
+function getNamedGuestResumeTokenFromSession(req, inviteCode, groupId) {
+  const access = getNamedGuestAccessFromSession(req);
+  if (!access) return "";
+  if (
+    String(access.inviteCode || "") !== String(inviteCode || "").trim()
+    || Number(access.groupId || 0) !== Number(groupId || 0)
+  ) {
+    return "";
+  }
+  return String(access.resumeToken || "").trim();
+}
+
+function generateGuestResumeToken() {
+  return crypto.randomBytes(18).toString("base64url");
+}
+
+function doesHashedSecretMatch(storedHash, token) {
+  const expected = String(storedHash || "").trim();
+  const supplied = String(token || "").trim();
+  if (!expected || !supplied) return false;
+  const suppliedHash = hashToken(supplied);
+  if (expected.length !== suppliedHash.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(suppliedHash));
+}
+
+function upsertNamedGuestProfile(guestId, displayName, groupId, options = {}) {
   const normalizedGuestId = String(guestId || "").trim();
   const normalizedDisplayName = normalizeDisplayName(displayName);
   const normalizedGroupId = Number(groupId || 0);
@@ -1360,17 +1902,60 @@ function upsertNamedGuestProfile(guestId, displayName, groupId) {
     return;
   }
   const now = new Date().toISOString();
+  const profileOptions = options && typeof options === "object"
+    ? options
+    : { resumeTokenHash: options };
+  const normalizedResumeTokenHash = profileOptions.resumeTokenHash
+    ? String(profileOptions.resumeTokenHash).trim()
+    : null;
+  const claimSecretHash = String(profileOptions.claimSecretHash || "").trim() || null;
+  const claimSecretMode = claimSecretHash
+    ? normalizeClaimSecretMode(profileOptions.claimSecretMode)
+    : null;
+  const claimSecretPrompt = claimSecretMode === CLAIM_SECRET_MODE_PASSPHRASE
+    ? normalizeDisplayName(profileOptions.claimSecretPrompt || CLAIM_SECRET_PROMPTS[0])
+    : null;
+  const claimSecretSetAt = claimSecretHash
+    ? String(profileOptions.claimSecretSetAt || now)
+    : null;
   db.prepare(
     `
-    INSERT INTO named_guest_profiles (guest_id, display_name, source_group_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO named_guest_profiles (
+      guest_id,
+      display_name,
+      source_group_id,
+      resume_token_hash,
+      claim_secret_hash,
+      claim_secret_mode,
+      claim_secret_prompt,
+      claim_secret_set_at,
+      created_at,
+      updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(guest_id)
     DO UPDATE SET
       display_name = excluded.display_name,
       source_group_id = excluded.source_group_id,
+      resume_token_hash = COALESCE(excluded.resume_token_hash, named_guest_profiles.resume_token_hash),
+      claim_secret_hash = COALESCE(excluded.claim_secret_hash, named_guest_profiles.claim_secret_hash),
+      claim_secret_mode = COALESCE(excluded.claim_secret_mode, named_guest_profiles.claim_secret_mode),
+      claim_secret_prompt = COALESCE(excluded.claim_secret_prompt, named_guest_profiles.claim_secret_prompt),
+      claim_secret_set_at = COALESCE(excluded.claim_secret_set_at, named_guest_profiles.claim_secret_set_at),
       updated_at = excluded.updated_at
     `
-  ).run(normalizedGuestId, normalizedDisplayName, normalizedGroupId, now, now);
+  ).run(
+    normalizedGuestId,
+    normalizedDisplayName,
+    normalizedGroupId,
+    normalizedResumeTokenHash,
+    claimSecretHash,
+    claimSecretMode,
+    claimSecretPrompt,
+    claimSecretSetAt,
+    now,
+    now
+  );
 }
 
 function upsertNamedGuestGroupMember(guestId, groupId, displayName) {
@@ -1433,7 +2018,7 @@ function isDisplayNameTakenInGroup(groupId, displayName, { excludeGuestId = "" }
   return !!namedGuestConflict;
 }
 
-function setNamedGuestAccess(req, { inviteCode, groupId, displayName }) {
+function setNamedGuestAccess(req, { inviteCode, groupId, displayName, claimSecret = null }) {
   if (!req?.session) return null;
   const normalizedInviteCode = String(inviteCode || "").trim();
   const normalizedGroupId = Number(groupId || 0);
@@ -1442,7 +2027,19 @@ function setNamedGuestAccess(req, { inviteCode, groupId, displayName }) {
     return null;
   }
   const guestId = getGuestIdFromSession(req, { create: true });
-  upsertNamedGuestProfile(guestId, normalizedDisplayName, normalizedGroupId);
+  upsertNamedGuestProfile(
+    guestId,
+    normalizedDisplayName,
+    normalizedGroupId,
+    claimSecret
+      ? {
+          claimSecretHash: claimSecret.hash,
+          claimSecretMode: claimSecret.mode,
+          claimSecretPrompt: claimSecret.prompt,
+          claimSecretSetAt: claimSecret.setAt
+        }
+      : {}
+  );
   upsertNamedGuestGroupMember(guestId, normalizedGroupId, normalizedDisplayName);
   req.session.namedGuestAccess = {
     inviteCode: normalizedInviteCode,
@@ -1626,12 +2223,103 @@ function getResponsesForGroup(groupId, { includeNamedGuests = true, excludeHidde
     .all(normalizedGroupId, normalizedGroupId);
 }
 
+function buildGuestConversionPlan(guestId, userId) {
+  const normalizedGuestId = String(guestId || "").trim();
+  const normalizedUserId = Number(userId || 0);
+  if (!normalizedGuestId || !normalizedUserId) {
+    return {
+      guestId: normalizedGuestId,
+      userId: normalizedUserId,
+      groups: [],
+      hasConflicts: false
+    };
+  }
+  const globalGroup = ensureGlobalGroup(normalizedUserId);
+  const rows = db
+    .prepare(
+      "SELECT group_id, question_id, answer FROM guest_responses WHERE guest_id = ?"
+    )
+    .all(normalizedGuestId);
+  const grouped = new Map();
+  for (const row of rows) {
+    const groupId = Number(row.group_id || 0);
+    if (!groupId) continue;
+    if (!grouped.has(groupId)) grouped.set(groupId, []);
+    grouped.get(groupId).push(row);
+  }
+
+  const globalGroupId = Number(globalGroup?.id || 0);
+  if (globalGroupId && !grouped.has(globalGroupId)) {
+    const sourceGroupEntry = Array.from(grouped.entries()).find(
+      ([groupId, groupRows]) => Number(groupId) !== globalGroupId && Array.isArray(groupRows) && groupRows.length > 0
+    );
+    if (sourceGroupEntry) {
+      const [, sourceRows] = sourceGroupEntry;
+      grouped.set(
+        globalGroupId,
+        sourceRows.map((row) => ({
+          ...row,
+          group_id: globalGroupId
+        }))
+      );
+    }
+  }
+
+  const groups = Array.from(grouped.entries())
+    .map(([groupId, groupRows]) => {
+      const group = getGroupById(groupId);
+      if (!group) return null;
+      const accountResponses = db
+        .prepare("SELECT COUNT(*) AS count FROM responses WHERE user_id = ? AND group_id = ?")
+        .get(normalizedUserId, groupId);
+      const accountCount = Number(accountResponses?.count || 0);
+      const guestCount = Array.isArray(groupRows) ? groupRows.length : 0;
+      return {
+        groupId,
+        groupName: String(group.name || "").trim() || `Group ${groupId}`,
+        isGlobal: Number(group.is_global || 0) === 1,
+        guestCount,
+        accountCount,
+        hasConflict: guestCount > 0 && accountCount > 0
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (a.isGlobal !== b.isGlobal) return a.isGlobal ? -1 : 1;
+      return a.groupName.localeCompare(b.groupName);
+    });
+
+  return {
+    guestId: normalizedGuestId,
+    userId: normalizedUserId,
+    groups,
+    hasConflicts: groups.some((group) => group.hasConflict)
+  };
+}
+
 function claimGuestResponsesForUser(req, userId, options = {}) {
   const sessionGuestId = getGuestIdFromSession(req, { create: false });
   const fallbackGuestId = String(options?.fallbackGuestId || "").trim();
   const guestId = sessionGuestId || fallbackGuestId;
   const normalizedUserId = Number(userId || 0);
   if (!guestId || !normalizedUserId) return;
+  const plan = buildGuestConversionPlan(guestId, normalizedUserId);
+  const conflictChoices = options?.conflictChoices && typeof options.conflictChoices === "object"
+    ? options.conflictChoices
+    : null;
+  if (plan.hasConflicts && !conflictChoices && !options?.force) {
+    if (req?.session) {
+      req.session.pendingGuestConversion = {
+        guestId,
+        userId: normalizedUserId,
+        createdAt: new Date().toISOString()
+      };
+    }
+    return {
+      needsReview: true,
+      plan
+    };
+  }
   const globalGroup = ensureGlobalGroup(normalizedUserId);
   const rows = db
     .prepare(
@@ -1690,7 +2378,20 @@ function claimGuestResponsesForUser(req, userId, options = {}) {
     for (const [groupId, groupRows] of grouped.entries()) {
       const group = getGroupById(groupId);
       if (!group) continue;
+      const choiceKey = String(groupId);
+      const selectedChoice = String(
+        conflictChoices?.groups?.[choiceKey]
+        || (Number(group.is_global || 0) === 1 ? conflictChoices?.global : "")
+        || "guest"
+      ).trim();
       addMember.run(normalizedUserId, groupId, now);
+      if (selectedChoice === "account") {
+        continue;
+      }
+      db.prepare("DELETE FROM responses WHERE user_id = ? AND group_id = ?").run(
+        normalizedUserId,
+        groupId
+      );
       for (const row of groupRows) {
         upsert.run(
           normalizedUserId,
@@ -1704,12 +2405,18 @@ function claimGuestResponsesForUser(req, userId, options = {}) {
     }
     db.prepare("DELETE FROM guest_responses WHERE guest_id = ?").run(guestId);
     db.prepare("DELETE FROM named_guest_group_members WHERE guest_id = ?").run(guestId);
+    db.prepare("DELETE FROM named_guest_profiles WHERE guest_id = ?").run(guestId);
   });
   tx();
   if (req?.session && sessionGuestId) {
     req.session.guestId = null;
     req.session.namedGuestAccess = null;
+    req.session.pendingGuestConversion = null;
   }
+  return {
+    converted: true,
+    plan
+  };
 }
 
 function isCoupledToGlobal(userId, groupId) {
@@ -1866,6 +2573,106 @@ function getMailer() {
   });
 }
 
+function createNamedGuestRecoveryToken({ guestId, groupId, action, targetEmail, targetUserId = null, createdByUserId }) {
+  const normalizedGuestId = String(guestId || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  const normalizedAction = String(action || "").trim();
+  const normalizedEmail = String(targetEmail || "").trim().toLowerCase();
+  const normalizedCreatedBy = Number(createdByUserId || 0);
+  if (
+    !normalizedGuestId
+    || !normalizedGroupId
+    || !["transfer", "reset_secret"].includes(normalizedAction)
+    || !normalizedEmail
+    || !normalizedCreatedBy
+  ) {
+    return null;
+  }
+  const token = generateToken();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString();
+  const info = db
+    .prepare(
+      `
+      INSERT INTO named_guest_recovery_tokens (
+        guest_id, group_id, token_hash, action, target_email, target_user_id,
+        created_by_user_id, created_at, expires_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `
+    )
+    .run(
+      normalizedGuestId,
+      normalizedGroupId,
+      hashToken(token),
+      normalizedAction,
+      normalizedEmail,
+      targetUserId ? Number(targetUserId) : null,
+      normalizedCreatedBy,
+      now,
+      expiresAt
+    );
+  return {
+    id: info.lastInsertRowid,
+    token,
+    url: `${BASE_URL}/guest-recovery/${token}`
+  };
+}
+
+function getNamedGuestRecoveryByToken(token) {
+  const normalizedToken = String(token || "").trim();
+  if (!normalizedToken) return null;
+  return db
+    .prepare(
+      `
+      SELECT
+        ngrt.*,
+        ngp.display_name,
+        g.name AS group_name,
+        u.name AS created_by_name
+      FROM named_guest_recovery_tokens ngrt
+      JOIN named_guest_profiles ngp ON ngp.guest_id = ngrt.guest_id
+      JOIN groups g ON g.id = ngrt.group_id
+      JOIN users u ON u.id = ngrt.created_by_user_id
+      WHERE ngrt.token_hash = ?
+        AND ngrt.used_at IS NULL
+        AND ngrt.expires_at > ?
+      LIMIT 1
+      `
+    )
+    .get(hashToken(normalizedToken), new Date().toISOString());
+}
+
+async function sendNamedGuestRecoveryEmail(recovery, url) {
+  const mailer = getMailer();
+  if (!mailer) return { ok: false, reason: "smtp_missing" };
+  const targetEmail = String(recovery?.target_email || "").trim();
+  if (!targetEmail) return { ok: false, reason: "missing_email" };
+  const ownerName = String(recovery?.created_by_name || "A group admin").trim();
+  const guestName = String(recovery?.display_name || "this guest").trim();
+  const groupName = String(recovery?.group_name || "this group").trim();
+  const isTransfer = String(recovery?.action || "") === "transfer";
+  const actionText = isTransfer
+    ? `transfer the Named Guest "${guestName}" in "${groupName}" to your account`
+    : `reset guest recovery for the Named Guest "${guestName}" in "${groupName}"`;
+  const body =
+    `${ownerName} wants to ${actionText}.\n\n` +
+    `If this is you, confirm here:\n${url}\n\n` +
+    "If you did not expect this, you can ignore this email.";
+  try {
+    await mailer.sendMail({
+      from: SMTP_FROM || SMTP_USER || "Wheel of Knowledge",
+      to: targetEmail,
+      subject: isTransfer ? "Confirm Named Guest transfer" : "Reset Named Guest recovery",
+      text: body
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error("Failed to send named guest recovery email:", err);
+    return { ok: false, reason: "send_failed" };
+  }
+}
+
 function generateToken() {
   return crypto.randomBytes(24).toString("hex");
 }
@@ -1988,6 +2795,140 @@ function serializeAnswerFromRequest(question, body) {
   return String(answer).trim();
 }
 
+const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+const sensitiveActionAttempts = new Map();
+
+function getThrottleClientKey(req) {
+  return String(req.ip || req.socket?.remoteAddress || "unknown").trim();
+}
+
+function createSensitiveActionThrottle(name, { max = 10, keyParts = null } = {}) {
+  return (req, res, next) => {
+    const now = Date.now();
+    for (const [key, bucket] of sensitiveActionAttempts.entries()) {
+      if (!bucket || bucket.resetAt <= now) {
+        sensitiveActionAttempts.delete(key);
+      }
+    }
+
+    const extraParts = typeof keyParts === "function" ? keyParts(req) : [];
+    const throttleKey = [
+      name,
+      getThrottleClientKey(req),
+      ...(Array.isArray(extraParts) ? extraParts : [extraParts])
+    ]
+      .map((part) => String(part || "").trim().toLowerCase())
+      .join(":");
+    const current = sensitiveActionAttempts.get(throttleKey);
+    const bucket =
+      current && current.resetAt > now
+        ? current
+        : { count: 0, resetAt: now + THROTTLE_WINDOW_MS };
+    bucket.count += 1;
+    sensitiveActionAttempts.set(throttleKey, bucket);
+
+    if (bucket.count <= max) {
+      return next();
+    }
+
+    const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+    res.setHeader("Retry-After", String(retryAfterSeconds));
+    const acceptsJson = String(req.get("accept") || "").includes("application/json");
+    if (acceptsJson || String(req.get("x-join-ajax") || "").trim() === "1") {
+      return res.status(429).json({
+        ok: false,
+        error: "Too many attempts. Please try again later."
+      });
+    }
+    return sendError(req, res, 429, "Too many attempts. Please try again later.");
+  };
+}
+
+app.post(
+  "/login",
+  createSensitiveActionThrottle("login", {
+    max: 8,
+    keyParts: (req) => [req.body?.email]
+  })
+);
+app.post(
+  "/resend-verification",
+  createSensitiveActionThrottle("resend-verification", {
+    max: 4,
+    keyParts: (req) => [req.body?.email]
+  })
+);
+app.post(
+  "/forgot-password",
+  createSensitiveActionThrottle("forgot-password", {
+    max: 4,
+    keyParts: (req) => [req.body?.email]
+  })
+);
+app.post(
+  "/reset-password",
+  createSensitiveActionThrottle("reset-password", {
+    max: 8,
+    keyParts: (req) => [req.body?.token]
+  })
+);
+app.post(
+  "/groups/join",
+  createSensitiveActionThrottle("group-code-password", {
+    max: 8,
+    keyParts: (req) => [req.body?.code]
+  })
+);
+app.post(
+  "/join/:code",
+  createSensitiveActionThrottle("invite-member-password", {
+    max: 8,
+    keyParts: (req) => [req.params?.code]
+  })
+);
+app.post(
+  "/join/:code/access",
+  createSensitiveActionThrottle("invite-group-access", {
+    max: 8,
+    keyParts: (req) => [req.params?.code]
+  })
+);
+app.post(
+  "/join/:code/guest",
+  createSensitiveActionThrottle("named-guest-join-password", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.body?.guestName]
+  })
+);
+app.post(
+  "/join/:code/guest/continue-current",
+  createSensitiveActionThrottle("named-guest-continue-current", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.session?.guestId]
+  })
+);
+app.post(
+  "/join/:code/guest/switch",
+  createSensitiveActionThrottle("named-guest-switch", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.session?.guestId]
+  })
+);
+app.post(
+  "/join/:code/guest/return",
+  createSensitiveActionThrottle("named-guest-return", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.body?.returnGuestId || req.body?.returnGuestName]
+  })
+);
+app.post(
+  "/join/:code/claim-secret",
+  createSensitiveActionThrottle("named-guest-claim-secret-setup", {
+    max: 8,
+    keyParts: (req) => [req.params?.code, req.session?.guestId]
+  })
+);
+
 registerAuthRoutes(app, {
   db,
   bcrypt,
@@ -2007,7 +2948,9 @@ registerAuthRoutes(app, {
   NODE_ENV: process.env.NODE_ENV || "development",
   claimGuestResponsesForUser,
   predictionsClosed,
-  getQuestions
+  getQuestions,
+  CURRENT_SEASON,
+  getRaces
 });
 
 app.get("/api/groups/check-name", requireAuth, (req, res) => {
@@ -2237,182 +3180,8 @@ app.post("/groups/join", requireAuth, async (req, res) => {
   return res.redirect(getGroupBasePath(group));
 });
 
-function parseLeaderboardStoredValue(question, raw) {
-  if (!raw) return null;
-  const text = String(raw).trim();
-  const type = question.type || "text";
-  if (
-    type === "ranking" ||
-    type === "multi_select" ||
-    type === "multi_select_limited" ||
-    type === "teammate_battle" ||
-    type === "boolean_with_optional_driver" ||
-    type === "numeric_with_driver" ||
-    type === "single_choice_with_driver"
-  ) {
-    try {
-      return JSON.parse(raw);
-    } catch (err) {
-      return null;
-    }
-  }
-  if (text.startsWith("[") || text.startsWith("{")) {
-    try {
-      return JSON.parse(text);
-    } catch (err) {}
-  }
-  return raw;
-}
-
-function leaderboardValuesMatch(actualValue, predictedValue) {
-  if (actualValue == null || predictedValue == null) return false;
-  if (Array.isArray(actualValue)) return actualValue.includes(predictedValue);
-  return String(actualValue) === String(predictedValue);
-}
-
-function scoreLeaderboardQuestion(question, predictedRaw, actualRaw) {
-  if (actualRaw == null || predictedRaw == null) return 0;
-  const type = question.type || "text";
-  if (type === "ranking") {
-    const points = question.points || {};
-    let score = 0;
-    const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
-    const count = Number(question.count) || 3;
-    for (let i = 0; i < count; i += 1) {
-      const actual = actualRaw[i];
-      const predicted = predictedRaw[i];
-      const key = positionLabels[i] || String(i + 1);
-      const value = Number(points[key] || 0);
-      if (actual == null || predicted == null) continue;
-      if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
-        score += value;
-      }
-    }
-    return score;
-  }
-  if (type === "single_choice" || type === "text" || type === "boolean") {
-    if (
-      type === "single_choice" &&
-      question.special_case === "all_podiums_bonus" &&
-      String(actualRaw) === String(question.bonus_value)
-    ) {
-      return String(predictedRaw) === String(question.bonus_value)
-        ? Number(question.bonus_points || 0)
-        : 0;
-    }
-    return leaderboardValuesMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
-  }
-  if (type === "multi_select") {
-    const points = Number(question.points || 0);
-    const penalty = Number(question.penalty ?? points);
-    const minimum = Number(question.minimum ?? 0);
-    const actualSet = new Set(actualRaw || []);
-    const predictedSet = new Set(predictedRaw || []);
-    let correct = 0;
-    let wrong = 0;
-    let missing = 0;
-    predictedSet.forEach((item) => {
-      if (actualSet.has(item)) correct += 1;
-      else wrong += 1;
-    });
-    actualSet.forEach((item) => {
-      if (!predictedSet.has(item)) missing += 1;
-    });
-    return Math.max(minimum, correct * points - (wrong + missing) * penalty);
-  }
-  if (type === "teammate_battle") {
-    const base = Number(question.points || 0);
-    const tieBonus = Number(question.tie_bonus || 0);
-    const actualWinner = actualRaw?.winner;
-    const actualDiff = Number(actualRaw?.diff);
-    const predictedWinner = predictedRaw?.winner;
-    const predictedDiff = Number(predictedRaw?.diff);
-    if (!actualWinner) return 0;
-    if (actualWinner === "tie") return predictedWinner === "tie" ? tieBonus : 0;
-    if (predictedWinner !== actualWinner) return 0;
-    if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
-    return Math.max(0, base - Math.abs(predictedDiff - actualDiff));
-  }
-  if (type === "boolean_with_optional_driver") {
-    const base = Number(question.points || 0);
-    const bonus = Number(question.bonus_points || 0);
-    const actualChoice = actualRaw?.choice;
-    const actualDriver = actualRaw?.driver;
-    const predictedChoice = predictedRaw?.choice;
-    const predictedDriver = predictedRaw?.driver;
-    if (actualChoice == null || predictedChoice == null) return 0;
-    let score = 0;
-    if (String(actualChoice) === String(predictedChoice)) {
-      score += base;
-      if (
-        String(actualChoice) === "yes" &&
-        actualDriver &&
-        String(actualDriver) === String(predictedDriver)
-      ) {
-        score += bonus;
-      }
-    }
-    return score;
-  }
-  if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
-    const points = question.points || {};
-    const actualValue = actualRaw?.value;
-    const predictedValue = predictedRaw?.value;
-    const actualDriver = actualRaw?.driver;
-    const predictedDriver = predictedRaw?.driver;
-    let score = 0;
-    if (actualValue != null && predictedValue != null) {
-      if (leaderboardValuesMatch(actualValue, predictedValue)) {
-        score += Number(points.position || 0);
-      } else if (
-        type === "single_choice_with_driver" &&
-        question.position_nearby_points &&
-        typeof question.position_nearby_points === "object"
-      ) {
-        const toGridNumber = (value) => {
-          if (value == null) return null;
-          const raw = String(value).trim().toLowerCase();
-          if (!raw) return null;
-          if (raw === "pitlane" || raw === "pit lane") return 23;
-          const numeric = Number(raw);
-          return Number.isFinite(numeric) ? numeric : null;
-        };
-        const actualGrid = toGridNumber(actualValue);
-        const predictedGrid = toGridNumber(predictedValue);
-        if (actualGrid != null && predictedGrid != null) {
-          const diff = Math.abs(actualGrid - predictedGrid);
-          score += Number(question.position_nearby_points[String(diff)] || 0);
-        }
-      }
-    }
-    if (actualDriver && predictedDriver && leaderboardValuesMatch(actualDriver, predictedDriver)) {
-      score += Number(points.driver || 0);
-    }
-    return score;
-  }
-  if (type === "multi_select_limited") {
-    const points = Number(question.points || 0);
-    const dnfByRace = actualRaw?.dnf_by_race || {};
-    let total = 0;
-    (predictedRaw || []).forEach((race) => {
-      total += Number(dnfByRace[race] || 0) * points;
-    });
-    return total;
-  }
-  if (type === "numeric") {
-    return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
-  }
-  return 0;
-}
-
-function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, options = {}) {
+function getGroupLeaderboardInputs(groupId, options = {}) {
   const excludeHiddenAdmins = Boolean(options.excludeHiddenAdmins);
-  const includeDetails = Boolean(options.includeDetails);
-  const questionMap = questions.reduce((acc, question) => {
-    acc[question.id] = question;
-    return acc;
-  }, {});
-
   const members = db
     .prepare(
       `
@@ -2437,17 +3206,6 @@ function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, option
       `
     )
     .all(groupId, groupId);
-
-  const scoreByUser = {};
-  members.forEach((member) => {
-    scoreByUser[member.participant_id] = {
-      userId: member.participant_id,
-      name: member.user_name,
-      total: 0,
-      byQuestion: includeDetails ? {} : undefined,
-      answersByQuestion: includeDetails ? {} : undefined
-    };
-  });
 
   const responses = db
     .prepare(
@@ -2479,42 +3237,81 @@ function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, option
     )
     .all(groupId, groupId);
 
-  responses.forEach((row) => {
-    const question = questionMap[row.question_id];
-    const scoreRow = scoreByUser[row.participant_id];
-    if (!question || !scoreRow) return;
-    const actual = parseLeaderboardStoredValue(question, actualsByQuestion[question.id]);
-    const predicted = parseLeaderboardStoredValue(question, row.answer);
-    const points = scoreLeaderboardQuestion(question, predicted, actual);
-    scoreRow.total += points;
-    if (includeDetails) {
-      scoreRow.byQuestion[row.question_id] = points;
-      scoreRow.answersByQuestion[row.question_id] = row.answer;
-    }
-  });
+  return { members, responses };
+}
 
-  return Object.values(scoreByUser).sort(
-    (a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name))
-  );
+function buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, options = {}) {
+  const { members, responses } = getGroupLeaderboardInputs(groupId, options);
+  return leaderboardModel.buildLeaderboardRows({
+    members,
+    responses,
+    questions,
+    actualsByQuestion,
+    includeDetails: Boolean(options.includeDetails)
+  });
 }
 
 function buildLeaderboardPreviewRows(leaderboard, currentParticipantId, limit = 5) {
-  const safeLimit = Math.max(1, Number(limit) || 5);
-  const rankedRows = leaderboard.map((row, index) => ({
-    rank: index + 1,
-    ...row
-  }));
-  if (rankedRows.length <= safeLimit) {
-    return rankedRows;
-  }
-  const currentId = String(currentParticipantId || "");
-  const currentIndex = currentId
-    ? rankedRows.findIndex((row) => String(row.userId) === currentId)
-    : -1;
-  if (currentIndex < 0 || currentIndex < safeLimit) {
-    return rankedRows.slice(0, safeLimit);
-  }
-  return [...rankedRows.slice(0, safeLimit - 1), rankedRows[currentIndex]];
+  return leaderboardModel.buildLeaderboardPreviewRows(leaderboard, currentParticipantId, limit);
+}
+
+function fetchSnapshotValuesBySnapshotIds(snapshotIds) {
+  const ids = (snapshotIds || [])
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id) && id > 0);
+  if (ids.length === 0) return {};
+  const placeholders = ids.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+      SELECT snapshot_id, question_id, value
+      FROM actual_snapshot_values
+      WHERE snapshot_id IN (${placeholders})
+      `
+    )
+    .all(...ids);
+  return rows.reduce((acc, row) => {
+    const snapshotId = Number(row.snapshot_id);
+    if (!acc[snapshotId]) acc[snapshotId] = {};
+    acc[snapshotId][row.question_id] = row.value;
+    return acc;
+  }, {});
+}
+
+function getLatestPreviewRoundDeltas({ groupId, questions, leaderboardInputs, excludeHiddenAdmins = false }) {
+  const safeGroupId = Number(groupId || 0);
+  if (!Number.isFinite(safeGroupId) || safeGroupId <= 0) return {};
+  const races = getRaces();
+  const snapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
+    maxRoundNumber: Array.isArray(races) ? races.length : null
+  });
+  if (snapshots.length < 2) return {};
+
+  const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(snapshots.map((snapshot) => snapshot.id));
+  const snapshotsWithValues = snapshots.filter((snapshot) => {
+    const values = snapshotValuesById[snapshot.id] || {};
+    return Object.keys(values).length > 0;
+  });
+  if (snapshotsWithValues.length < 2) return {};
+
+  const latestRound = snapshotsWithValues[snapshotsWithValues.length - 1];
+  const previousRound = snapshotsWithValues[snapshotsWithValues.length - 2];
+  const inputs =
+    leaderboardInputs ||
+    getGroupLeaderboardInputs(safeGroupId, { excludeHiddenAdmins });
+
+  return leaderboardModel.buildRoundDeltas({
+    latestRows: leaderboardModel.buildLeaderboardRows({
+      ...inputs,
+      questions,
+      actualsByQuestion: snapshotValuesById[latestRound.id] || {}
+    }),
+    previousRows: leaderboardModel.buildLeaderboardRows({
+      ...inputs,
+      questions,
+      actualsByQuestion: snapshotValuesById[previousRound.id] || {}
+    })
+  });
 }
 
 function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
@@ -2528,16 +3325,30 @@ function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
     acc[row.question_id] = row.value;
     return acc;
   }, {});
+  const excludeHiddenAdmins = isGlobalGroup(group);
+  const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
+  const latestRoundDeltasByParticipantId = getLatestPreviewRoundDeltas({
+    groupId,
+    questions,
+    leaderboardInputs,
+    excludeHiddenAdmins
+  });
   const rows = buildLeaderboardPreviewRows(
-    buildGroupLeaderboardRows(groupId, questions, actualsByQuestion, {
-      excludeHiddenAdmins: isGlobalGroup(group)
+    leaderboardModel.buildLeaderboardRows({
+      ...leaderboardInputs,
+      questions,
+      actualsByQuestion
     }),
     currentUserId,
     limit
   ).map((row) => ({
       rank: row.rank,
       name: row.name,
-      total: row.total
+      total: row.total,
+      latestRoundDelta:
+        latestRoundDeltasByParticipantId[
+          leaderboardModel.normalizeParticipantId(row.userId)
+        ] || null
     }));
   return rows.length > 0 ? { rows } : null;
 }
@@ -2723,18 +3534,96 @@ app.post("/groups/:id/invite-link/toggle", requireAuth, (req, res) => {
   res.redirect(`/groups/${groupId}`);
 });
 
+function getNamedGuestOptionsForGroup(groupId) {
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedGroupId) return [];
+  return db
+    .prepare(
+      `
+      SELECT guest_id, display_name
+      FROM named_guest_group_members
+      WHERE group_id = ?
+      ORDER BY display_name COLLATE NOCASE ASC, joined_at ASC
+      `
+    )
+    .all(normalizedGroupId)
+    .map((row) => ({
+      guestId: String(row.guest_id || "").trim(),
+      displayName: String(row.display_name || "").trim()
+    }))
+    .filter((row) => row.guestId && row.displayName);
+}
+
+function hasJoinGroupAccess(req, code, groupId) {
+  const normalizedCode = String(code || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedCode || !normalizedGroupId) return false;
+  const access = req?.session?.joinGroupAccess;
+  return Number(access?.[normalizedCode] || 0) === normalizedGroupId;
+}
+
+function setJoinGroupAccess(req, code, groupId) {
+  if (!req?.session) return;
+  const normalizedCode = String(code || "").trim();
+  const normalizedGroupId = Number(groupId || 0);
+  if (!normalizedCode || !normalizedGroupId) return;
+  req.session.joinGroupAccess = {
+    ...(req.session.joinGroupAccess || {}),
+    [normalizedCode]: normalizedGroupId
+  };
+}
+
 function renderJoinGuestPage(req, res, { group, code, displayName = "", returnName = "", error = null, activeMode = "new" }) {
   const mode = String(activeMode || "").toLowerCase() === "returning" ? "returning" : "new";
+  const requirePassword = !group.is_public && !!group.join_password_hash;
+  const canShowNamedGuestPicker = !requirePassword || hasJoinGroupAccess(req, code, Number(group.id));
+  const currentAccess = getNamedGuestAccessFromSession(req);
+  const currentNamedGuest = currentAccess
+    && String(req.session?.guestId || "").trim()
+    && Number(currentAccess.groupId || 0) !== Number(group.id)
+      ? {
+          displayName: String(currentAccess.displayName || "").trim()
+        }
+      : null;
   return res.render("join_guest", {
     user: null,
     group,
     code,
-    requirePassword: !group.is_public && !!group.join_password_hash,
+    requirePassword,
+    canShowNamedGuestPicker,
+    namedGuestOptions: canShowNamedGuestPicker ? getNamedGuestOptionsForGroup(Number(group.id)) : [],
+    defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0],
+    claimSecretPrompts: CLAIM_SECRET_PROMPTS,
+    currentNamedGuest,
     displayName,
     returnName,
     error,
     activeMode: mode,
     createAccountPath: `/signup?redirectTo=${encodeURIComponent(`/join/${code}`)}`
+  });
+}
+
+function getJoinConfirmMembers(groupId) {
+  return db
+    .prepare(
+      `
+      SELECT u.id, u.name, gm.role
+      FROM group_members gm
+      JOIN users u ON u.id = gm.user_id
+      WHERE gm.group_id = ?
+      ORDER BY gm.joined_at ASC
+      `
+    )
+    .all(groupId);
+}
+
+function renderJoinConfirmPage(req, res, { user, group, code, error = null }) {
+  return res.render("join_confirm", {
+    user,
+    group,
+    members: getJoinConfirmMembers(Number(group.id)),
+    code,
+    error
   });
 }
 
@@ -2757,6 +3646,7 @@ function respondJoinGuestError(req, res, {
       error: String(error || "Something went wrong.")
     });
   }
+  res.status(status);
   return renderJoinGuestPage(req, res, {
     group,
     code,
@@ -2775,6 +3665,17 @@ function respondJoinGuestRedirect(req, res, redirectPath) {
     });
   }
   return res.redirect(redirectPath);
+}
+
+function renderClaimSecretSetupPage(req, res, { group, code, error = null }) {
+  return res.render("claim_secret", {
+    user: null,
+    group,
+    code,
+    error,
+    defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0],
+    claimSecretPrompts: CLAIM_SECRET_PROMPTS
+  });
 }
 
 app.get("/join/:code", (req, res) => {
@@ -2816,14 +3717,111 @@ app.get("/join/:code", (req, res) => {
   if (isMember(user.id, invite.group_id)) {
     return res.redirect(`${getGroupBasePath(group)}/questions`);
   }
-  if (!isMember(user.id, invite.group_id)) {
-    const now = new Date().toISOString();
-    db.prepare(
-      "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-    ).run(user.id, invite.group_id, "member", now);
-    syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+  return renderJoinConfirmPage(req, res, { user, group, code });
+});
+
+app.post("/join/:code/access", async (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
   }
-  return res.redirect(`${getGroupBasePath(group)}/questions`);
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+  if (!group.is_public && group.join_password_hash) {
+    const ok = await bcrypt.compare(String(req.body.password || ""), group.join_password_hash);
+    if (!ok) {
+      return respondJoinGuestError(req, res, {
+        group,
+        code,
+        error: translate(locale, "join_guest.error_password_invalid"),
+        activeMode: "returning"
+      });
+    }
+  }
+  setJoinGroupAccess(req, code, Number(group.id));
+  return res.redirect(`/join/${code}?mode=returning`);
+});
+
+app.post("/join/:code/guest/switch", (req, res) => {
+  if (req.session) {
+    req.session.guestId = crypto.randomBytes(12).toString("hex");
+    req.session.namedGuestAccess = null;
+  }
+  return res.redirect(`/join/${req.params.code.trim()}`);
+});
+
+app.post("/join/:code/guest/continue-current", async (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const user = getCurrentUser(req);
+  if (user) {
+    return res.redirect(`/join/${code}`);
+  }
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (Number(group.invite_link_open ?? 1) !== 1) {
+    return sendError(req, res, 403, "Invite link is closed.");
+  }
+  if (!group.is_public && group.join_password_hash && !hasJoinGroupAccess(req, code, Number(group.id))) {
+    const ok = await bcrypt.compare(String(req.body.password || ""), group.join_password_hash);
+    if (!ok) {
+      return respondJoinGuestError(req, res, {
+        group,
+        code,
+        error: translate(locale, "join_guest.error_password_invalid"),
+        activeMode: "new"
+      });
+    }
+    setJoinGroupAccess(req, code, Number(group.id));
+  }
+
+  const access = getNamedGuestAccessFromSession(req);
+  const guestId = getGuestIdFromSession(req, { create: false });
+  const displayName = normalizeDisplayName(access?.displayName || "");
+  if (!guestId || !displayName) {
+    return res.redirect(`/join/${code}`);
+  }
+  if (
+    Number(group.is_global || 0) !== 1
+    && isDisplayNameTakenInGroup(Number(group.id), displayName, { excludeGuestId: guestId })
+  ) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      error: translate(locale, "join_guest.error_name_taken"),
+      activeMode: "new"
+    });
+  }
+  upsertNamedGuestProfile(guestId, displayName, Number(group.id));
+  upsertNamedGuestGroupMember(guestId, Number(group.id), displayName);
+  resumeNamedGuestAccess(req, {
+    inviteCode: code,
+    groupId: Number(group.id),
+    displayName,
+    guestId
+  });
+  return res.redirect(`/join/${code}/questions`);
 });
 
 app.get("/join/:code/responses", (req, res) => {
@@ -2847,11 +3845,7 @@ app.get("/join/:code/responses", (req, res) => {
   const user = getCurrentUser(req);
   if (user) {
     if (!isMember(user.id, invite.group_id)) {
-      const now = new Date().toISOString();
-      db.prepare(
-        "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-      ).run(user.id, invite.group_id, "member", now);
-      syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+      return res.redirect(`/join/${code}`);
     }
     return res.redirect(`${getGroupBasePath(group)}/responses`);
   }
@@ -2941,6 +3935,9 @@ app.post("/join/:code/guest", async (req, res) => {
     }
   }
 
+  const rememberDevice = shouldRememberGuestDevice(req.body);
+  await prepareGuestDeviceMemorySession(req, rememberDevice);
+
   const guestIdForJoin = getGuestIdFromSession(req, { create: true });
   if (
     Number(group.is_global || 0) !== 1
@@ -2955,10 +3952,23 @@ app.post("/join/:code/guest", async (req, res) => {
     });
   }
 
+  const skipsRecoverySecret = String(req.body.skipRecoverySecret || "").trim() === "1";
+  const claimSecret = skipsRecoverySecret ? null : buildClaimSecretFromRequest(req.body);
+  if (!skipsRecoverySecret && !claimSecret.ok) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      displayName,
+      error: translate(locale, claimSecret.errorKey),
+      activeMode: "new"
+    });
+  }
+
   setNamedGuestAccess(req, {
     inviteCode: code,
     groupId: Number(group.id),
-    displayName
+    displayName,
+    claimSecret
   });
   return respondJoinGuestRedirect(req, res, `/join/${code}/questions`);
 });
@@ -2986,8 +3996,9 @@ app.post("/join/:code/guest/return", async (req, res) => {
     return sendError(req, res, 403, "Invite link is closed.");
   }
 
+  const returnGuestId = String(req.body.returnGuestId || "").trim();
   const returnName = normalizeDisplayName(req.body.returnGuestName || "");
-  if (returnName.length < 2 || returnName.length > 40) {
+  if (!returnGuestId && (returnName.length < 2 || returnName.length > 40)) {
     return respondJoinGuestError(req, res, {
       group,
       code,
@@ -3023,21 +4034,55 @@ app.post("/join/:code/guest/return", async (req, res) => {
   const existingNamedGuest = db
     .prepare(
       `
-      SELECT guest_id, display_name
-      FROM named_guest_group_members
-      WHERE group_id = ?
-        AND display_name = ? COLLATE NOCASE
+      SELECT
+        ngm.guest_id,
+        ngm.display_name,
+        ngp.resume_token_hash,
+        ngp.claim_secret_hash,
+        ngp.claim_secret_mode,
+        ngp.claim_secret_prompt
+      FROM named_guest_group_members ngm
+      JOIN named_guest_profiles ngp ON ngp.guest_id = ngm.guest_id
+      WHERE ngm.group_id = ?
+        AND (
+          (? <> '' AND ngm.guest_id = ?)
+          OR (? = '' AND ngm.display_name = ? COLLATE NOCASE)
+        )
       LIMIT 1
       `
     )
-    .get(Number(group.id), returnName);
+    .get(
+      Number(group.id),
+      returnGuestId,
+      returnGuestId,
+      returnGuestId,
+      returnName
+    );
 
-  if (!existingNamedGuest) {
+  const suppliedClaimSecret = String(req.body.claimSecret || req.body.resumeToken || "").trim();
+  const hasSelfRecoverySecret = !!String(existingNamedGuest?.claim_secret_hash || "").trim();
+  const hasLegacyResumeToken = !!String(existingNamedGuest?.resume_token_hash || "").trim();
+  const matchesClaimSecret = existingNamedGuest
+    ? doesClaimSecretMatch(existingNamedGuest, suppliedClaimSecret)
+    : false;
+  const matchesLegacyResumeToken = existingNamedGuest
+    && !hasSelfRecoverySecret
+    && doesHashedSecretMatch(existingNamedGuest.resume_token_hash, suppliedClaimSecret);
+  if (existingNamedGuest && !hasSelfRecoverySecret && !hasLegacyResumeToken) {
     return respondJoinGuestError(req, res, {
       group,
       code,
       returnName,
-      error: translate(locale, "join_guest.error_name_not_found"),
+      error: translate(locale, "join_guest.error_recovery_not_set"),
+      activeMode: "returning"
+    });
+  }
+  if (!existingNamedGuest || (!matchesClaimSecret && !matchesLegacyResumeToken)) {
+    return respondJoinGuestError(req, res, {
+      group,
+      code,
+      returnName,
+      error: translate(locale, "join_guest.error_claim_secret_invalid"),
       activeMode: "returning"
     });
   }
@@ -3048,7 +4093,80 @@ app.post("/join/:code/guest/return", async (req, res) => {
     displayName: String(existingNamedGuest.display_name || returnName).trim(),
     guestId: String(existingNamedGuest.guest_id || "").trim()
   });
+  if (matchesLegacyResumeToken) {
+    if (req.session?.namedGuestAccess) {
+      req.session.namedGuestAccess.requiresClaimSecretSetup = true;
+    }
+    return respondJoinGuestRedirect(req, res, `/join/${code}/claim-secret`);
+  }
   return respondJoinGuestRedirect(req, res, `/join/${code}`);
+});
+
+app.get("/join/:code/claim-secret", (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (!hasNamedGuestAccess(req, code, Number(group.id))) {
+    return res.redirect(`/join/${code}`);
+  }
+  const guestId = getGuestIdFromSession(req, { create: false });
+  if (!requiresClaimSecretSetup(guestId)) {
+    return res.redirect(`/join/${code}`);
+  }
+  return renderClaimSecretSetupPage(req, res, {
+    group,
+    code,
+    error: req.query.error ? translate(locale, String(req.query.error)) : null
+  });
+});
+
+app.post("/join/:code/claim-secret", (req, res) => {
+  const code = req.params.code.trim();
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  const invite = db
+    .prepare("SELECT * FROM invites WHERE code = ?")
+    .get(code);
+  if (!invite) {
+    return sendError(req, res, 404, "Invite not found.");
+  }
+  const group = db
+    .prepare("SELECT * FROM groups WHERE id = ?")
+    .get(invite.group_id);
+  if (!group) {
+    return sendError(req, res, 404, "Group not found.");
+  }
+  if (!hasNamedGuestAccess(req, code, Number(group.id))) {
+    return res.redirect(`/join/${code}`);
+  }
+  const guestId = getGuestIdFromSession(req, { create: false });
+  const access = getNamedGuestAccessFromSession(req);
+  const claimSecret = buildClaimSecretFromRequest(req.body);
+  if (!claimSecret.ok) {
+    res.status(400);
+    return renderClaimSecretSetupPage(req, res, {
+      group,
+      code,
+      error: translate(locale, claimSecret.errorKey)
+    });
+  }
+  upsertNamedGuestProfile(guestId, access.displayName, Number(group.id), {
+    claimSecretHash: claimSecret.hash,
+    claimSecretMode: claimSecret.mode,
+    claimSecretPrompt: claimSecret.prompt,
+    claimSecretSetAt: claimSecret.setAt
+  });
+  return res.redirect(`/join/${code}/questions`);
 });
 
 app.get("/join/:code/questions", (req, res) => {
@@ -3072,11 +4190,7 @@ app.get("/join/:code/questions", (req, res) => {
   const user = getCurrentUser(req);
   if (user) {
     if (!isMember(user.id, invite.group_id)) {
-      const now = new Date().toISOString();
-      db.prepare(
-        "INSERT INTO group_members (user_id, group_id, role, joined_at) VALUES (?, ?, ?, ?)"
-      ).run(user.id, invite.group_id, "member", now);
-      syncFromGlobalIfCoupled(user.id, invite.group_id, now);
+      return res.redirect(`/join/${code}`);
     }
     const groupBasePath = getGroupBasePath(group);
     if (predictionsClosed()) {
@@ -3087,6 +4201,11 @@ app.get("/join/:code/questions", (req, res) => {
 
   if (!hasNamedGuestAccess(req, code, Number(group.id))) {
     return res.redirect(`/join/${code}`);
+  }
+  const access = getNamedGuestAccessFromSession(req);
+  const guestIdForClaimSecret = getGuestIdFromSession(req, { create: false });
+  if (access?.requiresClaimSecretSetup && requiresClaimSecretSetup(guestIdForClaimSecret)) {
+    return res.redirect(`/join/${code}/claim-secret`);
   }
   if (predictionsClosed()) {
     return res.redirect(`/join/${code}`);
@@ -3119,6 +4238,7 @@ app.get("/join/:code/questions", (req, res) => {
     isNamedGuestMode: true,
     guestSignupRedirectPath: `/join/${code}`,
     namedGuestDisplayName: String(getNamedGuestAccessFromSession(req)?.displayName || "").trim(),
+    namedGuestResumeToken: getNamedGuestResumeTokenFromSession(req, code, Number(group.id)),
     namedGuestShowBottomHint: req.query.saved === "1"
   });
 });
@@ -3185,6 +4305,141 @@ app.post("/join/:code/questions", (req, res) => {
   });
   tx();
   return res.redirect(`/join/${code}/questions?saved=1`);
+});
+
+app.get("/guest-conversion", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const pending = req.session?.pendingGuestConversion;
+  const guestId = String(pending?.guestId || req.session?.guestId || "").trim();
+  if (!guestId) {
+    return res.redirect("/dashboard");
+  }
+  const plan = buildGuestConversionPlan(guestId, user.id);
+  if (plan.groups.length === 0) {
+    claimGuestResponsesForUser(req, user.id, {
+      fallbackGuestId: guestId,
+      conflictChoices: { groups: {}, global: "account" },
+      force: true
+    });
+    return res.redirect("/dashboard");
+  }
+  return res.render("guest_conversion", {
+    user,
+    plan,
+    guestId
+  });
+});
+
+app.post("/guest-conversion", requireAuth, (req, res) => {
+  const user = getCurrentUser(req);
+  const pending = req.session?.pendingGuestConversion;
+  const guestId = String(req.body.guestId || pending?.guestId || req.session?.guestId || "").trim();
+  if (!guestId) {
+    return res.redirect("/dashboard");
+  }
+  const plan = buildGuestConversionPlan(guestId, user.id);
+  const groupChoices = {};
+  for (const group of plan.groups) {
+    const rawChoice = String(req.body[`group_${group.groupId}`] || "").trim();
+    groupChoices[String(group.groupId)] = rawChoice === "guest" ? "guest" : "account";
+  }
+  claimGuestResponsesForUser(req, user.id, {
+    fallbackGuestId: guestId,
+    conflictChoices: {
+      groups: groupChoices,
+      global: String(req.body.globalChoice || "") === "guest" ? "guest" : "account"
+    },
+    force: true
+  });
+  return res.redirect("/dashboard");
+});
+
+app.get("/guest-recovery/:token", (req, res) => {
+  const recovery = getNamedGuestRecoveryByToken(req.params.token);
+  if (!recovery) {
+    return sendError(req, res, 400, "Invalid or expired recovery link.");
+  }
+  const plan = recovery.action === "transfer" && recovery.target_user_id
+    ? buildGuestConversionPlan(recovery.guest_id, recovery.target_user_id)
+    : null;
+  return res.render("guest_recovery", {
+    user: getCurrentUser(req),
+    token: req.params.token,
+    recovery,
+    plan,
+    error: null,
+    success: null,
+    defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+  });
+});
+
+app.post("/guest-recovery/:token", (req, res) => {
+  const recovery = getNamedGuestRecoveryByToken(req.params.token);
+  if (!recovery) {
+    return sendError(req, res, 400, "Invalid or expired recovery link.");
+  }
+  if (recovery.action === "reset_secret") {
+    const locale = res.locals.locale || DEFAULT_LOCALE;
+    const claimSecret = buildClaimSecretFromRequest(req.body);
+    if (!claimSecret.ok) {
+      res.status(400);
+      return res.render("guest_recovery", {
+        user: getCurrentUser(req),
+        token: req.params.token,
+        recovery,
+        plan: null,
+        error: translate(locale, claimSecret.errorKey),
+        success: null,
+        defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+      });
+    }
+    upsertNamedGuestProfile(recovery.guest_id, recovery.display_name, recovery.group_id, {
+      claimSecretHash: claimSecret.hash,
+      claimSecretMode: claimSecret.mode,
+      claimSecretPrompt: claimSecret.prompt,
+      claimSecretSetAt: claimSecret.setAt
+    });
+    db.prepare("UPDATE named_guest_recovery_tokens SET used_at = ? WHERE id = ?")
+      .run(new Date().toISOString(), recovery.id);
+    return res.render("guest_recovery", {
+      user: getCurrentUser(req),
+      token: req.params.token,
+      recovery,
+      plan: null,
+      error: null,
+      success: "Guest recovery updated.",
+      defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+    });
+  }
+
+  if (recovery.action === "transfer" && recovery.target_user_id) {
+    const plan = buildGuestConversionPlan(recovery.guest_id, recovery.target_user_id);
+    const groupChoices = {};
+    for (const group of plan.groups) {
+      const rawChoice = String(req.body[`group_${group.groupId}`] || "").trim();
+      groupChoices[String(group.groupId)] = rawChoice === "guest" ? "guest" : "account";
+    }
+    claimGuestResponsesForUser(req, recovery.target_user_id, {
+      fallbackGuestId: recovery.guest_id,
+      conflictChoices: {
+        groups: groupChoices,
+        global: String(req.body.globalChoice || "") === "guest" ? "guest" : "account"
+      },
+      force: true
+    });
+    db.prepare("UPDATE named_guest_recovery_tokens SET used_at = ? WHERE id = ?")
+      .run(new Date().toISOString(), recovery.id);
+    return res.render("guest_recovery", {
+      user: getCurrentUser(req),
+      token: req.params.token,
+      recovery,
+      plan,
+      error: null,
+      success: "Named Guest transferred.",
+      defaultClaimPrompt: CLAIM_SECRET_PROMPTS[0]
+    });
+  }
+  return sendError(req, res, 400, "Recovery link is incomplete.");
 });
 
 app.post("/join/:code", requireAuth, async (req, res) => {
@@ -3381,6 +4636,72 @@ app.post("/groups/:id/named-guests/:guestId/kick", requireAuth, (req, res) => {
     }
   });
   tx();
+  return res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/named-guests/:guestId/transfer", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const guestId = String(req.params.guestId || "").trim();
+  const targetEmail = String(req.body.targetEmail || "").trim().toLowerCase();
+  if (!isGroupAdmin(user.id, groupId)) {
+    return sendError(req, res, 403, "Admin access only.");
+  }
+  const target = targetEmail
+    ? db.prepare("SELECT id, email FROM users WHERE email = ? AND is_verified = 1").get(targetEmail)
+    : null;
+  if (!target) {
+    return sendError(req, res, 400, "Transfer target must be an existing verified account email.");
+  }
+  const member = db
+    .prepare("SELECT 1 FROM named_guest_group_members WHERE group_id = ? AND guest_id = ?")
+    .get(groupId, guestId);
+  if (!member) {
+    return sendError(req, res, 404, "Named Guest not found.");
+  }
+  const created = createNamedGuestRecoveryToken({
+    guestId,
+    groupId,
+    action: "transfer",
+    targetEmail,
+    targetUserId: target.id,
+    createdByUserId: user.id
+  });
+  const recovery = created ? getNamedGuestRecoveryByToken(created.token) : null;
+  if (recovery) {
+    await sendNamedGuestRecoveryEmail(recovery, created.url);
+  }
+  return res.redirect(`/groups/${groupId}`);
+});
+
+app.post("/groups/:id/named-guests/:guestId/reset-secret", requireAuth, async (req, res) => {
+  const user = getCurrentUser(req);
+  const groupId = Number(req.params.id);
+  const guestId = String(req.params.guestId || "").trim();
+  const targetEmail = String(req.body.targetEmail || "").trim().toLowerCase();
+  if (!isGroupAdmin(user.id, groupId)) {
+    return sendError(req, res, 403, "Admin access only.");
+  }
+  if (!targetEmail) {
+    return sendError(req, res, 400, "Target email is required.");
+  }
+  const member = db
+    .prepare("SELECT 1 FROM named_guest_group_members WHERE group_id = ? AND guest_id = ?")
+    .get(groupId, guestId);
+  if (!member) {
+    return sendError(req, res, 404, "Named Guest not found.");
+  }
+  const created = createNamedGuestRecoveryToken({
+    guestId,
+    groupId,
+    action: "reset_secret",
+    targetEmail,
+    createdByUserId: user.id
+  });
+  const recovery = created ? getNamedGuestRecoveryByToken(created.token) : null;
+  if (recovery) {
+    await sendNamedGuestRecoveryEmail(recovery, created.url);
+  }
   return res.redirect(`/groups/${groupId}`);
 });
 
@@ -3771,7 +5092,10 @@ app.get("/global/responses", (req, res, next) => {
 
   const guestId = getGuestIdFromSession(req, { create: true });
   const questions = getQuestions(locale);
-  const responses = getResponsesForGroup(Number(group.id), { includeNamedGuests: false });
+  const responses = getResponsesForGroup(Number(group.id), {
+    includeNamedGuests: false,
+    excludeHiddenAdmins: true
+  });
   const viewerGuestAnswers = getGuestResponsesByGroup(guestId, Number(group.id));
   const showMineOnly = req.query.mine === "1";
 
@@ -3824,10 +5148,10 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
   });
 });
 
-app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, res) => {
+app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
   const user = getCurrentUser(req);
   const locale = res.locals.locale || DEFAULT_LOCALE;
-  const adminAccess = isAdmin(req);
+  const adminAccess = user ? isAdmin(req) : false;
   if (!isLeaderboardAvailable() && !adminAccess) {
     return sendError(
       req,
@@ -3842,10 +5166,15 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   }
   const groupId = Number(group.id);
   const excludeHiddenAdmins = isGlobalGroup(group);
-  if (!adminAccess && !isMember(user.id, groupId)) {
+  if (!excludeHiddenAdmins && !user) {
+    return res.redirect(`/login?redirectTo=${encodeURIComponent(req.originalUrl || req.path)}`);
+  }
+  if (!excludeHiddenAdmins && !adminAccess && !isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
+  const canViewQuestionBreakdown = Boolean(user);
   const questions = getQuestions(locale);
+  const races = getRaces();
   const actualRows = db.prepare("SELECT * FROM actuals").all();
   const currentActuals = actualRows.reduce((acc, row) => {
     acc[row.question_id] = row.value;
@@ -3854,10 +5183,10 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
   const snapshotRows = db
     .prepare(
       `
-      SELECT id, season, round_number, round_name, created_at
+      SELECT id, season, round_number, round_name, created_at, updated_at, review_status, reviewed_at
       FROM actual_snapshots
       WHERE round_number IS NOT NULL
-      ORDER BY season DESC, round_number DESC, created_at DESC, id DESC
+      ORDER BY season DESC, round_number DESC, COALESCE(updated_at, created_at) DESC, id DESC
       `
     )
     .all();
@@ -3867,6 +5196,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     const roundNumber = Number(row.round_number);
     const season = Number(row.season);
     if (!Number.isFinite(roundNumber) || roundNumber <= 0) return;
+    if (roundNumber > races.length) return;
     if (!Number.isFinite(season) || season <= 0) return;
     const key = `${season}:${roundNumber}`;
     if (snapshotByRound.has(key)) return;
@@ -3879,47 +5209,119 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
       season,
       roundNumber,
       roundName,
-      label: `${seasonLabel}R${roundNumber} - ${title}`.trim()
+      label: `${seasonLabel}R${roundNumber} - ${title}`.trim(),
+      reviewStatus:
+        String(row.review_status || "").trim().toLowerCase() === REVIEW_STATUS_PENDING
+          ? REVIEW_STATUS_PENDING
+          : "reviewed",
+      reviewedAt: row.reviewed_at || null,
+      updatedAt: row.updated_at || row.created_at || null
     });
   });
   const requestedSnapshotId = Number(req.query.snapshot || 0);
+  const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(
+    actualSnapshots.map((snapshot) => snapshot.id)
+  );
+  const findSnapshotWithValues = (snapshotId) => {
+    const id = Number(snapshotId || 0);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    const snapshot = actualSnapshots.find((item) => Number(item.id) === id);
+    if (!snapshot) return null;
+    const values = snapshotValuesById[id] || {};
+    return Object.keys(values).length > 0 ? snapshot : null;
+  };
   let selectedActualSnapshotId = null;
   let scoringActuals = currentActuals;
-  if (Number.isFinite(requestedSnapshotId) && requestedSnapshotId > 0) {
-    const snapshotMeta = db
-      .prepare(
-        `
-        SELECT id
-        FROM actual_snapshots
-        WHERE id = ?
-        LIMIT 1
-        `
-      )
-      .get(requestedSnapshotId);
-    if (snapshotMeta) {
-      const snapshotValueRows = db
-        .prepare(
-          `
-          SELECT question_id, value
-          FROM actual_snapshot_values
-          WHERE snapshot_id = ?
-          `
-        )
-        .all(requestedSnapshotId);
-      if (snapshotValueRows.length > 0) {
-        scoringActuals = snapshotValueRows.reduce((acc, row) => {
-          acc[row.question_id] = row.value;
-          return acc;
-        }, {});
-        selectedActualSnapshotId = requestedSnapshotId;
-      }
-    }
+  const explicitSnapshot = findSnapshotWithValues(requestedSnapshotId);
+  const defaultSnapshot =
+    explicitSnapshot ||
+    actualSnapshots.find((snapshot) => Object.keys(snapshotValuesById[snapshot.id] || {}).length > 0) ||
+    null;
+  if (defaultSnapshot) {
+    selectedActualSnapshotId = Number(defaultSnapshot.id);
+    scoringActuals = snapshotValuesById[selectedActualSnapshotId] || currentActuals;
   }
 
-  const leaderboard = buildGroupLeaderboardRows(groupId, questions, scoringActuals, {
-    excludeHiddenAdmins,
+  const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
+  const leaderboard = leaderboardModel.buildLeaderboardRows({
+    ...leaderboardInputs,
+    questions,
+    actualsByQuestion: scoringActuals,
     includeDetails: true
   });
+  const selectedParticipantId = leaderboardModel.resolveSelectedParticipantId(
+    leaderboard,
+    req.query.participant,
+    user?.id
+  );
+  const selectedLeaderboardRow =
+    leaderboard.find(
+      (row) => leaderboardModel.normalizeParticipantId(row.userId) === selectedParticipantId
+    ) || null;
+  const focusParticipantIds = leaderboardModel.buildLeaderboardFocusSet({
+    leaderboard,
+    currentParticipantId: user?.id,
+    selectedParticipantId
+  });
+  const leaderboardHistory = leaderboardModel.buildSnapshotHistory({
+    snapshots: actualSnapshots,
+    snapshotValuesById,
+    ...leaderboardInputs,
+    questions,
+    focusParticipantIds
+  });
+  const previousTrendRound =
+    selectedActualSnapshotId
+      ? (() => {
+          const selectedIndex = leaderboardHistory.rounds.findIndex(
+            (round) => Number(round.id) === Number(selectedActualSnapshotId)
+          );
+          return selectedIndex > 0 ? leaderboardHistory.rounds[selectedIndex - 1] : null;
+        })()
+      : null;
+  const latestTrendRound =
+    selectedActualSnapshotId
+      ? leaderboardHistory.rounds.find(
+          (round) => Number(round.id) === Number(selectedActualSnapshotId)
+        ) || null
+      : null;
+  const latestRoundDeltasByParticipantId =
+    previousTrendRound && latestTrendRound
+      ? leaderboardModel.buildRoundDeltas({
+          latestRows: leaderboardHistory.rankedRowsBySnapshotId[latestTrendRound.id] || [],
+          previousRows: leaderboardHistory.rankedRowsBySnapshotId[previousTrendRound.id] || []
+        })
+      : {};
+  const latestRoundDeltaMeta =
+    previousTrendRound && latestTrendRound
+      ? { latestRound: latestTrendRound, previousRound: previousTrendRound }
+      : null;
+  const participantInsights = leaderboardModel.buildSelectedParticipantInsights({
+    leaderboard,
+    questions,
+    selectedParticipantId
+  });
+  const breakdownMode = String(req.query.breakdown || "").trim().toLowerCase() === "all"
+    ? "all"
+    : "scored";
+  const selectedBreakdown = canViewQuestionBreakdown
+    ? leaderboardModel.buildSelectedParticipantBreakdown({
+        questions,
+        selectedRow: selectedLeaderboardRow,
+        actualsByQuestion: scoringActuals,
+        mode: breakdownMode
+      })
+    : { mode: breakdownMode, hasScoredRows: false, rows: [] };
+  const leaderboardQueryParams = new URLSearchParams();
+  if (selectedActualSnapshotId) {
+    leaderboardQueryParams.set("snapshot", String(selectedActualSnapshotId));
+  }
+  if (selectedParticipantId) {
+    leaderboardQueryParams.set("participant", selectedParticipantId);
+  }
+  if (canViewQuestionBreakdown && breakdownMode === "all") {
+    leaderboardQueryParams.set("breakdown", "all");
+  }
   const leaderboardPerPage = 10;
   const requestedLeaderboardPage = Number(req.query.page || 1);
   const currentLeaderboardPage =
@@ -3939,7 +5341,11 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     .slice(leaderboardOffset, leaderboardOffset + leaderboardPerPage)
     .map((row, index) => ({
       ...row,
-      rank: leaderboardOffset + index + 1
+      rank: leaderboardOffset + index + 1,
+      latestRoundDelta:
+        latestRoundDeltasByParticipantId[
+          leaderboardModel.normalizeParticipantId(row.userId)
+        ] || null
     }));
   res.render("leaderboard", {
     user,
@@ -3949,14 +5355,25 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], requireAuth, (req, r
     actuals: scoringActuals,
     actualSnapshots,
     selectedActualSnapshotId,
+    selectedParticipantId,
+    selectedLeaderboardRow,
+    selectedLatestRoundDelta:
+      selectedParticipantId
+        ? latestRoundDeltasByParticipantId[selectedParticipantId] || null
+        : null,
+    canViewQuestionBreakdown,
+    leaderboardHistory,
+    leaderboardFocusParticipantIds: focusParticipantIds,
+    latestRoundDeltaMeta,
+    participantInsights,
+    selectedBreakdown,
+    breakdownMode,
     leaderboardTotal: leaderboard.length,
     leaderboardPerPage,
     currentLeaderboardPage: safeLeaderboardPage,
     totalLeaderboardPages,
     leaderboardBasePath: `${getGroupBasePath(group)}/leaderboard`,
-    leaderboardQuery: selectedActualSnapshotId
-      ? `snapshot=${encodeURIComponent(String(selectedActualSnapshotId))}`
-      : ""
+    leaderboardQuery: leaderboardQueryParams.toString()
   });
 });
 
@@ -3968,7 +5385,14 @@ registerAdminRoutes(app, {
   getRoster,
   getRaces,
   clampNumber,
-  generateUniqueGroupId
+  generateUniqueGroupId,
+  dataDir: DATA_DIR,
+  dbPath: DB_PATH,
+  databaseUrl: DATABASE_URL,
+  questionsPath: QUESTIONS_PATH,
+  rosterPath: ROSTER_PATH,
+  racesPath: RACES_PATH,
+  logEvent
 });
 
 app.use((req, res) => {
@@ -3976,13 +5400,96 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error("Unhandled server error:", err);
+  logEvent("error", "unhandled_server_error", {
+    requestId: req.requestId,
+    method: req.method,
+    path: req.path,
+    error: serializeError(err)
+  });
   if (res.headersSent) {
     return next(err);
   }
   return sendError(req, res, 500, "Something went wrong. Please try again.");
 });
 
+let actualsAutoUpdateTimer = null;
+let actualsAutoUpdateRunning = false;
+
+async function executeActualsAutoUpdate(reason) {
+  if (!ACTUALS_AUTO_UPDATE_ENABLED) return;
+  if (actualsAutoUpdateRunning) {
+    logEvent("debug", "actuals_auto_update_skipped", { reason, skip: "already_running" });
+    return;
+  }
+
+  actualsAutoUpdateRunning = true;
+  logEvent("info", "actuals_auto_update_started", {
+    reason,
+    season: CURRENT_SEASON
+  });
+
+  try {
+    const result = await runActualsAutoUpdate({
+      season: CURRENT_SEASON,
+      dbPath: DB_PATH,
+      databaseUrl: DATABASE_URL,
+      dataDir: DATA_DIR,
+      questionsPath: QUESTIONS_PATH,
+      rosterPath: ROSTER_PATH,
+      racesPath: RACES_PATH,
+      dryRun: false
+    });
+    logEvent("info", "actuals_auto_update_succeeded", {
+      reason,
+      season: CURRENT_SEASON,
+      latestRound: Number(result?.latestRound || 0) || null,
+      snapshotCount: Array.isArray(result?.snapshots) ? result.snapshots.length : 0,
+      changedSnapshotCount: Number(result?.changedSnapshotCount || 0) || 0,
+      liveActualCount: Number(result?.liveActualCount || 0) || 0
+    });
+  } catch (err) {
+    logEvent("warn", "actuals_auto_update_failed", {
+      reason,
+      season: CURRENT_SEASON,
+      error: serializeError(err)
+    });
+  } finally {
+    actualsAutoUpdateRunning = false;
+  }
+}
+
+function startActualsAutoUpdateScheduler() {
+  if (!ACTUALS_AUTO_UPDATE_ENABLED) return;
+
+  const safeIntervalMinutes =
+    Number.isFinite(ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES) && ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES > 0
+      ? ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES
+      : 180;
+  const safeStartDelayMs =
+    Number.isFinite(ACTUALS_AUTO_UPDATE_START_DELAY_MS) && ACTUALS_AUTO_UPDATE_START_DELAY_MS >= 0
+      ? ACTUALS_AUTO_UPDATE_START_DELAY_MS
+      : 30000;
+
+  if (ACTUALS_AUTO_UPDATE_ON_START) {
+    const startupTimer = setTimeout(() => {
+      executeActualsAutoUpdate("startup").catch(() => {});
+    }, safeStartDelayMs);
+    startupTimer.unref?.();
+  }
+
+  actualsAutoUpdateTimer = setInterval(() => {
+    executeActualsAutoUpdate("interval").catch(() => {});
+  }, safeIntervalMinutes * 60 * 1000);
+  actualsAutoUpdateTimer.unref?.();
+}
+
+validateProductionConfig();
+
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  logEvent("info", "server_started", {
+    port: Number(PORT),
+    nodeEnv: process.env.NODE_ENV || "development",
+    baseUrl: BASE_URL
+  });
+  startActualsAutoUpdateScheduler();
 });

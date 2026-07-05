@@ -7,7 +7,7 @@
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 }; %>
 
-<div class="card">
+<div class="card admin-page-card">
   <% const overviewReturn = `/admin/overview?groupPage=${currentGroupPage}&usersPage=${currentUserPage}&namedGuestPage=${currentNamedGuestPage}&visitorPage=${currentVisitorPage}`; %>
   <% const groupsReturn = `${overviewReturn}#admin-groups`; %>
   <% const adminsReturn = `${overviewReturn}#admin-admins`; %>
@@ -34,7 +34,8 @@
   <% } %>
 
   <h2 id="admin-groups">Groups</h2>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Groups table" tabindex="0">
+  <table class="table compact admin-table-overview-groups">
     <thead>
       <tr>
         <th>Group</th>
@@ -60,6 +61,7 @@
             <div class="table-actions">
               <a class="link" href="/groups/<%= row.id %>/leaderboard">Leaderboard</a>
               <form method="post" action="/admin/groups/<%= row.id %>/delete" onsubmit="return confirm('Delete this group and all related data?')">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= groupsReturn %>">
                 <button class="secondary" type="submit">Delete group</button>
               </form>
@@ -69,6 +71,7 @@
       <% }) %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'groupPage',
@@ -89,7 +92,8 @@
       | Last activity: <strong><%= formatAdminDate(adminStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Admins table" tabindex="0">
+  <table class="table compact admin-table-overview-users">
     <thead>
       <tr>
         <th>Name</th>
@@ -115,6 +119,7 @@
               <span><%= showAdminEmail ? row.email : maskEmail(row.email) %></span>
               <% if (!showAdminEmail) { %>
                 <form id="reveal-email-admin-<%= row.id %>" method="post" action="/admin/users/<%= row.id %>/reveal-email" style="display:inline;">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                   <input type="hidden" name="adminPassword" value="">
                   <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-admin-<%= row.id %>')">View</button>
@@ -123,6 +128,7 @@
             </td>
             <td>
               <form method="post" action="/admin/users/<%= row.id %>/hide-from-global">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                 <input type="hidden" name="hideFromGlobal" value="0">
                 <label class="muted admin-inline-checkbox">
@@ -130,6 +136,7 @@
                     type="checkbox"
                     name="hideFromGlobal"
                     value="1"
+                    aria-label="Hide <%= row.name %> from global results"
                     <%= Number(row.hide_from_global || 0) === 1 ? 'checked' : '' %>
                     onchange="this.form.submit()"
                   />
@@ -140,10 +147,12 @@
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/remove-admin">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                   <button class="secondary admin-toggle-btn" type="submit">Remove admin</button>
                 </form>
                 <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= adminsReturn %>">
                   <button class="secondary" type="submit">Delete user</button>
                 </form>
@@ -154,6 +163,7 @@
       <% } %>
     </tbody>
   </table>
+  </div>
 
   <h2 id="admin-users" style="margin-top:24px;">Users</h2>
   <p class="muted">
@@ -164,11 +174,13 @@
       | Last activity: <strong><%= formatAdminDate(userStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Users table" tabindex="0">
+  <table class="table compact admin-table-overview-users">
     <thead>
       <tr>
         <th>Name</th>
         <th>Email</th>
+        <th>Hide from global</th>
         <th>Created</th>
         <th>Actions</th>
       </tr>
@@ -184,20 +196,40 @@
               <span><%= showUserEmail ? row.email : maskEmail(row.email) %></span>
               <% if (!showUserEmail) { %>
                 <form id="reveal-email-user-<%= row.id %>" method="post" action="/admin/users/<%= row.id %>/reveal-email" style="display:inline;">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= usersReturn %>">
                   <input type="hidden" name="adminPassword" value="">
                   <button class="link link-button" type="button" onclick="promptEmailReveal('reveal-email-user-<%= row.id %>')">View</button>
                 </form>
               <% } %>
             </td>
+            <td>
+              <form method="post" action="/admin/users/<%= row.id %>/hide-from-global">
+                <%- csrfField() %>
+                <input type="hidden" name="returnTo" value="<%= usersReturn %>">
+                <input type="hidden" name="hideFromGlobal" value="0">
+                <label class="muted admin-inline-checkbox">
+                  <input
+                    type="checkbox"
+                    name="hideFromGlobal"
+                    value="1"
+                    aria-label="Hide <%= row.name %> from global results"
+                    <%= Number(row.hide_from_global || 0) === 1 ? 'checked' : '' %>
+                    onchange="this.form.submit()"
+                  />
+                </label>
+              </form>
+            </td>
             <td><%= formatAdminDate(row.created_at) %></td>
             <td>
               <div class="table-actions">
                 <form method="post" action="/admin/users/<%= row.id %>/make-admin">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= usersReturn %>">
                   <button class="secondary admin-toggle-btn" type="submit">Make admin</button>
                 </form>
                 <form method="post" action="/admin/users/<%= row.id %>/delete" onsubmit="return confirm('Delete this user and all their memberships/responses?')">
+                  <%- csrfField() %>
                   <input type="hidden" name="returnTo" value="<%= usersReturn %>">
                   <button class="secondary" type="submit">Delete user</button>
                 </form>
@@ -207,6 +239,7 @@
       <% }) %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'usersPage',
@@ -227,7 +260,8 @@
       | Last activity: <strong><%= formatAdminDate(namedGuestStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Named guests table" tabindex="0">
+  <table class="table compact admin-table-overview-guests">
     <thead>
       <tr>
         <th>Name</th>
@@ -269,6 +303,7 @@
             <td><%= formatAdminDate(row.last_seen_at) %></td>
             <td>
               <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= namedGuestsReturn %>">
                 <button class="secondary" type="submit">Delete guest</button>
               </form>
@@ -278,6 +313,7 @@
       <% } %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'namedGuestPage',
@@ -298,7 +334,8 @@
       | Last activity: <strong><%= formatAdminDate(visitorStats.last_activity_at) %></strong>
     <% } %>
   </p>
-  <table class="table compact">
+  <div class="admin-table-scroll" role="region" aria-label="Visitors table" tabindex="0">
+  <table class="table compact admin-table-overview-guests">
     <thead>
       <tr>
         <th>Guest ID</th>
@@ -334,6 +371,7 @@
             <td><%= formatAdminDate(row.last_seen_at) %></td>
             <td>
               <form method="post" action="/admin/guests/<%= encodeURIComponent(guestId) %>/delete" onsubmit="return confirm('Delete this guest and all related responses?')">
+                <%- csrfField() %>
                 <input type="hidden" name="returnTo" value="<%= visitorsReturn %>">
                 <button class="secondary" type="submit">Delete guest</button>
               </form>
@@ -343,6 +381,7 @@
       <% } %>
     </tbody>
   </table>
+  </div>
   <%- include('partials/admin_pagination', {
     basePath: '/admin/overview',
     pageParamName: 'visitorPage',

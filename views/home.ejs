@@ -1,4 +1,8 @@
 <%- include('partials/header', { title: companyName, user }) %>
+<% const formatHomePercent = (value) => {
+    const rounded = Math.round(Number(value || 0) * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  }; %>
 
 <section class="hero home-page">
   <div class="hero-main-column">
@@ -10,12 +14,10 @@
         <% if (predictionsClosed) { %>
           <% if (!user) { %>
             <a class="button-link hero-start-predicting" href="/signup"><%= t('home.signup_next_year_notify') %></a>
-            <a class="link" href="/global/responses"><%= t('home.view_predictions') %></a>
           <% } else { %>
             <div class="home-closed-callout alert" role="status" aria-live="polite">
               <strong><%= t('header.countdown_closed') %></strong>
             </div>
-            <a class="button-link hero-start-predicting" href="/global/responses"><%= t('home.view_predictions') %></a>
             <a class="link" href="/dashboard"><%= t('home.go_dashboard') %></a>
           <% } %>
         <% } else { %>
@@ -30,17 +32,57 @@
       </div>
     </div>
 
-    <div class="card home-flow-card">
-      <h2><%= t('home.flow_title') %></h2>
-      <ol>
-        <li><%= t('home.flow_step_1') %></li>
-        <li><%= t('home.flow_step_2') %></li>
-        <li><%= t('home.flow_step_3') %></li>
-      </ol>
-      <p style="margin:10px 0 0;">
-        <a class="link" href="/about"><%= t('home.about_link', { company_name: companyName }) %></a>
-      </p>
-    </div>
+    <% if (predictionsClosed) { %>
+      <section class="card home-predictions-teaser" aria-labelledby="home-predictions-teaser-title">
+        <div class="home-predictions-teaser-head">
+          <span class="badge"><%= t('home.predictions_teaser_badge') %></span>
+          <h2 id="home-predictions-teaser-title">
+            <%= homePredictionTeaser && homePredictionTeaser.title ? homePredictionTeaser.title : t('home.predictions_teaser_badge') %>
+          </h2>
+        </div>
+
+        <% if (homePredictionTeaser && Array.isArray(homePredictionTeaser.positions) && homePredictionTeaser.positions.length > 0) { %>
+          <div class="responses-summary home-predictions-teaser-summary">
+            <div class="responses-ranking-splits">
+              <% homePredictionTeaser.positions.forEach((place) => { %>
+                <div class="responses-ranking-place">
+                  <div class="muted responses-ranking-place-title"><%= t('responses.position_label', { n: place.position }) %></div>
+                  <ul class="responses-bars">
+                    <% place.items.forEach((item) => { %>
+                      <li class="responses-bars-item">
+                        <span class="responses-bars-label"><%= item.label %></span>
+                        <span class="responses-bars-track" aria-hidden="true">
+                          <span class="responses-bars-fill" style="width:<%= item.percent %>%;"></span>
+                        </span>
+                        <span class="responses-bars-value"><%= formatHomePercent(item.percent) %>% (<%= item.count %>)</span>
+                      </li>
+                    <% }) %>
+                  </ul>
+                </div>
+              <% }) %>
+            </div>
+          </div>
+        <% } else { %>
+          <p class="muted home-predictions-teaser-empty"><%= t('home.predictions_teaser_empty') %></p>
+        <% } %>
+
+        <div class="home-predictions-teaser-actions">
+          <a class="button-link" href="/global/responses"><%= t('home.view_predictions') %></a>
+        </div>
+      </section>
+    <% } else { %>
+      <div class="card home-flow-card">
+        <h2><%= t('home.flow_title') %></h2>
+        <ol>
+          <li><%= t('home.flow_step_1') %></li>
+          <li><%= t('home.flow_step_2') %></li>
+          <li><%= t('home.flow_step_3') %></li>
+        </ol>
+        <p style="margin:10px 0 0;">
+          <a class="link" href="/about"><%= t('home.about_link', { company_name: companyName }) %></a>
+        </p>
+      </div>
+    <% } %>
   </div>
 
   <div class="home-leaderboard-card">
@@ -59,17 +101,19 @@
     }) %>
   </div>
 
-  <div class="card home-flow-card home-flow-card-mobile">
-    <h2><%= t('home.flow_title') %></h2>
-    <ol>
-      <li><%= t('home.flow_step_1') %></li>
-      <li><%= t('home.flow_step_2') %></li>
-      <li><%= t('home.flow_step_3') %></li>
-    </ol>
-    <p style="margin:10px 0 0;">
-      <a class="link" href="/about"><%= t('home.about_link', { company_name: companyName }) %></a>
-    </p>
-  </div>
+  <% if (!predictionsClosed) { %>
+    <div class="card home-flow-card home-flow-card-mobile">
+      <h2><%= t('home.flow_title') %></h2>
+      <ol>
+        <li><%= t('home.flow_step_1') %></li>
+        <li><%= t('home.flow_step_2') %></li>
+        <li><%= t('home.flow_step_3') %></li>
+      </ol>
+      <p style="margin:10px 0 0;">
+        <a class="link" href="/about"><%= t('home.about_link', { company_name: companyName }) %></a>
+      </p>
+    </div>
+  <% } %>
 </section>
 
 <%- include('partials/footer') %>

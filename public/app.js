@@ -87,6 +87,7 @@ const initCountdown = () => {
   const prefixEl = el.querySelector('.muted');
   const prefixText = el.dataset.countdownPrefix || prefixEl?.textContent || '';
   const closedText = el.dataset.countdownClosed || 'Predictions are closed!';
+  const closedDisplayText = el.dataset.countdownClosedDisplay || closedText;
   const compactClosedText = el.dataset.countdownClosedCompact || 'Closed!';
   const headerEl = document.querySelector('header');
   const rawDate = el.dataset.closeDate;
@@ -98,7 +99,7 @@ const initCountdown = () => {
     el.classList.toggle('is-closed', isClosed);
   };
   const getClosedDisplayText = () =>
-    headerEl?.classList.contains('is-time-compact') ? compactClosedText : closedText;
+    headerEl?.classList.contains('is-time-compact') ? compactClosedText : closedDisplayText;
   const setPrefixText = (text) => {
     if (prefixEl) prefixEl.textContent = text;
   };
@@ -111,6 +112,9 @@ const initCountdown = () => {
   const applyClosedState = () => {
     syncClosedClass();
     setPrefixText('');
+    el.setAttribute('aria-label', closedText);
+    el.setAttribute('title', closedText);
+    valueEl.setAttribute('title', closedText);
     setTimerText(getClosedDisplayText());
   };
   const formatHmsMarkup = (totalSeconds) => {
@@ -198,6 +202,183 @@ const initCopyButtons = () => {
         showTemporaryState('Failed');
       }
     });
+  });
+};
+
+const findLeaderboardSeriesElements = (seriesId) =>
+  Array.from(document.querySelectorAll('[data-chart-series]'))
+    .filter(series => series.dataset.chartSeries === seriesId);
+
+const setLeaderboardSeriesHover = (seriesId, isHovered) => {
+  if (!seriesId) return;
+  findLeaderboardSeriesElements(seriesId).forEach(series => {
+    series.classList.toggle('is-hovered', isHovered);
+  });
+  document.querySelectorAll('.leaderboard-chart-legend-item[data-chart-legend-item]').forEach(item => {
+    item.classList.toggle('is-hovered', item.dataset.chartLegendItem === seriesId && isHovered);
+  });
+  document.querySelectorAll('.leaderboard-rank-row[data-leaderboard-row-participant]').forEach(row => {
+    row.classList.toggle('is-hovered', row.dataset.leaderboardRowParticipant === seriesId && isHovered);
+  });
+};
+
+const syncLeaderboardChartToggle = (input) => {
+  const seriesId = input.dataset.chartSeriesToggle;
+  if (!seriesId) return;
+  const control = input.closest('.leaderboard-chart-legend-item');
+  const seriesElements = findLeaderboardSeriesElements(seriesId);
+  if (seriesElements.length === 0) return;
+
+  seriesElements.forEach(series => {
+    if (input.checked) {
+      series.removeAttribute('hidden');
+    } else {
+      series.setAttribute('hidden', '');
+    }
+  });
+  if (control) {
+    control.classList.toggle('is-muted', !input.checked);
+  }
+};
+
+const initLeaderboardChartToggles = (root = document) => {
+  root.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]').forEach(input => {
+    if (input.dataset.chartToggleReady === 'true') {
+      syncLeaderboardChartToggle(input);
+      return;
+    }
+    input.dataset.chartToggleReady = 'true';
+    const seriesId = input.dataset.chartSeriesToggle;
+    if (!seriesId) return;
+
+    input.addEventListener('change', () => syncLeaderboardChartToggle(input));
+    syncLeaderboardChartToggle(input);
+  });
+};
+
+const initLeaderboardChartHover = (root = document) => {
+  const bindHoverTarget = (item, seriesId) => {
+    if (item.dataset.chartHoverReady === 'true') return;
+    item.dataset.chartHoverReady = 'true';
+    if (!seriesId) return;
+
+    item.addEventListener('mouseenter', () => setLeaderboardSeriesHover(seriesId, true));
+    item.addEventListener('mouseleave', () => setLeaderboardSeriesHover(seriesId, false));
+    item.addEventListener('focusin', () => setLeaderboardSeriesHover(seriesId, true));
+    item.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!item.contains(document.activeElement)) {
+          setLeaderboardSeriesHover(seriesId, false);
+        }
+      }, 0);
+    });
+  };
+
+  root.querySelectorAll('.leaderboard-chart-legend-item[data-chart-legend-item]').forEach(item => {
+    bindHoverTarget(item, item.dataset.chartLegendItem);
+  });
+
+  root.querySelectorAll('.leaderboard-rank-row[data-leaderboard-row-participant]').forEach(item => {
+    bindHoverTarget(item, item.dataset.leaderboardRowParticipant);
+  });
+
+  root.querySelectorAll('.leaderboard-chart-series[data-chart-series]').forEach(item => {
+    bindHoverTarget(item, item.dataset.chartSeries);
+  });
+};
+
+let leaderboardParticipantSelectionReady = false;
+let leaderboardParticipantSelectionRequest = 0;
+
+const collectHiddenLeaderboardSeries = () =>
+  new Set(
+    Array.from(document.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]:not(:checked)'))
+      .map(input => input.dataset.chartSeriesToggle)
+      .filter(Boolean)
+  );
+
+const applyHiddenLeaderboardSeries = (hiddenSeriesIds, root = document) => {
+  hiddenSeriesIds.forEach(seriesId => {
+    root.querySelectorAll('.leaderboard-chart-toggle[data-chart-series-toggle]').forEach(input => {
+      if (input.dataset.chartSeriesToggle === seriesId) {
+        input.checked = false;
+      }
+    });
+  });
+};
+
+const updateLeaderboardFromUrl = async (url, { pushHistory = true } = {}) => {
+  const currentLayout = document.querySelector('.leaderboard-layout');
+  if (!currentLayout) {
+    window.location.href = url;
+    return;
+  }
+
+  const requestId = ++leaderboardParticipantSelectionRequest;
+  const hiddenSeriesIds = collectHiddenLeaderboardSeries();
+  currentLayout.setAttribute('aria-busy', 'true');
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'text/html',
+        'X-Requested-With': 'fetch'
+      },
+      credentials: 'same-origin'
+    });
+    if (!response.ok) throw new Error(`Leaderboard selection failed with status ${response.status}`);
+    const html = await response.text();
+    if (requestId !== leaderboardParticipantSelectionRequest) return;
+
+    const nextDocument = new DOMParser().parseFromString(html, 'text/html');
+    const nextLayout = nextDocument.querySelector('.leaderboard-layout');
+    if (!nextLayout) throw new Error('Leaderboard selection response did not include layout.');
+
+    currentLayout.replaceWith(nextLayout);
+    document.title = nextDocument.title || document.title;
+    applyHiddenLeaderboardSeries(hiddenSeriesIds, document);
+    initLeaderboardChartToggles(document);
+    initLeaderboardChartHover(document);
+
+    if (pushHistory) {
+      window.history.pushState({ leaderboardUrl: url }, '', url);
+    }
+  } catch (err) {
+    window.location.href = url;
+  } finally {
+    const nextCurrentLayout = document.querySelector('.leaderboard-layout');
+    if (nextCurrentLayout) {
+      nextCurrentLayout.removeAttribute('aria-busy');
+    }
+  }
+};
+
+const initLeaderboardParticipantSelection = () => {
+  if (leaderboardParticipantSelectionReady) return;
+  leaderboardParticipantSelectionReady = true;
+
+  document.addEventListener('click', (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest('a[data-leaderboard-participant-link]');
+    const interactive = target.closest('a, button, input, select, textarea, label');
+    const row = interactive ? null : target.closest('.leaderboard-rank-row[data-leaderboard-row-href]');
+    const href = link?.href || row?.dataset.leaderboardRowHref;
+    if (!href) return;
+    const nextUrl = new URL(href, window.location.href);
+    if (nextUrl.origin !== window.location.origin) return;
+
+    event.preventDefault();
+    updateLeaderboardFromUrl(nextUrl.toString());
+  });
+
+  window.addEventListener('popstate', () => {
+    if (document.querySelector('.leaderboard-layout')) {
+      updateLeaderboardFromUrl(window.location.href, { pushHistory: false });
+    }
   });
 };
 
@@ -633,8 +814,7 @@ const initSignupPasswordMatch = () => {
 
 const initThemeToggle = () => {
   const toggle = document.querySelector('[data-theme-toggle]');
-  const logos = Array.from(document.querySelectorAll('[data-logo-light][data-logo-dark]'));
-  if (!toggle && logos.length === 0) return;
+  if (!toggle) return;
 
   const root = document.documentElement;
   const labelEl = toggle ? toggle.querySelector('[data-theme-toggle-label]') : null;
@@ -657,16 +837,6 @@ const initThemeToggle = () => {
     }
     return getPreferredTheme();
   };
-  const syncLogos = (theme) => {
-    logos.forEach((img) => {
-      const lightSrc = img.dataset.logoLight;
-      const darkSrc = img.dataset.logoDark;
-      const nextSrc = theme === 'dark' ? darkSrc : lightSrc;
-      if (nextSrc && img.getAttribute('src') !== nextSrc) {
-        img.setAttribute('src', nextSrc);
-      }
-    });
-  };
   const setTheme = (theme) => {
     root.setAttribute('data-theme', theme);
     try {
@@ -674,7 +844,6 @@ const initThemeToggle = () => {
     } catch (err) {
       // ignore storage errors
     }
-    syncLogos(theme);
     const nextLabel = theme === 'dark' ? labelLight : labelDark;
     if (toggle) {
       toggle.setAttribute('aria-label', nextLabel);
@@ -697,11 +866,9 @@ const initThemeToggle = () => {
 
 const initHeaderMenu = () => {
   const header = document.querySelector('header');
-  const headerInner = header?.querySelector('.header-inner');
   const toggle = document.querySelector('[data-header-menu-toggle]');
-  const headerCenter = document.querySelector('[data-header-center]');
   const menu = document.querySelector('[data-header-menu]');
-  if (!header || !headerInner || !toggle || !menu) return;
+  if (!header || !toggle || !menu) return;
 
   const LAYOUT_COLLAPSE_WIDTH = 980;
   const TIMER_COMPACT_WIDTH = 1000;
@@ -730,14 +897,6 @@ const initHeaderMenu = () => {
 
     header.classList.toggle('is-collapsed', shouldCollapseMenu);
     header.classList.toggle('is-time-compact', shouldCompactTimer);
-    header.classList.remove('is-center-hidden');
-
-    if (headerCenter) {
-      const hasOverflow = headerInner.scrollWidth > headerInner.clientWidth + 1;
-      if (hasOverflow) {
-        header.classList.add('is-center-hidden');
-      }
-    }
 
     if (!shouldCollapseMenu) {
       closeMenu();
@@ -774,7 +933,7 @@ const initHeaderMenu = () => {
     if (!isCollapsed()) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const closeTrigger = target.closest('a.link, .account-name-link, [data-theme-toggle]');
+    const closeTrigger = target.closest('a.link, [data-theme-toggle]');
     if (!closeTrigger) return;
     closeMenu();
   });
@@ -782,6 +941,10 @@ const initHeaderMenu = () => {
   window.addEventListener('resize', syncLayout);
   window.addEventListener('load', syncLayout);
   syncLayout();
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(syncLayout).catch(() => {});
+  }
 };
 
 const initHeaderOffsets = () => {
@@ -802,6 +965,10 @@ const initHeaderOffsets = () => {
   syncOffsets();
   window.addEventListener('resize', syncOffsets);
   window.addEventListener('load', syncOffsets);
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(syncOffsets).catch(() => {});
+  }
 
   if (typeof ResizeObserver !== 'undefined') {
     const observer = new ResizeObserver(() => syncOffsets());
@@ -835,83 +1002,6 @@ const initScrollToEndButton = () => {
   updateVisibility();
 };
 
-const initLeaderboardPanels = () => {
-  document.querySelectorAll('.leaderboard-layout').forEach(scope => {
-    const activators = Array.from(scope.querySelectorAll('[data-member-activate]'));
-    const panels = Array.from(scope.querySelectorAll('.leaderboard-member-panel[id]'));
-    const mainColumn = scope.querySelector('.leaderboard-main-column');
-    const mainCard = scope.querySelector('.leaderboard-main-card');
-    const detailCard = scope.querySelector('.leaderboard-detail-card');
-    const panelHeightSource = mainColumn || mainCard;
-    if (activators.length === 0 || panels.length === 0) return;
-
-    const activatePanel = (targetId) => {
-      if (!targetId) return;
-      activators.forEach(activator => {
-        const isActive = activator.dataset.memberActivate === targetId;
-        activator.classList.toggle('is-active', isActive);
-        activator.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-      });
-      panels.forEach(panel => {
-        const isActive = panel.id === targetId;
-        panel.classList.toggle('is-active', isActive);
-        panel.hidden = !isActive;
-      });
-    };
-
-    const syncPanelHeight = () => {
-      if (!panelHeightSource) return;
-      if (window.matchMedia('(max-width: 980px)').matches) {
-        scope.style.removeProperty('--leaderboard-panel-height');
-        if (detailCard) {
-          detailCard.style.removeProperty('height');
-          detailCard.style.removeProperty('maxHeight');
-        }
-        panels.forEach(panel => {
-          panel.style.removeProperty('height');
-          panel.style.removeProperty('maxHeight');
-        });
-        return;
-      }
-      const targetHeight = panelHeightSource.offsetHeight;
-      scope.style.setProperty('--leaderboard-panel-height', `${targetHeight}px`);
-      if (detailCard) {
-        detailCard.style.height = `${targetHeight}px`;
-        detailCard.style.maxHeight = `${targetHeight}px`;
-      }
-      panels.forEach(panel => {
-        panel.style.height = '100%';
-        panel.style.maxHeight = '100%';
-      });
-    };
-
-    activators.forEach(activator => {
-      const targetId = activator.dataset.memberActivate || '';
-      if (!targetId) return;
-      const activate = () => activatePanel(targetId);
-      activator.addEventListener('click', activate);
-      activator.addEventListener('keydown', event => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        activate();
-      });
-    });
-
-    const initialTargetId =
-      activators.find(activator => activator.classList.contains('is-active'))?.dataset.memberActivate ||
-      panels.find(panel => !panel.hidden)?.id ||
-      activators[0]?.dataset.memberActivate ||
-      '';
-    activatePanel(initialTargetId);
-    syncPanelHeight();
-    window.addEventListener('resize', syncPanelHeight);
-    if (typeof ResizeObserver !== 'undefined' && panelHeightSource) {
-      const observer = new ResizeObserver(() => syncPanelHeight());
-      observer.observe(panelHeightSource);
-    }
-  });
-};
-
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
   initHeaderOffsets();
@@ -924,6 +1014,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initNumberSpinners();
   initCountdown();
   initCopyButtons();
+  initLeaderboardChartToggles();
+  initLeaderboardChartHover();
+  initLeaderboardParticipantSelection();
   initNameAvailabilityChecks();
   initVisibilityToggle();
   initQuestionsCouplingToggle();
@@ -932,5 +1025,4 @@ document.addEventListener('DOMContentLoaded', () => {
   initAdminActualsUnsavedState();
   initSignupPasswordMatch();
   initScrollToEndButton();
-  initLeaderboardPanels();
 });

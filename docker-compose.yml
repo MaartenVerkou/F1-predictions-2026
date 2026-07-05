@@ -14,10 +14,13 @@ services:
       - DEV_AUTO_LOGIN_NAME=${DEV_AUTO_LOGIN_NAME:-Dev Admin}
       - PORT=3000
       - APP_DOMAIN=${APP_DOMAIN:-localhost}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS:-1}
       - COMPANY_NAME=${COMPANY_NAME:-Wheel of Knowledge}
       - CONTACT_EMAIL=${CONTACT_EMAIL:-}
       - DATA_DIR=/app/state
       - DB_PATH=/app/state/app.db
+      - DATABASE_URL=${DATABASE_URL:-}
       - QUESTIONS_PATH=/app/config/questions.json
       - ROSTER_PATH=/app/config/roster.json
       - RACES_PATH=/app/config/races.json
@@ -29,17 +32,15 @@ services:
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-465}
       - SMTP_CLIENT_NAME=${SMTP_CLIENT_NAME:-}
+      - ACTUALS_AUTO_UPDATE_ENABLED=${ACTUALS_AUTO_UPDATE_ENABLED:-}
+      - ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES=${ACTUALS_AUTO_UPDATE_INTERVAL_MINUTES:-180}
+      - ACTUALS_AUTO_UPDATE_ON_START=${ACTUALS_AUTO_UPDATE_ON_START:-1}
+      - ACTUALS_AUTO_UPDATE_START_DELAY_MS=${ACTUALS_AUTO_UPDATE_START_DELAY_MS:-30000}
       - PAYPAL_DONATION_URL=${PAYPAL_DONATION_URL:-}
       - PAYPAL_DONATION_LABEL=${PAYPAL_DONATION_LABEL:-Donate}
     volumes:
       - ${STATE_DIR:-f1_state}:/app/state
       - ./data:/app/config:ro
-      - ./server.js:/app/server.js
-      - ./src:/app/src
-      - ./views:/app/views
-      - ./public:/app/public
-      - ./locales:/app/locales
-      - ./package.json:/app/package.json:ro
     restart: unless-stopped
 
   tunnel:

@@ -3,15 +3,21 @@ services:
     ports: !reset []
     networks:
       default: {}
-      proxy:
+      web:
         aliases:
           - f1-app
+      db: {}
   caddy:
+    profiles: !override
+      - legacy-edge
     networks:
       default: {}
-      proxy: {}
+      web: {}
 
 networks:
-  proxy:
+  web:
     external: true
-    name: proxy
+    name: mhv-web
+  db:
+    external: true
+    name: mhv-db

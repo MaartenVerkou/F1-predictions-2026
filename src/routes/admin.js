@@ -1,5 +1,17 @@
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
+const { runActualsAutoUpdate } = require("../actuals-auto-update");
+const { resolveConfiguredRaceName } = require("../race-names");
+const {
+  REVIEW_STATUS_PENDING,
+  REVIEW_STATUS_REVIEWED,
+  fetchSnapshotValues: loadSnapshotValues,
+  findLatestRoundSnapshotForSeason: loadLatestRoundSnapshotForSeason,
+  findSnapshotById,
+  listLatestSnapshotsForSeason,
+  markSnapshotReviewed,
+  upsertSnapshotForRound
+} = require("../actuals-snapshots");
 
 function registerAdminRoutes(app, deps) {
   const {
@@ -10,7 +22,14 @@ function registerAdminRoutes(app, deps) {
     getRoster,
     getRaces,
     clampNumber,
-    generateUniqueGroupId
+    generateUniqueGroupId,
+    dataDir,
+    dbPath,
+    databaseUrl,
+    questionsPath,
+    rosterPath,
+    racesPath,
+    logEvent
   } = deps;
   const CURRENT_SEASON = Number(process.env.F1_SEASON || 2026);
   const CURRENT_SEASON_API_BASE = "https://api.jolpi.ca/ergast/f1";
@@ -78,6 +97,8 @@ function registerAdminRoutes(app, deps) {
   const MULTI_ACTUAL_DRIVER_FIELD_IDS = new Set([
     "lowest_grid_win_position"
   ]);
+  const ADMIN_IDEA_TYPES = ["question", "feature", "other"];
+  const ADMIN_IDEA_STATUSES = ["open", "resolved", "ignored"];
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -127,6 +148,58 @@ function registerAdminRoutes(app, deps) {
     }
 
     throw new Error(`Failed to fetch after retries: ${url}`);
+  }
+
+  function withPagination(url, limit, offset) {
+    const parsed = new URL(url);
+    parsed.searchParams.set("limit", String(limit));
+    parsed.searchParams.set("offset", String(offset));
+    return parsed.toString();
+  }
+
+  function mergeRaceRows(existing, incoming, resultKey) {
+    if (!existing) {
+      return {
+        ...incoming,
+        [resultKey]: Array.isArray(incoming?.[resultKey]) ? incoming[resultKey].slice() : []
+      };
+    }
+    const merged = existing;
+    const seen = new Set(
+      (merged[resultKey] || []).map((row) =>
+        [row?.number, row?.Driver?.driverId, row?.position, row?.grid].join(":")
+      )
+    );
+    for (const row of incoming?.[resultKey] || []) {
+      const key = [row?.number, row?.Driver?.driverId, row?.position, row?.grid].join(":");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged[resultKey].push(row);
+    }
+    return merged;
+  }
+
+  async function fetchAllRaceTableRaces(url, resultKey) {
+    const limit = 100;
+    let offset = 0;
+    let total = Infinity;
+    const byRound = new Map();
+
+    while (offset < total) {
+      const payload = await fetchJson(withPagination(url, limit, offset));
+      total = parseNum(payload?.MRData?.total, 0);
+      const pageLimit = parseNum(payload?.MRData?.limit, limit) || limit;
+      const races = payload?.MRData?.RaceTable?.Races || [];
+      for (const race of races) {
+        const round = Number(race.round);
+        if (!Number.isFinite(round)) continue;
+        byRound.set(round, mergeRaceRows(byRound.get(round), race, resultKey));
+      }
+      offset += pageLimit;
+      if (pageLimit <= 0) break;
+    }
+
+    return Array.from(byRound.values()).sort((a, b) => parseNum(a.round) - parseNum(b.round));
   }
 
   function normalizeLookupKey(value) {
@@ -429,17 +502,17 @@ function registerAdminRoutes(app, deps) {
     const [
       driverStandingsJson,
       constructorStandingsJson,
-      resultsJson,
-      qualifyingJson,
-      sprintJson,
+      completedRaces,
+      completedQualifying,
+      completedSprints,
       driverOfTheDayResultsHtml,
       officialSeasonResultsHtml
     ] = await Promise.all([
       fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/driverStandings.json`),
       fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/constructorStandings.json`),
-      fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/results.json`),
-      fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/qualifying.json`),
-      fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/sprint.json`),
+      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/results.json`, "Results"),
+      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/qualifying.json`, "QualifyingResults"),
+      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/sprint.json`, "SprintResults"),
       fetchText(CURRENT_SEASON_DOTD_RESULTS_URL(safeSeason)).catch(() => null),
       fetchText(CURRENT_SEASON_RESULTS_URL(safeSeason)).catch(() => null)
     ]);
@@ -448,10 +521,6 @@ function registerAdminRoutes(app, deps) {
       driverStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
     const constructorStandings =
       constructorStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || [];
-    const completedRaces = resultsJson?.MRData?.RaceTable?.Races || [];
-    const completedQualifying = qualifyingJson?.MRData?.RaceTable?.Races || [];
-    const completedSprints = sprintJson?.MRData?.RaceTable?.Races || [];
-
     if (driverStandings.length === 0 || constructorStandings.length === 0 || completedRaces.length === 0) {
       throw new Error(`No completed ${safeSeason} season data is available yet.`);
     }
@@ -481,7 +550,8 @@ function registerAdminRoutes(app, deps) {
       await Promise.all(
         completedRaces.map(async (race) => {
           const raceName =
-            resolveCanonicalName(race.raceName, races || []) || String(race.raceName || "");
+            resolveConfiguredRaceName(race.raceName, races || []) ||
+            String(race.raceName || "");
           const slug = getFormula1RaceSlug(raceName);
           const url = officialRaceUrlsBySlug.get(slug);
           if (!raceName || !url) return [raceName, null];
@@ -497,7 +567,9 @@ function registerAdminRoutes(app, deps) {
     );
 
     completedRaces.forEach((race) => {
-      const raceName = resolveCanonicalName(race.raceName, races || []) || String(race.raceName || "");
+      const raceName =
+        resolveConfiguredRaceName(race.raceName, races || []) ||
+        String(race.raceName || "");
       const officialRows = officialRaceRowsByName.get(raceName);
       const apiResults = Array.isArray(race.Results) ? race.Results : [];
       let dnfCountThisRace = 0;
@@ -616,7 +688,7 @@ function registerAdminRoutes(app, deps) {
       .pop() || null;
     const latestRaceRound = latestCompletedRace ? parseNum(latestCompletedRace.round, 0) : 0;
     const latestRaceName = latestCompletedRace
-      ? (resolveCanonicalName(latestCompletedRace.raceName, races || []) ||
+      ? (resolveConfiguredRaceName(latestCompletedRace.raceName, races || []) ||
         String(latestCompletedRace.raceName || "").trim())
       : "";
 
@@ -837,125 +909,58 @@ function registerAdminRoutes(app, deps) {
     return `${basePath}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
   }
 
-  function findLatestRoundSnapshotForSeason(season) {
-    return db
-      .prepare(
-        `
-        SELECT round_number, round_name
-        FROM actual_snapshots
-        WHERE season = ?
-          AND round_number IS NOT NULL
-        ORDER BY round_number DESC, created_at DESC, id DESC
-        LIMIT 1
-        `
-      )
-      .get(season);
+  function normalizeAdminIdeaType(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return ADMIN_IDEA_TYPES.includes(normalized) ? normalized : "question";
   }
 
-  function findLatestSnapshotForRound(season, roundNumber) {
+  function normalizeAdminIdeaStatus(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    return ADMIN_IDEA_STATUSES.includes(normalized) ? normalized : null;
+  }
+
+  function mapAdminIdeaRow(row) {
+    return {
+      ...row,
+      id: Number(row.id),
+      created_by_user_id:
+        row.created_by_user_id == null ? null : Number(row.created_by_user_id),
+      updated_by_user_id:
+        row.updated_by_user_id == null ? null : Number(row.updated_by_user_id)
+    };
+  }
+
+  function listAdminIdeas() {
     return db
       .prepare(
         `
-        SELECT id, season, round_number, round_name, label, created_at
-        FROM actual_snapshots
-        WHERE season = ?
-          AND round_number = ?
-        ORDER BY created_at DESC, id DESC
-        LIMIT 1
+        SELECT
+          ai.*,
+          creator.name AS created_by_name,
+          updater.name AS updated_by_name
+        FROM admin_ideas ai
+        LEFT JOIN users creator ON creator.id = ai.created_by_user_id
+        LEFT JOIN users updater ON updater.id = ai.updated_by_user_id
+        ORDER BY
+          CASE ai.status WHEN 'open' THEN 0 WHEN 'resolved' THEN 1 ELSE 2 END,
+          COALESCE(ai.updated_at, ai.created_at) DESC,
+          ai.id DESC
         `
       )
-      .get(season, roundNumber);
+      .all()
+      .map(mapAdminIdeaRow);
+  }
+
+  function getSnapshotRoundOptions() {
+    return { maxRoundNumber: getRaces().length };
+  }
+
+  function findLatestRoundSnapshotForSeason(season) {
+    return loadLatestRoundSnapshotForSeason(db, season, getSnapshotRoundOptions());
   }
 
   function fetchSnapshotValues(snapshotId) {
-    const rows = db
-      .prepare(
-        `
-        SELECT question_id, value
-        FROM actual_snapshot_values
-        WHERE snapshot_id = ?
-        ORDER BY question_id ASC
-        `
-      )
-      .all(snapshotId);
-    return rows.reduce((acc, row) => {
-      acc[row.question_id] = row.value;
-      return acc;
-    }, {});
-  }
-
-  function createActualsSnapshot({
-    season,
-    roundNumber = null,
-    roundName = "",
-    sourceType = "manual",
-    sourceNote = "",
-    createdByUserId = null,
-    label = ""
-  }) {
-    const now = new Date().toISOString();
-    const actualRows = db
-      .prepare("SELECT question_id, value FROM actuals ORDER BY question_id ASC")
-      .all();
-    if (actualRows.length === 0) return null;
-
-    const safeSeason = Number.isFinite(Number(season)) ? Number(season) : CURRENT_SEASON;
-    const parsedRound = Number(roundNumber);
-    const safeRoundNumber =
-      Number.isFinite(parsedRound) && parsedRound > 0 ? Math.floor(parsedRound) : null;
-    const safeRoundName = String(roundName || "").trim();
-    const safeLabel = String(label || "").trim() || (
-      safeRoundNumber
-        ? `R${safeRoundNumber} - ${safeRoundName || "Snapshot"}`
-        : `Manual snapshot ${now.slice(0, 10)}`
-    );
-    const safeSourceType = String(sourceType || "").trim() || "manual";
-    const safeSourceNote = String(sourceNote || "").trim() || null;
-    const safeUserId = Number.isFinite(Number(createdByUserId))
-      ? Number(createdByUserId)
-      : null;
-
-    const insertSnapshot = db.prepare(
-      `
-      INSERT INTO actual_snapshots (
-        season,
-        round_number,
-        round_name,
-        label,
-        source_type,
-        source_note,
-        created_at,
-        created_by_user_id
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `
-    );
-    const insertValue = db.prepare(
-      `
-      INSERT INTO actual_snapshot_values (snapshot_id, question_id, value)
-      VALUES (?, ?, ?)
-      `
-    );
-
-    const tx = db.transaction(() => {
-      const snapshotInfo = insertSnapshot.run(
-        safeSeason,
-        safeRoundNumber,
-        safeRoundName || null,
-        safeLabel,
-        safeSourceType,
-        safeSourceNote,
-        now,
-        safeUserId
-      );
-      const snapshotId = Number(snapshotInfo.lastInsertRowid);
-      actualRows.forEach((row) => {
-        insertValue.run(snapshotId, row.question_id, row.value);
-      });
-      return snapshotId;
-    });
-
-    return tx();
+    return loadSnapshotValues(db, snapshotId);
   }
 
   function upsertActualsSnapshot({
@@ -966,105 +971,22 @@ function registerAdminRoutes(app, deps) {
     sourceType = "manual",
     sourceNote = "",
     createdByUserId = null,
-    label = ""
+    label = "",
+    reviewStatus = REVIEW_STATUS_REVIEWED,
+    preserveReviewIfUnchanged = false
   }) {
-    const now = new Date().toISOString();
-    const entries = Object.entries(valuesByQuestion || {}).filter(([, value]) => value != null && value !== "");
-    if (entries.length === 0) return null;
-
-    const safeSeason = Number.isFinite(Number(season)) ? Number(season) : CURRENT_SEASON;
-    const parsedRound = Number(roundNumber);
-    const safeRoundNumber =
-      Number.isFinite(parsedRound) && parsedRound > 0 ? Math.floor(parsedRound) : null;
-    const safeRoundName = String(roundName || "").trim();
-    const safeLabel = String(label || "").trim() || (
-      safeRoundNumber
-        ? `R${safeRoundNumber} - ${safeRoundName || "Snapshot"}`
-        : `Manual snapshot ${now.slice(0, 10)}`
-    );
-    const safeSourceType = String(sourceType || "").trim() || "manual";
-    const safeSourceNote = String(sourceNote || "").trim() || null;
-    const safeUserId = Number.isFinite(Number(createdByUserId))
-      ? Number(createdByUserId)
-      : null;
-
-    const existing = safeRoundNumber
-      ? findLatestSnapshotForRound(safeSeason, safeRoundNumber)
-      : null;
-
-    const insertSnapshot = db.prepare(
-      `
-      INSERT INTO actual_snapshots (
-        season,
-        round_number,
-        round_name,
-        label,
-        source_type,
-        source_note,
-        created_at,
-        created_by_user_id
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `
-    );
-    const updateSnapshot = db.prepare(
-      `
-      UPDATE actual_snapshots
-      SET round_name = ?,
-          label = ?,
-          source_type = ?,
-          source_note = ?,
-          created_at = ?,
-          created_by_user_id = ?
-      WHERE id = ?
-      `
-    );
-    const clearValues = db.prepare(
-      `
-      DELETE FROM actual_snapshot_values
-      WHERE snapshot_id = ?
-      `
-    );
-    const insertValue = db.prepare(
-      `
-      INSERT INTO actual_snapshot_values (snapshot_id, question_id, value)
-      VALUES (?, ?, ?)
-      `
-    );
-
-    const tx = db.transaction(() => {
-      let snapshotId = existing ? Number(existing.id) : null;
-      if (snapshotId) {
-        updateSnapshot.run(
-          safeRoundName || null,
-          safeLabel,
-          safeSourceType,
-          safeSourceNote,
-          now,
-          safeUserId,
-          snapshotId
-        );
-        clearValues.run(snapshotId);
-      } else {
-        const snapshotInfo = insertSnapshot.run(
-          safeSeason,
-          safeRoundNumber,
-          safeRoundName || null,
-          safeLabel,
-          safeSourceType,
-          safeSourceNote,
-          now,
-          safeUserId
-        );
-        snapshotId = Number(snapshotInfo.lastInsertRowid);
-      }
-      entries.forEach(([questionId, value]) => {
-        insertValue.run(snapshotId, questionId, value);
-      });
-      return snapshotId;
+    return upsertSnapshotForRound(db, {
+      season,
+      roundNumber,
+      roundName,
+      valuesByQuestion,
+      sourceType,
+      sourceNote,
+      createdByUserId,
+      label,
+      reviewStatus,
+      preserveReviewIfUnchanged
     });
-
-    return tx();
   }
 
   function buildStoredActualsFromBody(body, questions, races, now) {
@@ -2230,6 +2152,106 @@ function registerAdminRoutes(app, deps) {
     return res.redirect("/admin/overview");
   });
 
+  app.get("/admin/ideas", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const ideas = listAdminIdeas();
+    res.render("admin_ideas", {
+      user,
+      ideas,
+      openIdeas: ideas.filter((idea) => idea.status === "open"),
+      triagedIdeas: ideas.filter((idea) => idea.status !== "open"),
+      ideaTypes: ADMIN_IDEA_TYPES,
+      adminError: req.query.error ? String(req.query.error) : null,
+      adminSuccess: req.query.success ? String(req.query.success) : null
+    });
+  });
+
+  app.post("/admin/ideas", requireAdmin, (req, res) => {
+    const t = res.locals.t || ((key) => key);
+    const adminUser = getCurrentUser(req);
+    const type = normalizeAdminIdeaType(req.body.type);
+    const title = String(req.body.title || "").trim();
+    const notes = String(req.body.notes || "").trim();
+    if (!title) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_title_required"))
+      );
+    }
+    if (title.length > 500) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_title_too_long"))
+      );
+    }
+    if (notes.length > 4000) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_notes_too_long"))
+      );
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(
+      `
+      INSERT INTO admin_ideas (
+        type,
+        title,
+        notes,
+        status,
+        created_at,
+        updated_at,
+        created_by_user_id,
+        updated_by_user_id
+      )
+      VALUES (?, ?, ?, 'open', ?, ?, ?, ?)
+      `
+    ).run(
+      type,
+      title,
+      notes || null,
+      now,
+      now,
+      adminUser?.id || null,
+      adminUser?.id || null
+    );
+
+    return res.redirect(
+      withQueryParam("/admin/ideas", "success", t("admin_ideas.created_success"))
+    );
+  });
+
+  app.post("/admin/ideas/:id/status", requireAdmin, (req, res) => {
+    const t = res.locals.t || ((key) => key);
+    const adminUser = getCurrentUser(req);
+    const ideaId = Number(req.params.id);
+    const status = normalizeAdminIdeaStatus(req.body.status);
+    if (!Number.isFinite(ideaId) || ideaId <= 0 || !status) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_invalid_status"))
+      );
+    }
+
+    const result = db
+      .prepare(
+        `
+        UPDATE admin_ideas
+        SET status = ?,
+            updated_at = ?,
+            updated_by_user_id = ?
+        WHERE id = ?
+        `
+      )
+      .run(status, new Date().toISOString(), adminUser?.id || null, ideaId);
+
+    if (result.changes === 0) {
+      return res.redirect(
+        withQueryParam("/admin/ideas", "error", t("admin_ideas.error_not_found"))
+      );
+    }
+
+    return res.redirect(
+      withQueryParam("/admin/ideas", "success", t("admin_ideas.status_updated_success"))
+    );
+  });
+
   app.get("/admin/questions", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
@@ -2383,17 +2405,23 @@ function registerAdminRoutes(app, deps) {
       typeof req.session.adminActualsDraft.values === "object"
         ? req.session.adminActualsDraft.values
         : null;
+    const latestSnapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
+      maxRoundNumber: races.length
+    });
+    const latestSnapshotByRound = new Map(
+      latestSnapshots.map((snapshot) => [Number(snapshot.round_number), snapshot])
+    );
     const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
     const selectedTarget = String(req.query.target || "current").trim() || "current";
     const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
     const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
+    const latestRoundNumber =
+      Number.isFinite(Number(latestRoundSnapshot?.round_number))
+        ? Number(latestRoundSnapshot.round_number)
+        : null;
     const racesWithTargets = races.map((raceName, index) => {
       const roundNumber = index + 1;
-      const snapshotMeta = findLatestSnapshotForRound(CURRENT_SEASON, roundNumber);
-      const latestRoundNumber =
-        Number.isFinite(Number(latestRoundSnapshot?.round_number))
-          ? Number(latestRoundSnapshot.round_number)
-          : null;
+      const snapshotMeta = latestSnapshotByRound.get(roundNumber) || null;
       let timing = "future";
       if (latestRoundNumber != null) {
         if (roundNumber < latestRoundNumber) timing = "past";
@@ -2405,13 +2433,20 @@ function registerAdminRoutes(app, deps) {
         raceName,
         timing,
         snapshotId: snapshotMeta ? Number(snapshotMeta.id) : null,
-        snapshotLabel: snapshotMeta ? String(snapshotMeta.label || "").trim() : ""
+        snapshotLabel: snapshotMeta ? String(snapshotMeta.label || "").trim() : "",
+        reviewStatus: snapshotMeta ? snapshotMeta.review_status : null,
+        reviewedAt: snapshotMeta ? snapshotMeta.reviewed_at || null : null,
+        updatedAt: snapshotMeta ? snapshotMeta.updated_at || snapshotMeta.created_at || null : null
       };
     });
 
     const selectedRaceTarget =
       selectedRoundNumber != null
         ? racesWithTargets.find((race) => race.roundNumber === selectedRoundNumber) || null
+        : null;
+    const selectedSnapshotMeta =
+      selectedRaceTarget && selectedRaceTarget.snapshotId
+        ? latestSnapshotByRound.get(selectedRaceTarget.roundNumber) || null
         : null;
     const selectedSnapshotValues =
       selectedRaceTarget && selectedRaceTarget.snapshotId
@@ -2425,6 +2460,23 @@ function registerAdminRoutes(app, deps) {
     const isFutureRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "future");
     const allowPastEdit = String(req.query.unlockPast || "").trim() === "1";
     const requiresPastUnlock = isPastRaceTarget && !allowPastEdit;
+    const pendingReviewTargets = racesWithTargets.filter(
+      (target) => target.reviewStatus === REVIEW_STATUS_PENDING
+    );
+    const liveActualsSnapshot =
+      latestRoundNumber != null ? latestSnapshotByRound.get(latestRoundNumber) || null : null;
+    const liveActualsReview = liveActualsSnapshot
+      ? {
+          snapshotId: Number(liveActualsSnapshot.id),
+          roundNumber: Number(liveActualsSnapshot.round_number),
+          roundName:
+            String(liveActualsSnapshot.round_name || "").trim()
+            || `Round ${liveActualsSnapshot.round_number}`,
+          reviewStatus: liveActualsSnapshot.review_status,
+          reviewedAt: liveActualsSnapshot.reviewed_at || null,
+          updatedAt: liveActualsSnapshot.updated_at || liveActualsSnapshot.created_at || null
+        }
+      : null;
 
     res.render("admin_actuals", {
       user,
@@ -2435,6 +2487,9 @@ function registerAdminRoutes(app, deps) {
       actualsTarget: selectedTarget,
       raceTargets: racesWithTargets,
       selectedRaceTarget,
+      selectedSnapshotMeta,
+      liveActualsReview,
+      pendingReviewTargets,
       requiresPastUnlock,
       isFutureRaceTarget,
       hasDraft: Boolean(draftActuals),
@@ -2478,13 +2533,13 @@ function registerAdminRoutes(app, deps) {
         filledCount += 1;
       }
 
-        if (req.session) {
-          req.session.adminActualsDraft = {
-            target: "current",
-            values: draftActuals,
-            updatedAt: new Date().toISOString()
-          };
-        }
+      if (req.session) {
+        req.session.adminActualsDraft = {
+          target: "current",
+          values: draftActuals,
+          updatedAt: new Date().toISOString()
+        };
+      }
 
       const summary = [
         `Autofilled ${filledCount} question${filledCount === 1 ? "" : "s"} into the form`
@@ -2514,6 +2569,90 @@ function registerAdminRoutes(app, deps) {
     }
   });
 
+  app.post("/admin/actuals/run-auto-update", requireAdmin, async (req, res) => {
+    const adminUser = getCurrentUser(req);
+    try {
+      const result = await runActualsAutoUpdate({
+        season: CURRENT_SEASON,
+        dbPath,
+        databaseUrl,
+        dataDir,
+        questionsPath,
+        rosterPath,
+        racesPath,
+        dryRun: false
+      });
+      const latestSnapshot = Array.isArray(result?.snapshots) && result.snapshots.length > 0
+        ? result.snapshots[result.snapshots.length - 1]
+        : null;
+      const summary = [];
+      if (latestSnapshot?.roundNumber) {
+        summary.push(`Season sync applied through R${latestSnapshot.roundNumber} - ${latestSnapshot.roundName || `Round ${latestSnapshot.roundNumber}`}`);
+      } else if (Number.isFinite(Number(result?.latestRound)) && Number(result.latestRound) > 0) {
+        summary.push(`Season sync applied through round ${Number(result.latestRound)}`);
+      } else {
+        summary.push("Season sync applied");
+      }
+      if (Array.isArray(result?.snapshots) && result.snapshots.length > 0) {
+        summary.push(`updated ${result.snapshots.length} round snapshot${result.snapshots.length === 1 ? "" : "s"}`);
+      }
+      if (Number.isFinite(Number(result?.liveActualCount))) {
+        summary.push(`live actuals now contain ${Number(result.liveActualCount)} filled field${Number(result.liveActualCount) === 1 ? "" : "s"}`);
+      }
+      summary.push("latest synced round is left pending review until an admin confirms it");
+
+      if (typeof logEvent === "function") {
+        logEvent("info", "admin_actuals_auto_update_run", {
+          requestId: req.requestId,
+          adminUserId: adminUser?.id || null,
+          season: CURRENT_SEASON,
+          latestRound: Number(result?.latestRound || 0) || null,
+          snapshotCount: Array.isArray(result?.snapshots) ? result.snapshots.length : 0
+        });
+      }
+
+      return res.redirect(`/admin/actuals?success=${encodeURIComponent(summary.join(" | "))}`);
+    } catch (err) {
+      if (typeof logEvent === "function") {
+        logEvent("warn", "admin_actuals_auto_update_failed", {
+          requestId: req.requestId,
+          adminUserId: adminUser?.id || null,
+          season: CURRENT_SEASON,
+          error: {
+            message: err.message
+          }
+        });
+      }
+      return res.redirect(
+        `/admin/actuals?error=${encodeURIComponent(`Automatic season sync failed: ${err.message}`)}`
+      );
+    }
+  });
+
+  app.post("/admin/actuals/review", requireAdmin, (req, res) => {
+    const adminUser = getCurrentUser(req);
+    const snapshotId = Number(req.body.snapshotId || 0);
+    const target = String(req.body.target || "current").trim() || "current";
+    const unlockPast = String(req.body.unlockPast || "").trim() === "1";
+    const snapshot = findSnapshotById(db, snapshotId, getSnapshotRoundOptions());
+    if (!snapshot) {
+      return res.redirect(
+        `/admin/actuals?target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent("Snapshot not found.")}`
+      );
+    }
+
+    markSnapshotReviewed(db, {
+      snapshotId,
+      reviewedByUserId: adminUser?.id
+    });
+    const label = snapshot.round_number
+      ? `R${snapshot.round_number} - ${String(snapshot.round_name || "").trim() || `Round ${snapshot.round_number}`}`
+      : `Snapshot #${snapshot.id}`;
+    return res.redirect(
+      `/admin/actuals?target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&success=${encodeURIComponent(`${label} marked as reviewed.`)}`
+    );
+  });
+
   app.post("/admin/actuals", requireAdmin, (req, res) => {
     const adminUser = getCurrentUser(req);
     const questions = getQuestions();
@@ -2522,6 +2661,16 @@ function registerAdminRoutes(app, deps) {
     const selectedTarget = String(req.body.actualsTarget || "current").trim() || "current";
     const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
     const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
+    if (
+      selectedRoundNumber != null &&
+      (!Number.isFinite(selectedRoundNumber) ||
+        selectedRoundNumber < 1 ||
+        selectedRoundNumber > races.length)
+    ) {
+      return res.redirect(
+        `/admin/actuals?error=${encodeURIComponent("Selected race is outside the configured calendar.")}`
+      );
+    }
     const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
     const latestRoundNumber =
       Number.isFinite(Number(latestRoundSnapshot?.round_number))
@@ -2545,7 +2694,7 @@ function registerAdminRoutes(app, deps) {
       const roundName = races[selectedRoundNumber - 1] || `Round ${selectedRoundNumber}`;
       let successMessage;
       try {
-        const snapshotId = upsertActualsSnapshot({
+        const snapshotResult = upsertActualsSnapshot({
           season: CURRENT_SEASON,
           roundNumber: selectedRoundNumber,
           roundName,
@@ -2553,10 +2702,11 @@ function registerAdminRoutes(app, deps) {
           sourceType: "manual",
           sourceNote: "Manual save from admin actuals race selector",
           createdByUserId: adminUser?.id,
-          label: `R${selectedRoundNumber} - ${roundName}`
+          label: `R${selectedRoundNumber} - ${roundName}`,
+          reviewStatus: REVIEW_STATUS_REVIEWED
         });
-        successMessage = snapshotId
-          ? `Snapshot saved for R${selectedRoundNumber} - ${roundName}.`
+        successMessage = snapshotResult?.snapshotId
+          ? `Snapshot saved for R${selectedRoundNumber} - ${roundName} and marked reviewed.`
           : `No values saved for R${selectedRoundNumber} - ${roundName}.`;
       } catch (err) {
         return res.redirect(
@@ -2598,19 +2748,24 @@ function registerAdminRoutes(app, deps) {
     let successMessage = "Actuals saved.";
     try {
       const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
-      const archivedSnapshotId = createActualsSnapshot({
+      const archivedSnapshot = upsertActualsSnapshot({
         season: CURRENT_SEASON,
         roundNumber: latestRoundSnapshot?.round_number || null,
         roundName: String(latestRoundSnapshot?.round_name || "").trim(),
+        valuesByQuestion,
         sourceType: "manual",
         sourceNote: "Manual save from admin actuals",
         createdByUserId: adminUser?.id,
         label: latestRoundSnapshot?.round_number
           ? `R${latestRoundSnapshot.round_number} - ${String(latestRoundSnapshot?.round_name || "Manual update").trim() || "Manual update"}`
-          : `Manual save ${now.slice(0, 10)}`
+          : `Manual save ${now.slice(0, 10)}`,
+        reviewStatus: REVIEW_STATUS_REVIEWED
       });
-      if (archivedSnapshotId) {
-        successMessage = `Actuals saved. Snapshot #${archivedSnapshotId} saved.`;
+      if (archivedSnapshot?.snapshotId) {
+        const label = latestRoundSnapshot?.round_number
+          ? `R${latestRoundSnapshot.round_number}`
+          : `snapshot #${archivedSnapshot.snapshotId}`;
+        successMessage = `Actuals saved. ${label} marked reviewed.`;
       }
     } catch (archiveErr) {
       successMessage = `Actuals saved. Snapshot archive skipped: ${archiveErr.message}`;
@@ -2720,7 +2875,7 @@ function registerAdminRoutes(app, deps) {
     const users = db
       .prepare(
         `
-        SELECT id, name, email, created_at, is_admin
+        SELECT id, name, email, created_at, is_admin, COALESCE(hide_from_global, 0) as hide_from_global
         FROM users
         WHERE is_simulated = 0
           AND is_admin = 0
@@ -3740,6 +3895,30 @@ function registerAdminRoutes(app, deps) {
           actuals: actualsMap,
           actualSnapshots: [],
           selectedActualSnapshotId: null,
+          leaderboardHistory: {
+            hasEnoughHistory: false,
+            rounds: [],
+            series: [],
+            maxTotal: 0
+          },
+          leaderboardFocusParticipantIds: [],
+          participantInsights: {
+            selectedParticipant: null,
+            comparisonRows: [],
+            gaps: [],
+            strengths: [],
+            distinctive: [],
+            emptyReason: null
+          },
+          selectedBreakdown: {
+            mode: "scored",
+            hasScoredRows: false,
+            rows: []
+          },
+          canViewQuestionBreakdown: false,
+          selectedParticipantId: null,
+          selectedLatestRoundDelta: null,
+          latestRoundDeltaMeta: null,
           leaderboardTotal: fullLeaderboard.length,
           leaderboardPerPage,
           currentLeaderboardPage: safeLeaderboardPage,
@@ -3917,7 +4096,7 @@ function registerAdminRoutes(app, deps) {
     if (target.is_admin !== 1) {
       return res.redirect(withQueryParam(returnTo, "success", "User is not an admin."));
     }
-    db.prepare("UPDATE users SET is_admin = 0, hide_from_global = 0 WHERE id = ?").run(userId);
+    db.prepare("UPDATE users SET is_admin = 0 WHERE id = ?").run(userId);
     return res.redirect(withQueryParam(returnTo, "success", "Admin rights removed."));
   });
 
@@ -3935,9 +4114,6 @@ function registerAdminRoutes(app, deps) {
     if (!target) {
       return res.redirect(withQueryParam(returnTo, "error", "User not found."));
     }
-    if (Number(target.is_admin) !== 1) {
-      return res.redirect(withQueryParam(returnTo, "error", "Only admins can be hidden from global."));
-    }
 
     const hideFromGlobalRaw = req.body.hideFromGlobal;
     const hideFromGlobalValue = Array.isArray(hideFromGlobalRaw)
@@ -3950,8 +4126,8 @@ function registerAdminRoutes(app, deps) {
         returnTo,
         "success",
         hideFromGlobal === 1
-          ? "Admin hidden from global responses and leaderboard."
-          : "Admin shown in global responses and leaderboard."
+          ? "User hidden from global responses and leaderboard."
+          : "User shown in global responses and leaderboard."
       )
     );
   });

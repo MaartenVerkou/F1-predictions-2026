@@ -1,0 +1,46 @@
+<%- include('partials/header', { title: t('guest_conversion.page_title'), user }) %>
+
+<div class="card guest-conversion-card">
+  <h1><%= t('guest_conversion.heading') %></h1>
+  <p class="muted"><%= t('guest_conversion.intro') %></p>
+
+  <form method="post" action="/guest-conversion">
+    <%- csrfField() %>
+    <input type="hidden" name="guestId" value="<%= guestId %>" />
+
+    <% plan.groups.forEach((group) => { %>
+      <fieldset class="guest-conversion-group">
+        <legend>
+          <%= group.isGlobal ? t('guest_conversion.global_league') : group.groupName %>
+        </legend>
+        <% if (group.hasConflict) { %>
+          <p class="muted"><%= t('guest_conversion.conflict_notice') %></p>
+        <% } else { %>
+          <p class="muted"><%= t('guest_conversion.no_conflict_notice') %></p>
+        <% } %>
+        <label>
+          <input
+            type="radio"
+            name="group_<%= group.groupId %>"
+            value="account"
+            <%= group.hasConflict ? 'checked' : '' %>
+          />
+          <span><%= group.isGlobal ? t('guest_conversion.keep_account_global') : t('guest_conversion.keep_account_group') %></span>
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="group_<%= group.groupId %>"
+            value="guest"
+            <%= group.hasConflict ? '' : 'checked' %>
+          />
+          <span><%= group.isGlobal ? t('guest_conversion.use_guest_global') : t('guest_conversion.use_guest_group') %></span>
+        </label>
+      </fieldset>
+    <% }) %>
+
+    <button type="submit"><%= t('guest_conversion.confirm') %></button>
+  </form>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,9 +1,9 @@
-<%- include('partials/header', { title: 'Not found', user }) %>
+<%- include('partials/header', { title: t('not_found.page_title'), user }) %>
 
 <div class="card" style="max-width:520px; margin: 0 auto;">
-  <h1>Page not found</h1>
-  <p class="muted">That page does not exist.</p>
-  <a class="link" href="/">Go home</a>
+  <h1><%= t('not_found.heading') %></h1>
+  <p class="muted"><%= t('not_found.body') %></p>
+  <a class="link" href="/"><%= t('not_found.home') %></a>
 </div>
 
 <%- include('partials/footer') %>

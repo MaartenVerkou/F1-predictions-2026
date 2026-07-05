@@ -11,12 +11,12 @@ const questionLabel = (questionId) => {
   return q && q.prompt ? q.prompt : questionId;
 }; %>
 
-<div class="card">
+<div class="card admin-page-card">
   <h1>Test group analysis</h1>
   <p class="muted">
     Group: <strong><%= group.name %></strong>
   </p>
-  <div class="inline-actions">
+  <div class="admin-actions">
     <a class="link" href="/admin/analysis">Back to admin</a>
     <a class="link <%= analysisMode === 'actuals' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=actuals">Analyze actuals</a>
     <a class="link <%= analysisMode === 'sim200' ? 'is-active' : '' %>" href="/admin/analysis/<%= group.id %>?mode=sim200">Analyze 200 seasons</a>
@@ -76,7 +76,7 @@ const questionLabel = (questionId) => {
       No analyzable rows yet. Set season actuals first in Admin -> Actuals.
     </p>
   <% } else { %>
-    <div class="admin-analysis-table-scroll" role="region" aria-label="Analysis results table" tabindex="0">
+    <div class="admin-analysis-table-scroll admin-table-scroll" role="region" aria-label="Analysis results table" tabindex="0">
       <table class="table compact admin-analysis-results-table">
         <thead>
           <tr>

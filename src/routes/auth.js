@@ -1,3 +1,6 @@
+const leaderboardModel = require("../leaderboard-model");
+const { listLatestSnapshotsForSeason } = require("../actuals-snapshots");
+
 function registerAuthRoutes(app, deps) {
   const MIN_PASSWORD_LENGTH = 6;
   const {
@@ -19,13 +22,27 @@ function registerAuthRoutes(app, deps) {
     NODE_ENV,
     claimGuestResponsesForUser,
     predictionsClosed,
-    getQuestions
+    getQuestions,
+    CURRENT_SEASON,
+    getRaces
   } = deps;
 
   const BRAND_NAME = String(COMPANY_NAME || "Wheel of Knowledge").trim() || "Wheel of Knowledge";
   const TEAM_SIGNOFF = `The ${BRAND_NAME} Team`;
   const EMAIL_SENDER = String(SMTP_FROM || "").trim()
     || (SMTP_USER ? `${BRAND_NAME} <${SMTP_USER}>` : BRAND_NAME);
+  const PREVIEW_SEASON = Number(CURRENT_SEASON || process.env.F1_SEASON || 2026);
+  const HOME_PREDICTION_TEASER_QUESTION_ID = "drivers_championship_top_3";
+  const DASHBOARD_GLOBAL_ANSWER_ITEMS = [
+    {
+      questionId: "drivers_championship_top_3",
+      titleKey: "dashboard.drivers_championship_preview"
+    },
+    {
+      questionId: "constructors_championship_top_3",
+      titleKey: "dashboard.constructors_championship_preview"
+    }
+  ];
 
   const escapeHtml = (value) =>
     String(value || "")
@@ -123,6 +140,69 @@ function registerAuthRoutes(app, deps) {
       return rankedRows.slice(0, safeLimit);
     }
     return [...rankedRows.slice(0, safeLimit - 1), rankedRows[currentIndex]];
+  };
+
+  const fetchSnapshotValuesBySnapshotIds = (snapshotIds) => {
+    const ids = (snapshotIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+    if (ids.length === 0) return {};
+    const placeholders = ids.map(() => "?").join(", ");
+    const rows = db
+      .prepare(
+        `
+        SELECT snapshot_id, question_id, value
+        FROM actual_snapshot_values
+        WHERE snapshot_id IN (${placeholders})
+        `
+      )
+      .all(...ids);
+    return rows.reduce((acc, row) => {
+      const snapshotId = Number(row.snapshot_id);
+      if (!acc[snapshotId]) acc[snapshotId] = {};
+      acc[snapshotId][row.question_id] = row.value;
+      return acc;
+    }, {});
+  };
+
+  const getPreviewMaxRoundNumber = () => {
+    if (typeof getRaces !== "function") return null;
+    const races = getRaces();
+    return Array.isArray(races) && races.length > 0 ? races.length : null;
+  };
+
+  const buildPreviewRoundDeltas = ({ members, responses, questions }) => {
+    const maxRoundNumber = getPreviewMaxRoundNumber();
+    const snapshots = listLatestSnapshotsForSeason(db, PREVIEW_SEASON, {
+      maxRoundNumber
+    });
+    if (snapshots.length < 2) return {};
+
+    const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(
+      snapshots.map((snapshot) => snapshot.id)
+    );
+    const snapshotsWithValues = snapshots.filter((snapshot) => {
+      const values = snapshotValuesById[snapshot.id] || {};
+      return Object.keys(values).length > 0;
+    });
+    if (snapshotsWithValues.length < 2) return {};
+
+    const latestRound = snapshotsWithValues[snapshotsWithValues.length - 1];
+    const previousRound = snapshotsWithValues[snapshotsWithValues.length - 2];
+    return leaderboardModel.buildRoundDeltas({
+      latestRows: leaderboardModel.buildLeaderboardRows({
+        members,
+        responses,
+        questions,
+        actualsByQuestion: snapshotValuesById[latestRound.id] || {}
+      }),
+      previousRows: leaderboardModel.buildLeaderboardRows({
+        members,
+        responses,
+        questions,
+        actualsByQuestion: snapshotValuesById[previousRound.id] || {}
+      })
+    });
   };
 
   function getHomeGlobalLeaderboard(locale, currentUserId) {
@@ -383,6 +463,12 @@ function registerAuthRoutes(app, deps) {
       scoreRow.total += scoreQuestion(question, predicted, actual);
     });
 
+    const latestRoundDeltasByParticipantId = buildPreviewRoundDeltas({
+      members,
+      responses,
+      questions
+    });
+
     const rows = buildLeaderboardPreviewRows(
       Object.values(scoreByUser).sort(
         (a, b) => b.total - a.total || String(a.name).localeCompare(String(b.name))
@@ -392,7 +478,11 @@ function registerAuthRoutes(app, deps) {
     ).map((row) => ({
       rank: row.rank,
       name: row.name,
-      total: row.total
+      total: row.total,
+      latestRoundDelta:
+        latestRoundDeltasByParticipantId[
+          leaderboardModel.normalizeParticipantId(row.userId)
+        ] || null
     }));
 
     if (rows.length === 0) return null;
@@ -403,16 +493,155 @@ function registerAuthRoutes(app, deps) {
     };
   }
 
+  const parseDashboardRankingAnswer = (rawValue) => {
+    if (rawValue == null || rawValue === "") return [];
+    try {
+      const parsed = JSON.parse(String(rawValue));
+      return Array.isArray(parsed)
+        ? parsed
+            .map((value) => String(value || "").trim())
+            .filter(Boolean)
+            .slice(0, 3)
+        : [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const parseRankingAnswerByPosition = (rawValue, placeCount) => {
+    const safePlaceCount = Math.max(1, Number(placeCount) || 3);
+    if (rawValue == null || rawValue === "") return Array.from({ length: safePlaceCount }, () => "");
+    try {
+      const parsed = JSON.parse(String(rawValue));
+      if (!Array.isArray(parsed)) return Array.from({ length: safePlaceCount }, () => "");
+      return Array.from({ length: safePlaceCount }, (_, index) =>
+        String(parsed[index] || "").trim()
+      );
+    } catch (err) {
+      return Array.from({ length: safePlaceCount }, () => "");
+    }
+  };
+
+  const summarizeRankingRowsByPlace = (rows, placeCount, limit = 5) => {
+    const safePlaceCount = Math.max(1, Number(placeCount) || 3);
+    const safeLimit = Math.max(1, Number(limit) || 5);
+    const total = Array.isArray(rows) ? rows.length : 0;
+    const buckets = Array.from({ length: safePlaceCount }, () => new Map());
+
+    (rows || []).forEach((row) => {
+      const picks = parseRankingAnswerByPosition(row.answer, safePlaceCount);
+      picks.forEach((pick, index) => {
+        if (!pick) return;
+        buckets[index].set(pick, (buckets[index].get(pick) || 0) + 1);
+      });
+    });
+
+    return buckets
+      .map((bucket, index) => ({
+        position: index + 1,
+        items: Array.from(bucket.entries())
+          .map(([label, count]) => ({
+            label,
+            count,
+            percent: total > 0 ? (count * 100) / total : 0
+          }))
+          .sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            return a.label.localeCompare(b.label);
+          })
+          .slice(0, safeLimit)
+      }))
+      .filter((place) => place.items.length > 0);
+  };
+
+  const getHomePredictionTeaser = (locale) => {
+    const globalGroup = db.prepare("SELECT id FROM groups WHERE is_global = 1 LIMIT 1").get();
+    if (!globalGroup) return null;
+
+    const questions = typeof getQuestions === "function" ? getQuestions(locale) : [];
+    const question = Array.isArray(questions)
+      ? questions.find((item) => item.id === HOME_PREDICTION_TEASER_QUESTION_ID)
+      : null;
+    const placeCount = Math.min(3, Math.max(1, Number(question?.count || 3)));
+
+    const rows = db
+      .prepare(
+        `
+        SELECT r.answer
+        FROM responses r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.group_id = ?
+          AND r.question_id = ?
+          AND COALESCE(u.hide_from_global, 0) = 0
+        ORDER BY u.name ASC
+        `
+      )
+      .all(Number(globalGroup.id), HOME_PREDICTION_TEASER_QUESTION_ID);
+    if (rows.length === 0) return null;
+
+    const positions = summarizeRankingRowsByPlace(rows, placeCount, 5);
+    if (positions.length === 0) return null;
+
+    return {
+      questionId: HOME_PREDICTION_TEASER_QUESTION_ID,
+      title: String(question?.prompt || "Drivers' Championship: pick your Top 3"),
+      responseCount: rows.length,
+      positions
+    };
+  };
+
+  const getDashboardGlobalAnswerPreview = (userId, globalGroup) => {
+    const safeUserId = Number(userId || 0);
+    const globalGroupId = Number(globalGroup?.id || 0);
+    if (!Number.isFinite(safeUserId) || safeUserId <= 0) return null;
+    if (!Number.isFinite(globalGroupId) || globalGroupId <= 0) return null;
+
+    const rows = db
+      .prepare(
+        `
+        SELECT question_id, answer
+        FROM responses
+        WHERE user_id = ?
+          AND group_id = ?
+          AND question_id IN (${DASHBOARD_GLOBAL_ANSWER_ITEMS.map(() => "?").join(", ")})
+        `
+      )
+      .all(
+        safeUserId,
+        globalGroupId,
+        ...DASHBOARD_GLOBAL_ANSWER_ITEMS.map((item) => item.questionId)
+      );
+    const answersByQuestion = rows.reduce((acc, row) => {
+      acc[row.question_id] = row.answer;
+      return acc;
+    }, {});
+
+    const items = DASHBOARD_GLOBAL_ANSWER_ITEMS.map((item) => ({
+      ...item,
+      picks: parseDashboardRankingAnswer(answersByQuestion[item.questionId]).map(
+        (label, index) => ({
+          position: index + 1,
+          label
+        })
+      )
+    }));
+
+    return {
+      items,
+      hasAnyAnswer: items.some((item) => item.picks.length > 0)
+    };
+  };
+
   app.get("/", (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
+    const isClosed = typeof predictionsClosed === "function" ? predictionsClosed() : false;
     res.render("home", {
       user,
-      predictionsClosed: typeof predictionsClosed === "function" ? predictionsClosed() : false,
+      predictionsClosed: isClosed,
+      homePredictionTeaser: isClosed ? getHomePredictionTeaser(locale) : null,
       globalLeaderboard: getHomeGlobalLeaderboard(locale, user ? user.id : null),
-      globalLeaderboardHref: user
-        ? "/global/leaderboard"
-        : `/login?redirectTo=${encodeURIComponent("/global/leaderboard")}`
+      globalLeaderboardHref: "/global/leaderboard"
     });
   });
 
@@ -750,7 +979,8 @@ function registerAuthRoutes(app, deps) {
 
   app.get(["/signup", "/register"], (req, res) => {
     const namedGuestDisplayName = String(req.session?.namedGuestAccess?.displayName || "");
-    const suggestedName = buildAvailableUserNameSuggestion(namedGuestDisplayName);
+    const requestedName = String(req.query.name || "").trim();
+    const suggestedName = buildAvailableUserNameSuggestion(namedGuestDisplayName || requestedName);
     renderSignup(res, {
       form: {
         name: suggestedName,
@@ -874,12 +1104,16 @@ function registerAuthRoutes(app, deps) {
         "UPDATE users SET is_verified = 1, verified_at = COALESCE(verified_at, ?) WHERE id = ?"
       ).run(now, userId);
       req.session.userId = userId;
+      req.session.devIdentityMode = shouldBeAdmin ? "admin" : "member";
       const pendingGuestClaim = db
         .prepare("SELECT guest_id FROM pending_guest_claims WHERE user_id = ?")
         .get(userId);
       const fallbackGuestId = String(pendingGuestClaim?.guest_id || "").trim();
       if (typeof claimGuestResponsesForUser === "function") {
-        claimGuestResponsesForUser(req, userId, { fallbackGuestId });
+        const conversionResult = claimGuestResponsesForUser(req, userId, { fallbackGuestId });
+        if (conversionResult?.needsReview) {
+          return res.redirect("/guest-conversion");
+        }
       }
       db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(userId);
       if (req.session) {
@@ -975,8 +1209,12 @@ function registerAuthRoutes(app, deps) {
       });
     }
     req.session.userId = user.id;
+    req.session.devIdentityMode = user.is_admin ? "admin" : "member";
     if (typeof claimGuestResponsesForUser === "function") {
-      claimGuestResponsesForUser(req, user.id);
+      const conversionResult = claimGuestResponsesForUser(req, user.id);
+      if (conversionResult?.needsReview) {
+        return res.redirect("/guest-conversion");
+      }
     }
     db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(user.id);
     return res.redirect("/dashboard");
@@ -1248,14 +1486,21 @@ function registerAuthRoutes(app, deps) {
       verification.user_id
     );
     req.session.userId = verification.user_id;
+    const verifiedUser = db
+      .prepare("SELECT is_admin FROM users WHERE id = ?")
+      .get(verification.user_id);
+    req.session.devIdentityMode = verifiedUser?.is_admin ? "admin" : "member";
     const pendingGuestClaim = db
       .prepare("SELECT guest_id FROM pending_guest_claims WHERE user_id = ?")
       .get(verification.user_id);
     const fallbackGuestId = String(pendingGuestClaim?.guest_id || "").trim();
     if (typeof claimGuestResponsesForUser === "function") {
-      claimGuestResponsesForUser(req, verification.user_id, {
+      const conversionResult = claimGuestResponsesForUser(req, verification.user_id, {
         fallbackGuestId
       });
+      if (conversionResult?.needsReview) {
+        return res.redirect("/guest-conversion");
+      }
     }
     db.prepare("DELETE FROM pending_guest_claims WHERE user_id = ?").run(
       verification.user_id
@@ -1399,6 +1644,12 @@ function registerAuthRoutes(app, deps) {
     }));
     const featuredGlobalGroup =
       groupsWithPositions.find((group) => Number(group.is_global) === 1) || null;
+    const currentUserGlobalVisibility = db
+      .prepare("SELECT COALESCE(hide_from_global, 0) as hide_from_global FROM users WHERE id = ?")
+      .get(user.id);
+    const isCurrentUserHiddenFromGlobal =
+      Number(currentUserGlobalVisibility?.hide_from_global || 0) === 1;
+    const globalAnswerPreview = getDashboardGlobalAnswerPreview(user.id, featuredGlobalGroup);
     const regularGroups = groupsWithPositions.filter((group) => Number(group.is_global) !== 1);
     const requestedGroupsPage = Number(req.query.groupsPage || 1);
     const currentGroupsPage =
@@ -1440,6 +1691,8 @@ function registerAuthRoutes(app, deps) {
       user,
       groups: groupsWithPositions,
       featuredGlobalGroup,
+      isCurrentUserHiddenFromGlobal,
+      globalAnswerPreview,
       regularGroups: pagedRegularGroups,
       currentGroupsPage: safeGroupsPage,
       totalGroupsPages,
