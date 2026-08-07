@@ -2,8 +2,9 @@ name: f1predictions
 
 services:
   app:
+    image: ${APP_IMAGE:-f1predictions-app:workspace}
     build: .
-    command: /bin/sh -c 'if [ "$NODE_ENV" = "development" ]; then npm run start:dev; else npm start; fi'
+    command: node server.js
     ports:
       - "${PORT:-3000}:3000"
     environment:
@@ -40,7 +41,6 @@ services:
       - PAYPAL_DONATION_LABEL=${PAYPAL_DONATION_LABEL:-Donate}
     volumes:
       - ${STATE_DIR:-f1_state}:/app/state
-      - ./data:/app/config:ro
     restart: unless-stopped
 
   tunnel:

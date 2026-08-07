@@ -1,0 +1,23 @@
+{
+  "contractVersion": 1,
+  "lifecycle": "durable",
+  "app": { "slug": "f1", "displayName": "F1 Predictions" },
+  "source": { "workspace": "/home/mhv-operator/workspace/f1" },
+  "runtime": { "service": "app", "port": 3000, "healthPath": "/healthz" },
+  "preview": { "enabled": true, "dataMode": "isolated" },
+  "production": {
+    "domain": "wheelofknowledge.com",
+    "image": "ghcr.io/maartenverkou/f1-predictions-2026",
+    "databaseBackend": "postgres"
+  },
+  "checks": {
+    "fast": ["npm run lint", "npm test"],
+    "release": ["npm run lint", "npm test", "npm run build", "npm run test:e2e"]
+  },
+  "database": {
+    "mode": "shared-postgres",
+    "network": "mhv-db",
+    "host": "mhv-postgres",
+    "credentialsOwner": "server"
+  }
+}
