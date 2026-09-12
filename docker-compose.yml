@@ -22,10 +22,13 @@ services:
       - DATA_DIR=/app/state
       - DB_PATH=/app/state/app.db
       - DATABASE_URL=${DATABASE_URL:-}
-      - QUESTIONS_PATH=/app/config/questions.json
-      - ROSTER_PATH=/app/config/roster.json
-      - RACES_PATH=/app/config/races.json
-      - LAST_SEASON_RESULTS_PATH=${LAST_SEASON_RESULTS_PATH:-/app/config/last-season-results.json}
+      # Production images include the immutable F1 configuration in /app/data.
+      # Do not point these paths at /app/config: that directory is only present
+      # when a development bind mount supplies it.
+      - QUESTIONS_PATH=/app/data/questions.json
+      - ROSTER_PATH=/app/data/roster.json
+      - RACES_PATH=/app/data/races.json
+      - LAST_SEASON_RESULTS_PATH=/app/data/last-season-results.json
       - SESSION_SECRET=${SESSION_SECRET:-change-me}
       - PREDICTIONS_CLOSE_AT=${PREDICTIONS_CLOSE_AT:-2026-03-05T23:59:59}
       - SMTP_USER=${SMTP_USER:-}
