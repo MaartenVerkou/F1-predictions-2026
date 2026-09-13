@@ -6,7 +6,7 @@ const { expect, test } = require("@playwright/test");
 
 const DB_PATH = path.join(__dirname, "..", "..", ".tmp", "playwright-state", "app.db");
 
-test("admin actuals shows pending review backlog and can mark latest sync reviewed", async ({ page }) => {
+test("admin actuals focuses review on a selected pending race and can mark it reviewed", async ({ page }) => {
   await page.goto("/");
 
   const db = new Database(DB_PATH);
@@ -62,16 +62,17 @@ test("admin actuals shows pending review backlog and can mark latest sync review
 
   await page.goto("/admin/actuals");
 
-  await expect(page.locator("body")).toContainText("Review backlog:");
+  const workspace = page.locator("[data-admin-race-review-workspace]");
+  await expect(workspace).toBeVisible();
   await expect(page.locator("body")).toContainText("1 round snapshot still needs admin review.");
-  await expect(
-    page.getByRole("button", { name: /Mark latest synced round reviewed/i })
-  ).toBeVisible();
+  await expect(workspace).toContainText("R6 - Monaco Grand Prix");
+  await expect(page.locator("[data-admin-actuals-form]")).toContainText("Does every team score points?");
+  await expect(workspace.getByRole("button", { name: /Mark this snapshot reviewed/i })).toBeVisible();
 
-  await page.getByRole("button", { name: /Mark latest synced round reviewed/i }).click();
+  await workspace.getByRole("button", { name: /Mark this snapshot reviewed/i }).click();
 
   await expect(page.getByText(/marked as reviewed/i)).toBeVisible();
-  await expect(page.getByText(/Status:\s*Reviewed/i)).toBeVisible();
+  await expect(workspace.getByText(/Status:\s*Reviewed/i)).toBeVisible();
 });
 
 test("admin actuals and admin tables fit phone-width screens", async ({ page }) => {

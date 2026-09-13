@@ -2412,9 +2412,7 @@ function registerAdminRoutes(app, deps) {
       latestSnapshots.map((snapshot) => [Number(snapshot.round_number), snapshot])
     );
     const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
-    const selectedTarget = String(req.query.target || "current").trim() || "current";
-    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
-    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
+    const requestedTarget = String(req.query.target || "").trim();
     const latestRoundNumber =
       Number.isFinite(Number(latestRoundSnapshot?.round_number))
         ? Number(latestRoundSnapshot.round_number)
@@ -2440,6 +2438,12 @@ function registerAdminRoutes(app, deps) {
       };
     });
 
+    const pendingReviewTargets = racesWithTargets.filter(
+      (target) => target.reviewStatus === REVIEW_STATUS_PENDING
+    );
+    const selectedTarget = requestedTarget || pendingReviewTargets.at(-1)?.key || "current";
+    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
+    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
     const selectedRaceTarget =
       selectedRoundNumber != null
         ? racesWithTargets.find((race) => race.roundNumber === selectedRoundNumber) || null
@@ -2460,24 +2464,6 @@ function registerAdminRoutes(app, deps) {
     const isFutureRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "future");
     const allowPastEdit = String(req.query.unlockPast || "").trim() === "1";
     const requiresPastUnlock = isPastRaceTarget && !allowPastEdit;
-    const pendingReviewTargets = racesWithTargets.filter(
-      (target) => target.reviewStatus === REVIEW_STATUS_PENDING
-    );
-    const liveActualsSnapshot =
-      latestRoundNumber != null ? latestSnapshotByRound.get(latestRoundNumber) || null : null;
-    const liveActualsReview = liveActualsSnapshot
-      ? {
-          snapshotId: Number(liveActualsSnapshot.id),
-          roundNumber: Number(liveActualsSnapshot.round_number),
-          roundName:
-            String(liveActualsSnapshot.round_name || "").trim()
-            || `Round ${liveActualsSnapshot.round_number}`,
-          reviewStatus: liveActualsSnapshot.review_status,
-          reviewedAt: liveActualsSnapshot.reviewed_at || null,
-          updatedAt: liveActualsSnapshot.updated_at || liveActualsSnapshot.created_at || null
-        }
-      : null;
-
     res.render("admin_actuals", {
       user,
       questions,
@@ -2488,7 +2474,6 @@ function registerAdminRoutes(app, deps) {
       raceTargets: racesWithTargets,
       selectedRaceTarget,
       selectedSnapshotMeta,
-      liveActualsReview,
       pendingReviewTargets,
       requiresPastUnlock,
       isFutureRaceTarget,
