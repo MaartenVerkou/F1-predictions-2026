@@ -114,3 +114,4 @@ The platform SHALL treat production path migration as a separate verified operat
 - **WHEN** the migrated app fails its registered health check
 - **THEN** Caddy routing SHALL remain pointed at the previously healthy deployment
 - **AND** the migration SHALL be marked failed for operator review
+

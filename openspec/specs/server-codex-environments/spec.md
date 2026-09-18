@@ -2,7 +2,6 @@
 
 ## Purpose
 Define how the MHV production server provides per-app Codex CLI environments without giving Codex unrestricted access to the whole server or live deployment checkouts.
-
 ## Requirements
 ### Requirement: App Codex environments are isolated by app
 The MHV production server SHALL provide Codex CLI environments per app instead of sharing one unrestricted Codex home across all apps.
@@ -80,3 +79,4 @@ Codex-assisted changes SHALL create candidate worktrees and preview environments
 - **WHEN** production deployment is requested
 - **THEN** deployment SHALL use the registered production deployment path
 - **AND** Codex SHALL NOT directly write into the live production checkout as the deploy mechanism
+

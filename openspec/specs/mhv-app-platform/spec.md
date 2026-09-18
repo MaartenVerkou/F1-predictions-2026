@@ -2,7 +2,6 @@
 
 ## Purpose
 Define the shared platform contract for registering, onboarding, previewing, deploying, and operating separate app repositories on the MHV server.
-
 ## Requirements
 ### Requirement: Apps are registered in the MHV app registry
 The platform SHALL maintain an app registry that records the operational metadata needed to deploy and operate each app on the shared MHV server.
@@ -83,3 +82,4 @@ Preview environments SHALL use registered app slugs and first-level MHV hostname
 - **WHEN** preview cleanup runs
 - **THEN** the preview container, preview route, and preview database or file-state clone SHALL be removed
 - **AND** the production app state SHALL remain unchanged
+
