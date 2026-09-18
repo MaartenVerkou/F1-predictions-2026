@@ -249,10 +249,10 @@ function clonePreviewDatabase(descriptor) {
 
   const container = process.env.WOK_POSTGRES_CONTAINER || "mhv-postgres";
   const createRole = `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role}') THEN CREATE ROLE \"${role}\" LOGIN PASSWORD '${password}'; ELSE ALTER ROLE \"${role}\" LOGIN PASSWORD '${password}'; END IF; END $$;`;
-  const createDatabase = `SELECT format('CREATE DATABASE %I OWNER %I', '${target}', '${role}') WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${target}')\\gexec`;
+  const createDatabase = `if ! psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '${target}'" | grep -q 1; then psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c ${shellQuote(`CREATE DATABASE "${target}" OWNER "${role}"`)}; fi`;
   serverShell(
     `docker exec ${shellQuote(container)} sh -lc ${shellQuote(
-      `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c ${shellQuote(createRole)} && psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c ${shellQuote(createDatabase)}`
+      `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c ${shellQuote(createRole)} && ${createDatabase}`
     )}`
   );
 
@@ -292,10 +292,10 @@ function removePreviewDatabase(descriptor) {
     throw new Error("Refusing to remove a database or role outside the WOK preview namespace");
   }
   const container = process.env.WOK_POSTGRES_CONTAINER || "mhv-postgres";
-  const sql = `SELECT format('DROP DATABASE IF EXISTS %I WITH (FORCE)', '${target}')\\gexec; DROP ROLE IF EXISTS \"${role}\";`;
+  const dropDatabase = `psql -v ON_ERROR_STOP=1 -U \"$POSTGRES_USER\" -d postgres -c ${shellQuote(`DROP DATABASE IF EXISTS \"${target}\" WITH (FORCE)`)} && psql -v ON_ERROR_STOP=1 -U \"$POSTGRES_USER\" -d postgres -c ${shellQuote(`DROP ROLE IF EXISTS \"${role}\"`)}`;
   serverShell(
     `docker exec ${shellQuote(container)} sh -lc ${shellQuote(
-      `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres -c ${shellQuote(sql)}`
+      dropDatabase
     )}`
   );
 }
