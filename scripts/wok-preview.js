@@ -265,7 +265,7 @@ function clonePreviewDatabase(descriptor) {
     )}`,
     `docker exec ${shellQuote(container)} sh -lc ${shellQuote(
       `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d ${target} -c ${shellQuote(
-        `GRANT CONNECT ON DATABASE "${target}" TO "${role}"; GRANT USAGE, CREATE ON SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${role}";`
+        `GRANT CONNECT ON DATABASE "${target}" TO "${role}"; REASSIGN OWNED BY CURRENT_USER TO "${role}"; ALTER SCHEMA public OWNER TO "${role}"; GRANT USAGE, CREATE ON SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${role}";`
       )}`
     )}`
   ].join("\n");
