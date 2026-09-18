@@ -318,9 +318,14 @@ function waitForPreviewHealth(descriptor, timeoutMs = 120000) {
       const safeLogs = `${logs.stdout || ""}${logs.stderr || ""}`
         .replace(/postgres(?:ql)?:\/\/[^\s)]+/gi, "postgres://[REDACTED]")
         .replace(/(password\s*[=:]\s*)[^\s,}]+/gi, "$1[REDACTED]")
-        .slice(-4000)
         .trim();
-      throw new Error(`WOK preview health check failed for ${descriptor.id}${safeLogs ? `\n${safeLogs}` : ""}`);
+      const diagnosticLines = safeLogs
+        .split(/\r?\n/)
+        .filter((line) => /error|fatal|password|permission|connect|timeout|refused/i.test(line))
+        .slice(0, 12)
+        .join("\n")
+        .slice(0, 4000);
+      throw new Error(`WOK preview health check failed for ${descriptor.id}${diagnosticLines ? `\n${diagnosticLines}` : ""}`);
     }
     const wait = Math.min(5000, Math.max(100, deadline - Date.now()));
     if (wait > 0) spawnSync("sleep", [String(Math.ceil(wait / 1000))]);
