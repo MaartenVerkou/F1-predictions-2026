@@ -20,6 +20,7 @@ const DEFAULT_RETENTION_DAYS = 7;
 const PREVIEW_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/;
 const PREVIEW_REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._\/-]*$/;
 const PRODUCTION_HOST = "wheelofknowledge.com";
+const PREVIEW_DATA_MODES = new Set(["sanitized", "clone"]);
 
 function isPresent(value) {
   return value !== undefined && value !== null && value !== "";
@@ -49,6 +50,15 @@ function validatePreviewRef(value) {
   return ref;
 }
 
+function validatePreviewDataMode(value, options = {}) {
+  const defaultMode = options.defaultMode || "sanitized";
+  const mode = String(value || defaultMode).trim().toLowerCase();
+  if (!PREVIEW_DATA_MODES.has(mode)) {
+    throw new Error("Invalid preview data mode: use sanitized or clone");
+  }
+  return mode;
+}
+
 function findWokApp(registry) {
   const app = (registry?.apps || []).find((candidate) => candidate.slug === "wok");
   if (!app) throw new Error("The MHV registry has no wok app entry");
@@ -68,6 +78,7 @@ function buildPreviewDescriptor(app, options = {}) {
 
   const id = validatePreviewId(options.id);
   const ref = validatePreviewRef(options.ref);
+  const dataMode = validatePreviewDataMode(options.dataMode);
   if (options.localPort !== undefined && (!Number.isInteger(Number(options.localPort)) || Number(options.localPort) < 1024 || Number(options.localPort) > 65535)) {
     throw new Error("Invalid local preview port: use a TCP port between 1024 and 65535");
   }
@@ -87,6 +98,7 @@ function buildPreviewDescriptor(app, options = {}) {
     app: "wok",
     id,
     ref,
+    dataMode,
     createdAt,
     expiresAt: addDays(createdAt, retentionDays),
     hostname,
@@ -133,6 +145,7 @@ function yamlQuote(value) {
 function renderComposeOverlay(descriptor, options = {}) {
   const localPort = options.localPort;
   const ports = localPort ? `\n    ports:\n      - \"127.0.0.1:${Number(localPort)}:3000\"` : "";
+  const sanitized = descriptor.dataMode === "sanitized";
   return `name: ${descriptor.composeProject}
 
 services:
@@ -141,7 +154,7 @@ services:
     build:
       context: ${yamlQuote(descriptor.worktree)}
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${sanitized ? "development" : "production"}
       PORT: \"3000\"
       APP_DOMAIN: ${yamlQuote(descriptor.hostname)}
       TRUST_PROXY_HOPS: \"1\"
@@ -150,7 +163,10 @@ services:
       DATABASE_URL: $${"{WOK_PREVIEW_DATABASE_URL}"}
       SESSION_SECRET: $${"{WOK_PREVIEW_SESSION_SECRET}"}
       ADMIN_EMAILS: $${"{WOK_PREVIEW_ADMIN_EMAILS:-}"}
-      DEV_AUTO_LOGIN: \"0\"
+      DEV_AUTO_LOGIN: \"${sanitized ? "1" : "0"}\"
+      DEV_AUTO_LOGIN_EMAIL: \"preview-admin@wok.invalid\"
+      DEV_AUTO_LOGIN_NAME: \"Preview Admin\"
+      WOK_PREVIEW_DATA_MODE: ${yamlQuote(descriptor.dataMode)}
       QUESTIONS_PATH: /app/config/questions.json
       ROSTER_PATH: /app/config/roster.json
       RACES_PATH: /app/config/races.json
@@ -181,6 +197,9 @@ networks:
 }
 
 function renderCaddyRoute(descriptor, options = {}) {
+  if (descriptor.dataMode !== "sanitized") {
+    throw new Error("Only sanitized WOK previews may receive a public route");
+  }
   const accessLine = options.accessUpstream
     ? `\n\tforward_auth ${options.accessUpstream} {\n\t\turi /verify\n\t}`
     : "";
@@ -242,7 +261,7 @@ function postgresCommand(descriptor, sql) {
   );
 }
 
-function clonePreviewDatabase(descriptor) {
+function provisionPreviewDatabase(descriptor) {
   const source = descriptor.database.source;
   const target = descriptor.database.name;
   const role = descriptor.database.role;
@@ -260,24 +279,31 @@ function clonePreviewDatabase(descriptor) {
     )}`
   );
 
-  const dumpRestore = [
-    "set -eu",
-    `docker exec ${shellQuote(container)} sh -lc ${shellQuote(
-      `pg_dump -U "$POSTGRES_USER" -d ${source} --no-owner --no-acl`
-    )} | docker exec -i ${shellQuote(container)} sh -lc ${shellQuote(
-      `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d ${target}`
-    )}`,
-    `docker exec ${shellQuote(container)} sh -lc ${shellQuote(
-      `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d ${target} -c ${shellQuote(
-        `GRANT CONNECT ON DATABASE "${target}" TO "${role}"; ALTER SCHEMA public OWNER TO "${role}"; DO $$ DECLARE object_name text; BEGIN FOR object_name IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP EXECUTE format('ALTER TABLE public.%I OWNER TO %I', object_name, '${role}'); END LOOP; FOR object_name IN SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public' LOOP EXECUTE format('ALTER SEQUENCE public.%I OWNER TO %I', object_name, '${role}'); END LOOP; END $$; GRANT USAGE, CREATE ON SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${role}";`
-      )}`
-    )}`
-  ].join("\n");
-  serverShell(dumpRestore);
-  return { password };
+  const grantOwnership = `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d ${target} -c ${shellQuote(
+    `GRANT CONNECT ON DATABASE "${target}" TO "${role}"; ALTER SCHEMA public OWNER TO "${role}"; GRANT USAGE, CREATE ON SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "${role}"; GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "${role}"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "${role}";`
+  )}`;
+
+  if (descriptor.dataMode === "clone") {
+    const dumpRestore = [
+      "set -eu",
+      `docker exec ${shellQuote(container)} sh -lc ${shellQuote(
+        `pg_dump -U "$POSTGRES_USER" -d ${source} --no-owner --no-acl`
+      )} | docker exec -i ${shellQuote(container)} sh -lc ${shellQuote(
+        `psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d ${target}`
+      )}`,
+      `docker exec ${shellQuote(container)} sh -lc ${shellQuote(grantOwnership)}`
+    ].join("\n");
+    serverShell(dumpRestore);
+  } else {
+    serverShell(`docker exec ${shellQuote(container)} sh -lc ${shellQuote(grantOwnership)}`);
+  }
+  return { password, cloned: descriptor.dataMode === "clone" };
 }
 
 function clonePreviewFileState(app, descriptor) {
+  if (descriptor.dataMode === "sanitized") {
+    return { cloned: false, source: null, mode: "sanitized" };
+  }
   const source = descriptor.fileStateSource;
   if (!source) return { cloned: false, source: null };
   if (!source.startsWith("/var/lib/wheelofknowledge/state")) {
@@ -286,7 +312,26 @@ function clonePreviewFileState(app, descriptor) {
   serverShell(
     `mkdir -p ${shellQuote(descriptor.stateDir)} && if [ -d ${shellQuote(source)} ]; then cp -a ${shellQuote(source)}/. ${shellQuote(descriptor.stateDir)}/; fi`
   );
-  return { cloned: true, source };
+  return { cloned: true, source, mode: "clone" };
+}
+
+function seedSanitizedPreview(descriptor) {
+  if (descriptor.dataMode !== "sanitized") return { seeded: false, mode: descriptor.dataMode };
+  const result = spawnSync(
+    "docker",
+    ["exec", descriptor.containerName, "node", "scripts/seed-wok-preview.js"],
+    { encoding: "utf8" }
+  );
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `Failed to seed sanitized preview ${descriptor.id}`);
+  }
+  let details = {};
+  try {
+    details = JSON.parse(String(result.stdout || "").trim().split(/\r?\n/).pop() || "{}");
+  } catch (_error) {
+    details = {};
+  }
+  return { seeded: true, mode: "sanitized", ...details };
 }
 
 function removePreviewDatabase(descriptor) {
@@ -457,6 +502,9 @@ function metadataFromDescriptor(descriptor) {
 
 function createPreview(registry, app, options) {
   const descriptor = buildPreviewDescriptor(app, options);
+  if (options.activateRoute && descriptor.dataMode !== "sanitized") {
+    throw new Error("Only sanitized WOK previews may be activated publicly");
+  }
   if (options.activateRoute && !options.accessConfirmed) {
     throw new Error("Refusing to activate a public preview route without --access-confirmed true");
   }
@@ -477,14 +525,13 @@ function createPreview(registry, app, options) {
     const fileState = clonePreviewFileState(app, descriptor);
 
     databaseCreated = true;
-    const { password } = clonePreviewDatabase(descriptor);
+    const { password } = provisionPreviewDatabase(descriptor);
     const databaseUrl = `postgres://${descriptor.database.role}:${password}@${descriptor.database.host}:5432/${descriptor.database.name}`;
     writePrivate(descriptor.envPath, [
       `WOK_PREVIEW_DATABASE_URL=${databaseUrl}`,
       `WOK_PREVIEW_SESSION_SECRET=${randomSecret()}`,
       "WOK_PREVIEW_ADMIN_EMAILS=",
-      "NODE_ENV=production",
-      "DEV_AUTO_LOGIN=0",
+      `WOK_PREVIEW_DATA_MODE=${descriptor.dataMode}`,
       ""
     ].join("\n"));
     writePrivate(descriptor.composePath, renderComposeOverlay(descriptor, { localPort: descriptor.localPort }));
@@ -492,9 +539,12 @@ function createPreview(registry, app, options) {
 
     shell("sh", ["-lc", `${composeCommand(descriptor, "up -d --build")} >/dev/null`]);
     const health = waitForPreviewHealth(descriptor);
+    const seed = seedSanitizedPreview(descriptor);
     const metadata = metadataFromDescriptor(descriptor);
     metadata.resolvedCommit = shell("git", ["-C", descriptor.worktree, "rev-parse", "HEAD"]).trim();
     metadata.fileState = fileState;
+    metadata.database = { ...metadata.database, seeded: seed.seeded === true };
+    metadata.seed = seed;
     metadata.status = "healthy";
     metadata.health = health;
 
@@ -563,7 +613,8 @@ function removePreview(registry, app, id) {
   const descriptor = buildPreviewDescriptor(app, {
     id: metadata.id,
     ref: metadata.ref,
-    now: metadata.createdAt
+    now: metadata.createdAt,
+    dataMode: metadata.dataMode || "clone"
   });
   if (metadata.route?.active) removeCaddyRoute(registry, descriptor);
   shell("sh", ["-lc", `${composeCommand(descriptor, "down --volumes --remove-orphans")} >/dev/null 2>&1 || true`]);
@@ -576,8 +627,16 @@ function removePreview(registry, app, id) {
 function activatePreview(registry, app, id, accessConfirmed) {
   if (!accessConfirmed) throw new Error("Refusing to activate a public preview route without --access-confirmed true");
   const metadata = readPreviewMetadata(app, id);
+  if (metadata.dataMode !== "sanitized") {
+    throw new Error(`Only sanitized WOK previews may be activated publicly: ${metadata.id}`);
+  }
   if (metadata.health?.status !== 200) throw new Error(`WOK preview is not healthy: ${metadata.id}`);
-  const descriptor = buildPreviewDescriptor(app, { id: metadata.id, ref: metadata.ref, now: metadata.createdAt });
+  const descriptor = buildPreviewDescriptor(app, {
+    id: metadata.id,
+    ref: metadata.ref,
+    now: metadata.createdAt,
+    dataMode: metadata.dataMode
+  });
   activateCaddyRoute(registry, descriptor);
   metadata.status = "active";
   metadata.route = { active: true, accessPolicy: descriptor.accessPolicy };
@@ -615,13 +674,13 @@ async function cli(argv = process.argv.slice(2)) {
   const app = findWokApp(registry);
 
   if (args.command === "plan") {
-    const descriptor = buildPreviewDescriptor(app, { id: args.id, ref: args.ref, now: args.now });
+    const descriptor = buildPreviewDescriptor(app, { id: args.id, ref: args.ref, now: args.now, dataMode: args["data-mode"] });
     print(redactPreviewStatus(descriptor), args.json);
     return;
   }
 
   if (args.command === "render") {
-    const descriptor = buildPreviewDescriptor(app, { id: args.id, ref: args.ref, now: args.now });
+    const descriptor = buildPreviewDescriptor(app, { id: args.id, ref: args.ref, now: args.now, dataMode: args["data-mode"] });
     const output = {
       descriptor: redactPreviewStatus(descriptor),
       compose: renderComposeOverlay(descriptor, { localPort: args["local-port"] }),
@@ -645,6 +704,7 @@ async function cli(argv = process.argv.slice(2)) {
       activateRoute: args["activate-route"] === "true" || args["activate-route"] === true,
       accessConfirmed: args["access-confirmed"] === "true" || args["access-confirmed"] === true,
       keepFailed: args["keep-failed"] === "true" || args["keep-failed"] === true,
+      dataMode: args["data-mode"],
       localPort: args["local-port"]
     })), args.json);
     return;
@@ -681,7 +741,12 @@ async function cli(argv = process.argv.slice(2)) {
 
   if (args.command === "smoke") {
     const metadata = readPreviewMetadata(app, args.id);
-    const descriptor = buildPreviewDescriptor(app, { id: metadata.id, ref: metadata.ref, now: metadata.createdAt });
+    const descriptor = buildPreviewDescriptor(app, {
+      id: metadata.id,
+      ref: metadata.ref,
+      now: metadata.createdAt,
+      dataMode: metadata.dataMode || "clone"
+    });
     const health = waitForPreviewHealth(descriptor, 5000);
     const [preview, production] = await Promise.all([
       request(`https://${descriptor.hostname}/healthz`),
@@ -723,5 +788,6 @@ module.exports = {
   renderComposeOverlay,
   validatePreviewSmoke,
   validatePreviewId,
-  validatePreviewRef
+  validatePreviewRef,
+  validatePreviewDataMode
 };

@@ -16,6 +16,12 @@ The app-hub catalog can link to the stable `wok` slug, but the direct preview
 hostname is the operational URL. This keeps the mature app independent from
 the app-hub UI implementation.
 
+Public previews always use `sanitized` data mode. They are built from an empty
+isolated database, seeded with deterministic fake race-review data, and never
+restore a production dump or copy production file state. A private diagnostic
+clone is available only with an explicit `--data-mode clone` and can never be
+activated publicly.
+
 ## Plan locally
 
 The plan and render commands are side-effect free and work on Windows:
@@ -24,17 +30,19 @@ The plan and render commands are side-effect free and work on Windows:
 npm run platform:wok-preview -- plan `
   --id admin-race-review-20260918 `
   --ref codex/streamline-admin-race-result-review `
+  --data-mode sanitized `
   --json
 
 npm run platform:wok-preview -- render `
   --id admin-race-review-20260918 `
   --ref codex/streamline-admin-race-result-review `
+  --data-mode sanitized `
   --json
 ```
 
-The rendered descriptor proves the exact ref, preview hostname, isolated
-PostgreSQL names, seven-day expiry, and the unchanged production host. It does
-not read or print production credentials.
+The rendered descriptor proves the exact ref, `dataMode: sanitized`, preview
+hostname, isolated PostgreSQL names, seven-day expiry, and the unchanged
+production host. It does not read or print production credentials.
 
 ## Create a server preview
 
@@ -43,9 +51,9 @@ from the deployed `main` checkout after it is merged), not from the live
 container. `mhv-server` intentionally has no Node installation; the checked-in
 `wok-preview-server.sh` helper runs the lifecycle in the pinned Node tooling
 image with only the required host paths mounted. The command fetches the exact
-ref, creates a detached worktree, clones PostgreSQL into a `wok_preview_*`
-database and role, clones disposable file state, generates a private `.env`,
-builds the container, and waits for `/healthz`.
+ref, creates a detached worktree, provisions an empty `wok_preview_*` database
+and role, seeds deterministic test data after schema health, generates a
+private `.env`, builds the container, and waits for `/healthz`.
 
 ```bash
 ssh mhv-server
@@ -53,6 +61,7 @@ cd /srv/f1-predictions/previews/_wok-preview-tooling-20260918
 ./scripts/wok-preview-server.sh create \
   --id admin-race-review-20260918 \
   --ref codex/streamline-admin-race-result-review \
+  --data-mode sanitized \
   --json
 ```
 
@@ -94,7 +103,7 @@ Expired previews can be reviewed without mutation and then removed explicitly:
 ```
 
 Cleanup is exact-id scoped. It removes only the preview route, compose project,
-worktree, cloned database/role, state directory, and metadata. Production
+worktree, preview database/role, state directory, and metadata. Production
 containers, the production database, host-managed secrets, and the canonical
 route are not cleanup targets.
 

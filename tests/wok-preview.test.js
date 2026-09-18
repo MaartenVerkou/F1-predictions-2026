@@ -12,6 +12,7 @@ const {
   redactPreviewStatus,
   validatePreviewId,
   validatePreviewRef,
+  validatePreviewDataMode,
   validatePreviewSmoke
 } = require("../scripts/wok-preview");
 
@@ -29,6 +30,7 @@ test("builds an isolated WOK preview descriptor from an exact ref", () => {
 
   assert.equal(descriptor.app, "wok");
   assert.equal(descriptor.ref, "codex/streamline-admin-race-result-review");
+  assert.equal(descriptor.dataMode, "sanitized");
   assert.equal(descriptor.hostname, "wok-preview-admin-race-review-20260918.mhvmade.com");
   assert.equal(descriptor.productionHost, "wheelofknowledge.com");
   assert.equal(descriptor.composeProject, "wok-preview-admin-race-review-20260918");
@@ -46,6 +48,7 @@ test("rejects unsafe preview ids and refs", () => {
   assert.throws(() => validatePreviewRef("codex/preview\nrm -rf"), /ref/i);
   assert.throws(() => validatePreviewRef(""), /ref/i);
   assert.throws(() => buildPreviewDescriptor(wok, { id: "review-1", ref: "main", localPort: 80 }), /local preview port/i);
+  assert.throws(() => validatePreviewDataMode("production"), /data mode/i);
 });
 
 test("renders explicit protected route without changing the production host", () => {
@@ -73,10 +76,27 @@ test("renders an isolated compose overlay without production secrets", () => {
   assert.match(compose, /name: wok-preview-review-1/);
   assert.match(compose, /DATABASE_URL: \$\{WOK_PREVIEW_DATABASE_URL\}/);
   assert.match(compose, /SESSION_SECRET: \$\{WOK_PREVIEW_SESSION_SECRET\}/);
+  assert.match(compose, /NODE_ENV: development/);
+  assert.match(compose, /DEV_AUTO_LOGIN: "1"/);
+  assert.match(compose, /WOK_PREVIEW_DATA_MODE: "sanitized"/);
   assert.match(compose, /mhv-db/);
   assert.match(compose, /mhv-web/);
   assert.doesNotMatch(compose, /f1_predictions/);
   assert.doesNotMatch(compose, /wheelofknowledge\.com/);
+});
+
+test("clone previews cannot render or activate a public route", () => {
+  const descriptor = buildPreviewDescriptor(wok, {
+    id: "private-clone",
+    ref: "main",
+    dataMode: "clone",
+    now: "2026-09-18T10:00:00.000Z"
+  });
+  assert.equal(descriptor.dataMode, "clone");
+  assert.throws(() => renderCaddyRoute(descriptor), /sanitized/i);
+  const compose = renderComposeOverlay(descriptor);
+  assert.match(compose, /NODE_ENV: production/);
+  assert.match(compose, /DEV_AUTO_LOGIN: "0"/);
 });
 
 test("status redaction never exposes credentials", () => {
