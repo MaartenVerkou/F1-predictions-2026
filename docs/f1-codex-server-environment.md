@@ -107,6 +107,11 @@ New apps should use their registry slug for Codex paths where possible:
 
 Existing compatibility paths, such as `/srv/codex/f1` for WOK, must be recorded in `ops/mhv-app-registry.json` so automation does not assume public slug and filesystem path are identical.
 
+WOK preview runs now use the registry slug `wok` and the direct
+`wok-preview-<id>.mhvmade.com` hostname. The compatibility `f1` path remains a
+filesystem detail only; see [`docs/wok-preview-lifecycle.md`](wok-preview-lifecycle.md)
+for the isolated preview and cleanup commands.
+
 ## SSH Operational Notes
 
 Public SSH on port 22 receives regular internet-wide scanning. `mhv-server` keeps password authentication disabled and uses key-only root login, but it also raises SSH pre-auth connection limits to avoid legitimate admin sessions being dropped during scan bursts:
