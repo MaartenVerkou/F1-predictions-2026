@@ -314,7 +314,13 @@ function waitForPreviewHealth(descriptor, timeoutMs = 120000) {
     });
     if (result.status === 0 && result.stdout.trim() === "healthy") return { status: 200, checkedAt: new Date().toISOString() };
     if (result.status === 0 && result.stdout.trim() === "unhealthy") {
-      throw new Error(`WOK preview health check failed for ${descriptor.id}`);
+      const logs = spawnSync("docker", ["logs", "--tail", "40", descriptor.containerName], { encoding: "utf8" });
+      const safeLogs = `${logs.stdout || ""}${logs.stderr || ""}`
+        .replace(/postgres(?:ql)?:\/\/[^\s)]+/gi, "postgres://[REDACTED]")
+        .replace(/(password\s*[=:]\s*)[^\s,}]+/gi, "$1[REDACTED]")
+        .slice(-4000)
+        .trim();
+      throw new Error(`WOK preview health check failed for ${descriptor.id}${safeLogs ? `\n${safeLogs}` : ""}`);
     }
     const wait = Math.min(5000, Math.max(100, deadline - Date.now()));
     if (wait > 0) spawnSync("sleep", [String(Math.ceil(wait / 1000))]);
