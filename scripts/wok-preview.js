@@ -503,6 +503,17 @@ function createPreview(registry, app, options) {
     writePrivate(descriptor.metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
     return metadata;
   } catch (error) {
+    if (options.keepFailed) {
+      const failed = metadataFromDescriptor(descriptor);
+      failed.status = "failed";
+      failed.cleanup = { expiresAt: descriptor.expiresAt, state: "manual", error: String(error.message || error).slice(0, 1000) };
+      try {
+        writePrivate(descriptor.metadataPath, `${JSON.stringify(failed, null, 2)}\n`);
+      } catch (_metadataError) {
+        // Keep the original failure if the diagnostic metadata cannot be written.
+      }
+      throw error;
+    }
     if (routeActivated) {
       try {
         removeCaddyRoute(registry, descriptor);
@@ -628,7 +639,8 @@ async function cli(argv = process.argv.slice(2)) {
       ref: args.ref,
       now: args.now,
       activateRoute: args["activate-route"] === "true" || args["activate-route"] === true,
-      accessConfirmed: args["access-confirmed"] === "true" || args["access-confirmed"] === true
+      accessConfirmed: args["access-confirmed"] === "true" || args["access-confirmed"] === true,
+      keepFailed: args["keep-failed"] === "true" || args["keep-failed"] === true
     })), args.json);
     return;
   }
