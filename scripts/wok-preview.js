@@ -68,6 +68,9 @@ function buildPreviewDescriptor(app, options = {}) {
 
   const id = validatePreviewId(options.id);
   const ref = validatePreviewRef(options.ref);
+  if (options.localPort !== undefined && (!Number.isInteger(Number(options.localPort)) || Number(options.localPort) < 1024 || Number(options.localPort) > 65535)) {
+    throw new Error("Invalid local preview port: use a TCP port between 1024 and 65535");
+  }
   const createdAt = new Date(options.now || Date.now()).toISOString();
   const retentionDays = Number(app.preview?.retentionDays || DEFAULT_RETENTION_DAYS);
   if (!Number.isInteger(retentionDays) || retentionDays < 1 || retentionDays > 30) {
@@ -90,6 +93,7 @@ function buildPreviewDescriptor(app, options = {}) {
     productionHost: PRODUCTION_HOST,
     composeProject: `wok-preview-${id}`,
     containerName: `wok-preview-${id}`,
+    localPort: options.localPort ? Number(options.localPort) : null,
     worktree: `${base}/worktree`,
     stateDir: `${base}/state`,
     fileStateSource: app.state?.durableFilePaths?.[0] || null,
@@ -483,7 +487,7 @@ function createPreview(registry, app, options) {
       "DEV_AUTO_LOGIN=0",
       ""
     ].join("\n"));
-    writePrivate(descriptor.composePath, renderComposeOverlay(descriptor));
+    writePrivate(descriptor.composePath, renderComposeOverlay(descriptor, { localPort: descriptor.localPort }));
     writePrivate(descriptor.routePath, renderCaddyRoute(descriptor));
 
     shell("sh", ["-lc", `${composeCommand(descriptor, "up -d --build")} >/dev/null`]);
@@ -640,7 +644,8 @@ async function cli(argv = process.argv.slice(2)) {
       now: args.now,
       activateRoute: args["activate-route"] === "true" || args["activate-route"] === true,
       accessConfirmed: args["access-confirmed"] === "true" || args["access-confirmed"] === true,
-      keepFailed: args["keep-failed"] === "true" || args["keep-failed"] === true
+      keepFailed: args["keep-failed"] === "true" || args["keep-failed"] === true,
+      localPort: args["local-port"]
     })), args.json);
     return;
   }
