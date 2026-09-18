@@ -4,24 +4,37 @@
 TBD - created by archiving change standardize-wok-preview-and-runtime. Update Purpose after archive.
 ## Requirements
 ### Requirement: WOK previews use isolated app resources
-The system SHALL create each WOK preview from an exact Git ref using a dedicated worktree, compose project, generated app secret, distinct PostgreSQL database and role, and disposable file-state directory.
+The system SHALL create each WOK preview from an exact Git ref using a dedicated worktree, compose project, generated app secret, distinct PostgreSQL database and role, and disposable file-state directory. A preview SHALL default to `sanitized` data mode; only an explicitly selected private `clone` mode may restore production data, and that mode SHALL remain ineligible for public activation.
 
-#### Scenario: Operator creates a preview
+#### Scenario: Operator creates a sanitized preview
 - **GIVEN** the WOK registry entry is valid and an exact Git ref is supplied
-- **WHEN** the operator creates preview identifier `123`
+- **WHEN** the operator creates preview identifier `123` without selecting clone mode
 - **THEN** the system SHALL create a worktree and runtime resources scoped to that identifier
-- **AND** it SHALL not write to the live production checkout or production database
-- **AND** the preview SHALL report its exact ref and resource names
+- **AND** it SHALL create an empty isolated preview database without restoring production data
+- **AND** it SHALL not copy registered production file state
+- **AND** the preview SHALL report `dataMode: sanitized`, its exact ref, and resource names
+
+#### Scenario: Operator creates a private clone preview
+- **GIVEN** the operator explicitly selects clone mode
+- **WHEN** the operator creates preview identifier `123`
+- **THEN** the system MAY restore production data into the isolated preview database
+- **AND** the preview metadata SHALL report `dataMode: clone`
+- **AND** public activation SHALL reject that preview
 
 ### Requirement: Active previews have explicit protected routes
-The system SHALL route an active WOK preview at `wok-preview-<id>.mhvmade.com` only while its resources are healthy and its explicit Caddy route is installed.
+The system SHALL route an active sanitized WOK preview at `wok-preview-<id>.mhvmade.com` only while its resources are healthy and its explicit Caddy route is installed. Clone-mode previews SHALL never be publicly activated.
 
-#### Scenario: Preview becomes reachable
-- **GIVEN** a preview container passes its health check
+#### Scenario: Sanitized preview becomes reachable
+- **GIVEN** a sanitized preview container passes its health check and access confirmation is supplied
 - **WHEN** the preview route is activated
 - **THEN** Caddy SHALL route the exact preview hostname to that preview container over `mhv-web`
 - **AND** access protection SHALL remain enabled
 - **AND** the production `wheelofknowledge.com` route SHALL remain unchanged
+
+#### Scenario: Clone preview activation is rejected
+- **GIVEN** a preview metadata record reports `dataMode: clone`
+- **WHEN** an operator attempts public activation
+- **THEN** the system SHALL reject the activation before changing Caddy
 
 ### Requirement: Preview cleanup is scoped and complete
 The system SHALL remove an expired or explicitly deleted preview's container, route, worktree, database, role, disposable file state, and metadata without modifying production resources.
@@ -33,11 +46,11 @@ The system SHALL remove an expired or explicitly deleted preview's container, ro
 - **AND** the production container, route, database, and state SHALL remain available
 
 ### Requirement: Preview status exposes verification evidence
-The system SHALL provide preview status showing the exact ref, hostname, health result, database isolation identity, creation time, expiry time, and cleanup state without printing secrets.
+The system SHALL provide preview status showing the exact ref, data mode, hostname, health result, database isolation identity, creation time, expiry time, and cleanup state without printing secrets.
 
 #### Scenario: Operator inspects a preview
 - **GIVEN** preview `123` is active
 - **WHEN** the operator requests its status
-- **THEN** the system SHALL show the preview URL and health state
+- **THEN** the system SHALL show the preview URL, data mode, and health state
 - **AND** it SHALL redact passwords, session secrets, and database connection credentials
 
