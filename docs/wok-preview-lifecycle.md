@@ -77,10 +77,12 @@ activate the explicit Caddy route:
 ```
 
 Route activation is health-gated and reloads Caddy only after its configuration
-validates. It appends a marker-scoped block for the preview and leaves the
-`wheelofknowledge.com` block untouched. The command deliberately requires the
-explicit `--access-confirmed true` acknowledgement; the generated Caddy file
-does not contain credentials.
+validates. The helper streams the current host Caddyfile into the edge
+container so a stale bind-mounted file cannot hide the new route. It appends a
+marker-scoped block for the preview and leaves the `wheelofknowledge.com`
+block untouched. The command deliberately requires the explicit
+`--access-confirmed true` acknowledgement; the generated Caddy file does not
+contain credentials.
 
 ## Inspect, smoke-test, and clean up
 
