@@ -81,7 +81,7 @@ Codex-assisted F1 changes SHALL be prepared in isolated worktrees and deployed t
 - **AND** Codex SHALL NOT directly mutate the live production checkout as the normal change path
 
 ### Requirement: Production deployment uses registered app metadata
-Production deployment automation SHALL use registered app metadata to determine where and how an app is deployed on the MHV server.
+Production deployment automation SHALL use registered app metadata to determine where and how an app is deployed on the MHV server, while preserving WOK's canonical production hostname `wheelofknowledge.com` during compatibility-path operation and migration.
 
 #### Scenario: Deployment starts for a registered app
 - **GIVEN** an app is registered in the MHV app registry
@@ -89,6 +89,7 @@ Production deployment automation SHALL use registered app metadata to determine 
 - **THEN** deployment SHALL use the registered production path
 - **AND** deployment SHALL use the registered Docker service names
 - **AND** deployment SHALL verify the registered health endpoint before reporting success
+- **AND** a WOK deployment SHALL keep `wheelofknowledge.com` as its canonical host
 
 #### Scenario: Deployment targets an unregistered app
 - **GIVEN** an app has no registry entry
@@ -106,6 +107,7 @@ The platform SHALL treat production path migration as a separate verified operat
 - **AND** it SHALL preserve host-managed secrets
 - **AND** it SHALL preserve persistent state
 - **AND** it SHALL pass the registered health check before Caddy routing is changed
+- **AND** WOK's canonical public hostname SHALL remain `wheelofknowledge.com`
 
 #### Scenario: Migration health check fails
 - **GIVEN** an app migration has started

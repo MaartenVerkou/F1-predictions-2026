@@ -65,7 +65,7 @@ App-scoped Codex environments SHALL align with the app registry so Codex work ca
 - **AND** future automation SHALL use the registry rather than assuming the public slug and filesystem path are identical
 
 ### Requirement: Codex preview work stays separate from production deployment
-Codex-assisted changes SHALL create candidate worktrees and preview environments without directly mutating production checkouts.
+Codex-assisted changes SHALL create candidate worktrees and preview environments without directly mutating production checkouts. WOK preview candidates SHALL use the public `wok` identity while preserving the existing `/srv/codex/f1` compatibility path until migration is complete.
 
 #### Scenario: Codex prepares a preview candidate
 - **GIVEN** Codex is processing a registered app run
@@ -73,6 +73,7 @@ Codex-assisted changes SHALL create candidate worktrees and preview environments
 - **THEN** the changes SHALL be made in a dedicated worktree
 - **AND** preview deployment SHALL use an isolated preview environment
 - **AND** the live production checkout SHALL remain owned by production deployment automation
+- **AND** WOK preview metadata SHALL identify the app as `wok`
 
 #### Scenario: Codex run requests production deploy
 - **GIVEN** a Codex run has produced a candidate change
