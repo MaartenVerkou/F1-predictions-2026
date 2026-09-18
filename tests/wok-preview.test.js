@@ -45,6 +45,7 @@ test("rejects unsafe preview ids and refs", () => {
   assert.throws(() => validatePreviewId("WOK-Preview"), /preview id/i);
   assert.throws(() => validatePreviewRef("codex/preview\nrm -rf"), /ref/i);
   assert.throws(() => validatePreviewRef(""), /ref/i);
+  assert.throws(() => buildPreviewDescriptor(wok, { id: "review-1", ref: "main", localPort: 80 }), /local preview port/i);
 });
 
 test("renders explicit protected route without changing the production host", () => {

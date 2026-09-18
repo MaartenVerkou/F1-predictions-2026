@@ -40,14 +40,17 @@ not read or print production credentials.
 
 Run the lifecycle from the candidate checkout that contains this script (or
 from the deployed `main` checkout after it is merged), not from the live
-container. The command fetches the exact ref, creates a detached worktree,
-clones PostgreSQL into a `wok_preview_*` database and role, generates a private
-`.env`, builds the container, and waits for `/healthz`.
+container. `mhv-server` intentionally has no Node installation; the checked-in
+`wok-preview-server.sh` helper runs the lifecycle in the pinned Node tooling
+image with only the required host paths mounted. The command fetches the exact
+ref, creates a detached worktree, clones PostgreSQL into a `wok_preview_*`
+database and role, clones disposable file state, generates a private `.env`,
+builds the container, and waits for `/healthz`.
 
 ```bash
 ssh mhv-server
-cd /srv/f1-predictions/current
-node scripts/wok-preview.js create \
+cd /srv/f1-predictions/previews/_wok-preview-tooling-20260918
+./scripts/wok-preview-server.sh create \
   --id admin-race-review-20260918 \
   --ref codex/streamline-admin-race-result-review \
   --json
@@ -58,7 +61,7 @@ first confirm the Cloudflare Access policy covers the exact hostname, then
 activate the explicit Caddy route:
 
 ```bash
-node scripts/wok-preview.js activate \
+./scripts/wok-preview-server.sh activate \
   --id admin-race-review-20260918 \
   --access-confirmed true \
   --json
@@ -73,9 +76,9 @@ does not contain credentials.
 ## Inspect, smoke-test, and clean up
 
 ```bash
-node scripts/wok-preview.js status --id admin-race-review-20260918 --json
-node scripts/wok-preview.js smoke --id admin-race-review-20260918 --json
-node scripts/wok-preview.js remove --id admin-race-review-20260918 --json
+./scripts/wok-preview-server.sh status --id admin-race-review-20260918 --json
+./scripts/wok-preview-server.sh smoke --id admin-race-review-20260918 --json
+./scripts/wok-preview-server.sh remove --id admin-race-review-20260918 --json
 ```
 
 Status redacts database passwords and session secrets. The smoke check requires
@@ -86,8 +89,8 @@ an installed route, confirmed access protection, a reachable preview (200/302/
 Expired previews can be reviewed without mutation and then removed explicitly:
 
 ```bash
-node scripts/wok-preview.js cleanup --json
-node scripts/wok-preview.js cleanup --apply true --json
+./scripts/wok-preview-server.sh cleanup --json
+./scripts/wok-preview-server.sh cleanup --apply true --json
 ```
 
 Cleanup is exact-id scoped. It removes only the preview route, compose project,
