@@ -411,6 +411,13 @@ function caddyfilePath(registry) {
   return path.posix.join(registry.platform?.edge?.path || "/srv/edge/current", "Caddyfile");
 }
 
+function validateAndReloadCaddy(edgeContainer, filePath) {
+  const input = shellQuote(filePath);
+  const container = shellQuote(edgeContainer);
+  serverShell(`cat ${input} | docker exec -i ${container} caddy validate --config - --adapter caddyfile`);
+  serverShell(`cat ${input} | docker exec -i ${container} caddy reload --config - --adapter caddyfile`);
+}
+
 function activateCaddyRoute(registry, descriptor) {
   const filePath = caddyfilePath(registry);
   const current = fs.readFileSync(filePath, "utf8");
@@ -422,8 +429,7 @@ function activateCaddyRoute(registry, descriptor) {
   fs.copyFileSync(filePath, backup);
   fs.writeFileSync(filePath, next, { mode: 0o640 });
   try {
-    serverShell(`docker exec ${shellQuote(descriptor.edge.container)} caddy validate --config /etc/caddy/Caddyfile`);
-    serverShell(`docker exec ${shellQuote(descriptor.edge.container)} caddy reload --config /etc/caddy/Caddyfile`);
+    validateAndReloadCaddy(descriptor.edge.container, filePath);
   } catch (error) {
     fs.copyFileSync(backup, filePath);
     throw error;
@@ -459,8 +465,7 @@ function removeCaddyRoute(registry, descriptor) {
   fs.copyFileSync(filePath, backup);
   fs.writeFileSync(filePath, next, { mode: 0o640 });
   try {
-    serverShell(`docker exec ${shellQuote(descriptor.edge.container)} caddy validate --config /etc/caddy/Caddyfile`);
-    serverShell(`docker exec ${shellQuote(descriptor.edge.container)} caddy reload --config /etc/caddy/Caddyfile`);
+    validateAndReloadCaddy(descriptor.edge.container, filePath);
   } catch (error) {
     fs.copyFileSync(backup, filePath);
     throw error;
