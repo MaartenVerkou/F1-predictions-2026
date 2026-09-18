@@ -2,67 +2,56 @@
 set -euo pipefail
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)"
+RELEASE_DIR="${F1_RELEASE_DIR:-/srv/f1-predictions/shared/releases}"
+TOKEN_FILE="${GHCR_TOKEN_FILE:-/srv/mhvmade-apps/shared/secrets/ghcr-read-token}"
+CURRENT_TAG="mhv-release/f1:current"
+ROLLBACK_TAG="mhv-release/f1:rollback"
+COMPOSE=(-f "$ROOT_DIR/docker-compose.yml" -f "$ROOT_DIR/docker-compose.server.yml")
+
+case "${APP_IMAGE:-}" in
+  ghcr.io/maartenverkou/f1-predictions-2026@sha256:*) ;;
+  *) echo "APP_IMAGE must be the immutable F1 GHCR digest" >&2; exit 2 ;;
+esac
+test -s "$TOKEN_FILE" || { echo "Missing GHCR read credential" >&2; exit 2; }
+mkdir -p "$RELEASE_DIR"
+
+previous_image="$(docker inspect f1predictions-app-1 --format '{{.Image}}' 2>/dev/null || true)"
+if [[ -n "$previous_image" ]]; then
+  docker image tag "$previous_image" "$ROLLBACK_TAG"
+  if [[ -f "$RELEASE_DIR/f1-current.json" ]]; then
+    cp "$RELEASE_DIR/f1-current.json" "$RELEASE_DIR/f1-rollback.json"
+  else
+    printf '{"type":"legacy-image","image_id":"%s"}\n' "$previous_image" > "$RELEASE_DIR/f1-rollback.json"
+  fi
+fi
+
+docker_config="$(mktemp -d)"
+trap 'rm -rf "$docker_config"' EXIT HUP INT TERM
+DOCKER_CONFIG="$docker_config" docker login ghcr.io -u maartenverkou --password-stdin < "$TOKEN_FILE" >/dev/null
+DOCKER_CONFIG="$docker_config" docker pull "$APP_IMAGE" >/dev/null
+
 cd "$ROOT_DIR"
+APP_IMAGE="$APP_IMAGE" docker compose "${COMPOSE[@]}" up -d --no-build --no-deps app
 
-compose_files_raw="${DEPLOY_COMPOSE_FILES:-docker-compose.yml}"
-health_url="${DEPLOY_HEALTH_URL:-http://127.0.0.1:3000/healthz}"
-render_probe_url="${DEPLOY_RENDER_PROBE_URL:-http://127.0.0.1:3000/login}"
-health_retries="${DEPLOY_HEALTH_RETRIES:-40}"
-health_sleep_seconds="${DEPLOY_HEALTH_SLEEP_SECONDS:-3}"
-
-IFS=':' read -r -a compose_files <<< "$compose_files_raw"
-compose_args=()
-for compose_file in "${compose_files[@]}"; do
-  if [[ -z "$compose_file" ]]; then
-    continue
+healthy=0
+for _attempt in {1..20}; do
+  container_id="$(docker compose "${COMPOSE[@]}" ps -q app)"
+  container_ip="$(docker inspect "$container_id" --format '{{(index .NetworkSettings.Networks "mhv-web").IPAddress}}')"
+  if curl --fail --silent "http://$container_ip:3000/healthz" | python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("status") == "ok" and d.get("databaseBackend") == "postgres" else 1)'; then
+    healthy=1
+    break
   fi
-  if [[ ! -f "$compose_file" ]]; then
-    echo "Missing compose file: $compose_file" >&2
-    exit 1
-  fi
-  compose_args+=(-f "$compose_file")
+  sleep 3
 done
 
-if [[ "${#compose_args[@]}" -eq 0 ]]; then
-  compose_args=(-f docker-compose.yml)
+if [[ "$healthy" != 1 ]]; then
+  echo "F1 health/database gate failed; restoring rollback image" >&2
+  if docker image inspect "$ROLLBACK_TAG" >/dev/null 2>&1; then
+    APP_IMAGE="$ROLLBACK_TAG" docker compose "${COMPOSE[@]}" up -d --no-build --no-deps app
+  fi
+  exit 1
 fi
 
-health_probe() {
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsS "$health_url" >/dev/null
-    return
-  fi
-  wget -q -O - "$health_url" >/dev/null
-}
-
-render_probe() {
-  if [[ -z "$render_probe_url" ]]; then
-    return 0
-  fi
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsS "$render_probe_url" >/dev/null
-    return
-  fi
-  wget -q -O - "$render_probe_url" >/dev/null
-}
-
-docker compose "${compose_args[@]}" config -q
-docker compose "${compose_args[@]}" up -d --build --no-deps app
-
-for ((attempt = 1; attempt <= health_retries; attempt += 1)); do
-  if health_probe && render_probe; then
-    echo "Deploy healthy via $health_url and render probe ${render_probe_url:-disabled}"
-    exit 0
-  fi
-  sleep "$health_sleep_seconds"
-done
-
-container_id="$(docker compose "${compose_args[@]}" ps -q app || true)"
-if [[ -n "$container_id" ]]; then
-  docker logs --tail 120 "$container_id" || true
-else
-  docker compose "${compose_args[@]}" ps || true
-fi
-
-echo "Deploy health check failed for $health_url and render probe ${render_probe_url:-disabled}" >&2
-exit 1
+docker image tag "$APP_IMAGE" "$CURRENT_TAG"
+printf '{"image":"%s","deployed_at":"%s"}\n' "$APP_IMAGE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RELEASE_DIR/f1-current.json"
+printf 'production_health=ok\ndatabase_backend=postgres\nimage=%s\n' "$APP_IMAGE"

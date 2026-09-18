@@ -25,6 +25,9 @@
   "engines": {
     "node": "20.x || 22.x || 23.x || 24.x"
   },
+  "overrides": {
+    "brace-expansion": "2.1.4"
+  },
   "dependencies": {
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.10.0",
@@ -32,7 +35,7 @@
     "express": "^4.19.2",
     "express-session": "^1.17.3",
     "helmet": "^8.2.0",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^9.1.0",
     "pg": "^8.22.0"
   },
   "devDependencies": {

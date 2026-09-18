@@ -1,11 +1,20 @@
-﻿# Codex Project Instructions
+# Codex Instructions
 
-- For non-trivial product, feature, and architecture changes, clarify first and use OpenSpec: /opsx:propose, /opsx:apply, then /opsx:archive.
-- Use grill-with-docs when requirements, terminology, or domain boundaries are unclear.
-- Use tdd for feature work where behavior can be tested.
-- Use diagnose for bugs, regressions, and performance issues.
-- For web apps, verify critical flows with Playwright before finishing.
-- For production app work, consider logging, error tracking, security/access control, and deployment verification before finishing.
-- For local production-parity testing, use `powershell -ExecutionPolicy Bypass -File scripts/start-production-parity.ps1`; stop it with `powershell -ExecutionPolicy Bypass -File scripts/stop-production-parity.ps1`. Do not leave Docker running after the user is done reviewing.
-- If the user describes work in plain language, infer the matching workflow from docs/codex-workflow.md; do not require exact skill or slash-command names.
-- Keep changes scoped, run relevant tests, and summarize verification.
+This is the durable Wheel of Knowledge / F1 Predictions app (`f1`).
+
+- Work only in `/home/mhv-operator/workspace/f1`; never edit `/srv` or `/opt` application source.
+- Read `mhv-app.yaml` and the relevant OpenSpec change before non-trivial work.
+- PostgreSQL is the production source of truth. Never copy production data into an image or preview.
+- Secrets and `DATABASE_URL` are server-owned; never print, commit or replace them.
+- Use OpenSpec for features, architecture and data-model changes. Use focused tests for small fixes.
+
+## Change loop
+
+1. Inspect Git state and the relevant code/specs.
+2. Make one coherent change and run `checks.fast` from `mhv-app.yaml`.
+3. For visible or runtime changes, run release checks and refresh the Apps Hub preview.
+4. Verify `/healthz` and critical Playwright flows, then wait for explicit preview approval.
+
+## Approved release
+
+After approval, commit and push `main`, wait for CI and Trivy to pass, and deploy only the approved immutable GHCR digest through Apps Hub. Always dry-run first. Production must report `databaseBackend=postgres`; otherwise restore the retained rollback image. Never use `latest` and never build the production image on the server.
