@@ -13,5 +13,5 @@
 
 - [x] 3.1 Add unit coverage for sanitized defaults, clone rejection, compose, and fixture behavior
 - [x] 3.2 Run lint, unit tests, and Playwright verification
-- [ ] 3.3 Replace the existing server preview with sanitized data and activate its public hostname
-- [ ] 3.4 Verify public preview reachability and unchanged production health/database backend
+- [x] 3.3 Replace the existing server preview with sanitized data and activate its public hostname
+- [x] 3.4 Verify public preview reachability and unchanged production health/database backend
