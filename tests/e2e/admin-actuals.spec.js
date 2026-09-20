@@ -76,6 +76,10 @@ test("admin actuals focuses review on a selected pending race and can mark it re
   await expect(page.getByText(/marked as reviewed/i)).toBeVisible();
   await expect(workspace.getByText(/Last reviewed:/i)).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/0 round snapshot/i);
+
+  await page.goto("/admin/actuals?target=round%3A8");
+  await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/No saved snapshot yet|Saving will create one|This race is still in the future/i);
 });
 
 test("admin actuals and admin tables fit phone-width screens", async ({ page }) => {

@@ -89,10 +89,6 @@ const targetTimingLabel = (target) => {
     </div>
   <% } %>
 
-  <% if (isFutureRaceTarget) { %>
-    <div class="alert admin-alert-spaced"><%= t('admin_actuals.future_race_warning') %></div>
-  <% } %>
-
   <hr class="admin-actuals-divider" />
 
   <form method="post" action="/admin/actuals" data-admin-actuals-form data-initial-dirty="<%= hasDraft ? 'true' : 'false' %>">
