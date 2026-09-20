@@ -3083,23 +3083,21 @@ button:disabled {
   margin: 0;
 }
 
-.admin-actuals-review-meta {
+.admin-actuals-target-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
+  align-items: flex-end;
+  gap: 12px;
   min-width: 0;
-  min-height: 32px;
 }
 
-.admin-actuals-review-meta .admin-inline-form {
+.admin-actuals-target-row > .admin-target-form {
+  flex: 1 1 340px;
+}
+
+.admin-target-action,
+.admin-target-meta {
   margin-left: auto;
-}
-
-.admin-actuals-divider {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 2px 0 0;
 }
 
 .admin-target-field {
@@ -3158,10 +3156,6 @@ button:disabled {
 
 .admin-status-line span {
   min-width: 0;
-}
-
-.admin-status-action {
-  margin-top: 4px;
 }
 
 .admin-table-scroll {
