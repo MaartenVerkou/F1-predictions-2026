@@ -50,6 +50,7 @@
     "status_reviewed": "Gecontroleerd",
     "last_sync_label": "Laatste sync",
     "reviewed_label": "Gecontroleerd",
+    "last_reviewed_label": "Laatst gecontroleerd",
     "mark_latest_reviewed": "Markeer laatste gesyncte race als gecontroleerd",
     "preview_autofill": "Autofill vooraf bekijken",
     "run_sync_now": "Seizoenssync nu uitvoeren",

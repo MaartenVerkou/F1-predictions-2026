@@ -3083,6 +3083,33 @@ button:disabled {
   margin: 0;
 }
 
+.admin-actuals-review-backlog {
+  margin: -2px 0 0;
+}
+
+.admin-actuals-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  min-height: 32px;
+}
+
+.admin-actuals-review-meta .admin-inline-form {
+  margin-left: auto;
+}
+
+.admin-review-needed {
+  font-weight: 700;
+}
+
+.admin-actuals-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 2px 0 0;
+}
+
 .admin-target-field {
   flex: 1 1 340px;
   max-width: 520px;

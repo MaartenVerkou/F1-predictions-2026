@@ -50,6 +50,7 @@
     "status_reviewed": "Reviewed",
     "last_sync_label": "Last sync",
     "reviewed_label": "Reviewed",
+    "last_reviewed_label": "Last reviewed",
     "mark_latest_reviewed": "Mark latest synced round reviewed",
     "preview_autofill": "Preview autofill in form",
     "run_sync_now": "Run season sync now",

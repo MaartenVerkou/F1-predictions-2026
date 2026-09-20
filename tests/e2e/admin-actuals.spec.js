@@ -64,15 +64,16 @@ test("admin actuals focuses review on a selected pending race and can mark it re
 
   const workspace = page.locator("[data-admin-race-review-workspace]");
   await expect(workspace).toBeVisible();
+  await expect(page.locator("[data-admin-actuals-target-form] select")).toBeVisible();
   await expect(page.locator("body")).toContainText("1 round snapshot still needs admin review.");
-  await expect(workspace).toContainText("R6 - Monaco Grand Prix");
   await expect(page.locator("[data-admin-actuals-form]")).toContainText("Does every team score points?");
   await expect(workspace.getByRole("button", { name: /Mark this snapshot reviewed/i })).toBeVisible();
 
   await workspace.getByRole("button", { name: /Mark this snapshot reviewed/i }).click();
 
   await expect(page.getByText(/marked as reviewed/i)).toBeVisible();
-  await expect(workspace.getByText(/Status:\s*Reviewed/i)).toBeVisible();
+  await expect(workspace.getByText(/Last reviewed:/i)).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(/0 round snapshot/i);
 });
 
 test("admin actuals and admin tables fit phone-width screens", async ({ page }) => {

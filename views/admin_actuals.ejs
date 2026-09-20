@@ -6,26 +6,17 @@
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
 };
-const reviewStatusLabel = (status) =>
-  status === 'pending' ? t('admin_actuals.status_pending') : t('admin_actuals.status_reviewed');
 const targetTimingLabel = (target) => {
   if (!target) return '';
   if (target.timing === 'past') return t('admin_actuals.timing_past');
   if (target.timing === 'future') return t('admin_actuals.timing_future');
   return t('admin_actuals.timing_current_race');
 };
-const targetReviewLabel = (target) => {
-  if (!target) return '';
-  if (target.reviewStatus === 'pending') return t('admin_actuals.needs_review');
-  if (target.reviewStatus === 'reviewed') return t('admin_actuals.reviewed');
-  return '';
-};
-const snapshotLabel = (target) =>
-  target?.snapshotLabel || `R${target?.roundNumber || ''} - ${target?.raceName || ''}`;
 const pendingReviewSummary =
   (pendingReviewTargets || []).length === 1
     ? t('admin_actuals.review_backlog_one')
     : t('admin_actuals.review_backlog_many', { count: (pendingReviewTargets || []).length });
+const hasPendingReview = (pendingReviewTargets || []).length > 0;
 %>
 
 <div class="card admin-page-card admin-actuals-page">
@@ -39,18 +30,15 @@ const pendingReviewSummary =
     <div class="alert admin-success"><%= saveSuccess %></div>
   <% } %>
 
-  <section class="admin-status-panel admin-snapshot-panel" data-admin-race-review-workspace>
-    <div class="admin-status-title"><%= pendingReviewSummary %></div>
-    <form method="get" action="/admin/actuals" class="admin-target-form">
+  <form method="get" action="/admin/actuals" class="admin-target-form admin-actuals-target-form" data-admin-actuals-target-form>
     <label class="admin-field admin-target-field">
       <span class="muted"><%= t('admin_actuals.target_label') %></span>
       <select name="target" onchange="this.form.submit()">
         <option value="current" <%= actualsTarget === 'current' ? 'selected' : '' %>><%= t('admin_actuals.current_live_actuals') %></option>
         <% raceTargets.forEach((target) => { %>
           <% const timing = targetTimingLabel(target); %>
-          <% const review = targetReviewLabel(target); %>
           <option value="<%= target.key %>" <%= actualsTarget === target.key ? 'selected' : '' %>>
-            <%= `R${target.roundNumber} - ${target.raceName}` %><%= timing ? ` (${timing})` : '' %><%= review ? ` | ${review}` : '' %>
+            <%= `R${target.roundNumber} - ${target.raceName}` %><%= timing ? ` (${timing})` : '' %>
           </option>
         <% }) %>
       </select>
@@ -61,34 +49,32 @@ const pendingReviewSummary =
       <input type="hidden" name="unlockPast" value="1" />
     <% } %>
     <noscript><button type="submit" class="secondary"><%= t('admin_actuals.open_target') %></button></noscript>
-    </form>
+  </form>
 
-    <% if (selectedRaceTarget && selectedRaceTarget.snapshotId) { %>
-      <p class="muted admin-status-line">
-        <span><%= t('admin_actuals.editing_snapshot') %>: <strong><%= snapshotLabel(selectedRaceTarget) %></strong></span>
-      </p>
-      <% if (selectedSnapshotMeta) { %>
-        <p class="muted admin-status-line">
-          <span><%= t('admin_actuals.status_label') %>: <strong><%= reviewStatusLabel(selectedSnapshotMeta.review_status) %></strong></span>
-          <span><%= t('admin_actuals.last_sync_label') %>: <strong><%= formatAdminDate(selectedSnapshotMeta.updated_at || selectedSnapshotMeta.created_at) %></strong></span>
-          <% if (selectedSnapshotMeta.review_status === 'reviewed' && selectedSnapshotMeta.reviewed_at) { %>
-            <span><%= t('admin_actuals.reviewed_label') %>: <strong><%= formatAdminDate(selectedSnapshotMeta.reviewed_at) %></strong></span>
+  <% if (hasPendingReview) { %>
+    <p class="muted admin-actuals-review-backlog"><%= pendingReviewSummary %></p>
+  <% } %>
+
+  <% if (selectedRaceTarget && selectedRaceTarget.snapshotId) { %>
+    <section class="admin-actuals-review-meta" data-admin-race-review-workspace>
+      <% if (selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'pending') { %>
+        <strong class="admin-review-needed"><%= t('admin_actuals.needs_review') %></strong>
+        <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-status-action">
+    <%- csrfField() %>
+          <input type="hidden" name="snapshotId" value="<%= selectedSnapshotMeta.id %>" />
+          <input type="hidden" name="target" value="<%= actualsTarget %>" />
+          <% if (selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
+            <input type="hidden" name="unlockPast" value="1" />
           <% } %>
-        </p>
-        <% if (selectedSnapshotMeta.review_status === 'pending') { %>
-          <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-status-action">
-      <%- csrfField() %>
-            <input type="hidden" name="snapshotId" value="<%= selectedSnapshotMeta.id %>" />
-            <input type="hidden" name="target" value="<%= actualsTarget %>" />
-            <% if (selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
-              <input type="hidden" name="unlockPast" value="1" />
-            <% } %>
-            <button type="submit" class="secondary"><%= t('admin_actuals.mark_snapshot_reviewed') %></button>
-          </form>
-        <% } %>
+          <button type="submit" class="secondary"><%= t('admin_actuals.mark_snapshot_reviewed') %></button>
+        </form>
+      <% } else if (selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'reviewed' && selectedSnapshotMeta.reviewed_at) { %>
+        <span class="muted"><%= t('admin_actuals.last_reviewed_label') %>: <strong><%= formatAdminDate(selectedSnapshotMeta.reviewed_at) %></strong></span>
       <% } %>
-    <% } %>
-  </section>
+    </section>
+  <% } else if (selectedRaceTarget) { %>
+    <p class="muted admin-page-note" data-admin-race-review-workspace><%= t('admin_actuals.no_snapshot_yet_prefix') %> <strong><%= `R${selectedRaceTarget.roundNumber} - ${selectedRaceTarget.raceName}` %></strong>. <%= t('admin_actuals.no_snapshot_yet_suffix') %></p>
+  <% } %>
 
   <% if (actualsTarget === 'current') { %>
     <div class="admin-actions admin-actuals-actions">
@@ -119,9 +105,7 @@ const pendingReviewSummary =
     <div class="alert admin-alert-spaced"><%= t('admin_actuals.future_race_warning') %></div>
   <% } %>
 
-  <% if (selectedRaceTarget && !selectedRaceTarget.snapshotId) { %>
-    <p class="muted admin-page-note"><%= t('admin_actuals.no_snapshot_yet_prefix') %> <strong><%= `R${selectedRaceTarget.roundNumber} - ${selectedRaceTarget.raceName}` %></strong>. <%= t('admin_actuals.no_snapshot_yet_suffix') %></p>
-  <% } %>
+  <hr class="admin-actuals-divider" />
 
   <form method="post" action="/admin/actuals" data-admin-actuals-form data-initial-dirty="<%= hasDraft ? 'true' : 'false' %>">
     <%- csrfField() %>
