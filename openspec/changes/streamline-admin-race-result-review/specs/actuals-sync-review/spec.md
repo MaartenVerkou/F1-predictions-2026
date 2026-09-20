@@ -5,12 +5,12 @@ The system SHALL expose pending review status to admins and SHALL allow reviewed
 
 Feature: Actual sync review
 
-Rule: Admin actuals controls SHALL expose the latest review backlog and SHALL allow reviewed corrections without overwriting unrelated scoring targets.
+Rule: Admin actuals controls SHALL allow reviewed corrections for selected snapshots without overwriting unrelated scoring targets.
 
 #### Scenario: Admin reviews the latest synced round
 - **GIVEN** the latest synced round snapshot is pending review
 - **WHEN** an admin opens the Season actuals page
-- **THEN** the system SHALL show the pending review backlog and the live scoring source
+- **THEN** the system SHALL show the live scoring source and the latest synced round in the selector
 - **AND** the system SHALL allow the admin to select and mark the latest synced round reviewed
 - **AND** the selected review view SHALL show the round's question context and interpreted actual values
 

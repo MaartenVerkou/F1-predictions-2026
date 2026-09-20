@@ -65,7 +65,9 @@ test("admin actuals focuses review on a selected pending race and can mark it re
   const workspace = page.locator("[data-admin-race-review-workspace]");
   await expect(workspace).toBeVisible();
   await expect(page.locator("[data-admin-actuals-target-form] select")).toBeVisible();
-  await expect(page.locator("body")).toContainText("1 round snapshot still needs admin review.");
+  await expect(page.locator("body")).not.toContainText(/round snapshot still needs admin review/i);
+  await expect(page.locator("body")).not.toContainText(/No saved snapshot yet|Saving will create one/i);
+  await expect(page.locator("body")).not.toContainText(/Last sync:|Status:/i);
   await expect(page.locator("[data-admin-actuals-form]")).toContainText("Does every team score points?");
   await expect(workspace.getByRole("button", { name: /Mark this snapshot reviewed/i })).toBeVisible();
 

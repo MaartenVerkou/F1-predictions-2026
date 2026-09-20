@@ -3083,10 +3083,6 @@ button:disabled {
   margin: 0;
 }
 
-.admin-actuals-review-backlog {
-  margin: -2px 0 0;
-}
-
 .admin-actuals-review-meta {
   display: flex;
   flex-wrap: wrap;
@@ -3098,10 +3094,6 @@ button:disabled {
 
 .admin-actuals-review-meta .admin-inline-form {
   margin-left: auto;
-}
-
-.admin-review-needed {
-  font-weight: 700;
 }
 
 .admin-actuals-divider {

@@ -19,7 +19,7 @@ The Season actuals page currently shows overlapping content: a pending-race list
 
 ### Make the selector the single review entry point
 
-Show a compact pending-count summary and race selector above the selected snapshot. The selector labels each race with concise status so the full season timeline and duplicate snapshot-status cards are unnecessary. This directly matches the operator's one-race-at-a-time verification task.
+Show the race selector first, followed by one compact selected-snapshot line. For a pending snapshot, the line contains only the existing review action; for a reviewed snapshot, it contains the last-reviewed date. A race without a snapshot gets no instructional paragraph because the existing save action already explains that saving creates it. This keeps the operator focused on one race without repeating the selected race name or a season-wide backlog count.
 
 ### Show question context within the selected snapshot
 
@@ -31,7 +31,7 @@ Keep the existing save/approve routes and their CSRF protection. The UI merely p
 
 ## Risks / Trade-offs
 
-- [Removing full-season detail may hide useful context] → Retain concise per-race status in the selector and an explicit pending count.
+- [Removing full-season detail may hide useful context] → Retain the selected race in the selector and the review action/date line; answer context remains below the divider.
 - [Question context can make the card long] → Limit it to relevant score-bearing questions and use the existing responsive admin layout classes.
 - [Snapshot selection could drift from form state] → Use the selector value as the single selected-round source for both displayed context and submit target.
 

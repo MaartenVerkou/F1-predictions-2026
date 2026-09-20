@@ -5,7 +5,7 @@ The Season actuals page repeats the same review backlog, sync status, race timel
 ## What Changes
 
 - Replace the redundant review summaries with one compact review workspace.
-- Make the race selector the primary control, with clear pending/reviewed state and a pending-count summary.
+- Make the race selector the primary control, with one compact pending/reviewed state line.
 - Present the selected race's answer-at-the-time context next to its interpreted actual results and review action.
 - Keep editing and approval scoped to the selected snapshot, without changing which latest reviewed snapshot drives live scoring.
 

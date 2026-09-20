@@ -12,11 +12,6 @@ const targetTimingLabel = (target) => {
   if (target.timing === 'future') return t('admin_actuals.timing_future');
   return t('admin_actuals.timing_current_race');
 };
-const pendingReviewSummary =
-  (pendingReviewTargets || []).length === 1
-    ? t('admin_actuals.review_backlog_one')
-    : t('admin_actuals.review_backlog_many', { count: (pendingReviewTargets || []).length });
-const hasPendingReview = (pendingReviewTargets || []).length > 0;
 %>
 
 <div class="card admin-page-card admin-actuals-page">
@@ -51,14 +46,9 @@ const hasPendingReview = (pendingReviewTargets || []).length > 0;
     <noscript><button type="submit" class="secondary"><%= t('admin_actuals.open_target') %></button></noscript>
   </form>
 
-  <% if (hasPendingReview) { %>
-    <p class="muted admin-actuals-review-backlog"><%= pendingReviewSummary %></p>
-  <% } %>
-
   <% if (selectedRaceTarget && selectedRaceTarget.snapshotId) { %>
     <section class="admin-actuals-review-meta" data-admin-race-review-workspace>
       <% if (selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'pending') { %>
-        <strong class="admin-review-needed"><%= t('admin_actuals.needs_review') %></strong>
         <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-status-action">
     <%- csrfField() %>
           <input type="hidden" name="snapshotId" value="<%= selectedSnapshotMeta.id %>" />
@@ -72,8 +62,6 @@ const hasPendingReview = (pendingReviewTargets || []).length > 0;
         <span class="muted"><%= t('admin_actuals.last_reviewed_label') %>: <strong><%= formatAdminDate(selectedSnapshotMeta.reviewed_at) %></strong></span>
       <% } %>
     </section>
-  <% } else if (selectedRaceTarget) { %>
-    <p class="muted admin-page-note" data-admin-race-review-workspace><%= t('admin_actuals.no_snapshot_yet_prefix') %> <strong><%= `R${selectedRaceTarget.roundNumber} - ${selectedRaceTarget.raceName}` %></strong>. <%= t('admin_actuals.no_snapshot_yet_suffix') %></p>
   <% } %>
 
   <% if (actualsTarget === 'current') { %>
