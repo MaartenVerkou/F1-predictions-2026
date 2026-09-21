@@ -23,5 +23,5 @@
 
 - [x] 4.1 Add vertical-slice tests for replacement, swap, empty seat, duplicate occupancy, round cutoff, historical confirmation, and permissions.
 - [x] 4.2 Add a sanitized preview fixture that demonstrates a mid-season replacement and verify the lineup before/after the cutoff.
-- [ ] 4.3 Run lint, targeted tests, OpenSpec strict validation, and preview smoke checks for Inputs → Questions → Race data → Actuals.
+- [x] 4.3 Run lint, targeted tests, OpenSpec strict validation, and preview smoke checks for Inputs → Questions → Race data → Actuals.
 - [x] 4.4 Keep production migration/deployment pending explicit preview approval.
