@@ -142,6 +142,19 @@ function upsertTeam(db, { slug, displayName, shortName = null, active = true, no
   return Number(result.lastInsertRowid);
 }
 
+function upsertRace(db, { seasonId, roundNumber, slug, displayName, scheduledDate = null, calendarState = "scheduled", now = new Date().toISOString() }) {
+  const existing = db.prepare("SELECT id FROM races WHERE season_id = ? AND round_number = ? LIMIT 1").get(Number(seasonId), Number(roundNumber));
+  if (existing) {
+    db.prepare("UPDATE races SET slug = ?, display_name = ?, scheduled_date = ?, calendar_state = ?, updated_at = ? WHERE id = ?")
+      .run(String(slug), String(displayName), scheduledDate, String(calendarState), now, Number(existing.id));
+    return Number(existing.id);
+  }
+  const result = db.prepare(
+    "INSERT INTO races (season_id, round_number, slug, display_name, scheduled_date, calendar_state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(Number(seasonId), Number(roundNumber), String(slug), String(displayName), scheduledDate, String(calendarState), now, now);
+  return Number(result.lastInsertRowid);
+}
+
 function upsertSeasonDriver(db, { seasonId, driverId, driverNumber = null, displayNameOverride = null, active = true, now = new Date().toISOString() }) {
   db.prepare(
     "INSERT INTO season_drivers (season_id, driver_id, driver_number, display_name_override, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) " +
@@ -276,6 +289,7 @@ module.exports = {
   splitDisplayName,
   upsertDriver,
   upsertDriverTeamAssignment,
+  upsertRace,
   upsertSeasonDriver,
   upsertSeasonTeam,
   upsertTeam
