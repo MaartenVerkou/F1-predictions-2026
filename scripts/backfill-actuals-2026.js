@@ -877,6 +877,36 @@ function loadExistingActuals(db) {
     }, {});
 }
 
+function compareSnapshotValues(existingValues, derivedValues) {
+  const existing = existingValues || {};
+  const derived = derivedValues || {};
+  const questionIds = new Set([...Object.keys(existing), ...Object.keys(derived)]);
+  let changedCount = 0;
+  let addedCount = 0;
+  let removedCount = 0;
+  let unchangedCount = 0;
+  for (const questionId of questionIds) {
+    const hasExisting = Object.prototype.hasOwnProperty.call(existing, questionId);
+    const hasDerived = Object.prototype.hasOwnProperty.call(derived, questionId);
+    if (hasExisting && hasDerived && String(existing[questionId]) === String(derived[questionId])) {
+      unchangedCount += 1;
+    } else {
+      changedCount += 1;
+      if (!hasExisting && hasDerived) addedCount += 1;
+      if (hasExisting && !hasDerived) removedCount += 1;
+    }
+  }
+  return {
+    status: existingValues == null ? "new" : changedCount > 0 ? "changed" : "unchanged",
+    existingCount: Object.keys(existing).length,
+    derivedCount: Object.keys(derived).length,
+    unchangedCount,
+    changedCount,
+    addedCount,
+    removedCount
+  };
+}
+
 function ensureActualsSchema(db) {
   if (db.dialect === "postgres") {
     ensurePostgresSchema(db);
@@ -1001,6 +1031,7 @@ function writeActualsAndSnapshots(db, {
 }) {
   const now = new Date().toISOString();
   let changedSnapshotCount = 0;
+  const comparison = [];
   const tx = db.transaction(() => {
     for (const snapshot of snapshots) {
       const evidenceId = saveRaceDataSnapshot(db, {
@@ -1030,6 +1061,14 @@ function writeActualsAndSnapshots(db, {
     for (const snapshot of snapshots) {
       const derived = derivedByRound.get(snapshot.roundNumber);
       snapshot.values = derived?.values || {};
+      const existingSnapshot = findLatestSnapshotForRound(db, season, snapshot.roundNumber);
+      const existingValues = existingSnapshot ? fetchSnapshotValues(db, existingSnapshot.id) : null;
+      snapshot.comparison = compareSnapshotValues(existingValues, snapshot.values);
+      comparison.push({
+        roundNumber: snapshot.roundNumber,
+        roundName: snapshot.roundName,
+        ...snapshot.comparison
+      });
       const snapshotResult = upsertSnapshot(db, {
         season,
         roundNumber: snapshot.roundNumber,
@@ -1064,7 +1103,14 @@ function writeActualsAndSnapshots(db, {
   return {
     updatedAt: now,
     latestRound: rounds[rounds.length - 1] || null,
-    changedSnapshotCount
+    changedSnapshotCount,
+    comparison: {
+      rounds: comparison,
+      newRounds: comparison.filter((item) => item.status === "new").length,
+      changedRounds: comparison.filter((item) => item.status === "changed").length,
+      unchangedRounds: comparison.filter((item) => item.status === "unchanged").length,
+      changedQuestionCount: comparison.reduce((total, item) => total + item.changedCount, 0)
+    }
   };
 }
 
@@ -1183,6 +1229,7 @@ async function main() {
           dbPath: args.dbPath,
           updatedAt: result.updatedAt,
           changedSnapshotCount: result.changedSnapshotCount,
+          comparison: result.comparison,
           snapshots: snapshots.map((snapshot) => ({
             id: snapshot.id,
             roundNumber: snapshot.roundNumber,
@@ -1239,5 +1286,6 @@ if (require.main === module) {
 
 module.exports = {
   buildPersistedDataFromEvidence,
+  compareSnapshotValues,
   deriveSnapshotsFromPersistedEvidence
 };

@@ -2,7 +2,32 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildPersistedDataFromEvidence } = require("../scripts/backfill-actuals-2026");
+const {
+  buildPersistedDataFromEvidence,
+  compareSnapshotValues
+} = require("../scripts/backfill-actuals-2026");
+
+test("snapshot comparison reports new, changed, and unchanged values", () => {
+  assert.deepEqual(compareSnapshotValues(null, { q1: "A" }), {
+    status: "new",
+    existingCount: 0,
+    derivedCount: 1,
+    unchangedCount: 0,
+    changedCount: 1,
+    addedCount: 1,
+    removedCount: 0
+  });
+  assert.deepEqual(compareSnapshotValues({ q1: "A", q2: "B" }, { q1: "A", q2: "C" }), {
+    status: "changed",
+    existingCount: 2,
+    derivedCount: 2,
+    unchangedCount: 1,
+    changedCount: 1,
+    addedCount: 0,
+    removedCount: 0
+  });
+  assert.equal(compareSnapshotValues({ q1: "A" }, { q1: "A" }).status, "unchanged");
+});
 
 test("persisted evidence reconstructs derivation input without provider objects", () => {
   const data = buildPersistedDataFromEvidence([{
