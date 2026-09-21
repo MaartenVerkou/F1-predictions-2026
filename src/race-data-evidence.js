@@ -59,7 +59,14 @@ function teamNameFromApi(constructor, rosterTeams = []) {
   );
 }
 
-function normalizeResultRow(row, roster, kind) {
+function canonicalId(catalog, kind, label) {
+  const options = catalog?.[kind] || catalog?.[`${kind}s`] || [];
+  const key = normalizeLookupKey(label);
+  const match = options.find((option) => normalizeLookupKey(option.label || option.display_name || option.displayName) === key || normalizeLookupKey(option.slug) === key);
+  return match ? Number(match.id) : null;
+}
+
+function normalizeResultRow(row, roster, kind, canonicalCatalog = null) {
   const driver = driverNameFromApi(row?.Driver, roster?.drivers || []);
   const constructor = teamNameFromApi(row?.Constructor, roster?.teams || []);
   if (!driver && !constructor) return null;
@@ -68,6 +75,10 @@ function normalizeResultRow(row, roster, kind) {
   return {
     driver,
     constructor,
+    driver_label: driver,
+    team_label: constructor,
+    driver_id: canonicalId(canonicalCatalog, "driver", driver),
+    team_id: canonicalId(canonicalCatalog, "team", constructor),
     number: String(row?.number || "").trim() || null,
     grid: parseNum(row?.grid),
     position,
@@ -80,7 +91,7 @@ function normalizeResultRow(row, roster, kind) {
   };
 }
 
-function normalizeStandingsRow(row, roster, entityType) {
+function normalizeStandingsRow(row, roster, entityType, canonicalCatalog = null) {
   const entity =
     entityType === "driver"
       ? driverNameFromApi(row?.Driver, roster?.drivers || [])
@@ -88,14 +99,16 @@ function normalizeStandingsRow(row, roster, entityType) {
   if (!entity) return null;
   return {
     entity,
+    entity_label: entity,
+    entity_id: canonicalId(canonicalCatalog, entityType === "driver" ? "driver" : "team", entity),
     position: parseNum(row?.position),
     points: parseNum(row?.points, 0)
   };
 }
 
-function normalizeSourceRows(rows, roster, kind) {
+function normalizeSourceRows(rows, roster, kind, canonicalCatalog = null) {
   return (Array.isArray(rows) ? rows : [])
-    .map((row) => normalizeResultRow(row, roster, kind))
+    .map((row) => normalizeResultRow(row, roster, kind, canonicalCatalog))
     .filter(Boolean);
 }
 
@@ -119,7 +132,7 @@ function normalizeCoverage({ race, qualifying, sprint, driverStandings, construc
   };
 }
 
-function buildEvidenceBundle({ data, roster, roundNumber, roundName, fetchedAt, sourceUrls = {} }) {
+function buildEvidenceBundle({ data, roster, roundNumber, roundName, fetchedAt, sourceUrls = {}, canonicalCatalog = null }) {
   const round = Number(roundNumber);
   const race = (data?.results || []).find((item) => Number(item?.round) === round) || {};
   const qualifyingRace =
@@ -128,18 +141,18 @@ function buildEvidenceBundle({ data, roster, roundNumber, roundName, fetchedAt, 
     (data?.sprints || []).find((item) => Number(item?.round) === round) || {};
   const driverStandings = data?.driverStandingsByRound?.get(round) || [];
   const constructorStandings = data?.constructorStandingsByRound?.get(round) || [];
-  const raceRows = normalizeSourceRows(race.Results, roster, "race");
+  const raceRows = normalizeSourceRows(race.Results, roster, "race", canonicalCatalog);
   const qualifyingRows = normalizeSourceRows(
     qualifyingRace.QualifyingResults,
     roster,
-    "qualifying"
+    "qualifying", canonicalCatalog
   );
-  const sprintRows = normalizeSourceRows(sprintRace.SprintResults, roster, "sprint");
+  const sprintRows = normalizeSourceRows(sprintRace.SprintResults, roster, "sprint", canonicalCatalog);
   const normalizedDriverStandings = driverStandings
-    .map((row) => normalizeStandingsRow(row, roster, "driver"))
+    .map((row) => normalizeStandingsRow(row, roster, "driver", canonicalCatalog))
     .filter(Boolean);
   const normalizedConstructorStandings = constructorStandings
-    .map((row) => normalizeStandingsRow(row, roster, "constructor"))
+    .map((row) => normalizeStandingsRow(row, roster, "constructor", canonicalCatalog))
     .filter(Boolean);
   const coverage = normalizeCoverage({
     race: raceRows,
@@ -175,7 +188,8 @@ function buildEvidenceBundle({ data, roster, roundNumber, roundName, fetchedAt, 
       constructors: normalizedConstructorStandings
     },
     external: {
-      driverOfTheDay: data?.driverOfTheDayByRound?.get(round) || null
+      driverOfTheDay: data?.driverOfTheDayByRound?.get(round) || null,
+      driverOfTheDayId: canonicalId(canonicalCatalog, "driver", data?.driverOfTheDayByRound?.get(round))
     }
   };
 }

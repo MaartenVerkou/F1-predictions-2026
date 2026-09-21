@@ -13,6 +13,8 @@ const {
 const roster = require("../data/roster.json");
 const races = require("../data/races.json").races;
 const { DRIVER_TEAM_ASSIGNMENTS, seedSeasonInputs } = require("./seed-season-inputs");
+const { listSeasonInputs } = require("../src/season-inputs");
+const { buildCanonicalCatalog } = require("../src/canonical-answers");
 
 const PREVIEW_SOURCE = "preview_fixture";
 const PREVIEW_SYNC_ID = "preview-race-audit-v2";
@@ -50,7 +52,7 @@ function buildRows(round, now) {
   });
 }
 
-function buildEvidence(round, now, totals) {
+function buildEvidence(round, now, totals, canonicalCatalog = null) {
   const roundName = races[round - 1] || "Round " + round;
   const cancelled = round === 10;
   const raceRows = cancelled ? [] : buildRows(round, now);
@@ -114,6 +116,7 @@ function buildEvidence(round, now, totals) {
         driverOfTheDayByRound: new Map([[round, roster.drivers[(round - 1) % roster.drivers.length]]])
       },
       roster,
+      canonicalCatalog,
       roundNumber: round,
       roundName,
       fetchedAt: now,
@@ -138,6 +141,7 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
 
   ensureRaceDataSchema(database);
   seedSeasonInputs(database, { season: 2026, now });
+  const canonicalCatalog = buildCanonicalCatalog(listSeasonInputs(database, 2026));
   const transaction = database.transaction(() => {
     database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
     database.prepare("DELETE FROM actual_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);
@@ -157,7 +161,7 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
     const totals = { drivers: {}, teams: {} };
     const snapshots = [];
     for (let round = 1; round <= 13; round += 1) {
-      const built = buildEvidence(round, now, totals);
+      const built = buildEvidence(round, now, totals, canonicalCatalog);
       const evidenceId = saveRaceDataSnapshot(database, {
         season: 2026,
         roundNumber: round,
