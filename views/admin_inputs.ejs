@@ -52,7 +52,7 @@
       </details>
       <div class="admin-race-data-table-wrap">
         <table class="admin-inputs-table">
-          <thead><tr><th><%= t('admin_inputs.driver_number') %></th><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.active') %></th><th><%= t('admin_inputs.edit') %></th></tr></thead>
+          <thead><tr><th>#</th><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.active') %></th><th><%= t('admin_inputs.edit') %></th></tr></thead>
           <tbody>
             <% catalog.drivers.forEach((driver) => { %>
               <% const assignment = catalog.assignments.find((item) => Number(item.driver_id) === Number(driver.id) && Number(item.from_round) <= 1 && (item.to_round == null || Number(item.to_round) >= 1)); %>
