@@ -76,6 +76,9 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster 
     ...base,
     drivers: drivers.length ? drivers : base.drivers || [],
     teams: teams.length ? teams : base.teams || [],
+    driver_options: drivers.length ? drivers : base.driver_options || base.drivers || [],
+    team_options: teams.length ? teams : base.team_options || base.teams || [],
+    race_options: races || base.race_options || base.races || [],
     races: races || base.races || []
   };
 }
