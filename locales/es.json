@@ -543,7 +543,7 @@
     "seat": "Puesto",
     "driver_1": "Piloto 1",
     "driver_2": "Piloto 2",
-    "add_driver": "Añadir piloto de reemplazo",
+    "add_driver": "Añadir piloto",
     "driver_name": "Nombre del piloto",
     "driver_number": "Número del piloto",
     "optional": "Opcional",
