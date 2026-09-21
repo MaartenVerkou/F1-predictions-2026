@@ -2076,38 +2076,12 @@ button:disabled {
   width: auto;
 }
 
-.admin-inputs-row-editor summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.admin-inputs-row-editor summary::-webkit-details-marker {
-  display: none;
-}
-
-.admin-inputs-edit-trigger {
-  display: inline-flex;
-  align-items: center;
-  min-height: 32px;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.admin-inputs-row-editor[open] .admin-inputs-edit-trigger {
-  background: color-mix(in srgb, var(--card) 85%, var(--border));
-}
-
 .admin-inputs-row-edit-form {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
   gap: 8px;
-  min-width: 280px;
-  margin-top: 8px;
+  margin: 0;
 }
 
 .admin-inputs-row-edit-form label {
@@ -2122,6 +2096,61 @@ button:disabled {
 .admin-inputs-row-edit-form select {
   min-width: 125px;
   width: auto;
+}
+
+.admin-inputs-table-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 34px;
+  margin: 10px 0 8px;
+}
+
+.admin-inputs-table-toolbar button {
+  min-height: 32px;
+}
+
+.admin-inputs-selection {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-inputs-table thead th {
+  border-bottom: 2px solid color-mix(in srgb, var(--border) 55%, var(--text));
+}
+
+.admin-inputs-table [data-selectable-row] {
+  cursor: pointer;
+}
+
+.admin-inputs-table [data-selectable-row]:hover td,
+.admin-inputs-table [data-selectable-row]:hover th,
+.admin-inputs-table [data-selectable-row].is-selected td,
+.admin-inputs-table [data-selectable-row].is-selected th {
+  background: color-mix(in srgb, var(--accent) 9%, var(--card));
+}
+
+.admin-inputs-table [data-selectable-row]:focus-visible td,
+.admin-inputs-table [data-selectable-row]:focus-visible th {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.admin-inputs-row-editor-row td {
+  padding: 10px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--card));
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-inputs-new-row td,
+.admin-inputs-new-row th {
+  background: color-mix(in srgb, var(--accent) 5%, var(--card));
+}
+
+.admin-inputs-new-row input {
+  min-width: 120px;
+  width: 100%;
 }
 
 .admin-inputs-assignment-form {
@@ -2199,10 +2228,6 @@ button:disabled {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
-}
-
-.admin-inputs-driver-create {
-  margin-bottom: 2px;
 }
 
 .admin-inputs-table {

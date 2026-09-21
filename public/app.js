@@ -1002,6 +1002,79 @@ const initScrollToEndButton = () => {
   updateVisibility();
 };
 
+const initAdminInputTables = () => {
+  document.querySelectorAll('[data-selectable-table]').forEach((table) => {
+    const tableName = table.dataset.selectableTable || '';
+    const toolbar = document.querySelector(`[data-table-toolbar="${tableName}"]`);
+    if (!toolbar) return;
+    const editButton = toolbar.querySelector('[data-table-edit]');
+    const selection = toolbar.querySelector('[data-table-selection]');
+    const rows = Array.from(table.querySelectorAll('[data-selectable-row]'));
+    let selectedRow = null;
+
+    const closeEditors = () => {
+      table.querySelectorAll('[data-row-editor]').forEach((editor) => {
+        editor.hidden = true;
+      });
+    };
+
+    const clearSelection = () => {
+      rows.forEach((row) => {
+        row.classList.remove('is-selected');
+        row.setAttribute('aria-selected', 'false');
+      });
+      selectedRow = null;
+      if (editButton) editButton.disabled = true;
+      if (selection) selection.textContent = '';
+    };
+
+    const selectRow = (row) => {
+      closeEditors();
+      rows.forEach((candidate) => {
+        const isSelected = candidate === row;
+        candidate.classList.toggle('is-selected', isSelected);
+        candidate.setAttribute('aria-selected', String(isSelected));
+      });
+      selectedRow = row;
+      if (editButton) editButton.disabled = false;
+      if (selection) selection.textContent = row.dataset.rowLabel || '';
+    };
+
+    rows.forEach((row) => {
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('a, button, input, select, textarea, label')) return;
+        selectRow(row);
+      });
+      row.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        selectRow(row);
+      });
+    });
+
+    editButton?.addEventListener('click', () => {
+      if (!selectedRow) return;
+      const editor = document.getElementById(selectedRow.dataset.editTarget || '');
+      if (!editor) return;
+      closeEditors();
+      editor.hidden = false;
+      editor.querySelector('input, select, textarea')?.focus();
+    });
+
+    const addDriverButton = toolbar.querySelector('[data-add-driver-row]');
+    if (addDriverButton) {
+      addDriverButton.addEventListener('click', () => {
+        closeEditors();
+        clearSelection();
+        const newRow = table.querySelector('[data-new-driver-row]');
+        if (!newRow) return;
+        newRow.hidden = !newRow.hidden;
+        if (!newRow.hidden) newRow.querySelector('input')?.focus();
+      });
+    }
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
   initHeaderOffsets();
@@ -1023,6 +1096,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNamedGuestSaveFeedback();
   initPredictionsAutosave();
   initAdminActualsUnsavedState();
+  initAdminInputTables();
   initSignupPasswordMatch();
   initScrollToEndButton();
 });
