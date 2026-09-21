@@ -62,8 +62,8 @@ function scanEvidence(db, catalog, counts) {
     const fakeQuestion = { id: `race-data-r${row.round_number}` };
     for (const section of ["race", "qualifying", "sprint"]) {
       for (const item of payload?.[section]?.rows || []) {
-        scanValue(db, catalog, counts, { ...fakeQuestion, options_source: "drivers" }, JSON.stringify({ driver: item.driver }), `evidence:${row.round_number}:${section}:driver`);
-        scanValue(db, catalog, counts, { ...fakeQuestion, options_source: "teams" }, JSON.stringify({ team: item.constructor }), `evidence:${row.round_number}:${section}:team`);
+        scanValue(db, catalog, counts, { ...fakeQuestion, options_source: "drivers" }, JSON.stringify({ driver: item.driver_id ? `driver:${item.driver_id}` : item.driver }), `evidence:${row.round_number}:${section}:driver`);
+        scanValue(db, catalog, counts, { ...fakeQuestion, options_source: "teams" }, JSON.stringify({ team: item.team_id ? `team:${item.team_id}` : item.constructor }), `evidence:${row.round_number}:${section}:team`);
       }
     }
   }
