@@ -79,6 +79,15 @@
     "provider_key": "Provider key",
     "save_alias": "Save alias",
     "save_provider": "Save provider mapping"
+    ,"lineup_round": "Line-up at round"
+    ,"display_order": "Order"
+    ,"order_basis": "Order basis"
+    ,"order_basis_official": "Official"
+    ,"order_basis_previous_standings": "Previous standings"
+    ,"order_basis_manual": "Manual"
+    ,"seat": "Seat"
+    ,"driver_1": "Driver 1"
+    ,"driver_2": "Driver 2"
   },
   "admin_actuals": {
     "page_title": "Set actuals",

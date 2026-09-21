@@ -25,8 +25,8 @@
 - [x] 4.2 Replace index-based preview driver/team generation with a coherent sanitized catalog and assignment fixture.
 - [ ] 4.3 Add tests for renames, team changes, provider aliases, ambiguous mappings, legacy values, round cutoff consistency, and seat occupancy.
 - [x] 4.4 Refresh the sanitized preview and verify Inputs → Questions → Race data → Actuals end-to-end without changing production.
-- [ ] 4.5 Add season-specific team display ordering and round-bounded seat 1/seat 2 assignments without using IDs as order.
-- [ ] 4.6 Present the team list and two driver seats as the primary Inputs lineup view while preserving normalized assignment history.
+- [x] 4.5 Add season-specific team display ordering and round-bounded seat 1/seat 2 assignments without using IDs as order.
+- [x] 4.6 Present the team list and two driver seats as the primary Inputs lineup view while preserving normalized assignment history.
 
 ## 5. Release gates
 

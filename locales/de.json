@@ -525,7 +525,16 @@
     "active": "Aktiv",
     "yes": "Ja",
     "no": "Nein",
-    "mappings_empty": "Es sind noch keine Aliase oder Provider-Mappings gespeichert."
+    "mappings_empty": "Es sind noch keine Aliase oder Provider-Mappings gespeichert.",
+    "lineup_round": "Aufstellung in Runde",
+    "display_order": "Reihenfolge",
+    "order_basis": "Reihenfolgebasis",
+    "order_basis_official": "Offiziell",
+    "order_basis_previous_standings": "Vorjahreswertung",
+    "order_basis_manual": "Manuell",
+    "seat": "Sitz",
+    "driver_1": "Fahrer 1",
+    "driver_2": "Fahrer 2"
   },
   "admin_actuals": {
     "page_title": "Set actuals",

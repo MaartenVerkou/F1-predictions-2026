@@ -68,7 +68,16 @@
     "active": "Actief",
     "yes": "Ja",
     "no": "Nee",
-    "mappings_empty": "Er zijn nog geen aliassen of provider-mappings vastgelegd."
+    "mappings_empty": "Er zijn nog geen aliassen of provider-mappings vastgelegd.",
+    "lineup_round": "Opstelling in ronde",
+    "display_order": "Volgorde",
+    "order_basis": "Basis voor volgorde",
+    "order_basis_official": "Officieel",
+    "order_basis_previous_standings": "Vorig klassement",
+    "order_basis_manual": "Handmatig",
+    "seat": "Stoel",
+    "driver_1": "Coureur 1",
+    "driver_2": "Coureur 2"
   },
   "admin_actuals": {
     "page_title": "Uitslagen invullen",

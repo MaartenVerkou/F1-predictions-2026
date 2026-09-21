@@ -49,6 +49,27 @@ const DRIVER_TEAM_ASSIGNMENTS = {
   "Valtteri Bottas": "Cadillac"
 };
 
+// Stable presentation order for the season. IDs remain opaque database keys;
+// this list can be replaced for a future season without renumbering entities.
+const TEAM_DISPLAY_ORDER = [
+  "Mercedes", "Ferrari", "McLaren", "Red Bull Racing", "Racing Bulls",
+  "Alpine", "Haas F1 Team", "Audi", "Williams", "Aston Martin", "Cadillac"
+];
+
+const TEAM_DRIVER_ORDER = {
+  Mercedes: ["George Russell", "Kimi Antonelli"],
+  Ferrari: ["Charles Leclerc", "Lewis Hamilton"],
+  McLaren: ["Lando Norris", "Oscar Piastri"],
+  "Red Bull Racing": ["Max Verstappen", "Isack Hadjar"],
+  "Racing Bulls": ["Liam Lawson", "Arvid Lindblad"],
+  Alpine: ["Pierre Gasly", "Franco Colapinto"],
+  "Haas F1 Team": ["Esteban Ocon", "Oliver Bearman"],
+  Audi: ["Nico Hulkenberg", "Gabriel Bortoleto"],
+  Williams: ["Carlos Sainz Jr.", "Alexander Albon"],
+  "Aston Martin": ["Fernando Alonso", "Lance Stroll"],
+  Cadillac: ["Sergio Perez", "Valtteri Bottas"]
+};
+
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
 }
@@ -69,7 +90,8 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       teamIds.set(teamName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, alias: teamName, source: "seed", now });
       addProviderReference(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, provider: "jolpica", providerKey: slugify(teamName), providerLabel: teamName, now });
-      upsertSeasonTeam(db, { seasonId: seasonRow.id, teamId: id, now });
+      const displayOrder = TEAM_DISPLAY_ORDER.indexOf(teamName) + 1 || TEAM_DISPLAY_ORDER.length + 1;
+      upsertSeasonTeam(db, { seasonId: seasonRow.id, teamId: id, displayOrder, orderBasis: "official", now });
     }
 
     const driverIds = new Map();
@@ -81,11 +103,12 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       upsertSeasonDriver(db, { seasonId: seasonRow.id, driverId: id, now });
       const teamName = DRIVER_TEAM_ASSIGNMENTS[driverName];
       if (!teamName || !teamIds.has(teamName)) throw new Error(`Missing canonical team assignment for ${driverName}.`);
-      const existing = db.prepare("SELECT id, team_id FROM driver_team_assignments WHERE season_id = ? AND driver_id = ? AND from_round = 1 LIMIT 1").get(seasonRow.id, id);
+      const seatNumber = (TEAM_DRIVER_ORDER[teamName] || []).indexOf(driverName) + 1 || 1;
+      const existing = db.prepare("SELECT id, team_id, seat_number FROM driver_team_assignments WHERE season_id = ? AND driver_id = ? AND from_round = 1 LIMIT 1").get(seasonRow.id, id);
       if (!existing) {
-        upsertDriverTeamAssignment(db, { seasonId: seasonRow.id, driverId: id, teamId: teamIds.get(teamName), fromRound: 1, source: "seed", now });
-      } else if (Number(existing.team_id) !== Number(teamIds.get(teamName))) {
-        db.prepare("UPDATE driver_team_assignments SET team_id = ?, source = ?, updated_at = ? WHERE id = ?").run(teamIds.get(teamName), "seed", now, Number(existing.id));
+        upsertDriverTeamAssignment(db, { seasonId: seasonRow.id, driverId: id, teamId: teamIds.get(teamName), seatNumber, fromRound: 1, source: "seed", now });
+      } else if (Number(existing.team_id) !== Number(teamIds.get(teamName)) || Number(existing.seat_number || 1) !== seatNumber) {
+        db.prepare("UPDATE driver_team_assignments SET team_id = ?, seat_number = ?, source = ?, updated_at = ? WHERE id = ?").run(teamIds.get(teamName), seatNumber, "seed", now, Number(existing.id));
       }
     }
 
@@ -120,4 +143,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { DRIVER_TEAM_ASSIGNMENTS, seedSeasonInputs };
+module.exports = { DRIVER_TEAM_ASSIGNMENTS, TEAM_DISPLAY_ORDER, TEAM_DRIVER_ORDER, seedSeasonInputs };

@@ -6,6 +6,7 @@ const {
   canonicalizeQuestionValue
 } = require("../src/canonical-answers");
 const leaderboard = require("../src/leaderboard-model");
+const { TEAM_DISPLAY_ORDER, TEAM_DRIVER_ORDER } = require("../scripts/seed-season-inputs");
 
 const catalog = buildCanonicalCatalog({
   drivers: [{ id: 1, display_name: "Lewis Hamilton", slug: "lewis-hamilton" }],
@@ -50,4 +51,17 @@ test("leaderboard scoring dual-reads legacy labels and canonical references", ()
     ),
     4
   );
+});
+
+test("season lineup keeps presentation order independent from database ids", () => {
+  assert.deepEqual(TEAM_DISPLAY_ORDER.slice(0, 4), ["Mercedes", "Ferrari", "McLaren", "Red Bull Racing"]);
+  assert.equal(TEAM_DISPLAY_ORDER.length, 11);
+  assert.deepEqual(TEAM_DRIVER_ORDER.Williams, ["Carlos Sainz Jr.", "Alexander Albon"]);
+});
+
+test("each seeded team has two explicit driver seats", () => {
+  for (const team of TEAM_DISPLAY_ORDER) {
+    assert.equal((TEAM_DRIVER_ORDER[team] || []).length, 2, `${team} must have two seats`);
+    assert.notEqual(TEAM_DRIVER_ORDER[team][0], TEAM_DRIVER_ORDER[team][1]);
+  }
 });

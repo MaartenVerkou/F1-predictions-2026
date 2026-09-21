@@ -77,12 +77,13 @@ function ensureSeasonInputsSchema(db) {
     );
     CREATE TABLE IF NOT EXISTS season_teams (
       season_id INTEGER NOT NULL, team_id INTEGER NOT NULL, display_name_override TEXT,
+      display_order INTEGER NOT NULL DEFAULT 0, order_basis TEXT NOT NULL DEFAULT 'manual',
       active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
       PRIMARY KEY(season_id, team_id)
     );
     CREATE TABLE IF NOT EXISTS driver_team_assignments (
       id ${identityType}, season_id INTEGER NOT NULL, driver_id INTEGER NOT NULL, team_id INTEGER NOT NULL,
-      from_round INTEGER NOT NULL, to_round INTEGER, source TEXT NOT NULL DEFAULT 'admin',
+      from_round INTEGER NOT NULL, to_round INTEGER, seat_number INTEGER NOT NULL DEFAULT 1, source TEXT NOT NULL DEFAULT 'admin',
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(season_id, driver_id, from_round)
     );
     CREATE INDEX IF NOT EXISTS idx_driver_team_assignments_lookup
@@ -100,6 +101,15 @@ function ensureSeasonInputsSchema(db) {
       UNIQUE(provider, provider_key), UNIQUE(entity_type, entity_id, provider)
     );
   `);
+  const addColumnIfMissing = (table, column, definition) => {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!columns.some((entry) => entry.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  };
+  addColumnIfMissing("season_teams", "display_order", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("season_teams", "order_basis", "TEXT NOT NULL DEFAULT 'manual'");
+  addColumnIfMissing("driver_team_assignments", "seat_number", "INTEGER NOT NULL DEFAULT 1");
 }
 
 function createOrGetSeason(db, { year, label = String(year), status = "active", now = new Date().toISOString() }) {
@@ -162,16 +172,19 @@ function upsertSeasonDriver(db, { seasonId, driverId, driverNumber = null, displ
   ).run(Number(seasonId), Number(driverId), driverNumber, displayNameOverride, active ? 1 : 0, now, now);
 }
 
-function upsertSeasonTeam(db, { seasonId, teamId, displayNameOverride = null, active = true, now = new Date().toISOString() }) {
+function upsertSeasonTeam(db, { seasonId, teamId, displayNameOverride = null, displayOrder = 0, orderBasis = "manual", active = true, now = new Date().toISOString() }) {
   db.prepare(
-    "INSERT INTO season_teams (season_id, team_id, display_name_override, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) " +
-    "ON CONFLICT(season_id, team_id) DO UPDATE SET display_name_override = excluded.display_name_override, active = excluded.active, updated_at = excluded.updated_at"
-  ).run(Number(seasonId), Number(teamId), displayNameOverride, active ? 1 : 0, now, now);
+    "INSERT INTO season_teams (season_id, team_id, display_name_override, display_order, order_basis, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+    "ON CONFLICT(season_id, team_id) DO UPDATE SET display_name_override = excluded.display_name_override, display_order = excluded.display_order, order_basis = excluded.order_basis, active = excluded.active, updated_at = excluded.updated_at"
+  ).run(Number(seasonId), Number(teamId), displayNameOverride, Number(displayOrder) || 0, String(orderBasis || "manual"), active ? 1 : 0, now, now);
 }
 
-function assertAssignmentDoesNotOverlap(db, { seasonId, driverId, fromRound, toRound = null, excludeId = null }) {
+function assertAssignmentDoesNotOverlap(db, { seasonId, driverId, teamId, seatNumber = 1, fromRound, toRound = null, excludeId = null }) {
   const nextFrom = Number(fromRound);
   const nextTo = toRound == null ? 9999 : Number(toRound);
+  const nextSeat = Number(seatNumber);
+  if (![1, 2].includes(nextSeat)) throw new Error("Seat number must be 1 or 2.");
+  if (toRound != null && Number(toRound) < nextFrom) throw new Error("Assignment end round must be on or after its start round.");
   const rows = excludeId == null
     ? db.prepare(
       "SELECT id, from_round, to_round FROM driver_team_assignments WHERE season_id = ? AND driver_id = ?"
@@ -185,19 +198,31 @@ function assertAssignmentDoesNotOverlap(db, { seasonId, driverId, fromRound, toR
     return currentFrom <= nextTo && currentTo >= nextFrom;
   });
   if (overlap) throw new Error(`Driver assignment overlaps assignment ${overlap.id}.`);
-  if (toRound != null && Number(toRound) < nextFrom) throw new Error("Assignment end round must be on or after its start round.");
+  const seatRows = excludeId == null
+    ? db.prepare(
+      "SELECT id, from_round, to_round FROM driver_team_assignments WHERE season_id = ? AND team_id = ? AND seat_number = ?"
+    ).all(Number(seasonId), Number(teamId), nextSeat)
+    : db.prepare(
+      "SELECT id, from_round, to_round FROM driver_team_assignments WHERE season_id = ? AND team_id = ? AND seat_number = ? AND id <> ?"
+    ).all(Number(seasonId), Number(teamId), nextSeat, Number(excludeId));
+  const seatOverlap = seatRows.find((row) => {
+    const currentFrom = Number(row.from_round);
+    const currentTo = row.to_round == null ? 9999 : Number(row.to_round);
+    return currentFrom <= nextTo && currentTo >= nextFrom;
+  });
+  if (seatOverlap) throw new Error(`Team seat overlaps assignment ${seatOverlap.id}.`);
 }
 
-function upsertDriverTeamAssignment(db, { id = null, seasonId, driverId, teamId, fromRound, toRound = null, source = "admin", now = new Date().toISOString() }) {
-  assertAssignmentDoesNotOverlap(db, { seasonId, driverId, fromRound, toRound, excludeId: id });
+function upsertDriverTeamAssignment(db, { id = null, seasonId, driverId, teamId, seatNumber = 1, fromRound, toRound = null, source = "admin", now = new Date().toISOString() }) {
+  assertAssignmentDoesNotOverlap(db, { seasonId, driverId, teamId, seatNumber, fromRound, toRound, excludeId: id });
   if (id != null) {
-    db.prepare("UPDATE driver_team_assignments SET team_id = ?, from_round = ?, to_round = ?, source = ?, updated_at = ? WHERE id = ?")
-      .run(Number(teamId), Number(fromRound), toRound == null ? null : Number(toRound), String(source), now, Number(id));
+    db.prepare("UPDATE driver_team_assignments SET team_id = ?, seat_number = ?, from_round = ?, to_round = ?, source = ?, updated_at = ? WHERE id = ?")
+      .run(Number(teamId), Number(seatNumber), Number(fromRound), toRound == null ? null : Number(toRound), String(source), now, Number(id));
     return Number(id);
   }
   const result = db.prepare(
-    "INSERT INTO driver_team_assignments (season_id, driver_id, team_id, from_round, to_round, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(Number(seasonId), Number(driverId), Number(teamId), Number(fromRound), toRound == null ? null : Number(toRound), String(source), now, now);
+    "INSERT INTO driver_team_assignments (season_id, driver_id, team_id, seat_number, from_round, to_round, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(Number(seasonId), Number(driverId), Number(teamId), Number(seatNumber), Number(fromRound), toRound == null ? null : Number(toRound), String(source), now, now);
   return Number(result.lastInsertRowid);
 }
 
@@ -267,7 +292,7 @@ function assignmentForRound(db, { seasonId, driverId, roundNumber }) {
   const row = db.prepare(
     "SELECT a.*, t.display_name AS team_name FROM driver_team_assignments a JOIN teams t ON t.id = a.team_id WHERE a.season_id = ? AND a.driver_id = ? AND a.from_round <= ? AND (a.to_round IS NULL OR a.to_round >= ?) ORDER BY a.from_round DESC LIMIT 1"
   ).get(Number(seasonId), Number(driverId), Number(roundNumber), Number(roundNumber));
-  return row ? { ...row, id: Number(row.id), team_id: Number(row.team_id) } : null;
+  return row ? { ...row, id: Number(row.id), team_id: Number(row.team_id), seat_number: Number(row.seat_number || 1) } : null;
 }
 
 function listSeasonInputs(db, year) {
@@ -277,9 +302,9 @@ function listSeasonInputs(db, year) {
   return {
     season: { ...season, id: seasonId, year: Number(season.year) },
     drivers: db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.display_name").all(seasonId),
-    teams: db.prepare("SELECT t.*, st.display_name_override, st.active AS season_active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? ORDER BY t.display_name").all(seasonId),
+    teams: db.prepare("SELECT t.*, st.display_name_override, st.display_order, st.order_basis, st.active AS season_active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? ORDER BY COALESCE(st.display_order, 9999), t.display_name").all(seasonId),
     races: db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId),
-    assignments: db.prepare("SELECT a.*, d.display_name AS driver_name, t.display_name AS team_name FROM driver_team_assignments a JOIN drivers d ON d.id = a.driver_id JOIN teams t ON t.id = a.team_id WHERE a.season_id = ? ORDER BY a.from_round, d.display_name").all(seasonId),
+    assignments: db.prepare("SELECT a.*, d.display_name AS driver_name, t.display_name AS team_name, st.display_order FROM driver_team_assignments a JOIN drivers d ON d.id = a.driver_id JOIN teams t ON t.id = a.team_id LEFT JOIN season_teams st ON st.season_id = a.season_id AND st.team_id = a.team_id WHERE a.season_id = ? ORDER BY COALESCE(st.display_order, 9999), a.seat_number, a.from_round, d.display_name").all(seasonId),
     unresolved: []
   };
 }

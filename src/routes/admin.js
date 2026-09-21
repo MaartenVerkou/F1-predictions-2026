@@ -24,6 +24,7 @@ const {
   upsertDriver,
   upsertDriverTeamAssignment,
   upsertRace,
+  upsertSeasonTeam,
   upsertTeam
 } = require("../season-inputs");
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
@@ -2475,11 +2476,16 @@ function registerAdminRoutes(app, deps) {
       : "drivers";
     const season = Number(req.query.season || CURRENT_SEASON);
     const catalog = listSeasonInputs(db, season);
+    const requestedRound = Number(req.query.round || 1);
+    const lineupRound = catalog.races.length
+      ? Math.min(Math.max(Number.isInteger(requestedRound) ? requestedRound : 1, 1), catalog.races.length)
+      : 1;
     catalog.impact = getSeasonInputImpact(season);
     return res.render("admin_inputs", {
       user,
       season,
       tab,
+      lineupRound,
       catalog,
       inputsReady: Boolean(catalog.season),
       query: req.query
@@ -2515,6 +2521,8 @@ function registerAdminRoutes(app, deps) {
     const entityId = Number(req.body.entity_id);
     const displayName = String(req.body.display_name || "").trim();
     const calendarState = String(req.body.calendar_state || "scheduled").trim().toLowerCase() || "scheduled";
+    const displayOrder = Number(req.body.display_order || 0);
+    const orderBasis = String(req.body.order_basis || "manual").trim().toLowerCase() || "manual";
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
@@ -2529,6 +2537,9 @@ function registerAdminRoutes(app, deps) {
         const row = catalog.teams.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Team is not part of this season.");
         upsertTeam(db, { slug: row.slug, displayName, shortName: row.short_name, active: Number(row.active) !== 0 });
+        if (!Number.isInteger(displayOrder) || displayOrder < 0) throw new Error("Display order must be a non-negative number.");
+        if (!["official", "previous_standings", "manual"].includes(orderBasis)) throw new Error("Unsupported order basis.");
+        upsertSeasonTeam(db, { seasonId: catalog.season.id, teamId: entityId, displayOrder, orderBasis, active: Number(row.season_active) !== 0 });
       } else if (entityType === "race") {
         const row = catalog.races.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Race is not part of this season.");
@@ -2563,6 +2574,7 @@ function registerAdminRoutes(app, deps) {
     const id = String(req.body.id || "").trim() ? Number(req.body.id) : null;
     const driverId = Number(req.body.driver_id);
     const teamId = Number(req.body.team_id);
+    const seatNumber = Number(req.body.seat_number || 1);
     const fromRound = Number(req.body.from_round);
     const toRoundRaw = String(req.body.to_round || "").trim();
     const toRound = toRoundRaw ? Number(toRoundRaw) : null;
@@ -2573,6 +2585,7 @@ function registerAdminRoutes(app, deps) {
       if (!catalog.season || !catalog.drivers.some((row) => Number(row.id) === driverId) || !catalog.teams.some((row) => Number(row.id) === teamId)) {
         throw new Error("Choose a driver and team from this season.");
       }
+      if (![1, 2].includes(seatNumber)) throw new Error("Seat number must be 1 or 2.");
       if (!Number.isInteger(fromRound) || fromRound < 1 || fromRound > catalog.races.length) {
         throw new Error("From round must be a valid season round.");
       }
@@ -2584,6 +2597,7 @@ function registerAdminRoutes(app, deps) {
         seasonId: catalog.season.id,
         driverId,
         teamId,
+        seatNumber,
         fromRound,
         toRound,
         source
@@ -2594,6 +2608,7 @@ function registerAdminRoutes(app, deps) {
         assignmentId,
         driverId,
         teamId,
+        seatNumber,
         fromRound,
         toRound
       });

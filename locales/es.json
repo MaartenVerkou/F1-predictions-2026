@@ -525,7 +525,16 @@
     "active": "Activo",
     "yes": "Sí",
     "no": "No",
-    "mappings_empty": "Todavía no hay alias ni mapeos de proveedores registrados."
+    "mappings_empty": "Todavía no hay alias ni mapeos de proveedores registrados.",
+    "lineup_round": "Alineación en la ronda",
+    "display_order": "Orden",
+    "order_basis": "Base del orden",
+    "order_basis_official": "Oficial",
+    "order_basis_previous_standings": "Clasificación anterior",
+    "order_basis_manual": "Manual",
+    "seat": "Puesto",
+    "driver_1": "Piloto 1",
+    "driver_2": "Piloto 2"
   },
   "admin_actuals": {
     "page_title": "Set actuals",
