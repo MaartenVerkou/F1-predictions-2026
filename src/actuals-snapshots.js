@@ -146,6 +146,7 @@ function findLatestSnapshotForRound(db, season, roundNumber, options = {}) {
           review_status,
           reviewed_at,
           reviewed_by_user_id,
+          source_data_import_id,
           source_data_snapshot_id
         FROM actual_snapshots
         WHERE season = ?
@@ -184,6 +185,7 @@ function findLatestRoundSnapshotForSeason(db, season, options = {}) {
           review_status,
           reviewed_at,
           reviewed_by_user_id,
+          source_data_import_id,
           source_data_snapshot_id
         FROM actual_snapshots
         WHERE season = ?
@@ -222,6 +224,7 @@ function listLatestSnapshotsForSeason(db, season, options = {}) {
         review_status,
         reviewed_at,
         reviewed_by_user_id,
+        source_data_import_id,
         source_data_snapshot_id
       FROM actual_snapshots
       WHERE season = ?
@@ -261,6 +264,7 @@ function findSnapshotById(db, snapshotId, options = {}) {
           review_status,
           reviewed_at,
           reviewed_by_user_id,
+          source_data_import_id,
           source_data_snapshot_id
         FROM actual_snapshots
         WHERE id = ?
