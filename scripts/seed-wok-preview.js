@@ -4,16 +4,19 @@ const { createAppDatabase } = require("../src/app-database");
 const {
   SOURCE_TYPES,
   buildEvidenceBundle,
+  completeRaceDataImport,
+  createRaceDataImport,
   ensureRaceDataSchema,
   linkEvidenceToActualSnapshot,
   saveRaceDataSnapshot
 } = require("../src/race-data-evidence");
 const roster = require("../data/roster.json");
+const races = require("../data/races.json").races;
 
 const PREVIEW_SOURCE = "preview_fixture";
-const PREVIEW_ROUND = 6;
-const PREVIEW_VALUE = "yes";
-const PREVIEW_SYNC_ID = "preview-fixture-r6-v1";
+const PREVIEW_SYNC_ID = "preview-race-audit-v2";
+const PREVIEW_PARSER_VERSION = "preview-evidence-v1";
+const SANITIZED_NOTE = "Sanitized WOK preview fixture; not production data";
 
 function splitDriverName(name) {
   const parts = String(name).split(" ");
@@ -23,69 +26,103 @@ function splitDriverName(name) {
   };
 }
 
-function buildPreviewEvidence(now) {
-  const drivers = roster.drivers.slice(0, 6);
-  const teams = roster.teams.slice(0, 3);
-  const points = [25, 18, 15, 12, 10, 8];
-  const results = drivers.map((name, index) => ({
-    number: String(1 + index),
-    position: String(index + 1),
-    grid: index + 1,
-    points: String(points[index]),
-    laps: 78,
-    status: "Finished",
-    Driver: splitDriverName(name),
-    Constructor: { name: teams[index % teams.length] }
-  }));
-  const qualifyingResults = drivers.map((name, index) => ({
-    number: String(1 + index),
-    position: String(index + 1),
-    points: "0",
-    Driver: splitDriverName(name),
-    Constructor: { name: teams[index % teams.length] }
-  }));
-  const standings = drivers.map((name, index) => ({
-    position: String(index + 1),
-    points: String(points[index]),
-    Driver: splitDriverName(name)
-  }));
-  const constructorStandings = teams.map((name, index) => ({
-    position: String(index + 1),
-    points: String(points
-      .filter((_, driverIndex) => driverIndex % teams.length === index)
-      .reduce((sum, value) => sum + value, 0)),
-    Constructor: { name }
-  }));
-  return buildEvidenceBundle({
-    data: {
-      season: 2026,
-      results: [{
-        round: PREVIEW_ROUND,
-        raceName: "Monaco Grand Prix",
-        date: "2026-05-24",
-        Circuit: { circuitName: "Circuit de Monaco" },
-        Results: results
-      }],
-      qualifying: [{
-        round: PREVIEW_ROUND,
-        QualifyingResults: qualifyingResults
-      }],
-      sprints: [],
-      driverStandingsByRound: new Map([[PREVIEW_ROUND, standings]]),
-      constructorStandingsByRound: new Map([[PREVIEW_ROUND, constructorStandings]]),
-      driverOfTheDayByRound: new Map()
-    },
-    roster,
-    roundNumber: PREVIEW_ROUND,
-    roundName: "Monaco Grand Prix",
-    fetchedAt: now,
-    sourceUrls: {
-      race: "preview://sanitized/r6/results",
-      qualifying: "preview://sanitized/r6/qualifying",
-      driverStandings: "preview://sanitized/r6/driver-standings",
-      constructorStandings: "preview://sanitized/r6/constructor-standings"
-    }
+function buildRows(round, now) {
+  const pointsByPosition = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+  return roster.drivers.map((name, index) => {
+    const position = ((index + round * 2) % roster.drivers.length) + 1;
+    const retired = round === 8 && index === 4;
+    const dns = round === 13 && index === 17;
+    const status = retired ? "Retired" : dns ? "Did not start" : "Finished";
+    const visiblePosition = retired || dns ? "" : String(position);
+    return {
+      number: String(index + 1),
+      position: visiblePosition,
+      grid: String(((index * 3 + round) % 22) + 1),
+      points: retired || dns ? "0" : String(pointsByPosition[position - 1] || 0),
+      laps: retired ? "42" : "70",
+      status,
+      Driver: splitDriverName(name),
+      Constructor: { name: roster.teams[index % roster.teams.length] }
+    };
   });
+}
+
+function buildEvidence(round, now, totals) {
+  const roundName = races[round - 1] || "Round " + round;
+  const cancelled = round === 10;
+  const raceRows = cancelled ? [] : buildRows(round, now);
+  const qualifyingRows = cancelled || round === 8
+    ? []
+    : raceRows.map((row) => ({ ...row, position: row.position || "20" }));
+  const sprintRows = [6, 11].includes(round)
+    ? raceRows.slice(0, 10).map((row, index) => ({ ...row, position: String(index + 1), points: String(Math.max(0, 8 - index)) }))
+    : [];
+
+  if (!cancelled) {
+    raceRows.forEach((row) => {
+      const driver = row.Driver.givenName + " " + row.Driver.familyName;
+      const points = Number(row.points || 0);
+      totals.drivers[driver] = (totals.drivers[driver] || 0) + points;
+      const team = row.Constructor.name;
+      totals.teams[team] = (totals.teams[team] || 0) + points;
+      if (sprintRows.length) {
+        const sprint = sprintRows.find((item) => item.Driver.givenName + " " + item.Driver.familyName === driver);
+        const sprintPoints = Number(sprint?.points || 0);
+        totals.drivers[driver] += sprintPoints;
+        totals.teams[team] += sprintPoints;
+      }
+    });
+  }
+
+  const driverStandings = roster.drivers
+    .map((name) => ({ name, points: totals.drivers[name] || 0 }))
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
+    .map((item, index) => ({
+      position: String(index + 1),
+      points: String(item.points),
+      Driver: splitDriverName(item.name)
+    }));
+  const constructorStandings = roster.teams
+    .map((name) => ({ name, points: totals.teams[name] || 0 }))
+    .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
+    .map((item, index) => ({
+      position: String(index + 1),
+      points: String(item.points),
+      Constructor: { name: item.name }
+    }));
+
+  return {
+    roundName,
+    calendarState: cancelled ? "cancelled" : round === 8 ? "partial" : "completed",
+    evidence: buildEvidenceBundle({
+      data: {
+        season: 2026,
+        results: cancelled ? [] : [{
+          round,
+          raceName: roundName,
+          date: "2026-01-" + String(10 + round).padStart(2, "0"),
+          Circuit: { circuitName: "Sanitized Circuit " + round },
+          Results: raceRows
+        }],
+        qualifying: qualifyingRows.length ? [{ round, QualifyingResults: qualifyingRows }] : [],
+        sprints: sprintRows.length ? [{ round, SprintResults: sprintRows }] : [],
+        driverStandingsByRound: new Map([[round, driverStandings]]),
+        constructorStandingsByRound: new Map([[round, constructorStandings]]),
+        driverOfTheDayByRound: new Map([[round, roster.drivers[(round - 1) % roster.drivers.length]]])
+      },
+      roster,
+      roundNumber: round,
+      roundName,
+      fetchedAt: now,
+      sourceUrls: {
+        race: "preview://sanitized/r" + round + "/results",
+        qualifying: qualifyingRows.length ? "preview://sanitized/r" + round + "/qualifying" : null,
+        sprint: sprintRows.length ? "preview://sanitized/r" + round + "/sprint" : null,
+        driverStandings: "preview://sanitized/r" + round + "/driver-standings",
+        constructorStandings: "preview://sanitized/r" + round + "/constructor-standings"
+      }
+    })
+  };
 }
 
 function seedSanitizedPreview(database, now = new Date().toISOString()) {
@@ -97,81 +134,69 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
   }
 
   ensureRaceDataSchema(database);
-  const evidence = buildPreviewEvidence(now);
-  const existing = database
-    .prepare(
-      "SELECT id FROM actual_snapshots WHERE season = ? AND round_number = ? AND source_type = ? ORDER BY id DESC"
-    )
-    .get(2026, PREVIEW_ROUND, PREVIEW_SOURCE);
-
   const transaction = database.transaction(() => {
-    const snapshotId = existing
-      ? Number(existing.id)
-      : Number(
-          database
-            .prepare(
-              `
-              INSERT INTO actual_snapshots (
-                season, round_number, round_name, label, source_type, source_note,
-                created_at, updated_at, created_by_user_id, review_status,
-                reviewed_at, reviewed_by_user_id
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', NULL, NULL)
-              `
-            )
-            .run(
-              2026,
-              PREVIEW_ROUND,
-              "Monaco Grand Prix",
-              "R6 - Monaco Grand Prix",
-              PREVIEW_SOURCE,
-              "Sanitized WOK preview fixture",
-              now,
-              now
-            ).lastInsertRowid
-        );
+    database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
+    database.prepare("DELETE FROM actual_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);
+    database.prepare("DELETE FROM race_data_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);
+    database.prepare("DELETE FROM race_data_imports WHERE source_type = ?").run(PREVIEW_SOURCE);
 
-    const evidenceId = saveRaceDataSnapshot(database, {
+    const importId = createRaceDataImport(database, {
       season: 2026,
-      roundNumber: PREVIEW_ROUND,
-      roundName: "Monaco Grand Prix",
       syncId: PREVIEW_SYNC_ID,
-      fetchedAt: now,
-      sourceType: SOURCE_TYPES.JOLPICA,
-      sourceNote: "Sanitized WOK preview fixture; not production data",
-      evidence
+      sourceType: PREVIEW_SOURCE,
+      parserVersion: PREVIEW_PARSER_VERSION,
+      requestedRounds: 13,
+      reconstructed: false,
+      sourceNote: SANITIZED_NOTE,
+      startedAt: now
     });
-    linkEvidenceToActualSnapshot(database, snapshotId, evidenceId);
-
-    database
-      .prepare(
-        `
-        INSERT INTO actual_snapshot_values (snapshot_id, question_id, value)
-        VALUES (?, ?, ?)
-        ON CONFLICT(snapshot_id, question_id) DO UPDATE SET value = excluded.value
-        `
-      )
-      .run(snapshotId, "all_teams_score_points", PREVIEW_VALUE);
-
-    database
-      .prepare(
-        `
-        INSERT INTO actuals (question_id, value, updated_at)
-        VALUES (?, ?, ?)
-        ON CONFLICT(question_id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-        `
-      )
-      .run("all_teams_score_points", PREVIEW_VALUE, now);
-
-    return { snapshotId, evidenceId };
+    const totals = { drivers: {}, teams: {} };
+    const snapshots = [];
+    for (let round = 1; round <= 13; round += 1) {
+      const built = buildEvidence(round, now, totals);
+      const evidenceId = saveRaceDataSnapshot(database, {
+        season: 2026,
+        roundNumber: round,
+        roundName: built.roundName,
+        syncId: PREVIEW_SYNC_ID,
+        importId,
+        fetchedAt: now,
+        sourceType: PREVIEW_SOURCE,
+        sourceNote: SANITIZED_NOTE,
+        parserVersion: PREVIEW_PARSER_VERSION,
+        calendarState: built.calendarState,
+        reconstructed: false,
+        evidence: built.evidence
+      });
+      const snapshotId = Number(database.prepare(
+        "INSERT INTO actual_snapshots (season, round_number, round_name, label, source_type, source_note, created_at, updated_at, created_by_user_id, review_status, reviewed_at, reviewed_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', NULL, NULL)"
+      ).run(
+        2026, round, built.roundName, "R" + round + " - " + built.roundName,
+        PREVIEW_SOURCE, SANITIZED_NOTE, now, now
+      ).lastInsertRowid);
+      linkEvidenceToActualSnapshot(database, snapshotId, evidenceId, importId);
+      const value = built.calendarState === "cancelled" ? "no" : "yes";
+      database.prepare(
+        "INSERT INTO actual_snapshot_values (snapshot_id, question_id, value) VALUES (?, ?, ?)"
+      ).run(snapshotId, "all_teams_score_points", value);
+      snapshots.push({ round, snapshotId, evidenceId, calendarState: built.calendarState });
+    }
+    completeRaceDataImport(database, importId, {
+      status: "completed",
+      completedRounds: snapshots.length,
+      completedAt: now
+    });
+    database.prepare(
+      "INSERT INTO actuals (question_id, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(question_id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
+    ).run("all_teams_score_points", "yes", now);
+    return { importId, snapshots };
   });
-
   const result = transaction();
   return {
     sourceType: PREVIEW_SOURCE,
-    snapshotId: result.snapshotId,
-    evidenceId: result.evidenceId,
-    roundNumber: PREVIEW_ROUND,
-    seededQuestionIds: ["all_teams_score_points"],
+    importId: result.importId,
+    snapshotCount: result.snapshots.length,
+    rounds: result.snapshots.map((item) => item.round),
     sanitized: true
   };
 }
@@ -194,4 +219,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { seedSanitizedPreview, buildPreviewEvidence };
+module.exports = { seedSanitizedPreview, buildEvidence };

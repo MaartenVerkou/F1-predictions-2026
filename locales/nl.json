@@ -39,6 +39,9 @@
     "nav_race_data": "Racedata"
   },
   "admin_actuals": {
+    "cutoff": "Tot en met",
+    "import_status": "Import",
+    "reconstructed": "Gereconstrueerd",
     "page_title": "Uitslagen invullen",
     "heading": "Seizoensuitslagen",
     "intro": "Vul de echte uitkomsten in zodra ze bekend zijn. Deze bepalen direct de scores in het klassement.",

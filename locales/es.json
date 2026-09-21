@@ -27,6 +27,9 @@
     "cancel": "Cancel"
   },
   "login": {
+    "cutoff": "Hasta",
+    "import_status": "Importación",
+    "reconstructed": "Reconstruido",
     "page_title": "Iniciar sesión",
     "heading": "Bienvenido de nuevo",
     "forgot_password": "¿Olvidaste tu contraseña?",

@@ -2025,6 +2025,8 @@ button:disabled {
   margin: 0;
 }
 
+.admin-race-data-cutoff { margin: 4px 0 0; font-size: 0.9rem; }
+
 .admin-race-data-season {
   color: var(--muted);
   font-size: 14px;

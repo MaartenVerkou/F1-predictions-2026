@@ -6,6 +6,13 @@
     <div>
       <h1><%= t('admin_race_data.heading') %></h1>
       <p class="muted admin-page-intro"><%= t('admin_race_data.intro') %></p>
+      <p class="muted admin-race-data-cutoff">
+        <%= t('admin_race_data.cutoff') %>: <strong><%= view.selectedRound?.label || '—' %></strong>
+        <% if (selectedImport) { %>
+          · <%= selectedImport.reconstructed ? t('admin_race_data.reconstructed') : t('admin_race_data.import_status') %>:
+          <strong><%= selectedImport.status %></strong>
+        <% } %>
+      </p>
     </div>
     <span class="admin-race-data-season"><%= season %></span>
   </div>

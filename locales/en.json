@@ -39,6 +39,9 @@
     "nav_race_data": "Race data"
   },
   "admin_actuals": {
+    "cutoff": "Cutoff",
+    "import_status": "Import",
+    "reconstructed": "Reconstructed",
     "page_title": "Set actuals",
     "heading": "Season actuals",
     "intro": "Enter the real outcomes once the season is complete. These power the leaderboard immediately once actuals exist.",

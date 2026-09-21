@@ -487,12 +487,33 @@ if (db.dialect === "sqlite") {
     review_status TEXT NOT NULL DEFAULT 'reviewed',
     reviewed_at TEXT,
     reviewed_by_user_id INTEGER,
+    source_data_import_id INTEGER,
     source_data_snapshot_id INTEGER,
     FOREIGN KEY(created_by_user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS race_data_imports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season INTEGER NOT NULL,
+    sync_id TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    requested_rounds INTEGER NOT NULL DEFAULT 0,
+    completed_rounds INTEGER NOT NULL DEFAULT 0,
+    reconstructed INTEGER NOT NULL DEFAULT 0,
+    source_note TEXT,
+    error_message TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_race_data_imports_season_started
+    ON race_data_imports(season, started_at);
+
   CREATE TABLE IF NOT EXISTS race_data_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    import_id INTEGER,
     season INTEGER NOT NULL,
     round_number INTEGER NOT NULL,
     round_name TEXT,
@@ -500,6 +521,9 @@ if (db.dialect === "sqlite") {
     fetched_at TEXT NOT NULL,
     source_type TEXT NOT NULL,
     source_note TEXT,
+    parser_version TEXT NOT NULL DEFAULT 'evidence-v1',
+    calendar_state TEXT NOT NULL DEFAULT 'completed',
+    reconstructed INTEGER NOT NULL DEFAULT 0,
     coverage_status TEXT NOT NULL,
     payload_json TEXT NOT NULL,
     created_at TEXT NOT NULL,
@@ -508,6 +532,8 @@ if (db.dialect === "sqlite") {
 
   CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_season_round
     ON race_data_snapshots(season, round_number, created_at);
+  CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_import
+    ON race_data_snapshots(import_id, round_number);
 
   CREATE TABLE IF NOT EXISTS actual_snapshot_values (
     snapshot_id INTEGER NOT NULL,

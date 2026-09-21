@@ -13,6 +13,7 @@ const {
   upsertSnapshotForRound
 } = require("../actuals-snapshots");
 const {
+  listRaceDataImports,
   listRaceDataSnapshots,
   summarizeEvidence
 } = require("../race-data-evidence");
@@ -49,28 +50,42 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     (max, row) => Math.max(max, Number(row.round_number) || 0),
     0
   );
+  const requestedCutoff = Number(selectedRound);
+  const cutoffRoundNumber = Math.min(
+    Math.max(Number.isFinite(requestedCutoff) && requestedCutoff > 0 ? requestedCutoff : 1, 1),
+    Math.max(races.length, 1)
+  );
   const rounds = races.map((raceName, index) => {
     const roundNumber = index + 1;
     const evidence = evidenceByRound.get(roundNumber) || null;
-    const raceState = !evidence && /cancel+ed|afgelast/i.test(String(raceName))
+    const calendarState = String(
+      evidence?.calendar_state || evidence?.payload?.calendarState || ""
+    ).toLowerCase();
+    const baseState = calendarState === "cancelled"
       ? "cancelled"
-      : auditSourceState(evidence, roundNumber, latestEvidenceRound);
+      : !evidence && /cancel+ed|afgelast/i.test(String(raceName))
+        ? "cancelled"
+        : auditSourceState(evidence, roundNumber, latestEvidenceRound);
+    const state = roundNumber > cutoffRoundNumber ? "future" : baseState;
     return {
       roundNumber,
       raceName,
       label: "R" + roundNumber + " - " + raceName,
       evidence,
       snapshot: snapshotByRound.get(roundNumber) || null,
-      state: raceState,
+      state: baseState,
+      afterCutoff: roundNumber > cutoffRoundNumber,
+      baseState,
       summary: evidence ? summarizeEvidence(evidence.payload) : null
     };
   });
   const latestEvidence = evidenceRows[evidenceRows.length - 1] || null;
-  const latestPayload = latestEvidence?.payload || null;
-  const latestDriverStandings = latestPayload?.standings?.drivers || [];
-  const latestConstructorStandings = latestPayload?.standings?.constructors || [];
-  const latestDriverMap = new Map(latestDriverStandings.map((row) => [row.entity, row]));
-  const latestConstructorMap = new Map(latestConstructorStandings.map((row) => [row.entity, row]));
+  const selected = rounds.find((round) => round.roundNumber === cutoffRoundNumber) || rounds[0] || null;
+  const selectedPayload = selected?.evidence?.payload || null;
+  const selectedDriverStandings = selectedPayload?.standings?.drivers || [];
+  const selectedConstructorStandings = selectedPayload?.standings?.constructors || [];
+  const selectedDriverMap = new Map(selectedDriverStandings.map((row) => [row.entity, row]));
+  const selectedConstructorMap = new Map(selectedConstructorStandings.map((row) => [row.entity, row]));
 
   const drivers = Array.isArray(roster?.drivers) ? roster.drivers : [];
   const teams = Array.isArray(roster?.teams) ? roster.teams : [];
@@ -78,18 +93,21 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     const cells = rounds.map((round) => {
       const raceRows = round.evidence?.payload?.race?.rows || [];
       const row = raceRows.find((item) => item.driver === driver) || null;
+      const afterCutoff = round.roundNumber > cutoffRoundNumber;
       return {
-        label: round.evidence ? auditResultLabel(row) : "—",
-        title: row
-          ? [row.status, row.grid != null ? "grid " + row.grid : null, row.points != null ? row.points + " pts" : null]
-              .filter(Boolean)
-              .join(" · ")
-          : round.evidence ? "No classified row" : "Evidence unavailable",
-        state: round.state,
+        label: afterCutoff ? "—" : round.evidence ? auditResultLabel(row) : "—",
+        title: afterCutoff
+          ? "After selected cutoff"
+          : row
+            ? [row.status, row.grid != null ? "grid " + row.grid : null, row.points != null ? row.points + " pts" : null]
+                .filter(Boolean)
+                .join(" · ")
+            : round.evidence ? "No classified row" : "Evidence unavailable",
+        state: round.afterCutoff ? "future" : round.state,
         row
       };
     });
-    const standing = latestDriverMap.get(driver) || null;
+    const standing = selectedDriverMap.get(driver) || null;
     const constructor = cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
     return {
       name: driver,
@@ -102,6 +120,9 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
 
   const constructorRows = teams.map((team) => {
     const cells = rounds.map((round) => {
+      if (round.roundNumber > cutoffRoundNumber) {
+        return { label: "—", state: "future", title: "After selected cutoff" };
+      }
       if (!round.evidence) {
         return { label: "—", state: round.state, title: "Evidence unavailable" };
       }
@@ -117,7 +138,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
         title: points + " points from race and sprint"
       };
     });
-    const standing = latestConstructorMap.get(team) || null;
+    const standing = selectedConstructorMap.get(team) || null;
     return {
       name: team,
       cells,
@@ -126,8 +147,6 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     };
   });
 
-  const selectedRoundNumber = Number(selectedRound) || 1;
-  const selected = rounds.find((round) => round.roundNumber === selectedRoundNumber) || rounds[0] || null;
   const payload = selected?.evidence?.payload || null;
   const raceRows = payload?.race?.rows || [];
   const qualifyingRows = payload?.qualifying?.rows || [];
@@ -168,9 +187,11 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     drivers: driverRows,
     constructors: constructorRows,
     selectedRound: selected,
-    selectedRoundNumber: selected?.roundNumber || selectedRoundNumber,
+    selectedRoundNumber: selected?.roundNumber || cutoffRoundNumber,
+    cutoffRoundNumber,
     selectedEvidence: selected?.evidence || null,
     selectedSummary: selected?.summary || null,
+    selectedImportId: selected?.evidence?.import_id || null,
     detailRows,
     latestEvidence,
     latestEvidenceRound,
@@ -2554,6 +2575,7 @@ function registerAdminRoutes(app, deps) {
     const roster = getRoster();
     const races = getRaces();
     const evidenceRows = listRaceDataSnapshots(db, CURRENT_SEASON);
+    const importRows = listRaceDataImports(db, CURRENT_SEASON);
     const snapshotRows = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
       maxRoundNumber: races.length
     });
@@ -2584,7 +2606,11 @@ function registerAdminRoutes(app, deps) {
       view,
       viewMode,
       derivedActuals,
-      selectedSnapshot
+      selectedSnapshot,
+      importRows,
+      selectedImport: view.selectedImportId
+        ? importRows.find((item) => item.id === view.selectedImportId) || null
+        : null
     });
   });
 

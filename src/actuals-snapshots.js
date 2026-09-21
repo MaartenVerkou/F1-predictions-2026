@@ -32,6 +32,9 @@ function ensureActualSnapshotColumns(db) {
   if (!names.has("reviewed_by_user_id")) {
     db.exec("ALTER TABLE actual_snapshots ADD COLUMN reviewed_by_user_id INTEGER;");
   }
+  if (!names.has("source_data_import_id")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN source_data_import_id INTEGER;");
+  }
   if (!names.has("source_data_snapshot_id")) {
     db.exec("ALTER TABLE actual_snapshots ADD COLUMN source_data_snapshot_id INTEGER;");
   }
@@ -81,6 +84,10 @@ function mapSnapshotRow(row) {
       row.reviewed_by_user_id == null || row.reviewed_by_user_id === ""
         ? null
         : Number(row.reviewed_by_user_id),
+    source_data_import_id:
+      row.source_data_import_id == null || row.source_data_import_id === ""
+        ? null
+        : Number(row.source_data_import_id),
     source_data_snapshot_id:
       row.source_data_snapshot_id == null || row.source_data_snapshot_id === ""
         ? null

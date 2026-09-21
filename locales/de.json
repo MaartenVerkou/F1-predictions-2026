@@ -27,6 +27,9 @@
     "cancel": "Cancel"
   },
   "login": {
+    "cutoff": "Bis Runde",
+    "import_status": "Import",
+    "reconstructed": "Rekonstruiert",
     "page_title": "Anmelden",
     "heading": "Willkommen zurück",
     "forgot_password": "Passwort vergessen?",
