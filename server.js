@@ -19,7 +19,11 @@ const {
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
 const { ensureRaceDataSchema } = require("./src/race-data-evidence");
-const { ensureSeasonInputsSchema } = require("./src/season-inputs");
+const { ensureSeasonInputsSchema, listSeasonInputs } = require("./src/season-inputs");
+const {
+  buildCanonicalCatalog,
+  canonicalizeQuestionValue
+} = require("./src/canonical-answers");
 
 function loadDotEnvIfPresent(filePath = path.join(__dirname, ".env")) {
   if (!fs.existsSync(filePath)) return;
@@ -1735,10 +1739,15 @@ function getRoster() {
   }
   const parsed = readJsonFile(ROSTER_PATH);
   if (!parsed) return { drivers: [], teams: [] };
-  return {
+  const roster = {
     drivers: Array.isArray(parsed.drivers) ? parsed.drivers : [],
     teams: Array.isArray(parsed.teams) ? parsed.teams : []
   };
+  const catalog = buildCanonicalCatalog(listSeasonInputs(db, CURRENT_SEASON));
+  roster.driver_options = catalog.driver;
+  roster.team_options = catalog.team;
+  roster.race_options = catalog.race;
+  return roster;
 }
 
 function getRaces() {
@@ -2890,6 +2899,8 @@ function clampNumber(value, min, max) {
 }
 
 function serializeAnswerFromRequest(question, body) {
+  const catalog = buildCanonicalCatalog(listSeasonInputs(db, CURRENT_SEASON));
+  const canonical = (value) => canonicalizeQuestionValue(question, value, catalog);
   const type = question?.type || "text";
   if (type === "ranking") {
     const count = Number(question.count) || 3;
@@ -2902,13 +2913,13 @@ function serializeAnswerFromRequest(question, body) {
       }
     }
     if (selections.length === 0) return null;
-    return JSON.stringify(selections);
+    return JSON.stringify(canonical(selections));
   }
   if (type === "multi_select" || type === "multi_select_limited") {
     const selected = body?.[question.id];
     if (!selected) return null;
     const selections = Array.isArray(selected) ? selected : [selected];
-    return JSON.stringify(selections);
+    return JSON.stringify(canonical(selections));
   }
   if (type === "teammate_battle") {
     const winner = body?.[`${question.id}_winner`];
@@ -2917,13 +2928,13 @@ function serializeAnswerFromRequest(question, body) {
       return null;
     }
     const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
-    return JSON.stringify({ winner, diff });
+    return JSON.stringify(canonical({ winner, diff }));
   }
   if (type === "boolean_with_optional_driver") {
     const choice = body?.[question.id];
     const driver = body?.[`${question.id}_driver`];
     if (!choice) return null;
-    return JSON.stringify({ choice, driver });
+    return JSON.stringify(canonical({ choice, driver }));
   }
   if (type === "numeric_with_driver") {
     const valueRaw = body?.[`${question.id}_value`];
@@ -2932,7 +2943,7 @@ function serializeAnswerFromRequest(question, body) {
       return null;
     }
     const value = clampNumber(valueRaw, 0, 999);
-    return JSON.stringify({ value, driver });
+    return JSON.stringify(canonical({ value, driver }));
   }
   if (type === "single_choice_with_driver") {
     const value = body?.[`${question.id}_value`];
@@ -2940,7 +2951,7 @@ function serializeAnswerFromRequest(question, body) {
     if ((!value || value === "") && (!driver || driver === "")) {
       return null;
     }
-    return JSON.stringify({ value, driver });
+    return JSON.stringify(canonical({ value, driver }));
   }
   const answer = body?.[question.id];
   if (answer === undefined || answer === "") return null;
@@ -2949,7 +2960,7 @@ function serializeAnswerFromRequest(question, body) {
     if (value == null) return null;
     return String(value);
   }
-  return String(answer).trim();
+  return String(canonical(String(answer).trim()));
 }
 
 const THROTTLE_WINDOW_MS = 15 * 60 * 1000;

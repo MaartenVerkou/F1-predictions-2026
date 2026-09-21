@@ -18,6 +18,7 @@ const {
   summarizeEvidence
 } = require("../race-data-evidence");
 const { listSeasonInputs } = require("../season-inputs");
+const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
 
 
 function auditResultLabel(row) {
@@ -1753,10 +1754,15 @@ function registerAdminRoutes(app, deps) {
   }
 
   function serializeAnswerForStorage(question, answerValue) {
+    const canonical = (value) => canonicalizeQuestionValue(
+      question,
+      value,
+      buildCanonicalCatalog(listSeasonInputs(db, CURRENT_SEASON))
+    );
     if (answerValue == null || answerValue === "") return null;
     const type = question.type || "text";
     if (type === "single_choice" && Array.isArray(answerValue)) {
-      return JSON.stringify(answerValue);
+      return JSON.stringify(canonical(answerValue));
     }
     if (
       type === "ranking" ||
@@ -1767,10 +1773,10 @@ function registerAdminRoutes(app, deps) {
       type === "numeric_with_driver" ||
       type === "single_choice_with_driver"
     ) {
-      return JSON.stringify(answerValue);
+      return JSON.stringify(canonical(answerValue));
     }
     if (type === "numeric") return String(Number(answerValue));
-    return String(answerValue);
+    return String(canonical(answerValue));
   }
 
   function parseStoredValue(question, raw) {
