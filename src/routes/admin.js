@@ -2613,6 +2613,11 @@ function registerAdminRoutes(app, deps) {
       if (!["driver", "team", "race"].includes(entityType) || !Number.isInteger(entityId) || entityId <= 0) {
         throw new Error("Choose a valid canonical entity.");
       }
+      const catalog = listSeasonInputs(db, season);
+      const entityRows = entityType === "driver" ? catalog.drivers : entityType === "team" ? catalog.teams : catalog.races;
+      if (!catalog.season || !entityRows.some((row) => Number(row.id) === entityId)) {
+        throw new Error("The canonical entity is not part of this season.");
+      }
       addEntityAlias(db, {
         entityType,
         entityId,
@@ -2637,6 +2642,11 @@ function registerAdminRoutes(app, deps) {
       const providerKey = String(req.body.provider_key || "").trim();
       if (!["driver", "team", "race"].includes(entityType) || !Number.isInteger(entityId) || entityId <= 0 || !provider || !providerKey) {
         throw new Error("Provider, key and canonical entity are required.");
+      }
+      const catalog = listSeasonInputs(db, season);
+      const entityRows = entityType === "driver" ? catalog.drivers : entityType === "team" ? catalog.teams : catalog.races;
+      if (!catalog.season || !entityRows.some((row) => Number(row.id) === entityId)) {
+        throw new Error("The canonical entity is not part of this season.");
       }
       addProviderReference(db, { entityType, entityId, provider, providerKey, providerLabel: req.body.provider_label || null });
       logEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider });
