@@ -100,7 +100,9 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       driverIds.set(driverName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, alias: driverName, source: "seed", now });
       addProviderReference(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, provider: "jolpica", providerKey: providerKeyForDriver(driverName), providerLabel: driverName, now });
-      upsertSeasonDriver(db, { seasonId: seasonRow.id, driverId: id, now });
+      const driverNumber = roster.driver_numbers?.[driverName];
+      if (driverNumber == null) throw new Error(`Missing canonical driver number for ${driverName}.`);
+      upsertSeasonDriver(db, { seasonId: seasonRow.id, driverId: id, driverNumber, now });
       const teamName = DRIVER_TEAM_ASSIGNMENTS[driverName];
       if (!teamName || !teamIds.has(teamName)) throw new Error(`Missing canonical team assignment for ${driverName}.`);
       const seatNumber = (TEAM_DRIVER_ORDER[teamName] || []).indexOf(driverName) + 1 || 1;

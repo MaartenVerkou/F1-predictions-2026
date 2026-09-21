@@ -46,17 +46,17 @@
           <input type="hidden" name="season" value="<%= season %>">
           <label><%= t('admin_inputs.driver_name') %><input name="display_name" required></label>
           <label><%= t('admin_inputs.slug') %><input name="slug" placeholder="<%= t('admin_inputs.optional') %>"></label>
-          <label><%= t('admin_inputs.driver_number') %><input name="driver_number" placeholder="<%= t('admin_inputs.optional') %>"></label>
+          <label><%= t('admin_inputs.driver_number') %><input name="driver_number" type="number" min="1" max="99" required></label>
           <button type="submit"><%= t('admin_inputs.add_driver') %></button>
         </form>
       </details>
       <div class="admin-race-data-table-wrap">
         <table class="admin-inputs-table">
-          <thead><tr><th><%= t('admin_inputs.id') %></th><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.active') %></th><th></th></tr></thead>
+          <thead><tr><th><%= t('admin_inputs.driver_number') %></th><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.active') %></th><th><%= t('admin_inputs.id') %></th><th></th></tr></thead>
           <tbody>
             <% catalog.drivers.forEach((driver) => { %>
               <% const assignment = catalog.assignments.find((item) => Number(item.driver_id) === Number(driver.id) && Number(item.from_round) <= 1 && (item.to_round == null || Number(item.to_round) >= 1)); %>
-              <tr><td><code>driver:<%= driver.id %></code></td><th scope="row"><%= driver.display_name_override || driver.display_name %></th><td><%= assignment?.team_name || '—' %></td><td><%= Number(driver.season_active) ? t('admin_inputs.yes') : t('admin_inputs.no') %></td><td><form method="post" action="/admin/inputs/entity" class="admin-inputs-inline-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="driver"><input type="hidden" name="entity_id" value="<%= driver.id %>"><label class="sr-only" for="driver-name-<%= driver.id %>"><%= t('admin_inputs.driver') %></label><input id="driver-name-<%= driver.id %>" name="display_name" value="<%= driver.display_name %>" required><button class="secondary" type="submit"><%= t('admin_inputs.save_driver') %></button></form></td></tr>
+              <tr><td><%= driver.driver_number || '—' %></td><th scope="row"><%= driver.display_name_override || driver.display_name %></th><td><%= assignment?.team_name || '—' %></td><td><%= Number(driver.season_active) ? t('admin_inputs.yes') : t('admin_inputs.no') %></td><td><code>driver:<%= driver.id %></code></td><td><form method="post" action="/admin/inputs/entity" class="admin-inputs-inline-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="driver"><input type="hidden" name="entity_id" value="<%= driver.id %>"><label class="sr-only" for="driver-name-<%= driver.id %>"><%= t('admin_inputs.driver') %></label><input id="driver-name-<%= driver.id %>" name="display_name" value="<%= driver.display_name %>" required><label class="sr-only" for="driver-number-<%= driver.id %>"><%= t('admin_inputs.driver_number') %></label><input id="driver-number-<%= driver.id %>" name="driver_number" type="number" min="1" max="99" value="<%= driver.driver_number || '' %>" required><button class="secondary" type="submit"><%= t('admin_inputs.save_driver') %></button></form></td></tr>
             <% }) %>
           </tbody>
         </table>

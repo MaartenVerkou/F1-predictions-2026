@@ -2601,6 +2601,13 @@ function registerAdminRoutes(app, deps) {
         const row = catalog.drivers.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Driver is not part of this season.");
         upsertDriver(db, { slug: row.slug, displayName, active: Number(row.active) !== 0 });
+        upsertSeasonDriver(db, {
+          seasonId: catalog.season.id,
+          driverId: entityId,
+          driverNumber: req.body.driver_number == null ? row.driver_number : req.body.driver_number,
+          displayNameOverride: row.display_name_override,
+          active: Number(row.season_active) !== 0
+        });
       } else if (entityType === "team") {
         const row = catalog.teams.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Team is not part of this season.");

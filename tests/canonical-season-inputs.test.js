@@ -7,6 +7,7 @@ const {
 } = require("../src/canonical-answers");
 const leaderboard = require("../src/leaderboard-model");
 const { TEAM_DISPLAY_ORDER, TEAM_DRIVER_ORDER } = require("../scripts/seed-season-inputs");
+const { normalizeDriverNumber, sortSeasonDrivers } = require("../src/season-inputs");
 
 const catalog = buildCanonicalCatalog({
   drivers: [{ id: 1, display_name: "Lewis Hamilton", slug: "lewis-hamilton" }],
@@ -64,4 +65,19 @@ test("each seeded team has two explicit driver seats", () => {
     assert.equal((TEAM_DRIVER_ORDER[team] || []).length, 2, `${team} must have two seats`);
     assert.notEqual(TEAM_DRIVER_ORDER[team][0], TEAM_DRIVER_ORDER[team][1]);
   }
+});
+
+test("driver numbers normalize and determine presentation order", () => {
+  assert.equal(normalizeDriverNumber("03"), "3");
+  assert.equal(normalizeDriverNumber(""), null);
+  assert.throws(() => normalizeDriverNumber("100"), /between 1 and 99/);
+  assert.deepEqual(
+    sortSeasonDrivers([
+      { id: 2, driver_number: null },
+      { id: 8, driver_number: "44" },
+      { id: 3, driver_number: "3" },
+      { id: 1, driver_number: "44" }
+    ]).map((driver) => driver.id),
+    [3, 1, 8, 2]
+  );
 });

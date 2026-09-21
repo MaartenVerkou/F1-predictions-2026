@@ -32,6 +32,37 @@ function splitDisplayName(value) {
   };
 }
 
+function normalizeDriverNumber(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const safeValue = String(value).trim();
+  if (!/^\d+$/.test(safeValue)) throw new Error("Driver number must be a whole number between 1 and 99.");
+  const number = Number(safeValue);
+  if (!Number.isInteger(number) || number < 1 || number > 99) {
+    throw new Error("Driver number must be a whole number between 1 and 99.");
+  }
+  return String(number);
+}
+
+function driverNumberForSort(value) {
+  const safeValue = String(value ?? "").trim();
+  if (!/^\d+$/.test(safeValue)) return null;
+  const number = Number(safeValue);
+  return Number.isInteger(number) ? number : null;
+}
+
+function sortSeasonDrivers(drivers) {
+  return drivers.slice().sort((left, right) => {
+    const leftNumber = driverNumberForSort(left.driver_number);
+    const rightNumber = driverNumberForSort(right.driver_number);
+    if (leftNumber == null && rightNumber != null) return 1;
+    if (leftNumber != null && rightNumber == null) return -1;
+    if (leftNumber != null && rightNumber != null && leftNumber !== rightNumber) {
+      return leftNumber - rightNumber;
+    }
+    return Number(left.id) - Number(right.id);
+  });
+}
+
 function referenceFor(entityType, entityId) {
   if (!entityType || entityId == null) return null;
   return `${String(entityType)}:${Number(entityId)}`;
@@ -166,10 +197,11 @@ function upsertRace(db, { seasonId, roundNumber, slug, displayName, scheduledDat
 }
 
 function upsertSeasonDriver(db, { seasonId, driverId, driverNumber = null, displayNameOverride = null, active = true, now = new Date().toISOString() }) {
+  const normalizedDriverNumber = normalizeDriverNumber(driverNumber);
   db.prepare(
     "INSERT INTO season_drivers (season_id, driver_id, driver_number, display_name_override, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) " +
     "ON CONFLICT(season_id, driver_id) DO UPDATE SET driver_number = excluded.driver_number, display_name_override = excluded.display_name_override, active = excluded.active, updated_at = excluded.updated_at"
-  ).run(Number(seasonId), Number(driverId), driverNumber, displayNameOverride, active ? 1 : 0, now, now);
+  ).run(Number(seasonId), Number(driverId), normalizedDriverNumber, displayNameOverride, active ? 1 : 0, now, now);
 }
 
 function upsertSeasonTeam(db, { seasonId, teamId, displayNameOverride = null, displayOrder = 0, orderBasis = "manual", active = true, now = new Date().toISOString() }) {
@@ -301,7 +333,7 @@ function listSeasonInputs(db, year) {
   const seasonId = Number(season.id);
   return {
     season: { ...season, id: seasonId, year: Number(season.year) },
-    drivers: db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.display_name").all(seasonId),
+    drivers: sortSeasonDrivers(db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.id").all(seasonId)),
     teams: db.prepare("SELECT t.*, st.display_name_override, st.display_order, st.order_basis, st.active AS season_active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? ORDER BY COALESCE(st.display_order, 9999), t.display_name").all(seasonId),
     races: db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId),
     assignments: db.prepare("SELECT a.*, d.display_name AS driver_name, t.display_name AS team_name, st.display_order FROM driver_team_assignments a JOIN drivers d ON d.id = a.driver_id JOIN teams t ON t.id = a.team_id LEFT JOIN season_teams st ON st.season_id = a.season_id AND st.team_id = a.team_id WHERE a.season_id = ? ORDER BY COALESCE(st.display_order, 9999), a.seat_number, a.from_round, d.display_name").all(seasonId),
@@ -319,11 +351,13 @@ module.exports = {
   findEntityById,
   listSeasonInputs,
   normalizeEntityKey,
+  normalizeDriverNumber,
   parseReference,
   referenceFor,
   resolveEntity,
   slugify,
   splitDisplayName,
+  sortSeasonDrivers,
   upsertDriver,
   upsertDriverTeamAssignment,
   upsertRace,

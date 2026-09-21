@@ -23,6 +23,30 @@
     "Sergio Perez",
     "Valtteri Bottas"
   ],
+  "driver_numbers": {
+    "Alexander Albon": 23,
+    "Arvid Lindblad": 41,
+    "Carlos Sainz Jr.": 55,
+    "Charles Leclerc": 16,
+    "Esteban Ocon": 31,
+    "Fernando Alonso": 14,
+    "Franco Colapinto": 43,
+    "Gabriel Bortoleto": 5,
+    "George Russell": 63,
+    "Isack Hadjar": 6,
+    "Kimi Antonelli": 12,
+    "Lance Stroll": 18,
+    "Lando Norris": 1,
+    "Lewis Hamilton": 44,
+    "Liam Lawson": 30,
+    "Max Verstappen": 3,
+    "Nico Hulkenberg": 27,
+    "Oliver Bearman": 87,
+    "Oscar Piastri": 81,
+    "Pierre Gasly": 10,
+    "Sergio Perez": 11,
+    "Valtteri Bottas": 77
+  },
   "teams": [
     "Alpine",
     "Aston Martin",
@@ -37,4 +61,3 @@
     "Williams"
   ]
 }
-
