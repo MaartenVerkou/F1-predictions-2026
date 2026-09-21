@@ -24,7 +24,7 @@
 - [x] 4.1 Update Race data, Actuals, question forms, leaderboards, analysis, and scoring views to resolve labels from canonical IDs.
 - [x] 4.2 Replace index-based preview driver/team generation with a coherent sanitized catalog and assignment fixture.
 - [ ] 4.3 Add tests for renames, team changes, provider aliases, ambiguous mappings, legacy values, and round cutoff consistency.
-- [ ] 4.4 Refresh the sanitized preview and verify Inputs → Questions → Race data → Actuals end-to-end without changing production.
+- [x] 4.4 Refresh the sanitized preview and verify Inputs → Questions → Race data → Actuals end-to-end without changing production.
 
 ## 5. Release gates
 
