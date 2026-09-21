@@ -6,6 +6,7 @@ const path = require("node:path");
 const LOCALES = ["de", "en", "es", "fr", "nl"];
 const REQUIRED_ADMIN_INPUT_KEYS = [
   "save",
+  "remove",
   "save_driver",
   "save_team",
   "save_race",

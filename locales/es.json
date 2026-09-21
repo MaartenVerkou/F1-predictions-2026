@@ -528,6 +528,8 @@
     "mappings_empty": "Todavía no hay alias ni mapeos de proveedores registrados.",
     "save": "Guardar",
     "edit": "Editar",
+    "remove": "Eliminar",
+    "remove_confirm": "¿Eliminar {label} de esta temporada? Los datos históricos se conservarán.",
     "save_driver": "Guardar nombre del piloto",
     "save_team": "Guardar equipo",
     "save_race": "Guardar carrera",

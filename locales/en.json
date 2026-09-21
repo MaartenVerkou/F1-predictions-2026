@@ -72,6 +72,8 @@
     "mappings_empty": "No aliases or provider mappings are recorded yet.",
     "save": "Save",
     "edit": "Edit",
+    "remove": "Remove",
+    "remove_confirm": "Remove “{label}” from this season? Historical data will be kept.",
     "save_driver": "Save driver name",
     "save_team": "Save team",
     "save_race": "Save race",

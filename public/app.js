@@ -1008,6 +1008,7 @@ const initAdminInputTables = () => {
     const toolbar = document.querySelector(`[data-table-toolbar="${tableName}"]`);
     if (!toolbar) return;
     const editButton = toolbar.querySelector('[data-table-edit]');
+    const removeButton = toolbar.querySelector('[data-table-remove]');
     const selection = toolbar.querySelector('[data-table-selection]');
     const rows = Array.from(table.querySelectorAll('[data-selectable-row]'));
     let selectedRow = null;
@@ -1025,6 +1026,7 @@ const initAdminInputTables = () => {
       });
       selectedRow = null;
       if (editButton) editButton.disabled = true;
+      if (removeButton) removeButton.disabled = true;
       if (selection) selection.textContent = '';
     };
 
@@ -1037,6 +1039,7 @@ const initAdminInputTables = () => {
       });
       selectedRow = row;
       if (editButton) editButton.disabled = false;
+      if (removeButton) removeButton.disabled = false;
       if (selection) selection.textContent = row.dataset.rowLabel || '';
     };
 
@@ -1059,6 +1062,22 @@ const initAdminInputTables = () => {
       closeEditors();
       editor.hidden = false;
       editor.querySelector('input, select, textarea')?.focus();
+    });
+
+    removeButton?.addEventListener('click', () => {
+      if (!selectedRow) return;
+      const form = document.getElementById('admin-inputs-remove-form');
+      if (!form) return;
+      const label = selectedRow.dataset.rowLabel || '';
+      const template = removeButton.dataset.removeConfirm || '';
+      const message = template.replace('{label}', label);
+      if (!window.confirm(message)) return;
+      const type = tableName === 'drivers' ? 'driver' : tableName === 'teams' ? 'team' : tableName === 'assignments' ? 'assignment' : '';
+      const entityId = selectedRow.dataset.editTarget?.replace(/^(?:driver|team|assignment|race)-editor-/, '');
+      if (!type || !entityId) return;
+      form.elements.entity_type.value = type;
+      form.elements.entity_id.value = entityId;
+      form.requestSubmit();
     });
 
     const addDriverButton = toolbar.querySelector('[data-add-driver-row]');

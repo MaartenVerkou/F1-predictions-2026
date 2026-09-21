@@ -2591,6 +2591,7 @@ function registerAdminRoutes(app, deps) {
     const calendarState = String(req.body.calendar_state || "scheduled").trim().toLowerCase() || "scheduled";
     const displayOrder = Number(req.body.display_order || 0);
     const orderBasis = String(req.body.order_basis || "manual").trim().toLowerCase() || "manual";
+    const seasonActive = String(req.body.season_active || "") === "1";
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
@@ -2606,7 +2607,7 @@ function registerAdminRoutes(app, deps) {
           driverId: entityId,
           driverNumber: req.body.driver_number == null ? row.driver_number : req.body.driver_number,
           displayNameOverride: row.display_name_override,
-          active: Number(row.season_active) !== 0
+          active: seasonActive
         });
       } else if (entityType === "team") {
         const row = catalog.teams.find((item) => Number(item.id) === entityId);
@@ -2614,7 +2615,7 @@ function registerAdminRoutes(app, deps) {
         upsertTeam(db, { slug: row.slug, displayName, shortName: row.short_name, active: Number(row.active) !== 0 });
         if (!Number.isInteger(displayOrder) || displayOrder < 0) throw new Error("Display order must be a non-negative number.");
         if (!["official", "previous_standings", "manual"].includes(orderBasis)) throw new Error("Unsupported order basis.");
-        upsertSeasonTeam(db, { seasonId: catalog.season.id, teamId: entityId, displayOrder, orderBasis, active: Number(row.season_active) !== 0 });
+        upsertSeasonTeam(db, { seasonId: catalog.season.id, teamId: entityId, displayOrder, orderBasis, active: seasonActive });
       } else if (entityType === "race") {
         const row = catalog.races.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Race is not part of this season.");
@@ -2641,6 +2642,59 @@ function registerAdminRoutes(app, deps) {
       return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "success", "Entity updated.");
     } catch (err) {
       return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "error", err.message);
+    }
+  });
+
+  app.post("/admin/inputs/remove", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const entityType = String(req.body.entity_type || "").trim().toLowerCase();
+    const entityId = Number(req.body.entity_id);
+    const catalog = listSeasonInputs(db, season);
+    const adminUser = getCurrentUser(req);
+    const tab = entityType === "driver" ? "drivers" : entityType === "team" ? "teams" : "assignments";
+    try {
+      if (!catalog.season || !Number.isInteger(entityId) || entityId <= 0) {
+        throw new Error("A valid season input is required.");
+      }
+      if (entityType === "driver") {
+        const row = catalog.drivers.find((item) => Number(item.id) === entityId);
+        if (!row) throw new Error("Driver is not part of this season.");
+        upsertSeasonDriver(db, {
+          seasonId: catalog.season.id,
+          driverId: entityId,
+          driverNumber: row.driver_number,
+          displayNameOverride: row.display_name_override,
+          active: false
+        });
+      } else if (entityType === "team") {
+        const row = catalog.teams.find((item) => Number(item.id) === entityId);
+        if (!row) throw new Error("Team is not part of this season.");
+        upsertSeasonTeam(db, {
+          seasonId: catalog.season.id,
+          teamId: entityId,
+          displayNameOverride: row.display_name_override,
+          displayOrder: row.display_order,
+          orderBasis: row.order_basis,
+          active: false
+        });
+      } else if (entityType === "assignment") {
+        const row = catalog.assignments.find((item) => Number(item.id) === entityId);
+        if (!row) throw new Error("Assignment is not part of this season.");
+        const result = db.prepare("DELETE FROM driver_team_assignments WHERE id = ? AND season_id = ?").run(entityId, catalog.season.id);
+        if (Number(result.changes || 0) !== 1) throw new Error("Assignment could not be removed.");
+      } else {
+        throw new Error("This input cannot be removed here.");
+      }
+      logEvent("info", "admin_inputs_entity_removed", {
+        userId: adminUser?.id || null,
+        season,
+        entityType,
+        entityId
+      });
+      const message = entityType === "assignment" ? "Assignment removed." : `${entityType === "driver" ? "Driver" : "Team"} removed from season inputs.`;
+      return redirectInputs(res, season, tab, "success", message);
+    } catch (err) {
+      return redirectInputs(res, season, tab, "error", err.message);
     }
   });
 

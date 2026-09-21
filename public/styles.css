@@ -2101,10 +2101,19 @@ button:disabled {
 .admin-inputs-table-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 34px;
+  margin: 6px 0 4px;
+}
+
+.admin-inputs-toolbar-start,
+.admin-inputs-toolbar-end {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  min-height: 34px;
-  margin: 10px 0 8px;
 }
 
 .admin-inputs-table-toolbar button {
@@ -2112,8 +2121,25 @@ button:disabled {
 }
 
 .admin-inputs-selection {
+  max-width: min(32vw, 260px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 12px;
+}
+
+.admin-inputs-checkbox-field {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+}
+
+.admin-inputs-checkbox-field input {
+  min-width: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .admin-inputs-table thead th {
