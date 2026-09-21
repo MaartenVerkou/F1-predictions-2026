@@ -172,9 +172,13 @@ function upsertSeasonTeam(db, { seasonId, teamId, displayNameOverride = null, ac
 function assertAssignmentDoesNotOverlap(db, { seasonId, driverId, fromRound, toRound = null, excludeId = null }) {
   const nextFrom = Number(fromRound);
   const nextTo = toRound == null ? 9999 : Number(toRound);
-  const rows = db.prepare(
-    "SELECT id, from_round, to_round FROM driver_team_assignments WHERE season_id = ? AND driver_id = ? AND (? IS NULL OR id <> ?)"
-  ).all(Number(seasonId), Number(driverId), excludeId == null ? null : Number(excludeId), excludeId == null ? null : Number(excludeId));
+  const rows = excludeId == null
+    ? db.prepare(
+      "SELECT id, from_round, to_round FROM driver_team_assignments WHERE season_id = ? AND driver_id = ?"
+    ).all(Number(seasonId), Number(driverId))
+    : db.prepare(
+      "SELECT id, from_round, to_round FROM driver_team_assignments WHERE season_id = ? AND driver_id = ? AND id <> ?"
+    ).all(Number(seasonId), Number(driverId), Number(excludeId));
   const overlap = rows.find((row) => {
     const currentFrom = Number(row.from_round);
     const currentTo = row.to_round == null ? 9999 : Number(row.to_round);
