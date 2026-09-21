@@ -1,70 +1,64 @@
 ## Context
 
-The existing season sync already fetches race results, qualifying, sprint results, and standings to derive round actuals, but it currently discards the source rows after calculating values. The existing `actual_snapshots` and `actual_snapshot_values` tables therefore cannot explain why a derived value was produced. The completed compact Actuals review is now the stable editing workflow; this change adds a read-only evidence workflow beside it.
+The sync already fetches race results, qualifying, sprint results, standings, and manual external values to derive round actuals. It currently keeps those rows in memory and writes only derived values. The compact Actuals review is now the stable mutation workflow; this change adds a read-only evidence workflow and makes the persisted evidence the source of truth for derivation.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Preserve the evidence used by a sync so the audit view is deterministic and reproducible.
-- Present a compact driver matrix, a constructor points matrix, and a selected-round detail table.
-- Make missing, cancelled, future, and partial source states explicit.
+- Persist one coherent import batch with one normalized bundle per season round.
+- Make a derivation reproducible from stored bundles through a round cutoff.
+- Preserve source state, coverage, calendar state, parser version, and reconstruction provenance.
+- Present compact driver and constructor matrices plus selected-round details and cumulative cutoff totals.
 - Keep source inspection separate from scoring mutations and preserve the existing Actuals review actions.
-- Support both SQLite preview/test databases and PostgreSQL production without copying production data into previews.
+- Support SQLite preview/test databases and PostgreSQL production without copying production data into previews.
 
 **Non-Goals:**
 
-- Replacing the existing Actuals editor or review action.
-- Re-running external fetches every time an admin opens the page.
+- Replacing the Actuals editor or review action.
+- Re-fetching external sources whenever an admin opens the page.
 - Building a public race-results page.
-- Adding new scoring rules or changing how actual values are calculated.
-- Persisting provider-specific raw HTML when a normalized evidence field is sufficient.
+- Changing scoring rules or silently repairing missing source data.
+- Persisting provider-specific raw HTML when normalized fields are sufficient.
 
 ## Decisions
 
-### 1. Store one normalized source bundle per sync round
+### 1. Import batch is the unit of provenance
 
-Add a `race_data_snapshots` table with one row per season/round/sync evidence bundle. Store normalized evidence as JSON text so both SQLite and PostgreSQL can use the same persistence path. Include source type, source URLs/notes, fetched timestamp, parser version, coverage status, and the normalized payload.
+Add a `race_data_imports` table with an id, season, lifecycle status, started/completed timestamps, source type, parser version, requested/completed rounds, reconstruction flag, and human-readable note. A sync first creates one import row, then stores every normalized round bundle with that import id. The import is marked completed only after all fetch/persist work succeeds; failed imports remain inspectable with an error state.
 
-Link the derived `actual_snapshots` row to the source bundle with an additive nullable foreign-key-style identifier. When a re-sync produces unchanged values, preserve review metadata while updating the usable evidence link. When values change, create the normal pending snapshot and link it to the new bundle.
+Add nullable `source_data_import_id` and `source_data_snapshot_id` columns to `actual_snapshots`. The pair identifies the batch and exact round evidence used by the derived values. Existing rows remain valid and are treated as legacy/no-captured-evidence.
 
-This keeps source evidence separate from derived scoring values while avoiding a large number of provider-specific tables. It also makes the exact bundle used for an actual snapshot inspectable.
+### 2. Persist normalized evidence before deriving
 
-### 2. Normalize the fields needed by actuals
+`race_data_snapshots` remains JSON-backed for provider-neutral normalized fields, but each row belongs to an import id and carries calendar state and coverage. The import path writes bundles first. Derivation then loads bundles from the database up to the requested cutoff, reconstructs the same calculation input shape, and calls the existing question serialization rules. It never derives directly from the provider response object.
 
-The persisted bundle contains stable fields rather than provider-specific objects:
+For historical backfills where the original source capture is absent, the import is marked `reconstructed`, with the current fetch timestamp and source note. The result is explicitly not presented as the original historical capture. Existing reviewed snapshot metadata is preserved when derived values are unchanged.
 
-- race rows: driver, constructor, grid, classified position, status, race points, pole/fastest-lap markers when available;
-- qualifying rows: driver, constructor, qualifying position;
-- sprint rows: driver, constructor, position, status, points;
-- standings after the round: driver/constructor, position, points;
-- provenance: source label/URL, fetched time, coverage flags, and parser version.
+### 3. Cutoff-aware audit model
 
-Names are normalized through the existing roster aliases before storage. The UI renders explicit status tokens and does not infer zero from an absent row.
+The Race data page selects a round cutoff. Matrix cells for rounds after the cutoff are muted as future; cells through the cutoff use persisted evidence. Driver and constructor summary columns use standings from the selected cutoff bundle, not the latest available bundle. The selected detail panel shows calendar/import/coverage state, source timestamp, the round evidence, and a link to Actuals.
 
-### 3. Use two matrix tabs plus one selected-round detail
+### 4. Two matrix tabs plus one detail table
 
-The default Drivers tab shows drivers by configured race column with classified result/status cells and a cumulative summary. The Constructors tab shows constructor points by race. Selecting a race opens the detail table containing grid, qualifying, sprint, race, status, and points together. This gives broad season coverage without duplicating a dense qualifying or sprint matrix.
+The Drivers tab shows drivers by race with classified result/status cells. The Constructors tab shows constructor race points. The selected-round detail table combines grid, qualifying, sprint, race, status, and points so the admin can validate all actual-relevant inputs without separate dense tables.
 
-The matrix uses an internal scroll region and sticky identity columns, reusing the existing admin wide-table rules. Statuses remain textual and are not color-only.
+### 5. Read-only audit route
 
-### 4. Keep the audit route read-only
+`GET /admin/race-data` is admin-only and has no mutation form. It accepts only view/cutoff selection and links to the existing Actuals review target. CSRF/mutation protection remains unchanged because the page does not write.
 
-The new route is a GET-only admin endpoint. Links to Actuals preserve the selected round, but no form on the audit page can write snapshots or live actuals. Existing CSRF/mutation protection remains unchanged because the page adds no mutation.
+### 6. Sanitized preview fixture
 
-### 5. Seed sanitized preview evidence deterministically
-
-The preview seed creates a small deterministic source bundle using sanitized fixture names/values and the configured race calendar. It must not query or copy production data. The fixture is sufficient to exercise the drivers matrix, constructors matrix, incomplete-state messaging, and selected-round detail.
+The preview seed creates a deterministic import batch covering the configured season through R14 with fictionalized driver/team names and deliberate partial/future/cancelled states. It never queries or copies production. This makes cutoff totals, incomplete coverage, and missing evidence visible before preview approval.
 
 ## Risks / Trade-offs
 
-- **[Historical rows have no evidence]** → Render an explicit “evidence not captured” state and populate evidence on the next approved sync; do not fabricate old rows.
-- **[Provider data changes after a later sync]** → Keep a separate bundle per sync and link the bundle used for each derived snapshot.
-- **[Large JSON payloads]** → Store only normalized fields needed for audit and actual derivation, not raw provider HTML.
-- **[Driver/team aliases drift]** → Normalize through the existing roster and alias maps and show an incomplete coverage warning when a row cannot be mapped.
-- **[A failed feed could look like zero]** → Carry per-source coverage flags and render missing values distinctly.
-- **[Wide season tables are difficult on phones]** → Keep the table horizontally scrollable inside a bounded region, with sticky driver/constructor columns and a selected-round detail view.
-
+- **Historical rows have no source evidence** → mark them legacy/reconstructed/unavailable; do not fabricate old rows.
+- **Provider data changes after a later import** → keep a separate import id and link each derived snapshot to the exact batch/round.
+- **JSON payload size** → store only normalized fields needed for audit and derivation.
+- **Alias drift** → normalize against the roster and mark unmapped/partial coverage.
+- **A failed feed could look like zero** → carry per-source coverage and render explicit unavailable/status tokens.
+- **Wide tables on phones** → bounded horizontal scrolling with sticky identity columns and a selected-round detail view.
 
 ## Related Decision
 
