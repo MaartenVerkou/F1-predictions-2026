@@ -2509,7 +2509,14 @@ function registerAdminRoutes(app, deps) {
       : "teams";
     const season = Number(req.query.season || CURRENT_SEASON);
     const catalog = listSeasonInputs(db, season);
-    const requestedRound = Number(req.query.round || 1);
+    const explicitRound = Number(req.query.round);
+    const latestEvidenceRound = Number(
+      db.prepare("SELECT MAX(round_number) AS round_number FROM race_data_snapshots WHERE season = ?").get(Number(season))?.round_number || 0
+    );
+    const defaultLineupRound = latestEvidenceRound > 0 ? latestEvidenceRound + 1 : 1;
+    const requestedRound = Number.isInteger(explicitRound) && explicitRound > 0
+      ? explicitRound
+      : defaultLineupRound;
     const lineupRound = catalog.races.length
       ? Math.min(Math.max(Number.isInteger(requestedRound) ? requestedRound : 1, 1), catalog.races.length)
       : 1;
