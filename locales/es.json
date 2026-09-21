@@ -541,7 +541,16 @@
     "order_basis_manual": "Manual",
     "seat": "Puesto",
     "driver_1": "Piloto 1",
-    "driver_2": "Piloto 2"
+    "driver_2": "Piloto 2",
+    "add_driver": "Añadir piloto de reemplazo",
+    "driver_name": "Nombre del piloto",
+    "driver_number": "Número del piloto",
+    "optional": "Opcional",
+    "empty_seat": "Asiento vacío",
+    "save_lineup": "Guardar alineación",
+    "advanced_team_settings": "Identidad y orden avanzados del equipo",
+    "historical_warning": "Esta ronda ya tiene datos importados o resultados revisados. Guardar cambia la alineación canónica para esta ronda y las siguientes.",
+    "historical_confirm": "Entiendo que esto es una corrección histórica."
   },
   "admin_actuals": {
     "page_title": "Set actuals",

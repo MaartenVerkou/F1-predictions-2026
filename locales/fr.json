@@ -541,7 +541,16 @@
     "order_basis_manual": "Manuel",
     "seat": "Place",
     "driver_1": "Pilote 1",
-    "driver_2": "Pilote 2"
+    "driver_2": "Pilote 2",
+    "add_driver": "Ajouter un pilote remplaçant",
+    "driver_name": "Nom du pilote",
+    "driver_number": "Numéro du pilote",
+    "optional": "Facultatif",
+    "empty_seat": "Siège vide",
+    "save_lineup": "Enregistrer la composition",
+    "advanced_team_settings": "Identité et ordre avancés de l'équipe",
+    "historical_warning": "Cette manche contient déjà des données importées ou des résultats vérifiés. L'enregistrement modifie la composition canonique pour cette manche et les suivantes.",
+    "historical_confirm": "Je comprends qu'il s'agit d'une correction historique."
   },
   "admin_actuals": {
     "page_title": "Set actuals",

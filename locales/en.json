@@ -91,6 +91,15 @@
     ,"seat": "Seat"
     ,"driver_1": "Driver 1"
     ,"driver_2": "Driver 2"
+    ,"add_driver": "Add replacement driver"
+    ,"driver_name": "Driver name"
+    ,"driver_number": "Driver number"
+    ,"optional": "Optional"
+    ,"empty_seat": "Empty seat"
+    ,"save_lineup": "Save lineup"
+    ,"advanced_team_settings": "Advanced team identity and order"
+    ,"historical_warning": "This round already has imported evidence or reviewed actuals. Saving changes the canonical lineup used for this round and later rounds."
+    ,"historical_confirm": "I understand this is a historical correction."
   },
   "admin_actuals": {
     "page_title": "Set actuals",

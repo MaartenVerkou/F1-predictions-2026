@@ -541,7 +541,16 @@
     "order_basis_manual": "Manuell",
     "seat": "Sitz",
     "driver_1": "Fahrer 1",
-    "driver_2": "Fahrer 2"
+    "driver_2": "Fahrer 2",
+    "add_driver": "Ersatzfahrer hinzufügen",
+    "driver_name": "Fahrername",
+    "driver_number": "Startnummer",
+    "optional": "Optional",
+    "empty_seat": "Leerer Sitz",
+    "save_lineup": "Line-up speichern",
+    "advanced_team_settings": "Erweiterte Teamidentität und Reihenfolge",
+    "historical_warning": "Für diese Runde sind bereits Quelldaten oder geprüfte Ist-Ergebnisse vorhanden. Das Speichern ändert die kanonische Line-up für diese und folgende Runden.",
+    "historical_confirm": "Ich verstehe, dass dies eine historische Korrektur ist."
   },
   "admin_actuals": {
     "page_title": "Set actuals",

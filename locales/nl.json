@@ -84,7 +84,16 @@
     "order_basis_manual": "Handmatig",
     "seat": "Stoel",
     "driver_1": "Coureur 1",
-    "driver_2": "Coureur 2"
+    "driver_2": "Coureur 2",
+    "add_driver": "Vervangende coureur toevoegen",
+    "driver_name": "Naam coureur",
+    "driver_number": "Startnummer",
+    "optional": "Optioneel",
+    "empty_seat": "Lege stoel",
+    "save_lineup": "Line-up opslaan",
+    "advanced_team_settings": "Geavanceerde teamidentiteit en volgorde",
+    "historical_warning": "Voor deze ronde zijn al brongegevens of gecontroleerde actuals opgeslagen. Opslaan wijzigt de canonieke line-up voor deze en volgende rondes.",
+    "historical_confirm": "Ik begrijp dat dit een historische correctie is."
   },
   "admin_actuals": {
     "page_title": "Uitslagen invullen",

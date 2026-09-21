@@ -13,8 +13,9 @@ const {
 const roster = require("../data/roster.json");
 const races = require("../data/races.json").races;
 const { DRIVER_TEAM_ASSIGNMENTS, seedSeasonInputs } = require("./seed-season-inputs");
-const { listSeasonInputs } = require("../src/season-inputs");
+const { listSeasonInputs, upsertDriver, upsertSeasonDriver } = require("../src/season-inputs");
 const { buildCanonicalCatalog } = require("../src/canonical-answers");
+const { applySeasonLineup, buildLineupProjection } = require("../src/season-lineup");
 
 const PREVIEW_SOURCE = "preview_fixture";
 const PREVIEW_SYNC_ID = "preview-race-audit-v2";
@@ -131,6 +132,46 @@ function buildEvidence(round, now, totals, canonicalCatalog = null) {
   };
 }
 
+function seedPreviewReplacement(database, now) {
+  const catalog = listSeasonInputs(database, 2026);
+  if (!catalog.season) throw new Error("Preview season inputs were not seeded.");
+  const replacementId = upsertDriver(database, {
+    slug: "preview-replacement-driver",
+    displayName: "Preview Replacement",
+    active: true,
+    now
+  });
+  upsertSeasonDriver(database, {
+    seasonId: catalog.season.id,
+    driverId: replacementId,
+    driverNumber: "99",
+    active: true,
+    now
+  });
+  const projection = buildLineupProjection({
+    teams: catalog.teams,
+    drivers: catalog.drivers,
+    assignments: catalog.assignments,
+    roundNumber: 1
+  });
+  const targetTeam = projection.find((team) => team.teamName === "Mercedes") || projection[0];
+  if (!targetTeam) throw new Error("Preview fixture has no target team.");
+  const desiredSeats = projection.flatMap((team) => team.seats.map((seat) => ({
+    teamId: team.teamId,
+    seatNumber: seat.seatNumber,
+    driverId: team.teamId === targetTeam.teamId && seat.seatNumber === 2 ? replacementId : seat.driverId
+  })));
+  applySeasonLineup(database, {
+    seasonId: catalog.season.id,
+    roundNumber: 8,
+    desiredSeats,
+    source: PREVIEW_SOURCE,
+    now,
+    historicalCorrectionConfirmed: true
+  });
+  return { driverId: replacementId, teamId: targetTeam.teamId, fromRound: 8 };
+}
+
 function seedSanitizedPreview(database, now = new Date().toISOString()) {
   if (String(process.env.WOK_PREVIEW_DATA_MODE || "").trim().toLowerCase() !== "sanitized") {
     throw new Error("Preview fixture seeding requires WOK_PREVIEW_DATA_MODE=sanitized");
@@ -141,6 +182,7 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
 
   ensureRaceDataSchema(database);
   seedSeasonInputs(database, { season: 2026, now });
+  const replacement = seedPreviewReplacement(database, now);
   const canonicalCatalog = buildCanonicalCatalog(listSeasonInputs(database, 2026));
   const transaction = database.transaction(() => {
     database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
@@ -205,7 +247,8 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
     importId: result.importId,
     snapshotCount: result.snapshots.length,
     rounds: result.snapshots.map((item) => item.round),
-    sanitized: true
+    sanitized: true,
+    replacement
   };
 }
 

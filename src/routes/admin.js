@@ -24,10 +24,16 @@ const {
   upsertDriver,
   upsertDriverTeamAssignment,
   upsertRace,
+  upsertSeasonDriver,
   upsertSeasonTeam,
   upsertTeam
 } = require("../season-inputs");
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
+const {
+  applySeasonLineup,
+  buildLineupProjection,
+  historicalCorrectionRequired
+} = require("../season-lineup");
 
 
 function auditResultLabel(row) {
@@ -48,6 +54,30 @@ function auditResultLabel(row) {
 function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
   if (evidence) return evidence.coverage_status || evidence.payload?.coverage?.status || "incomplete";
   return Number(roundNumber) > Number(latestEvidenceRound || 0) ? "future" : "not_synced";
+}
+
+function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster }) {
+  const base = fallbackRoster || { drivers: [], teams: [], races: races || [] };
+  const catalog = listSeasonInputs(db, season);
+  if (!catalog.season || !Number.isInteger(Number(roundNumber)) || Number(roundNumber) < 1) return base;
+  const projection = buildLineupProjection({
+    teams: catalog.teams,
+    drivers: catalog.drivers,
+    assignments: catalog.assignments,
+    roundNumber: Number(roundNumber)
+  });
+  const drivers = Array.from(new Map(
+    projection.flatMap((team) => team.seats)
+      .filter((seat) => seat.driverId != null && seat.driverName)
+      .map((seat) => [String(seat.driverName), String(seat.driverName)])
+  ).values());
+  const teams = projection.map((team) => team.teamName);
+  return {
+    ...base,
+    drivers: drivers.length ? drivers : base.drivers || [],
+    teams: teams.length ? teams : base.teams || [],
+    races: races || base.races || []
+  };
 }
 
 function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound }) {
@@ -2473,19 +2503,30 @@ function registerAdminRoutes(app, deps) {
     const requestedTab = String(req.query.tab || "").trim().toLowerCase();
     const tab = ["drivers", "teams", "assignments", "races", "mappings"].includes(requestedTab)
       ? requestedTab
-      : "drivers";
+      : "teams";
     const season = Number(req.query.season || CURRENT_SEASON);
     const catalog = listSeasonInputs(db, season);
     const requestedRound = Number(req.query.round || 1);
     const lineupRound = catalog.races.length
       ? Math.min(Math.max(Number.isInteger(requestedRound) ? requestedRound : 1, 1), catalog.races.length)
       : 1;
+    const lineupProjection = catalog.season
+      ? buildLineupProjection({
+          teams: catalog.teams,
+          drivers: catalog.drivers,
+          assignments: catalog.assignments,
+          roundNumber: lineupRound
+        })
+      : [];
+    const lineupReviewState = getLineupReviewState(season, lineupRound);
     catalog.impact = getSeasonInputImpact(season);
     return res.render("admin_inputs", {
       user,
       season,
       tab,
       lineupRound,
+      lineupProjection,
+      lineupReviewState,
       catalog,
       inputsReady: Boolean(catalog.season),
       query: req.query
@@ -2509,9 +2550,26 @@ function registerAdminRoutes(app, deps) {
     return impact;
   }
 
-  function redirectInputs(res, season, tab, key, value) {
+  function getLineupReviewState(season, roundNumber) {
+    const reviewedRounds = db.prepare(
+      "SELECT round_number FROM actual_snapshots WHERE season = ? AND review_status = 'reviewed' AND round_number >= ? ORDER BY round_number"
+    ).all(Number(season), Number(roundNumber)).map((row) => Number(row.round_number));
+    const evidenceRounds = db.prepare(
+      "SELECT round_number FROM race_data_snapshots WHERE season = ? AND round_number >= ? ORDER BY round_number"
+    ).all(Number(season), Number(roundNumber)).map((row) => Number(row.round_number));
+    return {
+      reviewedRounds,
+      evidenceRounds,
+      requiresConfirmation: historicalCorrectionRequired({ roundNumber, reviewedRounds, evidenceRounds })
+    };
+  }
+
+  function redirectInputs(res, season, tab, key, value, extra = {}) {
     const params = new URLSearchParams({ season: String(season), tab: String(tab || "drivers") });
     if (key && value) params.set(key, String(value));
+    Object.entries(extra).forEach(([name, extraValue]) => {
+      if (extraValue != null && extraValue !== "") params.set(name, String(extraValue));
+    });
     return res.redirect(`/admin/inputs?${params.toString()}`);
   }
 
@@ -2566,6 +2624,80 @@ function registerAdminRoutes(app, deps) {
       return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "success", "Entity updated.");
     } catch (err) {
       return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "error", err.message);
+    }
+  });
+
+  app.post("/admin/inputs/driver", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const displayName = String(req.body.display_name || "").trim();
+    const slug = String(req.body.slug || "").trim();
+    const driverNumber = String(req.body.driver_number || "").trim() || null;
+    const catalog = listSeasonInputs(db, season);
+    const adminUser = getCurrentUser(req);
+    try {
+      if (!catalog.season || !displayName) throw new Error("A season and driver name are required.");
+      const driverId = upsertDriver(db, {
+        slug: slug || displayName,
+        displayName,
+        active: true
+      });
+      upsertSeasonDriver(db, {
+        seasonId: catalog.season.id,
+        driverId,
+        driverNumber
+      });
+      logEvent("info", "admin_inputs_driver_created", {
+        userId: adminUser?.id || null,
+        season,
+        driverId
+      });
+      return redirectInputs(res, season, "drivers", "success", "Driver added to season.");
+    } catch (err) {
+      return redirectInputs(res, season, "drivers", "error", err.message);
+    }
+  });
+
+  app.post("/admin/inputs/lineup", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const roundNumber = Number(req.body.round);
+    const catalog = listSeasonInputs(db, season);
+    const adminUser = getCurrentUser(req);
+    try {
+      if (!catalog.season) throw new Error("Season inputs are not available.");
+      if (!Number.isInteger(roundNumber) || roundNumber < 1 || roundNumber > catalog.races.length) {
+        throw new Error("Choose a valid season round.");
+      }
+      const desiredSeats = catalog.teams.flatMap((team) => [1, 2].map((seatNumber) => {
+        const value = req.body[`team_${team.id}_seat_${seatNumber}`];
+        return {
+          teamId: Number(team.id),
+          seatNumber,
+          driverId: value == null || String(value).trim() === "" ? null : Number(value)
+        };
+      }));
+      const reviewState = getLineupReviewState(season, roundNumber);
+      const historicalCorrectionConfirmed = String(req.body.historical_correction || "") === "1";
+      const result = applySeasonLineup(db, {
+        seasonId: catalog.season.id,
+        roundNumber,
+        desiredSeats,
+        reviewedRounds: reviewState.reviewedRounds,
+        evidenceRounds: reviewState.evidenceRounds,
+        historicalCorrectionConfirmed
+      });
+      logEvent("info", "admin_inputs_lineup_updated", {
+        userId: adminUser?.id || null,
+        season,
+        roundNumber,
+        changedSeats: result.operations.length,
+        affectedRounds: {
+          from: roundNumber,
+          to: catalog.races.length
+        }
+      });
+      return redirectInputs(res, season, "teams", "success", `Lineup saved (${result.operations.length} changes).`, { round: roundNumber });
+    } catch (err) {
+      return redirectInputs(res, season, "teams", "error", err.message, { round: roundNumber });
     }
   });
 
@@ -2821,9 +2953,16 @@ function registerAdminRoutes(app, deps) {
       requestedRound > 0
         ? requestedRound
         : Number(evidenceRows.at(-1)?.round_number || 1);
+    const roundRoster = buildRoundAwareRoster({
+      db,
+      season: CURRENT_SEASON,
+      roundNumber: defaultRound,
+      races,
+      fallbackRoster: roster
+    });
     const view = buildRaceDataAuditView({
       races,
-      roster,
+      roster: roundRoster,
       evidenceRows,
       snapshotRows,
       selectedRound: defaultRound
@@ -2853,7 +2992,7 @@ function registerAdminRoutes(app, deps) {
     const saveError = req.query.error ? String(req.query.error) : null;
     const saveSuccess = req.query.success ? String(req.query.success) : null;
     const questions = getQuestions(locale);
-    const roster = getRoster();
+    const baseRoster = getRoster();
     const races = getRaces();
     const actualRows = db.prepare("SELECT * FROM actuals").all();
     const persistedActuals = actualRows.reduce((acc, row) => {
@@ -2928,6 +3067,13 @@ function registerAdminRoutes(app, deps) {
     const isFutureRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "future");
     const allowPastEdit = String(req.query.unlockPast || "").trim() === "1";
     const requiresPastUnlock = isPastRaceTarget && !allowPastEdit;
+    const roster = buildRoundAwareRoster({
+      db,
+      season: CURRENT_SEASON,
+      roundNumber: selectedRoundNumber || latestRoundNumber || races.length || 1,
+      races,
+      fallbackRoster: baseRoster
+    });
     res.render("admin_actuals", {
       user,
       questions,

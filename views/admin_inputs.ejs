@@ -39,6 +39,17 @@
     </nav>
 
     <% if (tab === 'drivers') { %>
+      <details class="admin-inputs-advanced admin-inputs-driver-create">
+        <summary><%= t('admin_inputs.add_driver') %></summary>
+        <form method="post" action="/admin/inputs/driver" class="admin-inputs-assignment-form">
+          <%- csrfField() %>
+          <input type="hidden" name="season" value="<%= season %>">
+          <label><%= t('admin_inputs.driver_name') %><input name="display_name" required></label>
+          <label><%= t('admin_inputs.slug') %><input name="slug" placeholder="<%= t('admin_inputs.optional') %>"></label>
+          <label><%= t('admin_inputs.driver_number') %><input name="driver_number" placeholder="<%= t('admin_inputs.optional') %>"></label>
+          <button type="submit"><%= t('admin_inputs.add_driver') %></button>
+        </form>
+      </details>
       <div class="admin-race-data-table-wrap">
         <table class="admin-inputs-table">
           <thead><tr><th><%= t('admin_inputs.id') %></th><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.active') %></th><th></th></tr></thead>
@@ -56,23 +67,50 @@
         <label for="lineup-round"><%= t('admin_inputs.lineup_round') %></label>
         <select id="lineup-round" name="round" onchange="this.form.submit()"><% catalog.races.forEach((race) => { %><option value="<%= race.round_number %>" <%= Number(race.round_number) === Number(lineupRound) ? 'selected' : '' %>>R<%= race.round_number %> — <%= race.display_name %></option><% }) %></select>
       </form>
-      <div class="admin-race-data-table-wrap">
-        <table class="admin-inputs-table admin-inputs-lineup-table">
-          <thead><tr><th><%= t('admin_inputs.display_order') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.driver_1') %></th><th><%= t('admin_inputs.driver_2') %></th><th><%= t('admin_inputs.order_basis') %></th><th><%= t('admin_inputs.active') %></th><th></th></tr></thead>
-          <tbody>
-            <% catalog.teams.forEach((team) => { %>
-              <% const seatOne = catalog.assignments.find((item) => Number(item.team_id) === Number(team.id) && Number(item.seat_number || 1) === 1 && Number(item.from_round) <= Number(lineupRound) && (item.to_round == null || Number(item.to_round) >= Number(lineupRound))); %>
-              <% const seatTwo = catalog.assignments.find((item) => Number(item.team_id) === Number(team.id) && Number(item.seat_number || 1) === 2 && Number(item.from_round) <= Number(lineupRound) && (item.to_round == null || Number(item.to_round) >= Number(lineupRound))); %>
-              <tr>
-                <td><%= team.display_order || '—' %></td><th scope="row"><%= team.display_name_override || team.display_name %></th>
-                <td><strong><%= seatOne?.driver_name || '—' %></strong></td><td><strong><%= seatTwo?.driver_name || '—' %></strong></td>
-                <td><%= team.order_basis || 'manual' %></td><td><%= Number(team.season_active) ? t('admin_inputs.yes') : t('admin_inputs.no') %></td>
-                <td><form method="post" action="/admin/inputs/entity" class="admin-inputs-inline-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="team"><input type="hidden" name="entity_id" value="<%= team.id %>"><label class="sr-only" for="team-name-<%= team.id %>"><%= t('admin_inputs.team') %></label><input id="team-name-<%= team.id %>" name="display_name" value="<%= team.display_name %>" required><label class="sr-only" for="team-order-<%= team.id %>"><%= t('admin_inputs.display_order') %></label><input id="team-order-<%= team.id %>" name="display_order" type="number" min="0" value="<%= team.display_order || 0 %>"><select name="order_basis"><option value="official" <%= team.order_basis === 'official' ? 'selected' : '' %>><%= t('admin_inputs.order_basis_official') %></option><option value="previous_standings" <%= team.order_basis === 'previous_standings' ? 'selected' : '' %>><%= t('admin_inputs.order_basis_previous_standings') %></option><option value="manual" <%= !team.order_basis || team.order_basis === 'manual' ? 'selected' : '' %>><%= t('admin_inputs.order_basis_manual') %></option></select><button class="secondary" type="submit"><%= t('admin_inputs.save_team') %></button></form></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
+      <form method="post" action="/admin/inputs/lineup" class="admin-inputs-lineup-form">
+        <%- csrfField() %>
+        <input type="hidden" name="season" value="<%= season %>">
+        <input type="hidden" name="round" value="<%= lineupRound %>">
+        <% if (lineupReviewState?.requiresConfirmation) { %>
+          <div class="alert admin-inputs-history-warning">
+            <%= t('admin_inputs.historical_warning') %>
+            <label><input type="checkbox" name="historical_correction" value="1"> <%= t('admin_inputs.historical_confirm') %></label>
+          </div>
+        <% } %>
+        <div class="admin-race-data-table-wrap">
+          <table class="admin-inputs-table admin-inputs-lineup-table">
+            <thead><tr><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.driver_1') %></th><th><%= t('admin_inputs.driver_2') %></th></tr></thead>
+            <tbody>
+              <% lineupProjection.forEach((lineupTeam) => { %>
+                <tr>
+                  <th scope="row"><%= lineupTeam.teamName %></th>
+                  <% lineupTeam.seats.forEach((seat) => { %>
+                    <td>
+                      <label class="sr-only" for="team-<%= lineupTeam.teamId %>-seat-<%= seat.seatNumber %>"><%= seat.seatNumber === 1 ? t('admin_inputs.driver_1') : t('admin_inputs.driver_2') %> — <%= lineupTeam.teamName %></label>
+                      <select id="team-<%= lineupTeam.teamId %>-seat-<%= seat.seatNumber %>" name="team_<%= lineupTeam.teamId %>_seat_<%= seat.seatNumber %>">
+                        <option value=""><%= t('admin_inputs.empty_seat') %></option>
+                        <% catalog.drivers.forEach((driver) => { %>
+                          <option value="<%= driver.id %>" <%= Number(driver.id) === Number(seat.driverId) ? 'selected' : '' %>><%= driver.display_name_override || driver.display_name %></option>
+                        <% }) %>
+                      </select>
+                    </td>
+                  <% }) %>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <button type="submit"><%= t('admin_inputs.save_lineup') %></button>
+      </form>
+      <details class="admin-inputs-advanced">
+        <summary><%= t('admin_inputs.advanced_team_settings') %></summary>
+        <div class="admin-race-data-table-wrap">
+          <table class="admin-inputs-table">
+            <thead><tr><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.display_order') %></th><th><%= t('admin_inputs.order_basis') %></th><th></th></tr></thead>
+            <tbody><% catalog.teams.forEach((team) => { %><tr><th scope="row"><%= team.display_name_override || team.display_name %></th><td colspan="2"><form method="post" action="/admin/inputs/entity" class="admin-inputs-inline-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="team"><input type="hidden" name="entity_id" value="<%= team.id %>"><label class="sr-only" for="team-name-<%= team.id %>"><%= t('admin_inputs.team') %></label><input id="team-name-<%= team.id %>" name="display_name" value="<%= team.display_name %>" required><label class="sr-only" for="team-order-<%= team.id %>"><%= t('admin_inputs.display_order') %></label><input id="team-order-<%= team.id %>" name="display_order" type="number" min="0" value="<%= team.display_order || 0 %>"><select name="order_basis"><option value="official" <%= team.order_basis === 'official' ? 'selected' : '' %>><%= t('admin_inputs.order_basis_official') %></option><option value="previous_standings" <%= team.order_basis === 'previous_standings' ? 'selected' : '' %>><%= t('admin_inputs.order_basis_previous_standings') %></option><option value="manual" <%= !team.order_basis || team.order_basis === 'manual' ? 'selected' : '' %>><%= t('admin_inputs.order_basis_manual') %></option></select><button class="secondary" type="submit"><%= t('admin_inputs.save_team') %></button></form></td><td></td></tr><% }) %></tbody>
+          </table>
+        </div>
+      </details>
     <% } else if (tab === 'assignments') { %>
       <form method="post" action="/admin/inputs/assignment" class="admin-inputs-assignment-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><label><%= t('admin_inputs.driver') %><select name="driver_id" required><% catalog.drivers.forEach((driver) => { %><option value="<%= driver.id %>"><%= driver.display_name %></option><% }) %></select></label><label><%= t('admin_inputs.team') %><select name="team_id" required><% catalog.teams.forEach((team) => { %><option value="<%= team.id %>"><%= team.display_name %></option><% }) %></select></label><label><%= t('admin_inputs.seat') %><select name="seat_number"><option value="1"><%= t('admin_inputs.driver_1') %></option><option value="2"><%= t('admin_inputs.driver_2') %></option></select></label><label><%= t('admin_inputs.from_round') %><input name="from_round" type="number" min="1" max="<%= catalog.races.length %>" value="1" required></label><label><%= t('admin_inputs.to_round') %><input name="to_round" type="number" min="1" max="<%= catalog.races.length %>"></label><label><%= t('admin_inputs.source') %><input name="source" value="admin"></label><button type="submit"><%= t('admin_inputs.save_assignment') %></button></form>
       <div class="admin-race-data-table-wrap">

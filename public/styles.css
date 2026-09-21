@@ -2095,6 +2095,68 @@ button:disabled {
   min-width: 120px;
 }
 
+.admin-inputs-lineup-round-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+}
+
+.admin-inputs-lineup-round-form label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-inputs-lineup-round-form select {
+  min-width: 260px;
+}
+
+.admin-inputs-lineup-form {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.admin-inputs-lineup-form button {
+  justify-self: start;
+}
+
+.admin-inputs-lineup-table select {
+  min-width: 190px;
+}
+
+.admin-inputs-history-warning {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.admin-inputs-history-warning label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+
+.admin-inputs-advanced {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.admin-inputs-advanced summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-inputs-driver-create {
+  margin-bottom: 2px;
+}
+
 .admin-inputs-table {
   width: 100%;
   border-collapse: separate;
