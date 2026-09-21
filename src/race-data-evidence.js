@@ -382,7 +382,7 @@ function saveRaceDataSnapshot(db, {
         import_id, season, round_number, round_name, sync_id, fetched_at, source_type,
         source_note, parser_version, calendar_state, reconstructed,
         coverage_status, payload_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       importId == null ? null : Number(importId),
