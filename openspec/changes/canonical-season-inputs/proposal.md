@@ -6,6 +6,7 @@ The application currently treats drivers, teams, races, question options, import
 
 - Add a canonical season-inputs capability with stable IDs for drivers, teams, races, and season membership.
 - Add time-bounded driver/team assignments so mid-season changes remain historically correct.
+- Add season-specific team presentation order and round-bounded seat 1/seat 2 occupancy without using IDs as ordering.
 - Add provider identity and alias mappings as explicit data, replacing scattered name-alias constants.
 - Add an admin Inputs workspace before Questions for editing labels, assignments, calendar state, and unresolved mappings.
 - Make question options resolve from canonical inputs and make new answers/actuals use canonical entity references.

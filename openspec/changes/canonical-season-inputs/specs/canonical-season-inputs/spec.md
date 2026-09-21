@@ -79,3 +79,29 @@ The system SHALL write new entity-valued answers, normalized source rows, actual
 - **WHEN** Race data renders a selected round
 - **THEN** the driver and team SHALL be shown from the canonical season inputs
 - **AND** the source label SHALL remain available for audit provenance
+
+### Requirement: Season lineups have explicit order and seat occupancy
+Feature: Team-centric season lineup
+
+Rule: The system SHALL keep database identity separate from presentation order and driver seat assignment.
+
+#### Scenario: Admin opens the team lineup
+- **GIVEN** an authenticated admin opens Inputs for a configured season
+- **WHEN** the team lineup renders
+- **THEN** teams SHALL be ordered by the season's explicit display order
+- **AND** each team SHALL show seat 1 and seat 2 for the selected effective round
+- **AND** the displayed order SHALL NOT be derived from database IDs
+
+#### Scenario: A driver changes into a team seat
+- **GIVEN** a driver assignment ends before round N
+- **AND** a replacement assignment for the same team seat starts at round N
+- **WHEN** the admin views the lineup for rounds before and from N
+- **THEN** the earlier round SHALL show the original driver
+- **AND** round N onward SHALL show the replacement driver
+- **AND** overlapping occupancy of one team seat SHALL be rejected
+
+#### Scenario: A new season receives a new team order
+- **GIVEN** a new season has the same canonical teams or an additional team
+- **WHEN** an admin sets its season display order
+- **THEN** existing team IDs SHALL remain unchanged
+- **AND** the order SHALL be stored only for that season

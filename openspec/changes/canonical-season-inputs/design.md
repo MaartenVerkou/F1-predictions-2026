@@ -12,6 +12,7 @@ The current application loads `data/roster.json` and `data/races.json` as separa
 - Make imported evidence and derived values reproducible and identity-safe.
 - Provide an admin workspace that exposes and validates the canonical inputs before question editing.
 - Migrate legacy labels additively with an explicit unresolved mapping queue.
+- Present each season as an ordered team grid with two round-aware driver seats without making database IDs positional.
 
 **Non-Goals:**
 
@@ -52,6 +53,10 @@ New response and actual serializers write canonical references: a single entity 
 
 The preview seed creates deterministic canonical inputs and a valid season assignment map, then generates race evidence from that map. It may use fictionalized labels, but the same driver always resolves to the same ID and the team shown in each round is the assignment used by the result. It never reads production data.
 
+### 8. Keep identity, season order, and seat occupancy separate
+
+Team and driver IDs remain opaque immutable identities. `season_teams.display_order` stores the season presentation order independently from IDs, with an `order_basis` such as `official`, `previous_standings`, or `manual`. The 2026 seed uses the official season grid order represented by the reference lineup, while future seasons can be reordered without renumbering entities. `driver_team_assignments.seat_number` stores seat 1 or seat 2 for an effective round range; it is a presentation/entry slot, not a driver identity or car number. The normalized assignment table remains authoritative, while the admin UI presents a team-centric lineup projection.
+
 ## Risks / Trade-offs
 
 - **Legacy answers contain ambiguous labels** → resolve through provider refs and aliases, report unresolved values, and do not auto-rewrite ambiguous matches.
@@ -60,6 +65,8 @@ The preview seed creates deterministic canonical inputs and a valid season assig
 - **Migration touches scoring boundaries** → dual-read legacy values first, add canonical-write tests, and block production activation until unresolved mappings are reviewed.
 - **More admin concepts increase UI density** → keep Inputs as one top-level page with focused tabs and a compact unresolved-mapping summary.
 - **Provider identity gaps** → retain source labels and mark rows incomplete rather than assigning a guessed entity.
+- **Order mistaken for identity** → keep season display order and championship standings separate from immutable IDs; never sort by insertion ID.
+- **Driver seat changes** → validate non-overlapping driver assignments and team-seat occupancy, while race evidence keeps the observed team ID for historical audit.
 
 ## Migration Plan
 
@@ -70,6 +77,7 @@ The preview seed creates deterministic canonical inputs and a valid season assig
 5. Switch imports, question options, actual derivation, and scoring to canonical IDs; preserve legacy display values for audit.
 6. Re-seed the sanitized preview and run targeted/full checks plus preview smoke tests.
 7. Only after preview approval apply the production migration and activate the canonical model; retain rollback migrations for the additive phase.
+8. Add season team ordering and seat occupancy, backfill the 2026 official lineup, and expose one team-centric Inputs view before production approval.
 
 ## Open Questions
 
