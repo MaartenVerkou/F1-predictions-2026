@@ -492,7 +492,8 @@
     "increase_value": "Increase value",
     "decrease_value": "Decrease value",
     "pagination_summary": "{label} page {current} of {total}{per_page}",
-    "per_page_suffix": " ({count}/page)"
+    "per_page_suffix": " ({count}/page)",
+    "nav_race_data": "Datos de carrera"
   },
   "admin_actuals": {
     "page_title": "Set actuals",
@@ -632,5 +633,43 @@
     "intro": "Este enlace de recuperacion es para {guest_name} en {group_name}. Revisa la accion antes de confirmar.",
     "confirm_reset": "Definir nuevo PIN de recuperacion",
     "confirm_transfer": "Confirmar transferencia"
+  },
+  "admin_race_data": {
+    "page_title": "Auditoría de datos de carrera",
+    "heading": "Datos de carrera",
+    "intro": "Revisa los resultados de origen usados para calcular los resultados reales.",
+    "view_label": "Vista de datos",
+    "drivers_view": "Pilotos",
+    "constructors_view": "Constructores",
+    "round_label": "Carrera seleccionada",
+    "open_round": "Abrir carrera",
+    "position": "Pos.",
+    "constructor": "Constructor",
+    "driver": "Piloto",
+    "team": "Equipo",
+    "points": "Puntos",
+    "no_round": "No hay carrera seleccionada",
+    "source_status": "Cobertura",
+    "fetched": "Obtenido",
+    "no_evidence": "No hay datos de origen guardados para esta carrera.",
+    "open_actuals": "Abrir resultados",
+    "coverage": "Fuentes",
+    "derived_actuals": "Resultados calculados",
+    "no_evidence_detail": "Aún no hay un paquete de origen para esta carrera.",
+    "legend": "Leyenda",
+    "grid": "Parrilla",
+    "qualifying_short": "Q",
+    "sprint": "Sprint",
+    "race": "Carrera",
+    "status": "Estado",
+    "points_short": "Pts",
+    "legend_finish": "1–10 = clasificado",
+    "legend_retired": "Ret = retirado",
+    "legend_dns": "DNS = no tomó la salida",
+    "legend_dnq": "DNQ = no clasificado",
+    "legend_nc": "NC = no clasificado",
+    "legend_unavailable": "— = no disponible / no inscrito",
+    "future_round": "Carrera futura; todavía no se esperan datos de origen.",
+    "cancelled_round": "Carrera cancelada; no se esperan datos de origen."
   }
 }

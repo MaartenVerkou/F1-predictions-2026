@@ -18,6 +18,7 @@ const {
 } = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
+const { ensureRaceDataSchema } = require("./src/race-data-evidence");
 
 function loadDotEnvIfPresent(filePath = path.join(__dirname, ".env")) {
   if (!fs.existsSync(filePath)) return;
@@ -486,8 +487,27 @@ if (db.dialect === "sqlite") {
     review_status TEXT NOT NULL DEFAULT 'reviewed',
     reviewed_at TEXT,
     reviewed_by_user_id INTEGER,
+    source_data_snapshot_id INTEGER,
     FOREIGN KEY(created_by_user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS race_data_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season INTEGER NOT NULL,
+    round_number INTEGER NOT NULL,
+    round_name TEXT,
+    sync_id TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_note TEXT,
+    coverage_status TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(season, round_number, sync_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_season_round
+    ON race_data_snapshots(season, round_number, created_at);
 
   CREATE TABLE IF NOT EXISTS actual_snapshot_values (
     snapshot_id INTEGER NOT NULL,
@@ -678,6 +698,7 @@ function ensureQuestionSettingsColumns() {
 
 ensureQuestionSettingsColumns();
 ensureActualSnapshotColumns(db);
+ensureRaceDataSchema(db);
 
 function seedAdminIdeas() {
   const now = new Date().toISOString();

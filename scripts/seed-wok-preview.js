@@ -1,10 +1,92 @@
 "use strict";
 
 const { createAppDatabase } = require("../src/app-database");
+const {
+  SOURCE_TYPES,
+  buildEvidenceBundle,
+  ensureRaceDataSchema,
+  linkEvidenceToActualSnapshot,
+  saveRaceDataSnapshot
+} = require("../src/race-data-evidence");
+const roster = require("../data/roster.json");
 
 const PREVIEW_SOURCE = "preview_fixture";
 const PREVIEW_ROUND = 6;
 const PREVIEW_VALUE = "yes";
+const PREVIEW_SYNC_ID = "preview-fixture-r6-v1";
+
+function splitDriverName(name) {
+  const parts = String(name).split(" ");
+  return {
+    givenName: parts.shift() || "",
+    familyName: parts.join(" ")
+  };
+}
+
+function buildPreviewEvidence(now) {
+  const drivers = roster.drivers.slice(0, 6);
+  const teams = roster.teams.slice(0, 3);
+  const points = [25, 18, 15, 12, 10, 8];
+  const results = drivers.map((name, index) => ({
+    number: String(1 + index),
+    position: String(index + 1),
+    grid: index + 1,
+    points: String(points[index]),
+    laps: 78,
+    status: "Finished",
+    Driver: splitDriverName(name),
+    Constructor: { name: teams[index % teams.length] }
+  }));
+  const qualifyingResults = drivers.map((name, index) => ({
+    number: String(1 + index),
+    position: String(index + 1),
+    points: "0",
+    Driver: splitDriverName(name),
+    Constructor: { name: teams[index % teams.length] }
+  }));
+  const standings = drivers.map((name, index) => ({
+    position: String(index + 1),
+    points: String(points[index]),
+    Driver: splitDriverName(name)
+  }));
+  const constructorStandings = teams.map((name, index) => ({
+    position: String(index + 1),
+    points: String(points
+      .filter((_, driverIndex) => driverIndex % teams.length === index)
+      .reduce((sum, value) => sum + value, 0)),
+    Constructor: { name }
+  }));
+  return buildEvidenceBundle({
+    data: {
+      season: 2026,
+      results: [{
+        round: PREVIEW_ROUND,
+        raceName: "Monaco Grand Prix",
+        date: "2026-05-24",
+        Circuit: { circuitName: "Circuit de Monaco" },
+        Results: results
+      }],
+      qualifying: [{
+        round: PREVIEW_ROUND,
+        QualifyingResults: qualifyingResults
+      }],
+      sprints: [],
+      driverStandingsByRound: new Map([[PREVIEW_ROUND, standings]]),
+      constructorStandingsByRound: new Map([[PREVIEW_ROUND, constructorStandings]]),
+      driverOfTheDayByRound: new Map()
+    },
+    roster,
+    roundNumber: PREVIEW_ROUND,
+    roundName: "Monaco Grand Prix",
+    fetchedAt: now,
+    sourceUrls: {
+      race: "preview://sanitized/r6/results",
+      qualifying: "preview://sanitized/r6/qualifying",
+      driverStandings: "preview://sanitized/r6/driver-standings",
+      constructorStandings: "preview://sanitized/r6/constructor-standings"
+    }
+  });
+}
 
 function seedSanitizedPreview(database, now = new Date().toISOString()) {
   if (String(process.env.WOK_PREVIEW_DATA_MODE || "").trim().toLowerCase() !== "sanitized") {
@@ -14,6 +96,8 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
     throw new Error("Preview fixture seeding requires DATABASE_URL");
   }
 
+  ensureRaceDataSchema(database);
+  const evidence = buildPreviewEvidence(now);
   const existing = database
     .prepare(
       "SELECT id FROM actual_snapshots WHERE season = ? AND round_number = ? AND source_type = ? ORDER BY id DESC"
@@ -46,6 +130,18 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
             ).lastInsertRowid
         );
 
+    const evidenceId = saveRaceDataSnapshot(database, {
+      season: 2026,
+      roundNumber: PREVIEW_ROUND,
+      roundName: "Monaco Grand Prix",
+      syncId: PREVIEW_SYNC_ID,
+      fetchedAt: now,
+      sourceType: SOURCE_TYPES.JOLPICA,
+      sourceNote: "Sanitized WOK preview fixture; not production data",
+      evidence
+    });
+    linkEvidenceToActualSnapshot(database, snapshotId, evidenceId);
+
     database
       .prepare(
         `
@@ -66,15 +162,17 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
       )
       .run("all_teams_score_points", PREVIEW_VALUE, now);
 
-    return snapshotId;
+    return { snapshotId, evidenceId };
   });
 
-  const snapshotId = transaction();
+  const result = transaction();
   return {
     sourceType: PREVIEW_SOURCE,
-    snapshotId,
+    snapshotId: result.snapshotId,
+    evidenceId: result.evidenceId,
     roundNumber: PREVIEW_ROUND,
-    seededQuestionIds: ["all_teams_score_points"]
+    seededQuestionIds: ["all_teams_score_points"],
+    sanitized: true
   };
 }
 
@@ -96,4 +194,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { seedSanitizedPreview };
+module.exports = { seedSanitizedPreview, buildPreviewEvidence };

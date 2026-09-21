@@ -10,6 +10,13 @@ const {
   normalizeReviewStatus,
   snapshotValuesEqual
 } = require("../src/actuals-snapshots");
+const {
+  buildEvidenceBundle,
+  ensureRaceDataSchema,
+  linkEvidenceToActualSnapshot,
+  saveRaceDataSnapshot,
+  SOURCE_TYPES
+} = require("../src/race-data-evidence");
 const { createAppDatabase } = require("../src/app-database");
 const { ensurePostgresSchema } = require("../src/postgres-schema");
 const { resolveConfiguredRaceName } = require("../src/race-names");
@@ -737,6 +744,7 @@ async function fetchSeasonData({ season, roster }) {
   }
 
   return {
+    season,
     results,
     qualifying,
     sprints,
@@ -768,6 +776,8 @@ function loadExistingActuals(db) {
 function ensureActualsSchema(db) {
   if (db.dialect === "postgres") {
     ensurePostgresSchema(db);
+    ensureActualSnapshotColumns(db);
+    ensureRaceDataSchema(db);
     return;
   }
 
@@ -809,6 +819,7 @@ function ensureActualsSchema(db) {
       ON actual_snapshot_values(snapshot_id);
   `);
   ensureActualSnapshotColumns(db);
+  ensureRaceDataSchema(db);
 }
 
 function upsertSnapshot(db, { season, roundNumber, roundName, values, now }) {
@@ -878,9 +889,20 @@ function upsertSnapshot(db, { season, roundNumber, roundName, values, now }) {
 
 function writeActualsAndSnapshots(db, { season, rounds, latestValues, snapshots }) {
   const now = new Date().toISOString();
+  const syncId = now;
   let changedSnapshotCount = 0;
   const tx = db.transaction(() => {
     for (const snapshot of snapshots) {
+      const evidenceId = saveRaceDataSnapshot(db, {
+        season,
+        roundNumber: snapshot.roundNumber,
+        roundName: snapshot.roundName,
+        syncId,
+        fetchedAt: snapshot.evidence?.fetchedAt || now,
+        sourceType: SOURCE_TYPES.JOLPICA,
+        sourceNote: BACKFILL_SOURCE_NOTE,
+        evidence: snapshot.evidence
+      });
       const snapshotResult = upsertSnapshot(db, {
         season,
         roundNumber: snapshot.roundNumber,
@@ -889,6 +911,8 @@ function writeActualsAndSnapshots(db, { season, rounds, latestValues, snapshots 
         now
       });
       snapshot.id = snapshotResult?.snapshotId || null;
+      snapshot.evidenceId = evidenceId;
+      linkEvidenceToActualSnapshot(db, snapshot.id, evidenceId);
       snapshot.valuesChanged = Boolean(snapshotResult?.valuesChanged);
       snapshot.reviewStatus = snapshotResult?.reviewStatus || REVIEW_STATUS_PENDING;
       if (snapshot.valuesChanged) changedSnapshotCount += 1;
@@ -896,10 +920,7 @@ function writeActualsAndSnapshots(db, { season, rounds, latestValues, snapshots 
 
     db.prepare("DELETE FROM actuals").run();
     const insertActual = db.prepare(
-      `
-      INSERT INTO actuals (question_id, value, updated_at)
-      VALUES (?, ?, ?)
-      `
+      "INSERT INTO actuals (question_id, value, updated_at) VALUES (?, ?, ?)"
     );
     Object.entries(latestValues).forEach(([questionId, value]) => {
       insertActual.run(questionId, value, now);
@@ -928,18 +949,36 @@ async function main() {
     throw new Error(`No completed ${args.season} rounds found.`);
   }
 
-  const snapshots = completedRounds.map((roundNumber) => ({
-    roundNumber,
-    roundName: getRoundName(data, races, roundNumber),
-    values: serializedActualsForRound({
-      questions,
-      roster,
-      races,
-      data,
+  const snapshots = completedRounds.map((roundNumber) => {
+    const roundName = getRoundName(data, races, roundNumber);
+    return {
       roundNumber,
-      totalRounds
-    })
-  }));
+      roundName,
+      values: serializedActualsForRound({
+        questions,
+        roster,
+        races,
+        data,
+        roundNumber,
+        totalRounds
+      }),
+      evidence: buildEvidenceBundle({
+        data,
+        roster,
+        roundNumber,
+        roundName,
+        fetchedAt: new Date().toISOString(),
+        sourceUrls: {
+          race: API_BASE + "/" + args.season + "/" + roundNumber + "/results.json",
+          qualifying: API_BASE + "/" + args.season + "/" + roundNumber + "/qualifying.json",
+          sprint: API_BASE + "/" + args.season + "/" + roundNumber + "/sprint.json",
+          driverStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/driverStandings.json",
+          constructorStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/constructorStandings.json",
+          driverOfTheDay: FORMULA1_DOTD_URL
+        }
+      })
+    };
+  });
 
   const latestSnapshot = snapshots[snapshots.length - 1];
   let latestValues = { ...latestSnapshot.values };

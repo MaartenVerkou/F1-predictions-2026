@@ -492,7 +492,8 @@
     "increase_value": "Increase value",
     "decrease_value": "Decrease value",
     "pagination_summary": "{label} page {current} of {total}{per_page}",
-    "per_page_suffix": " ({count}/page)"
+    "per_page_suffix": " ({count}/page)",
+    "nav_race_data": "Données de course"
   },
   "admin_actuals": {
     "page_title": "Set actuals",
@@ -632,5 +633,43 @@
     "intro": "Ce lien de recuperation concerne {guest_name} dans {group_name}. Verifie l action avant de confirmer.",
     "confirm_reset": "Definir un nouveau PIN de recuperation",
     "confirm_transfer": "Confirmer le transfert"
+  },
+  "admin_race_data": {
+    "page_title": "Audit des données de course",
+    "heading": "Données de course",
+    "intro": "Vérifiez les résultats sources utilisés pour calculer les résultats réels.",
+    "view_label": "Vue des données",
+    "drivers_view": "Pilotes",
+    "constructors_view": "Constructeurs",
+    "round_label": "Course sélectionnée",
+    "open_round": "Ouvrir la course",
+    "position": "Pos.",
+    "constructor": "Constructeur",
+    "driver": "Pilote",
+    "team": "Équipe",
+    "points": "Points",
+    "no_round": "Aucune course sélectionnée",
+    "source_status": "Couverture",
+    "fetched": "Récupéré",
+    "no_evidence": "Aucune donnée source enregistrée pour cette course.",
+    "open_actuals": "Ouvrir les résultats",
+    "coverage": "Sources",
+    "derived_actuals": "Résultats calculés",
+    "no_evidence_detail": "Aucun paquet source n'est encore disponible pour cette course.",
+    "legend": "Légende",
+    "grid": "Grille",
+    "qualifying_short": "Q",
+    "sprint": "Sprint",
+    "race": "Course",
+    "status": "Statut",
+    "points_short": "Pts",
+    "legend_finish": "1–10 = classé",
+    "legend_retired": "Ret = abandon",
+    "legend_dns": "DNS = non-partant",
+    "legend_dnq": "DNQ = non qualifié",
+    "legend_nc": "NC = non classé",
+    "legend_unavailable": "— = indisponible / non inscrit",
+    "future_round": "Course future ; les données sources ne sont pas encore attendues.",
+    "cancelled_round": "Course annulée ; aucune donnée source n’est attendue."
   }
 }

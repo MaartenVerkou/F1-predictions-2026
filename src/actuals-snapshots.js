@@ -32,6 +32,9 @@ function ensureActualSnapshotColumns(db) {
   if (!names.has("reviewed_by_user_id")) {
     db.exec("ALTER TABLE actual_snapshots ADD COLUMN reviewed_by_user_id INTEGER;");
   }
+  if (!names.has("source_data_snapshot_id")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN source_data_snapshot_id INTEGER;");
+  }
 
   db.exec(`
     UPDATE actual_snapshots
@@ -77,7 +80,11 @@ function mapSnapshotRow(row) {
     reviewed_by_user_id:
       row.reviewed_by_user_id == null || row.reviewed_by_user_id === ""
         ? null
-        : Number(row.reviewed_by_user_id)
+        : Number(row.reviewed_by_user_id),
+    source_data_snapshot_id:
+      row.source_data_snapshot_id == null || row.source_data_snapshot_id === ""
+        ? null
+        : Number(row.source_data_snapshot_id)
   };
 }
 
@@ -131,7 +138,8 @@ function findLatestSnapshotForRound(db, season, roundNumber, options = {}) {
           created_by_user_id,
           review_status,
           reviewed_at,
-          reviewed_by_user_id
+          reviewed_by_user_id,
+          source_data_snapshot_id
         FROM actual_snapshots
         WHERE season = ?
           AND round_number = ?
@@ -168,7 +176,8 @@ function findLatestRoundSnapshotForSeason(db, season, options = {}) {
           created_by_user_id,
           review_status,
           reviewed_at,
-          reviewed_by_user_id
+          reviewed_by_user_id,
+          source_data_snapshot_id
         FROM actual_snapshots
         WHERE season = ?
           AND round_number IS NOT NULL
@@ -205,7 +214,8 @@ function listLatestSnapshotsForSeason(db, season, options = {}) {
         created_by_user_id,
         review_status,
         reviewed_at,
-        reviewed_by_user_id
+        reviewed_by_user_id,
+        source_data_snapshot_id
       FROM actual_snapshots
       WHERE season = ?
         AND round_number IS NOT NULL
@@ -243,7 +253,8 @@ function findSnapshotById(db, snapshotId, options = {}) {
           created_by_user_id,
           review_status,
           reviewed_at,
-          reviewed_by_user_id
+          reviewed_by_user_id,
+          source_data_snapshot_id
         FROM actual_snapshots
         WHERE id = ?
         LIMIT 1

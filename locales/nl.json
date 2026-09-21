@@ -35,7 +35,8 @@
     "increase_value": "Waarde verhogen",
     "decrease_value": "Waarde verlagen",
     "pagination_summary": "{label}: pagina {current} van {total}{per_page}",
-    "per_page_suffix": " ({count}/pagina)"
+    "per_page_suffix": " ({count}/pagina)",
+    "nav_race_data": "Racedata"
   },
   "admin_actuals": {
     "page_title": "Uitslagen invullen",
@@ -632,5 +633,43 @@
     "intro": "Deze herstellink is voor {guest_name} in {group_name}. Controleer de actie voordat je bevestigt.",
     "confirm_reset": "Nieuwe herstelpincode instellen",
     "confirm_transfer": "Overdracht bevestigen"
+  },
+  "admin_race_data": {
+    "page_title": "Audit racedata",
+    "heading": "Racedata",
+    "intro": "Controleer de bronuitslagen die voor de actuals en scoreberekening worden gebruikt.",
+    "view_label": "Dataview",
+    "drivers_view": "Coureurs",
+    "constructors_view": "Constructeurs",
+    "round_label": "Geselecteerde race",
+    "open_round": "Open race",
+    "position": "Pos.",
+    "constructor": "Constructeur",
+    "driver": "Coureur",
+    "team": "Team",
+    "points": "Punten",
+    "no_round": "Geen race geselecteerd",
+    "source_status": "Dekking",
+    "fetched": "Opgehaald",
+    "no_evidence": "Geen opgeslagen brondata voor deze race.",
+    "open_actuals": "Open actuals",
+    "coverage": "Bronnen",
+    "derived_actuals": "Afgeleide actuals",
+    "no_evidence_detail": "Voor deze race is nog geen bronbundel opgeslagen. Voer een seizoenssync uit of kies een andere race.",
+    "legend": "Legenda",
+    "grid": "Grid",
+    "qualifying_short": "Q",
+    "sprint": "Sprint",
+    "race": "Race",
+    "status": "Status",
+    "points_short": "Pnt",
+    "legend_finish": "1–10 = geklasseerd",
+    "legend_retired": "Ret = uitgevallen",
+    "legend_dns": "DNS = niet gestart",
+    "legend_dnq": "DNQ = niet gekwalificeerd",
+    "legend_nc": "NC = niet geklasseerd",
+    "legend_unavailable": "— = niet beschikbaar / niet ingeschreven",
+    "future_round": "Toekomstige race; brondata wordt nog niet verwacht.",
+    "cancelled_round": "Afgelaste race; er wordt geen brondata verwacht."
   }
 }

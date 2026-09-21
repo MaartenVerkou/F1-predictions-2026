@@ -35,7 +35,8 @@
     "increase_value": "Increase value",
     "decrease_value": "Decrease value",
     "pagination_summary": "{label} page {current} of {total}{per_page}",
-    "per_page_suffix": " ({count}/page)"
+    "per_page_suffix": " ({count}/page)",
+    "nav_race_data": "Race data"
   },
   "admin_actuals": {
     "page_title": "Set actuals",
@@ -632,5 +633,43 @@
     "intro": "This recovery link is for {guest_name} in {group_name}. Review the action before confirming.",
     "confirm_reset": "Set new Recovery PIN",
     "confirm_transfer": "Confirm transfer"
+  },
+  "admin_race_data": {
+    "page_title": "Race data audit",
+    "heading": "Race data",
+    "intro": "Inspect the source results used to derive actuals before accepting scoring.",
+    "view_label": "Data view",
+    "drivers_view": "Drivers",
+    "constructors_view": "Constructors",
+    "round_label": "Selected round",
+    "open_round": "Open round",
+    "position": "Pos.",
+    "constructor": "Constructor",
+    "driver": "Driver",
+    "team": "Team",
+    "points": "Points",
+    "no_round": "No round selected",
+    "source_status": "Coverage",
+    "fetched": "Fetched",
+    "no_evidence": "No persisted evidence for this round.",
+    "open_actuals": "Open Actuals",
+    "coverage": "Sources",
+    "derived_actuals": "Derived actuals",
+    "no_evidence_detail": "This round has no source bundle yet. Run a season sync or choose another round.",
+    "legend": "Legend",
+    "grid": "Grid",
+    "qualifying_short": "Q",
+    "sprint": "Sprint",
+    "race": "Race",
+    "status": "Status",
+    "points_short": "Pts",
+    "legend_finish": "1–10 = classified finish",
+    "legend_retired": "Ret = retired",
+    "legend_dns": "DNS = did not start",
+    "legend_dnq": "DNQ = did not qualify",
+    "legend_nc": "NC = not classified",
+    "legend_unavailable": "— = unavailable / not entered",
+    "future_round": "Future round; source data is not expected yet.",
+    "cancelled_round": "Cancelled round; no source data is expected."
   }
 }

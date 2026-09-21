@@ -12,6 +12,171 @@ const {
   markSnapshotReviewed,
   upsertSnapshotForRound
 } = require("../actuals-snapshots");
+const {
+  listRaceDataSnapshots,
+  summarizeEvidence
+} = require("../race-data-evidence");
+
+
+function auditResultLabel(row) {
+  if (!row) return "—";
+  const position = Number(row.position);
+  if (Number.isFinite(position) && position > 0) return String(position);
+  const raw = String(row.status || row.positionText || "").trim();
+  const key = raw.toLowerCase();
+  if (key.includes("retir") || key === "dnf") return "Ret";
+  if (key.includes("did not start") || key === "dns") return "DNS";
+  if (key.includes("did not qualify") || key === "dnq") return "DNQ";
+  if (key.includes("disqual") || key === "dsq") return "DSQ";
+  if (key.includes("not classified") || key === "nc") return "NC";
+  if (key.includes("withdrew") || key === "wd") return "WD";
+  return raw || "—";
+}
+
+function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
+  if (evidence) return evidence.coverage_status || evidence.payload?.coverage?.status || "incomplete";
+  return Number(roundNumber) > Number(latestEvidenceRound || 0) ? "future" : "not_synced";
+}
+
+function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound }) {
+  const evidenceByRound = new Map(
+    evidenceRows.map((row) => [Number(row.round_number), row])
+  );
+  const snapshotByRound = new Map(
+    snapshotRows.map((row) => [Number(row.round_number), row])
+  );
+  const latestEvidenceRound = evidenceRows.reduce(
+    (max, row) => Math.max(max, Number(row.round_number) || 0),
+    0
+  );
+  const rounds = races.map((raceName, index) => {
+    const roundNumber = index + 1;
+    const evidence = evidenceByRound.get(roundNumber) || null;
+    const raceState = !evidence && /cancel+ed|afgelast/i.test(String(raceName))
+      ? "cancelled"
+      : auditSourceState(evidence, roundNumber, latestEvidenceRound);
+    return {
+      roundNumber,
+      raceName,
+      label: "R" + roundNumber + " - " + raceName,
+      evidence,
+      snapshot: snapshotByRound.get(roundNumber) || null,
+      state: raceState,
+      summary: evidence ? summarizeEvidence(evidence.payload) : null
+    };
+  });
+  const latestEvidence = evidenceRows[evidenceRows.length - 1] || null;
+  const latestPayload = latestEvidence?.payload || null;
+  const latestDriverStandings = latestPayload?.standings?.drivers || [];
+  const latestConstructorStandings = latestPayload?.standings?.constructors || [];
+  const latestDriverMap = new Map(latestDriverStandings.map((row) => [row.entity, row]));
+  const latestConstructorMap = new Map(latestConstructorStandings.map((row) => [row.entity, row]));
+
+  const drivers = Array.isArray(roster?.drivers) ? roster.drivers : [];
+  const teams = Array.isArray(roster?.teams) ? roster.teams : [];
+  const driverRows = drivers.map((driver) => {
+    const cells = rounds.map((round) => {
+      const raceRows = round.evidence?.payload?.race?.rows || [];
+      const row = raceRows.find((item) => item.driver === driver) || null;
+      return {
+        label: round.evidence ? auditResultLabel(row) : "—",
+        title: row
+          ? [row.status, row.grid != null ? "grid " + row.grid : null, row.points != null ? row.points + " pts" : null]
+              .filter(Boolean)
+              .join(" · ")
+          : round.evidence ? "No classified row" : "Evidence unavailable",
+        state: round.state,
+        row
+      };
+    });
+    const standing = latestDriverMap.get(driver) || null;
+    const constructor = cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
+    return {
+      name: driver,
+      constructor,
+      cells,
+      points: standing?.points ?? null,
+      championshipPosition: standing?.position ?? null
+    };
+  });
+
+  const constructorRows = teams.map((team) => {
+    const cells = rounds.map((round) => {
+      if (!round.evidence) {
+        return { label: "—", state: round.state, title: "Evidence unavailable" };
+      }
+      const raceRows = round.evidence.payload?.race?.rows || [];
+      const sprintRows = round.evidence.payload?.sprint?.rows || [];
+      const points = raceRows
+        .filter((row) => row.constructor === team)
+        .concat(sprintRows.filter((row) => row.constructor === team))
+        .reduce((total, row) => total + Number(row.points || 0), 0);
+      return {
+        label: String(points),
+        state: round.state,
+        title: points + " points from race and sprint"
+      };
+    });
+    const standing = latestConstructorMap.get(team) || null;
+    return {
+      name: team,
+      cells,
+      points: standing?.points ?? null,
+      championshipPosition: standing?.position ?? null
+    };
+  });
+
+  const selectedRoundNumber = Number(selectedRound) || 1;
+  const selected = rounds.find((round) => round.roundNumber === selectedRoundNumber) || rounds[0] || null;
+  const payload = selected?.evidence?.payload || null;
+  const raceRows = payload?.race?.rows || [];
+  const qualifyingRows = payload?.qualifying?.rows || [];
+  const sprintRows = payload?.sprint?.rows || [];
+  const raceByDriver = new Map(raceRows.map((row) => [row.driver, row]));
+  const qualifyingByDriver = new Map(qualifyingRows.map((row) => [row.driver, row]));
+  const sprintByDriver = new Map(sprintRows.map((row) => [row.driver, row]));
+  const detailNames = Array.from(
+    new Set(
+      drivers.concat(
+        raceRows.map((row) => row.driver),
+        qualifyingRows.map((row) => row.driver),
+        sprintRows.map((row) => row.driver)
+      )
+    )
+  ).filter(Boolean);
+  const detailRows = detailNames.map((driver) => {
+    const race = raceByDriver.get(driver) || null;
+    const qualifying = qualifyingByDriver.get(driver) || null;
+    const sprint = sprintByDriver.get(driver) || null;
+    return {
+      driver,
+      constructor: race?.constructor || qualifying?.constructor || sprint?.constructor || null,
+      grid: race?.grid ?? null,
+      qualifyingPosition: qualifying?.position ?? null,
+      sprintPosition: sprint?.position ?? null,
+      sprintStatus: sprint?.status || null,
+      sprintPoints: sprint?.points ?? null,
+      racePosition: race?.positionText || null,
+      raceLabel: auditResultLabel(race),
+      raceStatus: race?.status || null,
+      racePoints: race?.points ?? null
+    };
+  });
+
+  return {
+    rounds,
+    drivers: driverRows,
+    constructors: constructorRows,
+    selectedRound: selected,
+    selectedRoundNumber: selected?.roundNumber || selectedRoundNumber,
+    selectedEvidence: selected?.evidence || null,
+    selectedSummary: selected?.summary || null,
+    detailRows,
+    latestEvidence,
+    latestEvidenceRound,
+    snapshotRows
+  };
+}
 
 function registerAdminRoutes(app, deps) {
   const {
@@ -2383,6 +2548,46 @@ function registerAdminRoutes(app, deps) {
     );
   });
 
+  app.get("/admin/race-data", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const locale = res.locals.locale || "en";
+    const roster = getRoster();
+    const races = getRaces();
+    const evidenceRows = listRaceDataSnapshots(db, CURRENT_SEASON);
+    const snapshotRows = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
+      maxRoundNumber: races.length
+    });
+    const viewMode =
+      String(req.query.view || "").trim().toLowerCase() === "constructors"
+        ? "constructors"
+        : "drivers";
+    const requestedRound = Number(req.query.round || 0);
+    const defaultRound =
+      requestedRound > 0
+        ? requestedRound
+        : Number(evidenceRows.at(-1)?.round_number || 1);
+    const view = buildRaceDataAuditView({
+      races,
+      roster,
+      evidenceRows,
+      snapshotRows,
+      selectedRound: defaultRound
+    });
+    const selectedSnapshot = view.selectedRound?.snapshot || null;
+    const derivedActuals = selectedSnapshot
+      ? loadSnapshotValues(selectedSnapshot.id)
+      : {};
+    return res.render("admin_race_data", {
+      user,
+      season: CURRENT_SEASON,
+      locale,
+      view,
+      viewMode,
+      derivedActuals,
+      selectedSnapshot
+    });
+  });
+
   app.get("/admin/actuals", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
@@ -4303,5 +4508,8 @@ function registerAdminRoutes(app, deps) {
 }
 
 module.exports = {
+  auditResultLabel,
+  auditSourceState,
+  buildRaceDataAuditView,
   registerAdminRoutes
 };
