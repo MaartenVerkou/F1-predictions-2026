@@ -2575,7 +2575,7 @@ function registerAdminRoutes(app, deps) {
     });
     const selectedSnapshot = view.selectedRound?.snapshot || null;
     const derivedActuals = selectedSnapshot
-      ? loadSnapshotValues(selectedSnapshot.id)
+      ? loadSnapshotValues(db, selectedSnapshot.id)
       : {};
     return res.render("admin_race_data", {
       user,
