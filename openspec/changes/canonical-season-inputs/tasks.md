@@ -1,9 +1,9 @@
 ## 1. Canonical schema and resolver
 
-- [ ] 1.1 Add additive SQLite/PostgreSQL schema for seasons, drivers, teams, races, season memberships, round-bounded driver/team assignments, aliases, and provider references.
-- [ ] 1.2 Add shared canonical-input repository/resolver helpers with stable IDs, alias/provider lookup, overlap validation, and unresolved mapping results.
-- [ ] 1.3 Add ADR documenting canonical season inputs and ID-based identity semantics.
-- [ ] 1.4 Bootstrap the 2026 catalog from the current roster/calendar and produce deterministic provider mappings without changing production data.
+- [x] 1.1 Add additive SQLite/PostgreSQL schema for seasons, drivers, teams, races, season memberships, round-bounded driver/team assignments, aliases, and provider references.
+- [x] 1.2 Add shared canonical-input repository/resolver helpers with stable IDs, alias/provider lookup, overlap validation, and unresolved mapping results.
+- [x] 1.3 Add ADR documenting canonical season inputs and ID-based identity semantics.
+- [x] 1.4 Bootstrap the 2026 catalog from the current roster/calendar and produce deterministic provider mappings without changing production data.
 
 ## 2. Canonicalize questions, answers, actuals, and evidence
 
