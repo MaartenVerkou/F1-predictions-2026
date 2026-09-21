@@ -83,6 +83,16 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   });
   const latestEvidence = evidenceRows[evidenceRows.length - 1] || null;
   const selected = rounds.find((round) => round.roundNumber === cutoffRoundNumber) || rounds[0] || null;
+  const selectedSummary = selected?.summary
+    ? {
+        ...selected.summary,
+        status: selected.state === "incomplete"
+          ? "incomplete"
+          : selected.state === "cancelled"
+            ? "cancelled"
+            : selected.summary.status
+      }
+    : null;
   const selectedPayload = selected?.evidence?.payload || null;
   const selectedDriverStandings = selectedPayload?.standings?.drivers || [];
   const selectedConstructorStandings = selectedPayload?.standings?.constructors || [];
@@ -192,7 +202,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     selectedRoundNumber: selected?.roundNumber || cutoffRoundNumber,
     cutoffRoundNumber,
     selectedEvidence: selected?.evidence || null,
-    selectedSummary: selected?.summary || null,
+    selectedSummary,
     selectedImportId: selected?.evidence?.import_id || null,
     detailRows,
     latestEvidence,

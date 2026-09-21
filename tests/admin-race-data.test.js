@@ -75,6 +75,38 @@ test("buildRaceDataAuditView marks missing and future evidence without inventing
   assert.equal(view.selectedRound.snapshot.id, 10);
 });
 
+test("selected summary reflects partial and cancelled calendar states", () => {
+  const evidence = (round, calendarState, coverageStatus = "complete") => ({
+    id: round,
+    round_number: round,
+    calendar_state: calendarState,
+    coverage_status: coverageStatus,
+    payload: {
+      coverage: { status: coverageStatus, sources: {} },
+      race: { rows: [] },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: { drivers: [], constructors: [] }
+    }
+  });
+  const partial = buildRaceDataAuditView({
+    races: ["Austrian Grand Prix"],
+    roster: { drivers: [], teams: [] },
+    evidenceRows: [evidence(1, "partial")],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+  const cancelled = buildRaceDataAuditView({
+    races: ["Belgian Grand Prix"],
+    roster: { drivers: [], teams: [] },
+    evidenceRows: [evidence(1, "cancelled")],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+  assert.equal(partial.selectedSummary.status, "incomplete");
+  assert.equal(cancelled.selectedSummary.status, "cancelled");
+});
+
 test("auditSourceState distinguishes an older missing round from a future round", () => {
   assert.equal(auditSourceState(null, 2, 4), "not_synced");
   assert.equal(auditSourceState(null, 5, 4), "future");
