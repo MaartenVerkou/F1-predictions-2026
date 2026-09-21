@@ -27,9 +27,6 @@
     "cancel": "Cancel"
   },
   "login": {
-    "cutoff": "Jusqu’à",
-    "import_status": "Import",
-    "reconstructed": "Reconstruit",
     "page_title": "Connexion",
     "heading": "Bon retour",
     "forgot_password": "Mot de passe oublie ?",
@@ -638,6 +635,9 @@
     "confirm_transfer": "Confirmer le transfert"
   },
   "admin_race_data": {
+    "cutoff": "Jusqu’à",
+    "import_status": "Import",
+    "reconstructed": "Reconstruit",
     "page_title": "Audit des données de course",
     "heading": "Données de course",
     "intro": "Vérifiez les résultats sources utilisés pour calculer les résultats réels.",

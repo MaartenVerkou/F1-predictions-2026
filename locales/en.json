@@ -39,9 +39,6 @@
     "nav_race_data": "Race data"
   },
   "admin_actuals": {
-    "cutoff": "Cutoff",
-    "import_status": "Import",
-    "reconstructed": "Reconstructed",
     "page_title": "Set actuals",
     "heading": "Season actuals",
     "intro": "Enter the real outcomes once the season is complete. These power the leaderboard immediately once actuals exist.",
@@ -638,6 +635,9 @@
     "confirm_transfer": "Confirm transfer"
   },
   "admin_race_data": {
+    "cutoff": "Cutoff",
+    "import_status": "Import",
+    "reconstructed": "Reconstructed",
     "page_title": "Race data audit",
     "heading": "Race data",
     "intro": "Inspect the source results used to derive actuals before accepting scoring.",

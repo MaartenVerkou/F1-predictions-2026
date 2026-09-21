@@ -27,9 +27,6 @@
     "cancel": "Cancel"
   },
   "login": {
-    "cutoff": "Bis Runde",
-    "import_status": "Import",
-    "reconstructed": "Rekonstruiert",
     "page_title": "Anmelden",
     "heading": "Willkommen zurück",
     "forgot_password": "Passwort vergessen?",
@@ -638,6 +635,9 @@
     "confirm_transfer": "Uebertragung bestaetigen"
   },
   "admin_race_data": {
+    "cutoff": "Bis Runde",
+    "import_status": "Import",
+    "reconstructed": "Rekonstruiert",
     "page_title": "Renndaten-Prüfung",
     "heading": "Renndaten",
     "intro": "Prüfe die Quelldaten, aus denen die tatsächlichen Ergebnisse berechnet werden.",
