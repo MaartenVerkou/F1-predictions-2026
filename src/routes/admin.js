@@ -63,9 +63,11 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     ).toLowerCase();
     const baseState = calendarState === "cancelled"
       ? "cancelled"
-      : !evidence && /cancel+ed|afgelast/i.test(String(raceName))
-        ? "cancelled"
-        : auditSourceState(evidence, roundNumber, latestEvidenceRound);
+      : calendarState === "partial"
+        ? "incomplete"
+        : !evidence && /cancel+ed|afgelast/i.test(String(raceName))
+          ? "cancelled"
+          : auditSourceState(evidence, roundNumber, latestEvidenceRound);
     const state = roundNumber > cutoffRoundNumber ? "future" : baseState;
     return {
       roundNumber,
