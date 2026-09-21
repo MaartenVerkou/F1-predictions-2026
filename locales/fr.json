@@ -527,6 +527,7 @@
     "no": "Non",
     "mappings_empty": "Aucun alias ni mapping fournisseur n'est encore enregistré.",
     "save": "Enregistrer",
+    "edit": "Modifier",
     "save_driver": "Enregistrer le nom du pilote",
     "save_team": "Enregistrer l'équipe",
     "save_race": "Enregistrer la course",

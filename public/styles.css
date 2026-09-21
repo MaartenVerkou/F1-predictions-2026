@@ -2076,6 +2076,54 @@ button:disabled {
   width: auto;
 }
 
+.admin-inputs-row-editor summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-inputs-row-editor summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-inputs-edit-trigger {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-inputs-row-editor[open] .admin-inputs-edit-trigger {
+  background: color-mix(in srgb, var(--card) 85%, var(--border));
+}
+
+.admin-inputs-row-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  min-width: 280px;
+  margin-top: 8px;
+}
+
+.admin-inputs-row-edit-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-inputs-row-edit-form input,
+.admin-inputs-row-edit-form select {
+  min-width: 125px;
+  width: auto;
+}
+
 .admin-inputs-assignment-form {
   padding: 12px;
   border: 1px solid var(--border);

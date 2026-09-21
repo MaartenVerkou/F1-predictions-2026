@@ -527,6 +527,7 @@
     "no": "Nein",
     "mappings_empty": "Es sind noch keine Aliase oder Provider-Mappings gespeichert.",
     "save": "Speichern",
+    "edit": "Bearbeiten",
     "save_driver": "Fahrernamen speichern",
     "save_team": "Team speichern",
     "save_race": "Rennen speichern",

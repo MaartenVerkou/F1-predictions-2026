@@ -71,6 +71,7 @@
     "no": "No",
     "mappings_empty": "No aliases or provider mappings are recorded yet.",
     "save": "Save",
+    "edit": "Edit",
     "save_driver": "Save driver name",
     "save_team": "Save team",
     "save_race": "Save race",
