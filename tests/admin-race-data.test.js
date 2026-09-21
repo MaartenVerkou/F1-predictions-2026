@@ -79,3 +79,29 @@ test("auditSourceState distinguishes an older missing round from a future round"
   assert.equal(auditSourceState(null, 2, 4), "not_synced");
   assert.equal(auditSourceState(null, 5, 4), "future");
 });
+
+test("buildRaceDataAuditView uses selected cutoff standings and mutes later rounds", () => {
+  const bundle = (round, points) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: { rows: [{ driver: "Kimi Antonelli", constructor: "Mercedes", position: 1, positionText: "1", points: 25, grid: 1, status: "Finished" }] },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: { drivers: [{ entity: "Kimi Antonelli", position: 1, points }], constructors: [{ entity: "Mercedes", position: 1, points }] }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster: { drivers: ["Kimi Antonelli"], teams: ["Mercedes"] },
+    evidenceRows: [bundle(1, 25), bundle(2, 75)],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+  assert.equal(view.drivers[0].points, 25);
+  assert.equal(view.drivers[0].championshipPosition, 1);
+  assert.equal(view.drivers[0].cells[1].state, "future");
+  assert.equal(view.cutoffRoundNumber, 1);
+});

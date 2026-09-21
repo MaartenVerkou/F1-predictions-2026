@@ -1124,6 +1124,7 @@ async function main() {
       sqlitePath: args.dbPath
     });
     let result;
+    let importId = null;
     try {
       if (db.dialect === "sqlite") {
         db.pragma("busy_timeout = 5000");
@@ -1131,7 +1132,7 @@ async function main() {
       ensureActualsSchema(db);
       existingActuals = loadExistingActuals(db);
       const syncId = "backfill-" + args.season + "-" + Date.now();
-      const importId = createRaceDataImport(db, {
+      importId = createRaceDataImport(db, {
         season: args.season,
         syncId,
         sourceType: SOURCE_TYPES.JOLPICA,
@@ -1161,6 +1162,16 @@ async function main() {
       const latestDerived = persistedSnapshots.find((snapshot) => snapshot.roundNumber === (completedRounds.at(-1)));
       latestValues = { ...existingActuals, ...(latestDerived?.values || {}) };
       snapshots.splice(0, snapshots.length, ...persistedSnapshots);
+    } catch (error) {
+      if (importId != null) {
+        completeRaceDataImport(db, importId, {
+          status: "failed",
+          completedRounds: 0,
+          completedAt: new Date().toISOString(),
+          errorMessage: error.message || String(error)
+        });
+      }
+      throw error;
     } finally {
       db.close?.();
     }
@@ -1219,7 +1230,14 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  buildPersistedDataFromEvidence,
+  deriveSnapshotsFromPersistedEvidence
+};
