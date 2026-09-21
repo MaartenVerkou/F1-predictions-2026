@@ -12,6 +12,7 @@ const {
 } = require("../src/race-data-evidence");
 const roster = require("../data/roster.json");
 const races = require("../data/races.json").races;
+const { DRIVER_TEAM_ASSIGNMENTS, seedSeasonInputs } = require("./seed-season-inputs");
 
 const PREVIEW_SOURCE = "preview_fixture";
 const PREVIEW_SYNC_ID = "preview-race-audit-v2";
@@ -29,6 +30,8 @@ function splitDriverName(name) {
 function buildRows(round, now) {
   const pointsByPosition = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
   return roster.drivers.map((name, index) => {
+    const teamName = DRIVER_TEAM_ASSIGNMENTS[name];
+    if (!teamName) throw new Error(`Missing canonical preview team assignment for ${name}.`);
     const position = ((index + round * 2) % roster.drivers.length) + 1;
     const retired = round === 8 && index === 4;
     const dns = round === 13 && index === 17;
@@ -42,7 +45,7 @@ function buildRows(round, now) {
       laps: retired ? "42" : "70",
       status,
       Driver: splitDriverName(name),
-      Constructor: { name: roster.teams[index % roster.teams.length] }
+      Constructor: { name: teamName }
     };
   });
 }
@@ -134,6 +137,7 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
   }
 
   ensureRaceDataSchema(database);
+  seedSeasonInputs(database, { season: 2026, now });
   const transaction = database.transaction(() => {
     database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
     database.prepare("DELETE FROM actual_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);

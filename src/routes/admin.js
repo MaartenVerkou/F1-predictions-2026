@@ -17,6 +17,7 @@ const {
   listRaceDataSnapshots,
   summarizeEvidence
 } = require("../race-data-evidence");
+const { listSeasonInputs } = require("../season-inputs");
 
 
 function auditResultLabel(row) {
@@ -2448,6 +2449,23 @@ function registerAdminRoutes(app, deps) {
     return res.redirect(
       withQueryParam("/admin/ideas", "success", t("admin_ideas.status_updated_success"))
     );
+  });
+
+  app.get("/admin/inputs", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const requestedTab = String(req.query.tab || "").trim().toLowerCase();
+    const tab = ["drivers", "teams", "assignments", "races", "mappings"].includes(requestedTab)
+      ? requestedTab
+      : "drivers";
+    const season = Number(req.query.season || CURRENT_SEASON);
+    const catalog = listSeasonInputs(db, season);
+    return res.render("admin_inputs", {
+      user,
+      season,
+      tab,
+      catalog,
+      inputsReady: Boolean(catalog.season)
+    });
   });
 
   app.get("/admin/questions", requireAdmin, (req, res) => {

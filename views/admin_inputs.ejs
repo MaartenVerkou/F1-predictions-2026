@@ -1,0 +1,74 @@
+<%- include('partials/header', { title: t('admin_inputs.title'), user }) %>
+<%- include('partials/admin_nav', { active: 'inputs' }) %>
+
+<div class="card admin-page-card admin-inputs-page">
+  <div class="admin-race-data-heading">
+    <div>
+      <h1><%= t('admin_inputs.title') %></h1>
+      <p class="muted admin-page-intro"><%= t('admin_inputs.intro') %></p>
+    </div>
+    <form method="get" action="/admin/inputs" class="admin-inputs-season-form">
+      <label for="admin-inputs-season"><%= t('admin_inputs.season') %></label>
+      <input id="admin-inputs-season" name="season" type="number" min="2000" max="2100" value="<%= season %>" />
+      <input type="hidden" name="tab" value="<%= tab %>" />
+      <button class="secondary" type="submit"><%= t('admin_inputs.open') %></button>
+    </form>
+  </div>
+
+  <% if (!inputsReady) { %>
+    <div class="alert"><%= t('admin_inputs.not_seeded') %></div>
+  <% } else { %>
+    <div class="admin-inputs-summary muted">
+      <span><strong><%= catalog.season.label %></strong></span>
+      <span><%= t('admin_inputs.driver_count', { count: catalog.drivers.length }) %></span>
+      <span><%= t('admin_inputs.team_count', { count: catalog.teams.length }) %></span>
+      <span><%= t('admin_inputs.race_count', { count: catalog.races.length }) %></span>
+      <span><%= t('admin_inputs.assignment_count', { count: catalog.assignments.length }) %></span>
+    </div>
+
+    <nav class="admin-inputs-tabs" aria-label="<%= t('admin_inputs.tabs') %>">
+      <% ['drivers', 'teams', 'assignments', 'races', 'mappings'].forEach((name) => { %>
+        <a class="admin-race-data-tab <%= tab === name ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=<%= name %>">
+          <%= t('admin_inputs.tab_' + name) %>
+        </a>
+      <% }) %>
+    </nav>
+
+    <% if (tab === 'drivers') { %>
+      <div class="admin-race-data-table-wrap">
+        <table class="admin-inputs-table">
+          <thead><tr><th><%= t('admin_inputs.id') %></th><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.active') %></th></tr></thead>
+          <tbody>
+            <% catalog.drivers.forEach((driver) => { %>
+              <% const assignment = catalog.assignments.find((item) => Number(item.driver_id) === Number(driver.id) && Number(item.from_round) <= 1 && (item.to_round == null || Number(item.to_round) >= 1)); %>
+              <tr><td><code>driver:<%= driver.id %></code></td><th scope="row"><%= driver.display_name_override || driver.display_name %></th><td><%= assignment?.team_name || '—' %></td><td><%= Number(driver.season_active) ? t('admin_inputs.yes') : t('admin_inputs.no') %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else if (tab === 'teams') { %>
+      <div class="admin-race-data-table-wrap">
+        <table class="admin-inputs-table">
+          <thead><tr><th><%= t('admin_inputs.id') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.slug') %></th><th><%= t('admin_inputs.active') %></th></tr></thead>
+          <tbody><% catalog.teams.forEach((team) => { %><tr><td><code>team:<%= team.id %></code></td><th scope="row"><%= team.display_name_override || team.display_name %></th><td><%= team.slug %></td><td><%= Number(team.season_active) ? t('admin_inputs.yes') : t('admin_inputs.no') %></td></tr><% }) %></tbody>
+        </table>
+      </div>
+    <% } else if (tab === 'assignments') { %>
+      <div class="admin-race-data-table-wrap">
+        <table class="admin-inputs-table">
+          <thead><tr><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.from_round') %></th><th><%= t('admin_inputs.to_round') %></th><th><%= t('admin_inputs.source') %></th></tr></thead>
+          <tbody><% catalog.assignments.forEach((assignment) => { %><tr><th scope="row"><%= assignment.driver_name %></th><td><%= assignment.team_name %></td><td>R<%= assignment.from_round %></td><td><%= assignment.to_round == null ? '—' : 'R' + assignment.to_round %></td><td><%= assignment.source %></td></tr><% }) %></tbody>
+        </table>
+      </div>
+    <% } else if (tab === 'races') { %>
+      <div class="admin-race-data-table-wrap">
+        <table class="admin-inputs-table">
+          <thead><tr><th><%= t('admin_inputs.round') %></th><th><%= t('admin_inputs.race') %></th><th><%= t('admin_inputs.slug') %></th><th><%= t('admin_inputs.status') %></th></tr></thead>
+          <tbody><% catalog.races.forEach((race) => { %><tr><td>R<%= race.round_number %></td><th scope="row"><%= race.display_name %></th><td><%= race.slug %></td><td><%= race.calendar_state %></td></tr><% }) %></tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="alert"><%= t('admin_inputs.mappings_empty') %></div>
+    <% } %>
+  <% } %>
+</div>
