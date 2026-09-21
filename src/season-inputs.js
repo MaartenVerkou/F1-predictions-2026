@@ -201,9 +201,13 @@ function addEntityAlias(db, { entityType, entityId, seasonId = null, alias, sour
   const value = String(alias || "").trim();
   if (!value) throw new Error("Alias cannot be empty.");
   const normalized = normalizeEntityKey(value);
-  const existing = db.prepare(
-    "SELECT id, entity_id FROM entity_aliases WHERE entity_type = ? AND ((season_id IS NULL AND ? IS NULL) OR season_id = ?) AND normalized_alias = ? LIMIT 1"
-  ).get(String(entityType), seasonId == null ? null : Number(seasonId), seasonId == null ? null : Number(seasonId), normalized);
+  const existing = seasonId == null
+    ? db.prepare(
+      "SELECT id, entity_id FROM entity_aliases WHERE entity_type = ? AND season_id IS NULL AND normalized_alias = ? LIMIT 1"
+    ).get(String(entityType), normalized)
+    : db.prepare(
+      "SELECT id, entity_id FROM entity_aliases WHERE entity_type = ? AND season_id = ? AND normalized_alias = ? LIMIT 1"
+    ).get(String(entityType), Number(seasonId), normalized);
   if (existing && Number(existing.entity_id) !== Number(entityId)) throw new Error("Alias already belongs to another entity.");
   if (existing) return Number(existing.id);
   const result = db.prepare(
@@ -237,9 +241,13 @@ function resolveEntity(db, { entityType, seasonId = null, provider = null, provi
   }
   const normalized = normalizeEntityKey(label);
   if (!normalized) return { status: "unresolved", entity: null };
-  const rows = db.prepare(
-    "SELECT entity_id, season_id, alias, source FROM entity_aliases WHERE entity_type = ? AND normalized_alias = ? AND (season_id IS NULL OR season_id = ?) ORDER BY CASE WHEN season_id IS NULL THEN 1 ELSE 0 END, season_id DESC"
-  ).all(String(entityType), normalized, seasonId == null ? null : Number(seasonId));
+  const rows = seasonId == null
+    ? db.prepare(
+      "SELECT entity_id, season_id, alias, source FROM entity_aliases WHERE entity_type = ? AND normalized_alias = ? AND season_id IS NULL ORDER BY season_id DESC"
+    ).all(String(entityType), normalized)
+    : db.prepare(
+      "SELECT entity_id, season_id, alias, source FROM entity_aliases WHERE entity_type = ? AND normalized_alias = ? AND (season_id IS NULL OR season_id = ?) ORDER BY CASE WHEN season_id IS NULL THEN 1 ELSE 0 END, season_id DESC"
+    ).all(String(entityType), normalized, Number(seasonId));
   const ids = Array.from(new Set(rows.map((row) => Number(row.entity_id))));
   if (ids.length === 1) return { status: "resolved", entity: findEntityById(db, entityType, ids[0]), alias: rows[0] };
   if (ids.length > 1) return { status: "ambiguous", entity: null, candidates: ids.map((id) => findEntityById(db, entityType, id)) };
