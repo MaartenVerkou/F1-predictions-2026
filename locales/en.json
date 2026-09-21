@@ -673,6 +673,7 @@
     "legend_nc": "NC = not classified",
     "legend_unavailable": "— = unavailable / not entered",
     "future_round": "Future round; source data is not expected yet.",
-    "cancelled_round": "Cancelled round; no source data is expected."
+    "cancelled_round": "Cancelled round; no source data is expected.",
+    "partial_round": "Partial source coverage; missing fields remain unavailable."
   }
 }

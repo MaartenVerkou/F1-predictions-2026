@@ -673,6 +673,7 @@
     "legend_nc": "NC = no clasificado",
     "legend_unavailable": "— = no disponible / no inscrito",
     "future_round": "Carrera futura; todavía no se esperan datos de origen.",
-    "cancelled_round": "Carrera cancelada; no se esperan datos de origen."
+    "cancelled_round": "Carrera cancelada; no se esperan datos de origen.",
+    "partial_round": "Cobertura parcial; los campos faltantes siguen no disponibles."
   }
 }

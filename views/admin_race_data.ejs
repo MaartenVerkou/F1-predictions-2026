@@ -106,7 +106,15 @@
             · <%= t('admin_race_data.fetched') %>:
             <%= view.selectedRound.evidence.fetched_at || view.selectedRound.evidence.payload?.fetchedAt || '—' %>
             · <%= view.selectedRound.evidence.source_type || '—' %>
+            <% if (view.selectedRound.evidence.reconstructed) { %>
+              · <%= t('admin_race_data.reconstructed') %>
+            <% } %>
           </p>
+          <% if (view.selectedRound.state === 'cancelled') { %>
+            <p class="muted"><%= t('admin_race_data.cancelled_round') %></p>
+          <% } else if (view.selectedRound.state === 'incomplete') { %>
+            <p class="muted"><%= t('admin_race_data.partial_round') %></p>
+          <% } %>
         <% } else { %>
           <p class="muted">
             <%= view.selectedRound?.state === 'future'

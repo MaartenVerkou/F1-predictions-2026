@@ -673,6 +673,7 @@
     "legend_nc": "NC = niet geklasseerd",
     "legend_unavailable": "— = niet beschikbaar / niet ingeschreven",
     "future_round": "Toekomstige race; brondata wordt nog niet verwacht.",
-    "cancelled_round": "Afgelaste race; er wordt geen brondata verwacht."
+    "cancelled_round": "Afgelaste race; er wordt geen brondata verwacht.",
+    "partial_round": "Gedeeltelijke brondekking; ontbrekende velden blijven onbekend."
   }
 }

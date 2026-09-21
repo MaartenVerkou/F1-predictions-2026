@@ -673,6 +673,7 @@
     "legend_nc": "NC = nicht klassifiziert",
     "legend_unavailable": "— = nicht verfügbar / nicht gemeldet",
     "future_round": "Zukünftiges Rennen; Quelldaten werden noch nicht erwartet.",
-    "cancelled_round": "Abgesagtes Rennen; es werden keine Quelldaten erwartet."
+    "cancelled_round": "Abgesagtes Rennen; es werden keine Quelldaten erwartet.",
+    "partial_round": "Unvollständige Quellenabdeckung; fehlende Felder bleiben nicht verfügbar."
   }
 }

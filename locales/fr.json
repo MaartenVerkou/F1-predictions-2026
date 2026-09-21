@@ -673,6 +673,7 @@
     "legend_nc": "NC = non classé",
     "legend_unavailable": "— = indisponible / non inscrit",
     "future_round": "Course future ; les données sources ne sont pas encore attendues.",
-    "cancelled_round": "Course annulée ; aucune donnée source n’est attendue."
+    "cancelled_round": "Course annulée ; aucune donnée source n’est attendue.",
+    "partial_round": "Couverture partielle; les champs manquants restent indisponibles."
   }
 }
