@@ -55,6 +55,7 @@
     "team_count": "{count} teams",
     "race_count": "{count} races",
     "assignment_count": "{count} assignments",
+    "impact_summary": "Current season data: {evidence} race evidence snapshots · {snapshots} actual snapshots · {values} snapshot values. Changes use stable IDs and are audit logged.",
     "id": "ID",
     "driver": "Driver",
     "team": "Team",
@@ -69,6 +70,15 @@
     "yes": "Yes",
     "no": "No",
     "mappings_empty": "No aliases or provider mappings are recorded yet."
+    ,"save": "Save",
+    "save_assignment": "Save assignment",
+    "entity_type": "Entity type",
+    "entity_id": "Entity ID",
+    "alias": "Alias",
+    "provider": "Provider",
+    "provider_key": "Provider key",
+    "save_alias": "Save alias",
+    "save_provider": "Save provider mapping"
   },
   "admin_actuals": {
     "page_title": "Set actuals",

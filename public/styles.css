@@ -2056,6 +2056,45 @@ button:disabled {
   font-size: 13px;
 }
 
+.admin-inputs-impact {
+  margin: -8px 0 0;
+  font-size: 13px;
+}
+
+.admin-inputs-inline-form,
+.admin-inputs-assignment-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+  margin: 0;
+}
+
+.admin-inputs-inline-form input,
+.admin-inputs-inline-form select {
+  min-width: 130px;
+  width: auto;
+}
+
+.admin-inputs-assignment-form {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.admin-inputs-assignment-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-inputs-assignment-form input,
+.admin-inputs-assignment-form select {
+  min-width: 120px;
+}
+
 .admin-inputs-table {
   width: 100%;
   border-collapse: separate;

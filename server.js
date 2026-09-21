@@ -1658,9 +1658,9 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
       includeExcluded,
       includeMeta
     });
-    return attachLastSeasonReferences(
+    return attachCanonicalCatalog(attachLastSeasonReferences(
       localizeQuestions(adjustedFallback, resolvedLocale)
-    );
+    ));
   }
 
   const parsed = readJsonFile(QUESTIONS_PATH);
@@ -1676,9 +1676,9 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
     includeExcluded,
     includeMeta
   });
-  return attachLastSeasonReferences(
+  return attachCanonicalCatalog(attachLastSeasonReferences(
     localizeQuestions(adjustedQuestions, resolvedLocale)
-  );
+  ));
 }
 
 function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
@@ -1731,6 +1731,24 @@ function attachLastSeasonReferences(questions) {
     ...question,
     last_season: refs[question.id] || null
   }));
+}
+
+function attachCanonicalCatalog(questions) {
+  let catalog = { driver: [], team: [], race: [] };
+  try {
+    catalog = buildCanonicalCatalog(listSeasonInputs(db, CURRENT_SEASON));
+  } catch (err) {
+    // The question catalogue remains usable while the canonical input tables are unavailable.
+  }
+  return (questions || []).map((question) => {
+    const attached = { ...question };
+    Object.defineProperty(attached, "_canonicalCatalog", {
+      value: catalog,
+      enumerable: false,
+      configurable: true
+    });
+    return attached;
+  });
 }
 
 function getRoster() {

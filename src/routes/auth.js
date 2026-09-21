@@ -1,5 +1,6 @@
 const leaderboardModel = require("../leaderboard-model");
 const { listLatestSnapshotsForSeason } = require("../actuals-snapshots");
+const { canonicalizeQuestionValue } = require("../canonical-answers");
 
 function registerAuthRoutes(app, deps) {
   const MIN_PASSWORD_LENGTH = 6;
@@ -226,6 +227,7 @@ function registerAuthRoutes(app, deps) {
 
     const parseStoredValue = (question, raw) => {
       if (!raw) return null;
+      let parsed = null;
       const text = String(raw).trim();
       const type = question.type || "text";
       if (
@@ -238,17 +240,18 @@ function registerAuthRoutes(app, deps) {
         type === "single_choice_with_driver"
       ) {
         try {
-          return JSON.parse(raw);
+          parsed = JSON.parse(raw);
         } catch (err) {
           return null;
         }
-      }
-      if (text.startsWith("[") || text.startsWith("{")) {
+      } else if (text.startsWith("[") || text.startsWith("{")) {
         try {
-          return JSON.parse(text);
+          parsed = JSON.parse(text);
         } catch (err) {}
+      } else {
+        parsed = raw;
       }
-      return raw;
+      return canonicalizeQuestionValue(question, parsed, question?._canonicalCatalog);
     };
 
     const isMatch = (actualValue, predictedValue) => {
@@ -670,6 +673,7 @@ function registerAuthRoutes(app, deps) {
 
   const parseStoredValue = (question, raw) => {
     if (!raw) return null;
+    let parsed = null;
     const text = String(raw).trim();
     const type = question.type || "text";
     if (
@@ -682,17 +686,18 @@ function registerAuthRoutes(app, deps) {
       type === "single_choice_with_driver"
     ) {
       try {
-        return JSON.parse(raw);
+        parsed = JSON.parse(raw);
       } catch (err) {
         return null;
       }
-    }
-    if (text.startsWith("[") || text.startsWith("{")) {
+    } else if (text.startsWith("[") || text.startsWith("{")) {
       try {
-        return JSON.parse(text);
+        parsed = JSON.parse(text);
       } catch (err) {}
+    } else {
+      parsed = raw;
     }
-    return raw;
+    return canonicalizeQuestionValue(question, parsed, question?._canonicalCatalog);
   };
 
   const isMatch = (actualValue, predictedValue) => {

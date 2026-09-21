@@ -17,7 +17,15 @@ const {
   listRaceDataSnapshots,
   summarizeEvidence
 } = require("../race-data-evidence");
-const { listSeasonInputs } = require("../season-inputs");
+const {
+  addEntityAlias,
+  addProviderReference,
+  listSeasonInputs,
+  upsertDriver,
+  upsertDriverTeamAssignment,
+  upsertRace,
+  upsertTeam
+} = require("../season-inputs");
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
 
 
@@ -1781,6 +1789,7 @@ function registerAdminRoutes(app, deps) {
 
   function parseStoredValue(question, raw) {
     if (!raw) return null;
+    let parsed = null;
     const text = String(raw).trim();
     const type = question.type || "text";
     if (
@@ -1793,17 +1802,18 @@ function registerAdminRoutes(app, deps) {
       type === "single_choice_with_driver"
     ) {
       try {
-        return JSON.parse(raw);
+        parsed = JSON.parse(raw);
       } catch (err) {
         return null;
       }
-    }
-    if (text.startsWith("[") || text.startsWith("{")) {
+    } else if (text.startsWith("[") || text.startsWith("{")) {
       try {
-        return JSON.parse(text);
+        parsed = JSON.parse(text);
       } catch (err) {}
+    } else {
+      parsed = raw;
     }
-    return raw;
+    return canonicalizeQuestionValue(question, parsed, question?._canonicalCatalog);
   }
 
   function isMatch(actualValue, predictedValue) {
@@ -2465,13 +2475,175 @@ function registerAdminRoutes(app, deps) {
       : "drivers";
     const season = Number(req.query.season || CURRENT_SEASON);
     const catalog = listSeasonInputs(db, season);
+    catalog.impact = getSeasonInputImpact(season);
     return res.render("admin_inputs", {
       user,
       season,
       tab,
       catalog,
-      inputsReady: Boolean(catalog.season)
+      inputsReady: Boolean(catalog.season),
+      query: req.query
     });
+  });
+
+  function getSeasonInputImpact(season) {
+    const impact = { evidenceSnapshots: 0, actualSnapshots: 0, actualValues: 0 };
+    const queries = [
+      ["evidenceSnapshots", "SELECT COUNT(*) AS count FROM race_data_snapshots WHERE season = ?", [Number(season)]],
+      ["actualSnapshots", "SELECT COUNT(*) AS count FROM actual_snapshots WHERE season = ?", [Number(season)]],
+      ["actualValues", "SELECT COUNT(*) AS count FROM actual_snapshot_values v JOIN actual_snapshots s ON s.id = v.snapshot_id WHERE s.season = ?", [Number(season)]]
+    ];
+    for (const [key, sql, params] of queries) {
+      try {
+        impact[key] = Number(db.prepare(sql).get(...params)?.count || 0);
+      } catch (err) {
+        impact[key] = 0;
+      }
+    }
+    return impact;
+  }
+
+  function redirectInputs(res, season, tab, key, value) {
+    const params = new URLSearchParams({ season: String(season), tab: String(tab || "drivers") });
+    if (key && value) params.set(key, String(value));
+    return res.redirect(`/admin/inputs?${params.toString()}`);
+  }
+
+  app.post("/admin/inputs/entity", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const entityType = String(req.body.entity_type || "").trim().toLowerCase();
+    const entityId = Number(req.body.entity_id);
+    const displayName = String(req.body.display_name || "").trim();
+    const calendarState = String(req.body.calendar_state || "scheduled").trim().toLowerCase() || "scheduled";
+    const catalog = listSeasonInputs(db, season);
+    const adminUser = getCurrentUser(req);
+    try {
+      if (!catalog.season || !Number.isInteger(entityId) || entityId <= 0 || !displayName) {
+        throw new Error("A valid season, entity and display name are required.");
+      }
+      if (entityType === "driver") {
+        const row = catalog.drivers.find((item) => Number(item.id) === entityId);
+        if (!row) throw new Error("Driver is not part of this season.");
+        upsertDriver(db, { slug: row.slug, displayName, active: Number(row.active) !== 0 });
+      } else if (entityType === "team") {
+        const row = catalog.teams.find((item) => Number(item.id) === entityId);
+        if (!row) throw new Error("Team is not part of this season.");
+        upsertTeam(db, { slug: row.slug, displayName, shortName: row.short_name, active: Number(row.active) !== 0 });
+      } else if (entityType === "race") {
+        const row = catalog.races.find((item) => Number(item.id) === entityId);
+        if (!row) throw new Error("Race is not part of this season.");
+        if (!["scheduled", "completed", "cancelled", "partial"].includes(calendarState)) {
+          throw new Error("Unsupported calendar state.");
+        }
+        upsertRace(db, {
+          seasonId: catalog.season.id,
+          roundNumber: row.round_number,
+          slug: row.slug,
+          displayName,
+          scheduledDate: row.scheduled_date,
+          calendarState
+        });
+      } else {
+        throw new Error("Unsupported entity type.");
+      }
+      logEvent("info", "admin_inputs_entity_updated", {
+        userId: adminUser?.id || null,
+        season,
+        entityType,
+        entityId
+      });
+      return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "success", "Entity updated.");
+    } catch (err) {
+      return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "error", err.message);
+    }
+  });
+
+  app.post("/admin/inputs/assignment", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const id = String(req.body.id || "").trim() ? Number(req.body.id) : null;
+    const driverId = Number(req.body.driver_id);
+    const teamId = Number(req.body.team_id);
+    const fromRound = Number(req.body.from_round);
+    const toRoundRaw = String(req.body.to_round || "").trim();
+    const toRound = toRoundRaw ? Number(toRoundRaw) : null;
+    const source = String(req.body.source || "admin").trim().slice(0, 120) || "admin";
+    const catalog = listSeasonInputs(db, season);
+    const adminUser = getCurrentUser(req);
+    try {
+      if (!catalog.season || !catalog.drivers.some((row) => Number(row.id) === driverId) || !catalog.teams.some((row) => Number(row.id) === teamId)) {
+        throw new Error("Choose a driver and team from this season.");
+      }
+      if (!Number.isInteger(fromRound) || fromRound < 1 || fromRound > catalog.races.length) {
+        throw new Error("From round must be a valid season round.");
+      }
+      if (toRound != null && (!Number.isInteger(toRound) || toRound < fromRound || toRound > catalog.races.length)) {
+        throw new Error("To round must be empty or a valid round after the start round.");
+      }
+      const assignmentId = upsertDriverTeamAssignment(db, {
+        id,
+        seasonId: catalog.season.id,
+        driverId,
+        teamId,
+        fromRound,
+        toRound,
+        source
+      });
+      logEvent("info", "admin_inputs_assignment_updated", {
+        userId: adminUser?.id || null,
+        season,
+        assignmentId,
+        driverId,
+        teamId,
+        fromRound,
+        toRound
+      });
+      return redirectInputs(res, season, "assignments", "success", "Assignment saved.");
+    } catch (err) {
+      return redirectInputs(res, season, "assignments", "error", err.message);
+    }
+  });
+
+  app.post("/admin/inputs/alias", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const tab = String(req.body.tab || "mappings");
+    const adminUser = getCurrentUser(req);
+    try {
+      const entityType = String(req.body.entity_type || "").trim().toLowerCase();
+      const entityId = Number(req.body.entity_id);
+      if (!["driver", "team", "race"].includes(entityType) || !Number.isInteger(entityId) || entityId <= 0) {
+        throw new Error("Choose a valid canonical entity.");
+      }
+      addEntityAlias(db, {
+        entityType,
+        entityId,
+        seasonId: String(req.body.global_alias || "") === "1" ? null : listSeasonInputs(db, season).season?.id,
+        alias: req.body.alias,
+        source: "admin"
+      });
+      logEvent("info", "admin_inputs_alias_added", { userId: adminUser?.id || null, season, entityType, entityId });
+      return redirectInputs(res, season, tab, "success", "Alias saved.");
+    } catch (err) {
+      return redirectInputs(res, season, tab, "error", err.message);
+    }
+  });
+
+  app.post("/admin/inputs/provider-ref", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const adminUser = getCurrentUser(req);
+    try {
+      const entityType = String(req.body.entity_type || "").trim().toLowerCase();
+      const entityId = Number(req.body.entity_id);
+      const provider = String(req.body.provider || "").trim();
+      const providerKey = String(req.body.provider_key || "").trim();
+      if (!["driver", "team", "race"].includes(entityType) || !Number.isInteger(entityId) || entityId <= 0 || !provider || !providerKey) {
+        throw new Error("Provider, key and canonical entity are required.");
+      }
+      addProviderReference(db, { entityType, entityId, provider, providerKey, providerLabel: req.body.provider_label || null });
+      logEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider });
+      return redirectInputs(res, season, "mappings", "success", "Provider mapping saved.");
+    } catch (err) {
+      return redirectInputs(res, season, "mappings", "error", err.message);
+    }
   });
 
   app.get("/admin/questions", requireAdmin, (req, res) => {
