@@ -22,6 +22,7 @@ const {
   addProviderReference,
   listSeasonInputs,
   listSeasonMappings,
+  removeSeasonMembership,
   upsertDriver,
   upsertDriverTeamAssignment,
   upsertRace,
@@ -2626,7 +2627,6 @@ function registerAdminRoutes(app, deps) {
     const displayOrderRaw = String(req.body.display_order || "").trim();
     const displayOrder = displayOrderRaw === "" ? null : Number(displayOrderRaw);
     const requestedOrderBasis = String(req.body.order_basis || "").trim().toLowerCase();
-    const seasonActive = String(req.body.season_active || "") === "1";
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
@@ -2637,23 +2637,22 @@ function registerAdminRoutes(app, deps) {
       if (entityType === "driver") {
         const row = catalog.drivers.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Driver is not part of this season.");
-        upsertDriver(db, { slug: row.slug, displayName, active: Number(row.active) !== 0 });
+        upsertDriver(db, { slug: row.slug, displayName });
         upsertSeasonDriver(db, {
           seasonId: catalog.season.id,
           driverId: entityId,
           driverNumber: req.body.driver_number == null ? row.driver_number : req.body.driver_number,
-          displayNameOverride: row.display_name_override,
-          active: seasonActive
+          displayNameOverride: row.display_name_override
         });
       } else if (entityType === "team") {
         const row = catalog.teams.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Team is not part of this season.");
-        upsertTeam(db, { slug: row.slug, displayName, shortName: row.short_name, active: Number(row.active) !== 0 });
+        upsertTeam(db, { slug: row.slug, displayName, shortName: row.short_name });
         const nextDisplayOrder = displayOrder == null ? Number(row.display_order || 0) : displayOrder;
         const orderBasis = requestedOrderBasis || row.order_basis || "manual";
         if (!Number.isInteger(nextDisplayOrder) || nextDisplayOrder < 0) throw new Error("Display order must be a non-negative number.");
         if (!["official", "previous_standings", "manual"].includes(orderBasis)) throw new Error("Unsupported order basis.");
-        upsertSeasonTeam(db, { seasonId: catalog.season.id, teamId: entityId, displayOrder: nextDisplayOrder, orderBasis, active: seasonActive });
+        upsertSeasonTeam(db, { seasonId: catalog.season.id, teamId: entityId, displayOrder: nextDisplayOrder, orderBasis });
       } else if (entityType === "race") {
         const row = catalog.races.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Race is not part of this season.");
@@ -2745,26 +2744,9 @@ function registerAdminRoutes(app, deps) {
         throw new Error("A valid season input is required.");
       }
       if (entityType === "driver") {
-        const row = catalog.drivers.find((item) => Number(item.id) === entityId);
-        if (!row) throw new Error("Driver is not part of this season.");
-        upsertSeasonDriver(db, {
-          seasonId: catalog.season.id,
-          driverId: entityId,
-          driverNumber: row.driver_number,
-          displayNameOverride: row.display_name_override,
-          active: false
-        });
+        removeSeasonMembership(db, { seasonId: catalog.season.id, entityType, entityId });
       } else if (entityType === "team") {
-        const row = catalog.teams.find((item) => Number(item.id) === entityId);
-        if (!row) throw new Error("Team is not part of this season.");
-        upsertSeasonTeam(db, {
-          seasonId: catalog.season.id,
-          teamId: entityId,
-          displayNameOverride: row.display_name_override,
-          displayOrder: row.display_order,
-          orderBasis: row.order_basis,
-          active: false
-        });
+        removeSeasonMembership(db, { seasonId: catalog.season.id, entityType, entityId });
       } else if (entityType === "assignment") {
         const row = catalog.assignments.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Assignment is not part of this season.");
@@ -2799,8 +2781,7 @@ function registerAdminRoutes(app, deps) {
       if (!catalog.season || !displayName) throw new Error("A season and driver name are required.");
       const driverId = upsertDriver(db, {
         slug: slug || displayName,
-        displayName,
-        active: true
+        displayName
       });
       upsertSeasonDriver(db, {
         seasonId: catalog.season.id,

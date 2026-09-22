@@ -2131,67 +2131,6 @@ button:disabled {
   line-height: 1.3;
 }
 
-.admin-inputs-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.admin-inputs-season-meta,
-.admin-inputs-counts {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-}
-
-.admin-inputs-season-meta strong {
-  font-size: 14px;
-}
-
-.admin-inputs-status {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: capitalize;
-}
-
-.admin-inputs-status--archived {
-  border-color: color-mix(in srgb, var(--alert-border) 72%, var(--border));
-  color: var(--alert-text);
-  background: color-mix(in srgb, var(--alert-bg) 70%, transparent);
-}
-
-.admin-inputs-status--active {
-  border-color: color-mix(in srgb, #208c5a 48%, var(--border));
-  color: #187246;
-  background: color-mix(in srgb, #208c5a 10%, transparent);
-}
-
-:root[data-theme="dark"] .admin-inputs-status--active {
-  border-color: color-mix(in srgb, #6ed49a 52%, var(--border));
-  color: #9be8b8;
-  background: color-mix(in srgb, #208c5a 22%, transparent);
-}
-
-.admin-inputs-impact {
-  margin: -2px 0 0;
-  font-size: 13px;
-}
-
 .admin-inputs-inline-form,
 .admin-inputs-assignment-form {
   display: flex;

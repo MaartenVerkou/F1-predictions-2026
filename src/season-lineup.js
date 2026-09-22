@@ -72,7 +72,6 @@ function buildLineupProjection({ teams = [], drivers = [], assignments = [], rou
   if (!Number.isInteger(round) || round < 1) throw new Error("Round number must be a positive integer.");
   assertAssignmentIntervals(assignments);
   return [...teams]
-    .filter((team) => team.active == null || Number(team.active) === 1 || team.active === true)
     .sort((left, right) => Number(left.display_order || 9999) - Number(right.display_order || 9999)
       || teamName(left).localeCompare(teamName(right)))
     .map((team) => ({
@@ -96,7 +95,6 @@ function buildLineupProjection({ teams = [], drivers = [], assignments = [], rou
 function buildTeamLineupHistory({ teams = [], drivers = [], assignments = [] }) {
   const normalizedAssignments = assertAssignmentIntervals(assignments);
   const sortedTeams = [...teams]
-    .filter((team) => team.active == null || Number(team.active) === 1 || team.active === true)
     .sort((left, right) => Number(left.display_order || 9999) - Number(right.display_order || 9999)
       || teamName(left).localeCompare(teamName(right)));
   return sortedTeams.map((team) => {
@@ -123,7 +121,6 @@ function buildTeamLineupHistory({ teams = [], drivers = [], assignments = [] }) 
       teamId: Number(team.id),
       teamName: teamName(team),
       displayOrder: Number(team.display_order || 0),
-      active: team.active == null || Number(team.active) === 1 || team.active === true,
       seats
     };
   });
@@ -254,10 +251,10 @@ function applyTeamLineupHistory(db, {
 }) {
   const safeSeasonId = optionalPositiveInteger(seasonId, "Season");
   const teams = db.prepare(
-    "SELECT t.*, st.display_name_override, st.display_order, st.active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ?"
+    "SELECT t.*, st.display_name_override, st.display_order FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ?"
   ).all(safeSeasonId);
   const drivers = db.prepare(
-    "SELECT d.*, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ?"
+    "SELECT d.*, sd.display_name_override FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ?"
   ).all(safeSeasonId);
   const assignments = db.prepare(
     "SELECT * FROM driver_team_assignments WHERE season_id = ? ORDER BY from_round, id"
@@ -335,7 +332,7 @@ function buildLineupPlan({ teams = [], drivers = [], assignments = [], roundNumb
   for (const seat of desired) {
     if (seat.driverId == null) continue;
     if (!driverIds.has(seat.driverId)) throw new Error(`Unknown season driver ${seat.driverId}.`);
-    if (occupied.has(seat.driverId)) throw new Error(`Driver ${seat.driverId} is assigned to more than one active seat.`);
+    if (occupied.has(seat.driverId)) throw new Error(`Driver ${seat.driverId} is assigned to more than one occupied seat.`);
     occupied.add(seat.driverId);
   }
 
@@ -400,10 +397,10 @@ function applySeasonLineup(db, {
   const safeSeasonId = Number(seasonId);
   const safeRound = Number(roundNumber);
   const teams = db.prepare(
-    "SELECT t.*, st.display_name_override, st.display_order, st.active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? AND st.active = 1"
+    "SELECT t.*, st.display_name_override, st.display_order FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ?"
   ).all(safeSeasonId);
   const drivers = db.prepare(
-    "SELECT d.*, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? AND sd.active = 1"
+    "SELECT d.*, sd.display_name_override FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ?"
   ).all(safeSeasonId);
   const assignments = db.prepare(
     "SELECT * FROM driver_team_assignments WHERE season_id = ? ORDER BY from_round, id"

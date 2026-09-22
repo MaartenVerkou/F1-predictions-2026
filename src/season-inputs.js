@@ -90,12 +90,12 @@ function ensureSeasonInputsSchema(db) {
     );
     CREATE TABLE IF NOT EXISTS drivers (
       id ${identityType}, slug TEXT NOT NULL UNIQUE, given_name TEXT NOT NULL,
-      family_name TEXT NOT NULL, display_name TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1,
+      family_name TEXT NOT NULL, display_name TEXT NOT NULL,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS teams (
       id ${identityType}, slug TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
-      short_name TEXT, active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      short_name TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS races (
       id ${identityType}, season_id INTEGER NOT NULL, round_number INTEGER NOT NULL,
@@ -105,13 +105,13 @@ function ensureSeasonInputsSchema(db) {
     );
     CREATE TABLE IF NOT EXISTS season_drivers (
       season_id INTEGER NOT NULL, driver_id INTEGER NOT NULL, driver_number TEXT,
-      display_name_override TEXT, active INTEGER NOT NULL DEFAULT 1,
+      display_name_override TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(season_id, driver_id)
     );
     CREATE TABLE IF NOT EXISTS season_teams (
       season_id INTEGER NOT NULL, team_id INTEGER NOT NULL, display_name_override TEXT,
       display_order INTEGER NOT NULL DEFAULT 0, order_basis TEXT NOT NULL DEFAULT 'manual',
-      active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
       PRIMARY KEY(season_id, team_id)
     );
     CREATE TABLE IF NOT EXISTS driver_team_assignments (
@@ -146,9 +146,33 @@ function ensureSeasonInputsSchema(db) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
     }
   };
+  const hasColumn = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all()
+    .some((entry) => entry.name === column);
+  const dropColumnIfPresent = (table, column) => {
+    if (hasColumn(table, column)) db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`);
+  };
   addColumnIfMissing("season_teams", "display_order", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("season_teams", "order_basis", "TEXT NOT NULL DEFAULT 'manual'");
   addColumnIfMissing("driver_team_assignments", "seat_number", "INTEGER NOT NULL DEFAULT 1");
+
+  if (hasColumn("season_drivers", "active")) {
+    db.exec(
+      "DELETE FROM season_drivers WHERE active = 0 AND NOT EXISTS " +
+      "(SELECT 1 FROM driver_team_assignments a WHERE a.season_id = season_drivers.season_id AND a.driver_id = season_drivers.driver_id)"
+    );
+  }
+  if (hasColumn("season_teams", "active")) {
+    db.exec(
+      "DELETE FROM season_teams WHERE active = 0 AND NOT EXISTS " +
+      "(SELECT 1 FROM driver_team_assignments a WHERE a.season_id = season_teams.season_id AND a.team_id = season_teams.team_id)"
+    );
+  }
+  [
+    ["drivers", "active"],
+    ["teams", "active"],
+    ["season_drivers", "active"],
+    ["season_teams", "active"]
+  ].forEach(([table, column]) => dropColumnIfPresent(table, column));
 }
 
 function createOrGetSeason(db, { year, label = String(year), status = "active", now = new Date().toISOString() }) {
@@ -160,34 +184,34 @@ function createOrGetSeason(db, { year, label = String(year), status = "active", 
   return { id: Number(result.lastInsertRowid), year: Number(year), label: String(label), status: String(status) };
 }
 
-function upsertDriver(db, { slug, displayName, givenName, familyName, active = true, now = new Date().toISOString() }) {
+function upsertDriver(db, { slug, displayName, givenName, familyName, now = new Date().toISOString() }) {
   const safeName = String(displayName || `${givenName || ""} ${familyName || ""}`).trim();
   const parts = splitDisplayName(safeName);
   const safeSlug = slugify(slug || safeName);
   const existing = db.prepare("SELECT id FROM drivers WHERE slug = ? LIMIT 1").get(safeSlug);
   if (existing) {
-    db.prepare("UPDATE drivers SET given_name = ?, family_name = ?, display_name = ?, active = ?, updated_at = ? WHERE id = ?")
-      .run(givenName || parts.givenName, familyName || parts.familyName, safeName, active ? 1 : 0, now, Number(existing.id));
+    db.prepare("UPDATE drivers SET given_name = ?, family_name = ?, display_name = ?, updated_at = ? WHERE id = ?")
+      .run(givenName || parts.givenName, familyName || parts.familyName, safeName, now, Number(existing.id));
     return Number(existing.id);
   }
   const result = db.prepare(
-    "INSERT INTO drivers (slug, given_name, family_name, display_name, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(safeSlug, givenName || parts.givenName, familyName || parts.familyName, safeName, active ? 1 : 0, now, now);
+    "INSERT INTO drivers (slug, given_name, family_name, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(safeSlug, givenName || parts.givenName, familyName || parts.familyName, safeName, now, now);
   return Number(result.lastInsertRowid);
 }
 
-function upsertTeam(db, { slug, displayName, shortName = null, active = true, now = new Date().toISOString() }) {
+function upsertTeam(db, { slug, displayName, shortName = null, now = new Date().toISOString() }) {
   const safeName = String(displayName || "").trim();
   const safeSlug = slugify(slug || safeName);
   const existing = db.prepare("SELECT id FROM teams WHERE slug = ? LIMIT 1").get(safeSlug);
   if (existing) {
-    db.prepare("UPDATE teams SET display_name = ?, short_name = ?, active = ?, updated_at = ? WHERE id = ?")
-      .run(safeName, shortName, active ? 1 : 0, now, Number(existing.id));
+    db.prepare("UPDATE teams SET display_name = ?, short_name = ?, updated_at = ? WHERE id = ?")
+      .run(safeName, shortName, now, Number(existing.id));
     return Number(existing.id);
   }
   const result = db.prepare(
-    "INSERT INTO teams (slug, display_name, short_name, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(safeSlug, safeName, shortName, active ? 1 : 0, now, now);
+    "INSERT INTO teams (slug, display_name, short_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+  ).run(safeSlug, safeName, shortName, now, now);
   return Number(result.lastInsertRowid);
 }
 
@@ -204,19 +228,19 @@ function upsertRace(db, { seasonId, roundNumber, slug, displayName, scheduledDat
   return Number(result.lastInsertRowid);
 }
 
-function upsertSeasonDriver(db, { seasonId, driverId, driverNumber = null, displayNameOverride = null, active = true, now = new Date().toISOString() }) {
+function upsertSeasonDriver(db, { seasonId, driverId, driverNumber = null, displayNameOverride = null, now = new Date().toISOString() }) {
   const normalizedDriverNumber = normalizeDriverNumber(driverNumber);
   db.prepare(
-    "INSERT INTO season_drivers (season_id, driver_id, driver_number, display_name_override, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) " +
-    "ON CONFLICT(season_id, driver_id) DO UPDATE SET driver_number = excluded.driver_number, display_name_override = excluded.display_name_override, active = excluded.active, updated_at = excluded.updated_at"
-  ).run(Number(seasonId), Number(driverId), normalizedDriverNumber, displayNameOverride, active ? 1 : 0, now, now);
+    "INSERT INTO season_drivers (season_id, driver_id, driver_number, display_name_override, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) " +
+    "ON CONFLICT(season_id, driver_id) DO UPDATE SET driver_number = excluded.driver_number, display_name_override = excluded.display_name_override, updated_at = excluded.updated_at"
+  ).run(Number(seasonId), Number(driverId), normalizedDriverNumber, displayNameOverride, now, now);
 }
 
-function upsertSeasonTeam(db, { seasonId, teamId, displayNameOverride = null, displayOrder = 0, orderBasis = "manual", active = true, now = new Date().toISOString() }) {
+function upsertSeasonTeam(db, { seasonId, teamId, displayNameOverride = null, displayOrder = 0, orderBasis = "manual", now = new Date().toISOString() }) {
   db.prepare(
-    "INSERT INTO season_teams (season_id, team_id, display_name_override, display_order, order_basis, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
-    "ON CONFLICT(season_id, team_id) DO UPDATE SET display_name_override = excluded.display_name_override, display_order = excluded.display_order, order_basis = excluded.order_basis, active = excluded.active, updated_at = excluded.updated_at"
-  ).run(Number(seasonId), Number(teamId), displayNameOverride, Number(displayOrder) || 0, String(orderBasis || "manual"), active ? 1 : 0, now, now);
+    "INSERT INTO season_teams (season_id, team_id, display_name_override, display_order, order_basis, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) " +
+    "ON CONFLICT(season_id, team_id) DO UPDATE SET display_name_override = excluded.display_name_override, display_order = excluded.display_order, order_basis = excluded.order_basis, updated_at = excluded.updated_at"
+  ).run(Number(seasonId), Number(teamId), displayNameOverride, Number(displayOrder) || 0, String(orderBasis || "manual"), now, now);
 }
 
 function assertAssignmentDoesNotOverlap(db, { seasonId, driverId, teamId, seatNumber = 1, fromRound, toRound = null, excludeId = null }) {
@@ -388,12 +412,46 @@ function listSeasonInputs(db, year) {
   assertAssignmentIntervals(assignments);
   return {
     season: { ...season, id: seasonId, year: Number(season.year) },
-    drivers: sortSeasonDrivers(db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.id").all(seasonId)),
-    teams: db.prepare("SELECT t.*, st.display_name_override, st.display_order, st.order_basis, st.active AS season_active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? ORDER BY COALESCE(st.display_order, 9999), t.display_name").all(seasonId),
+    drivers: sortSeasonDrivers(db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.id").all(seasonId)),
+    teams: db.prepare("SELECT t.*, st.display_name_override, st.display_order, st.order_basis FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? ORDER BY COALESCE(st.display_order, 9999), t.display_name").all(seasonId),
     races: db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId),
     assignments,
     unresolved: []
   };
+}
+
+function removeSeasonMembership(db, { seasonId, entityType, entityId }) {
+  const membership = {
+    driver: {
+      table: "season_drivers",
+      idColumn: "driver_id",
+      label: "Driver"
+    },
+    team: {
+      table: "season_teams",
+      idColumn: "team_id",
+      label: "Team"
+    }
+  }[String(entityType || "").trim().toLowerCase()];
+  if (!membership) throw new Error("This input cannot be removed here.");
+  const safeSeasonId = Number(seasonId);
+  const safeEntityId = Number(entityId);
+  if (!Number.isInteger(safeSeasonId) || safeSeasonId <= 0 || !Number.isInteger(safeEntityId) || safeEntityId <= 0) {
+    throw new Error("A valid season input is required.");
+  }
+  const referenced = db.prepare(
+    `SELECT 1 FROM driver_team_assignments WHERE season_id = ? AND ${membership.idColumn} = ? LIMIT 1`
+  ).get(safeSeasonId, safeEntityId);
+  if (referenced) {
+    throw new Error(`${membership.label} has assignment history in this season and cannot be removed.`);
+  }
+  const result = db.prepare(
+    `DELETE FROM ${membership.table} WHERE season_id = ? AND ${membership.idColumn} = ?`
+  ).run(safeSeasonId, safeEntityId);
+  if (Number(result.changes || 0) !== 1) {
+    throw new Error(`${membership.label} is not part of this season.`);
+  }
+  return { entityType: String(entityType).trim().toLowerCase(), entityId: safeEntityId };
 }
 
 module.exports = {
@@ -409,6 +467,7 @@ module.exports = {
   normalizeEntityKey,
   normalizeDriverNumber,
   parseReference,
+  removeSeasonMembership,
   referenceFor,
   resolveEntity,
   slugify,

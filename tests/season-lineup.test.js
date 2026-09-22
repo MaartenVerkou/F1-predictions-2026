@@ -93,7 +93,7 @@ test("plan rejects duplicate driver occupancy", () => {
       { teamId: 20, seatNumber: 1, driverId: 3 },
       { teamId: 20, seatNumber: 2, driverId: null }
     ]
-  }), /Driver 1 is assigned to more than one active seat/);
+  }), /Driver 1 is assigned to more than one occupied seat/);
 });
 
 test("projection respects the replacement round cutoff", () => {
@@ -236,10 +236,10 @@ test("team history plan can remove all assignments for one seat", () => {
 test("team history applies a two-seat swap without a unique-key collision", () => {
   const db = new Database(":memory:");
   db.exec(`
-    CREATE TABLE teams (id INTEGER PRIMARY KEY, display_name TEXT, active INTEGER DEFAULT 1);
-    CREATE TABLE season_teams (season_id INTEGER, team_id INTEGER, display_name_override TEXT, display_order INTEGER, active INTEGER DEFAULT 1);
-    CREATE TABLE drivers (id INTEGER PRIMARY KEY, display_name TEXT, active INTEGER DEFAULT 1);
-    CREATE TABLE season_drivers (season_id INTEGER, driver_id INTEGER, display_name_override TEXT, active INTEGER DEFAULT 1);
+    CREATE TABLE teams (id INTEGER PRIMARY KEY, display_name TEXT);
+    CREATE TABLE season_teams (season_id INTEGER, team_id INTEGER, display_name_override TEXT, display_order INTEGER);
+    CREATE TABLE drivers (id INTEGER PRIMARY KEY, display_name TEXT);
+    CREATE TABLE season_drivers (season_id INTEGER, driver_id INTEGER, display_name_override TEXT);
     CREATE TABLE races (id INTEGER PRIMARY KEY, season_id INTEGER, round_number INTEGER);
     CREATE TABLE driver_team_assignments (
       id INTEGER PRIMARY KEY,

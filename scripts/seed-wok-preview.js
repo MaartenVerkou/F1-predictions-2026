@@ -138,14 +138,12 @@ function seedPreviewReplacement(database, now) {
   const replacementId = upsertDriver(database, {
     slug: "preview-replacement-driver",
     displayName: "Preview Replacement",
-    active: true,
     now
   });
   upsertSeasonDriver(database, {
     seasonId: catalog.season.id,
     driverId: replacementId,
     driverNumber: "99",
-    active: true,
     now
   });
   const projection = buildLineupProjection({

@@ -163,7 +163,6 @@ CREATE TABLE IF NOT EXISTS drivers (
   given_name TEXT NOT NULL,
   family_name TEXT NOT NULL,
   display_name TEXT NOT NULL,
-  active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -173,7 +172,6 @@ CREATE TABLE IF NOT EXISTS teams (
   slug TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   short_name TEXT,
-  active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -197,7 +195,6 @@ CREATE TABLE IF NOT EXISTS season_drivers (
   driver_id INTEGER NOT NULL,
   driver_number TEXT,
   display_name_override TEXT,
-  active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY(season_id, driver_id)
@@ -209,7 +206,6 @@ CREATE TABLE IF NOT EXISTS season_teams (
   display_name_override TEXT,
   display_order INTEGER NOT NULL DEFAULT 0,
   order_basis TEXT NOT NULL DEFAULT 'manual',
-  active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   PRIMARY KEY(season_id, team_id)

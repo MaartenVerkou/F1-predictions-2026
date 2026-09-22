@@ -37,7 +37,6 @@ function copySeason(db, sourceSeason, targetSeason, status, { replacement = fals
       displayNameOverride: row.display_name_override,
       displayOrder: row.display_order,
       orderBasis: row.order_basis,
-      active: row.active,
       now
     });
   });
@@ -47,7 +46,6 @@ function copySeason(db, sourceSeason, targetSeason, status, { replacement = fals
       driverId: row.driver_id,
       driverNumber: row.driver_number,
       displayNameOverride: row.display_name_override,
-      active: row.active,
       now
     });
   });
@@ -71,7 +69,6 @@ function copySeason(db, sourceSeason, targetSeason, status, { replacement = fals
       seasonId: target.id,
       driverId: reserveDriver,
       driverNumber: "98",
-      active: true,
       now
     });
   }

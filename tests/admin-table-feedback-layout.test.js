@@ -49,6 +49,8 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.match(view, /archived_policy_short/);
   assert.doesNotMatch(view, /admin-inputs-summary/);
   assert.doesNotMatch(view, /impact_summary/);
+  assert.doesNotMatch(view, /season_active/);
+  assert.doesNotMatch(view, /admin_inputs\.active/);
   const navigation = view.slice(view.indexOf('<nav class="admin-inputs-tabs"'), view.indexOf('</nav>') + 6);
   assert.doesNotMatch(navigation, /assignments/);
 });
