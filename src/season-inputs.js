@@ -98,6 +98,8 @@ function seasonAgeReferenceDate(year, races = []) {
     : `${Number(year)}-01-01`;
 }
 
+const RACE_COMPLETION_WINDOW_MS = 12 * 60 * 60 * 1000;
+
 function deriveRaceCalendarStatus(race, now = new Date()) {
   const calendarState = String(race?.calendar_state || "scheduled").trim().toLowerCase();
   if (["completed", "cancelled", "partial"].includes(calendarState)) return calendarState;
@@ -105,7 +107,8 @@ function deriveRaceCalendarStatus(race, now = new Date()) {
   const scheduledTime = Date.parse(String(race?.scheduled_date || ""));
   const currentTime = now instanceof Date ? now.getTime() : Date.parse(String(now || ""));
   if (!Number.isFinite(scheduledTime) || !Number.isFinite(currentTime)) return "unscheduled";
-  return scheduledTime > currentTime ? "upcoming" : "started";
+  if (scheduledTime > currentTime) return "upcoming";
+  return currentTime - scheduledTime >= RACE_COMPLETION_WINDOW_MS ? "completed" : "started";
 }
 
 function driverNumberForSort(value) {

@@ -5,7 +5,7 @@ const { deriveRaceCalendarStatus } = require("../src/season-inputs");
 
 const NOW = new Date("2026-09-22T12:00:00.000Z");
 
-test("derives upcoming and started from the scheduled start", () => {
+test("derives upcoming, started, and completed from the scheduled start", () => {
   assert.equal(
     deriveRaceCalendarStatus({ calendar_state: "scheduled", scheduled_date: "2026-09-22T12:00:01.000Z" }, NOW),
     "upcoming"
@@ -16,7 +16,15 @@ test("derives upcoming and started from the scheduled start", () => {
   );
   assert.equal(
     deriveRaceCalendarStatus({ calendar_state: "scheduled", scheduled_date: "2026-09-01T12:00:00.000Z" }, NOW),
+    "completed"
+  );
+  assert.equal(
+    deriveRaceCalendarStatus({ calendar_state: "scheduled", scheduled_date: "2026-09-22T00:00:01.000Z" }, NOW),
     "started"
+  );
+  assert.equal(
+    deriveRaceCalendarStatus({ calendar_state: "scheduled", scheduled_date: "2026-09-22T00:00:00.000Z" }, NOW),
+    "completed"
   );
 });
 

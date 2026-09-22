@@ -1,7 +1,7 @@
 ## 1. Completion rule
 
-- [ ] 1.1 Update the live race status helper with a named twelve-hour completion window and preserve explicit overrides.
-- [ ] 1.2 Add boundary tests for before start, during the window, exactly twelve hours, and after the window.
+- [x] 1.1 Update the live race status helper with a named twelve-hour completion window and preserve explicit overrides.
+- [x] 1.2 Add boundary tests for before start, during the window, exactly twelve hours, and after the window.
 
 ## 2. Verification and preview
 
