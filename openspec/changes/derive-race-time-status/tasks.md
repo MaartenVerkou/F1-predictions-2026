@@ -11,4 +11,4 @@
 ## 3. Verification
 
 - [x] 3.1 Add focused deterministic tests for future, started, missing-start, and explicit override cases.
-- [ ] 3.2 Run lint, unit tests, OpenSpec strict validation, and preview health/UI checks; confirm production remains unchanged.
+- [x] 3.2 Run lint, unit tests, OpenSpec strict validation, and preview health/UI checks; confirm production remains unchanged.
