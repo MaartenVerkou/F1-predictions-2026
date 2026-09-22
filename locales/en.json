@@ -102,7 +102,6 @@
     ,"optional": "Optional"
     ,"empty_seat": "Empty seat"
     ,"save_lineup": "Save lineup"
-    ,"team_settings": "Team settings"
     ,"historical_warning": "This round already has imported evidence or reviewed actuals. Saving changes the canonical lineup used for this round and later rounds."
     ,"historical_confirm": "I understand this is a historical correction."
   },

@@ -2143,7 +2143,7 @@ button:disabled {
 }
 
 .admin-inputs-team-table {
-  min-width: 420px;
+  min-width: 760px;
   table-layout: fixed;
 }
 
@@ -2154,7 +2154,7 @@ button:disabled {
 
 .admin-inputs-team-table th:first-child,
 .admin-inputs-team-table td:first-child {
-  width: 92px;
+  width: 64px;
 }
 
 .admin-inputs-team-table th:last-child,
@@ -2194,13 +2194,6 @@ button:disabled {
 .admin-inputs-team-order form {
   display: block;
   margin: 0;
-}
-
-.admin-inputs-order-number {
-  min-width: 28px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
 }
 
 .admin-inputs-data-table-wrap {
@@ -2302,7 +2295,7 @@ button:disabled {
   justify-self: start;
 }
 
-.admin-inputs-lineup-table select {
+.admin-inputs-team-table select {
   min-width: 190px;
 }
 
@@ -2317,19 +2310,6 @@ button:disabled {
   align-items: center;
   gap: 7px;
   font-weight: 600;
-}
-
-.admin-inputs-advanced {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-.admin-inputs-advanced summary {
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
 }
 
 .admin-inputs-table {
