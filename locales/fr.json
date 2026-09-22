@@ -518,6 +518,7 @@
     "team": "Équipe",
     "race": "Course",
     "round": "Tour",
+    "race_start": "Départ (heure locale)",
     "from_round": "À partir du tour",
     "to_round": "Jusqu'au tour",
     "source": "Source",

@@ -61,6 +61,7 @@
     "team": "Team",
     "race": "Race",
     "round": "Ronde",
+    "race_start": "Start (lokaal)",
     "from_round": "Vanaf ronde",
     "to_round": "Tot en met ronde",
     "source": "Bron",

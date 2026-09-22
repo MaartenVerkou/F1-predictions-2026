@@ -2026,11 +2026,11 @@ button:disabled {
 }
 
 .admin-inputs-page {
-  gap: 10px;
+  gap: 6px;
 }
 
 .admin-page-card.admin-inputs-page {
-  gap: 10px;
+  gap: 6px;
 }
 
 .admin-season-policy {
@@ -2181,7 +2181,7 @@ button:disabled {
 .admin-inputs-page .admin-inputs-table-toolbar {
   min-height: 32px;
   margin: 0;
-  padding: 0 2px;
+  padding: 0 2px 2px;
 }
 
 .admin-inputs-page .admin-inputs-lineup-help {
@@ -2278,6 +2278,16 @@ button:disabled {
 
 .admin-inputs-data-table-wrap {
   margin-top: 0;
+}
+
+.admin-inputs-race-start,
+.admin-inputs-race-start time {
+  white-space: nowrap;
+}
+
+.admin-inputs-race-start {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .admin-inputs-table.table th,

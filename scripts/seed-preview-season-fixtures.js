@@ -56,6 +56,7 @@ function copySeason(db, sourceSeason, targetSeason, status, { replacement = fals
       slug: row.slug,
       displayName: row.display_name,
       scheduledDate: row.scheduled_date,
+      scheduledTimezone: row.scheduled_timezone,
       calendarState: row.calendar_state,
       now
     });

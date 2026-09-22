@@ -518,6 +518,7 @@
     "team": "Team",
     "race": "Rennen",
     "round": "Runde",
+    "race_start": "Start (lokal)",
     "from_round": "Ab Runde",
     "to_round": "Bis Runde",
     "source": "Quelle",

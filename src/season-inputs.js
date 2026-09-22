@@ -100,6 +100,7 @@ function ensureSeasonInputsSchema(db) {
     CREATE TABLE IF NOT EXISTS races (
       id ${identityType}, season_id INTEGER NOT NULL, round_number INTEGER NOT NULL,
       slug TEXT NOT NULL, display_name TEXT NOT NULL, scheduled_date TEXT,
+      scheduled_timezone TEXT,
       calendar_state TEXT NOT NULL DEFAULT 'scheduled', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
       UNIQUE(season_id, round_number), UNIQUE(season_id, slug)
     );
@@ -154,6 +155,7 @@ function ensureSeasonInputsSchema(db) {
   addColumnIfMissing("season_teams", "display_order", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("season_teams", "order_basis", "TEXT NOT NULL DEFAULT 'manual'");
   addColumnIfMissing("driver_team_assignments", "seat_number", "INTEGER NOT NULL DEFAULT 1");
+  addColumnIfMissing("races", "scheduled_timezone", "TEXT");
 
   if (hasColumn("season_drivers", "active")) {
     db.exec(
@@ -215,16 +217,16 @@ function upsertTeam(db, { slug, displayName, shortName = null, now = new Date().
   return Number(result.lastInsertRowid);
 }
 
-function upsertRace(db, { seasonId, roundNumber, slug, displayName, scheduledDate = null, calendarState = "scheduled", now = new Date().toISOString() }) {
+function upsertRace(db, { seasonId, roundNumber, slug, displayName, scheduledDate = null, scheduledTimezone = null, calendarState = "scheduled", now = new Date().toISOString() }) {
   const existing = db.prepare("SELECT id FROM races WHERE season_id = ? AND round_number = ? LIMIT 1").get(Number(seasonId), Number(roundNumber));
   if (existing) {
-    db.prepare("UPDATE races SET slug = ?, display_name = ?, scheduled_date = ?, calendar_state = ?, updated_at = ? WHERE id = ?")
-      .run(String(slug), String(displayName), scheduledDate, String(calendarState), now, Number(existing.id));
+    db.prepare("UPDATE races SET slug = ?, display_name = ?, scheduled_date = ?, scheduled_timezone = ?, calendar_state = ?, updated_at = ? WHERE id = ?")
+      .run(String(slug), String(displayName), scheduledDate, scheduledTimezone, String(calendarState), now, Number(existing.id));
     return Number(existing.id);
   }
   const result = db.prepare(
-    "INSERT INTO races (season_id, round_number, slug, display_name, scheduled_date, calendar_state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(Number(seasonId), Number(roundNumber), String(slug), String(displayName), scheduledDate, String(calendarState), now, now);
+    "INSERT INTO races (season_id, round_number, slug, display_name, scheduled_date, scheduled_timezone, calendar_state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(Number(seasonId), Number(roundNumber), String(slug), String(displayName), scheduledDate, scheduledTimezone, String(calendarState), now, now);
   return Number(result.lastInsertRowid);
 }
 

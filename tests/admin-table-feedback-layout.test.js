@@ -23,13 +23,12 @@ test("admin feedback uses the shared context wrapper", () => {
   }
 });
 
-test("team lineup overview explains periods before the team toolbar", () => {
+test("team lineup overview keeps the toolbar concise", () => {
   const view = readView("admin_inputs.ejs");
   const help = view.indexOf("admin-inputs-lineup-help");
   const toolbar = view.indexOf('data-table-toolbar="teams"');
-  assert.ok(help >= 0);
+  assert.equal(help, -1, "redundant lineup guidance should not take vertical space");
   assert.ok(toolbar >= 0);
-  assert.ok(help < toolbar, "lineup guidance should stay above the toolbar");
   assert.match(view, /data-lineup-history-form/);
   assert.match(view, /data-lineup-history-status/);
   assert.match(view, /admin_inputs\.lineup_changes_pending/);
@@ -45,7 +44,10 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.match(view, /data-season-mutation/);
   assert.match(view, /assignment_history/);
   assert.match(view, /data_quality/);
-  assert.match(view, /data-hide-until-selection/);
+  assert.doesNotMatch(view, /data-hide-until-selection/);
+  assert.match(view, /data-table-edit disabled/);
+  assert.match(view, /data-table-remove/);
+  assert.match(view, /data-table-remove[^\n]*disabled/);
   assert.match(view, /archived_policy_short/);
   assert.doesNotMatch(view, /admin-inputs-summary/);
   assert.doesNotMatch(view, /impact_summary/);
@@ -53,6 +55,14 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.doesNotMatch(view, /admin_inputs\.active/);
   const navigation = view.slice(view.indexOf('<nav class="admin-inputs-tabs"'), view.indexOf('</nav>') + 6);
   assert.doesNotMatch(navigation, /assignments/);
+});
+
+test("race inputs show the localized scheduled start", () => {
+  const view = readView("admin_inputs.ejs");
+  assert.match(view, /admin_inputs\.race_start/);
+  assert.match(view, /formatRaceStart/);
+  assert.match(view, /scheduled_timezone/);
+  assert.match(view, /colspan="4"/);
 });
 
 test("shared table styles define header and first-row boundaries", () => {

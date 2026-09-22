@@ -81,7 +81,9 @@ function providerKeyForDriver(name) {
 function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() } = {}) {
   ensureSeasonInputsSchema(db);
   const roster = readJson(ROSTER_PATH);
-  const raceNames = readJson(RACES_PATH).races || [];
+  const raceData = readJson(RACES_PATH);
+  const raceNames = raceData.races || [];
+  const calendar = raceData.calendar?.[String(season)] || {};
   const transaction = db.transaction(() => {
     const seasonRow = createOrGetSeason(db, { year: season, label: String(season), now });
     const teamIds = new Map();
@@ -122,6 +124,8 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
         roundNumber,
         slug: slugify(raceName),
         displayName: raceName,
+        scheduledDate: calendar[raceName]?.start || null,
+        scheduledTimezone: calendar[raceName]?.timezone || null,
         calendarState: "scheduled",
         now
       });

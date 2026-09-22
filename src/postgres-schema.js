@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS races (
   slug TEXT NOT NULL,
   display_name TEXT NOT NULL,
   scheduled_date TEXT,
+  scheduled_timezone TEXT,
   calendar_state TEXT NOT NULL DEFAULT 'scheduled',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,

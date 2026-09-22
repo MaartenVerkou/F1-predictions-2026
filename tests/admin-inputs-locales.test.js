@@ -12,6 +12,7 @@ const REQUIRED_ADMIN_INPUT_KEYS = [
   "save_driver",
   "save_team",
   "save_race",
+  "race_start",
   "save_assignment",
   "save_alias",
   "save_provider",

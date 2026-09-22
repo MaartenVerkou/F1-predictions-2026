@@ -2665,6 +2665,7 @@ function registerAdminRoutes(app, deps) {
           slug: row.slug,
           displayName,
           scheduledDate: row.scheduled_date,
+          scheduledTimezone: row.scheduled_timezone,
           calendarState
         });
       } else {

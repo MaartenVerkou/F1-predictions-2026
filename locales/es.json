@@ -518,6 +518,7 @@
     "team": "Equipo",
     "race": "Carrera",
     "round": "Ronda",
+    "race_start": "Salida (hora local)",
     "from_round": "Desde ronda",
     "to_round": "Hasta ronda",
     "source": "Fuente",

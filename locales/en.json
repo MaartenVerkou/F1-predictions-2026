@@ -62,6 +62,7 @@
     "team": "Team",
     "race": "Race",
     "round": "Round",
+    "race_start": "Start (local)",
     "from_round": "From round",
     "to_round": "To round",
     "source": "Source",
