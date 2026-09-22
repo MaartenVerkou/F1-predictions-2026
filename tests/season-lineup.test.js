@@ -28,6 +28,17 @@ test("projection shows two team seats at the selected round", () => {
   assert.deepEqual(projection.map((row) => row.seats.map((seat) => seat.driverId)), [[1, 2], [3, null]]);
 });
 
+test("season presentation changes keep the canonical driver identity", () => {
+  const projection = buildLineupProjection({
+    teams: [{ id: 10, display_name: "Alpha", display_order: 1 }],
+    drivers: [{ id: 1, display_name: "Renamed Driver", driver_number: "99" }],
+    assignments: [{ id: 301, team_id: 10, driver_id: 1, seat_number: 1, from_round: 1, to_round: null }],
+    roundNumber: 3
+  });
+  assert.equal(projection[0].seats[0].driverId, 1);
+  assert.equal(projection[0].seats[0].driverName, "Renamed Driver");
+});
+
 test("replacement plan closes the old interval and starts at the selected round", () => {
   const plan = buildLineupPlan({
     teams,
