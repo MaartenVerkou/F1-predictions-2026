@@ -2429,7 +2429,7 @@ button:disabled {
 .admin-lineup-period {
   display: flex;
   align-items: baseline;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
   padding: 3px 0;
@@ -2444,7 +2444,6 @@ button:disabled {
   flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-align: right;
 }
 
 .admin-lineup-period span {
@@ -2452,7 +2451,6 @@ button:disabled {
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
-  text-align: right;
 }
 
 .admin-inputs-team-editor {
