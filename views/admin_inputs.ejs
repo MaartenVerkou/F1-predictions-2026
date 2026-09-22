@@ -23,12 +23,20 @@
   </div>
 
   <% if (seasonContext?.invalidRequestedSeason) { %>
-    <div class="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    <div class="admin-feedback-context">
+      <div class="alert" role="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    </div>
   <% } else if (!inputsReady) { %>
-    <div class="alert"><%= t('admin_inputs.not_seeded') %></div>
+    <div class="admin-feedback-context">
+      <div class="alert" role="status"><%= t('admin_inputs.not_seeded') %></div>
+    </div>
   <% } else { %>
-    <% if (query?.error) { %><div class="alert"><%= query.error %></div><% } %>
-    <% if (query?.success) { %><div class="alert success"><%= query.success %></div><% } %>
+    <% if (query?.error || query?.success) { %>
+      <div class="admin-feedback-context">
+        <% if (query?.error) { %><div class="alert" role="alert"><%= query.error %></div><% } %>
+        <% if (query?.success) { %><div class="alert success" role="status"><%= query.success %></div><% } %>
+      </div>
+    <% } %>
     <div class="admin-inputs-summary muted">
       <span><strong><%= catalog.season.label %></strong></span>
       <span><%= catalog.season.status %></span>
@@ -89,6 +97,12 @@
         <label for="lineup-round"><%= t('admin_inputs.lineup_round') %></label>
         <select id="lineup-round" name="round" onchange="this.form.submit()"><% catalog.races.forEach((race) => { %><option value="<%= race.round_number %>" <%= Number(race.round_number) === Number(lineupRound) ? 'selected' : '' %>>R<%= race.round_number %> — <%= race.display_name %></option><% }) %></select>
       </form>
+      <% if (lineupReviewState?.requiresConfirmation) { %>
+        <div class="alert admin-inputs-history-warning" role="alert">
+          <%= t('admin_inputs.historical_warning') %>
+          <label><input type="checkbox" name="historical_correction" value="1" form="admin-inputs-lineup-form"> <%= t('admin_inputs.historical_confirm') %></label>
+        </div>
+      <% } %>
       <div class="admin-inputs-table-toolbar" data-table-toolbar="teams" data-table-capabilities="edit,remove,reorder">
         <div class="admin-inputs-toolbar-start">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
@@ -110,12 +124,6 @@
         <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
         <input type="hidden" name="round" value="<%= lineupRound %>">
-        <% if (lineupReviewState?.requiresConfirmation) { %>
-          <div class="alert admin-inputs-history-warning">
-            <%= t('admin_inputs.historical_warning') %>
-            <label><input type="checkbox" name="historical_correction" value="1"> <%= t('admin_inputs.historical_confirm') %></label>
-          </div>
-        <% } %>
       </form>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-team-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_teams') %>" tabindex="0">
         <table class="table compact admin-inputs-table admin-inputs-team-table" data-selectable-table="teams">

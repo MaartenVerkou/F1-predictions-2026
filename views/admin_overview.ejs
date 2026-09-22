@@ -26,11 +26,15 @@
   }; %>
   <h1>Admin overview</h1>
   <p class="muted">Accounts, groups, named guests, and visitor activity.</p>
-  <% if (adminError) { %>
-    <div class="alert"><%= adminError %></div>
-  <% } %>
-  <% if (adminSuccess) { %>
-    <p class="muted"><%= adminSuccess %></p>
+  <% if (adminError || adminSuccess) { %>
+    <div class="admin-feedback-context">
+      <% if (adminError) { %>
+        <div class="alert" role="alert"><%= adminError %></div>
+      <% } %>
+      <% if (adminSuccess) { %>
+        <p class="muted" role="status"><%= adminSuccess %></p>
+      <% } %>
+    </div>
   <% } %>
 
   <h2 id="admin-groups">Groups</h2>

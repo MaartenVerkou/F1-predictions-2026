@@ -20,14 +20,20 @@ const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === '
   <p class="muted admin-page-intro"><%= t('admin_actuals.intro') %></p>
 
   <% if (seasonContext?.invalidRequestedSeason) { %>
-    <div class="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    <div class="admin-feedback-context">
+      <div class="alert" role="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    </div>
   <% } %>
 
-  <% if (saveError) { %>
-    <div class="alert"><%= saveError %></div>
-  <% } %>
-  <% if (saveSuccess) { %>
-    <div class="alert admin-success"><%= saveSuccess %></div>
+  <% if (saveError || saveSuccess) { %>
+    <div class="admin-feedback-context">
+      <% if (saveError) { %>
+        <div class="alert" role="alert"><%= saveError %></div>
+      <% } %>
+      <% if (saveSuccess) { %>
+        <div class="alert admin-success" role="status"><%= saveSuccess %></div>
+      <% } %>
+    </div>
   <% } %>
 
   <div class="admin-actuals-target-row" data-admin-race-review-workspace>

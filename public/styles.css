@@ -2302,7 +2302,7 @@ button:disabled {
 .admin-inputs-history-warning {
   display: grid;
   gap: 8px;
-  margin: 0;
+  margin: 12px 0 14px;
 }
 
 .admin-inputs-history-warning label {
@@ -3742,8 +3742,55 @@ button:disabled {
   scrollbar-width: thin;
 }
 
+.admin-page-card .admin-table-scroll {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+
 .admin-table-scroll .table {
   margin-bottom: 0;
+}
+
+/* Shared admin table frame. Keep columns page-specific, but give every table
+   the same header, first-row, and overflow rhythm. */
+.admin-page-card .admin-table-scroll > table,
+.admin-page-card .admin-race-data-table-wrap > table,
+.admin-page-card .admin-race-data-detail-table-wrap > table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-page-card .admin-table-scroll > table thead th,
+.admin-page-card .admin-race-data-table-wrap > table thead th,
+.admin-page-card .admin-race-data-detail-table-wrap > table thead th {
+  border-bottom: 2px solid color-mix(in srgb, var(--border) 55%, var(--text));
+}
+
+.admin-page-card .admin-table-scroll > table tbody tr:first-child > th,
+.admin-page-card .admin-table-scroll > table tbody tr:first-child > td,
+.admin-page-card .admin-race-data-table-wrap > table tbody tr:first-child > th,
+.admin-page-card .admin-race-data-table-wrap > table tbody tr:first-child > td,
+.admin-page-card .admin-race-data-detail-table-wrap > table tbody tr:first-child > th,
+.admin-page-card .admin-race-data-detail-table-wrap > table tbody tr:first-child > td {
+  border-top: 1px solid var(--border);
+}
+
+.admin-feedback-context {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 14px;
+}
+
+.admin-feedback-context .alert,
+.admin-feedback-context > .muted {
+  margin: 0;
+}
+
+.admin-inputs-table-toolbar,
+.admin-race-data-toolbar {
+  margin-top: 14px;
+  margin-bottom: 8px;
 }
 
 .admin-table-scroll code,

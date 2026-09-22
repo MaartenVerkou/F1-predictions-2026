@@ -27,7 +27,9 @@
   </div>
 
   <% if (seasonContext?.invalidRequestedSeason) { %>
-    <div class="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    <div class="admin-feedback-context">
+      <div class="alert" role="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    </div>
   <% } %>
 
   <div class="admin-race-data-toolbar">

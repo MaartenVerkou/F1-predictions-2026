@@ -1,0 +1,5 @@
+- [x] 1. Audit admin views and identify the shared table shell plus all feedback render paths.
+- [x] 2. Add shared table frame, header rule, first-row boundary, toolbar spacing, and feedback-context styles.
+- [x] 3. Move feedback rendering above toolbars in Inputs, Race data, Actuals, Overview, and Questions without changing message content.
+- [x] 4. Remove conflicting local table/message spacing and preserve responsive overflow and capability flags.
+- [ ] 5. Add/adjust focused tests for feedback placement and table-boundary markup; run syntax, unit, and preview smoke checks.
