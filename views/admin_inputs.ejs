@@ -13,7 +13,7 @@
       <select id="admin-inputs-season" name="season" onchange="this.form.submit()">
         <% (availableSeasons || []).forEach((availableSeason) => { %>
           <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>>
-            <%= availableSeason.label %><% if (availableSeason.status !== 'active') { %> · <%= availableSeason.statusLabel %><% } %>
+            <%= availableSeason.label %>
           </option>
         <% }) %>
       </select>
