@@ -11,4 +11,4 @@
 ## 3. Verification and preview
 
 - [x] 3.1 Add normalization, seeded-value, locale/static-view, and timezone-offset tests.
-- [ ] 3.2 Run syntax checks, full tests, strict OpenSpec validation, rebuild and seed the isolated preview, verify teams/races in the UI, and confirm production health/data remain unchanged.
+- [x] 3.2 Run syntax checks, full tests, strict OpenSpec validation, rebuild and seed the isolated preview, verify teams/races in the UI, and confirm production health/data remain unchanged.
