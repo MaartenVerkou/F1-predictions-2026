@@ -98,6 +98,16 @@ function seasonAgeReferenceDate(year, races = []) {
     : `${Number(year)}-01-01`;
 }
 
+function deriveRaceCalendarStatus(race, now = new Date()) {
+  const calendarState = String(race?.calendar_state || "scheduled").trim().toLowerCase();
+  if (["completed", "cancelled", "partial"].includes(calendarState)) return calendarState;
+
+  const scheduledTime = Date.parse(String(race?.scheduled_date || ""));
+  const currentTime = now instanceof Date ? now.getTime() : Date.parse(String(now || ""));
+  if (!Number.isFinite(scheduledTime) || !Number.isFinite(currentTime)) return "unscheduled";
+  return scheduledTime > currentTime ? "upcoming" : "started";
+}
+
 function driverNumberForSort(value) {
   const safeValue = String(value ?? "").trim();
   if (!/^\d+$/.test(safeValue)) return null;
@@ -481,7 +491,8 @@ function listSeasonInputs(db, year) {
   const seasonId = Number(season.id);
   const assignments = db.prepare("SELECT a.*, d.display_name AS driver_name, t.display_name AS team_name, st.display_order FROM driver_team_assignments a JOIN drivers d ON d.id = a.driver_id JOIN teams t ON t.id = a.team_id LEFT JOIN season_teams st ON st.season_id = a.season_id AND st.team_id = a.team_id WHERE a.season_id = ? ORDER BY COALESCE(st.display_order, 9999), a.seat_number, a.from_round, d.display_name").all(seasonId);
   assertAssignmentIntervals(assignments);
-  const races = db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId);
+  const races = db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId)
+    .map((race) => ({ ...race, derived_status: deriveRaceCalendarStatus(race) }));
   const ageReferenceDate = seasonAgeReferenceDate(season.year, races);
   const drivers = sortSeasonDrivers(db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.id").all(seasonId))
     .map((driver) => ({ ...driver, age: calculateDriverAge(driver.date_of_birth, ageReferenceDate) }));
@@ -545,6 +556,7 @@ module.exports = {
   normalizeNationalityCode,
   normalizeDateOfBirth,
   calculateDriverAge,
+  deriveRaceCalendarStatus,
   seasonAgeReferenceDate,
   parseReference,
   removeSeasonMembership,
