@@ -19,6 +19,10 @@ const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === '
   <h1><%= t('admin_actuals.heading') %></h1>
   <p class="muted admin-page-intro"><%= t('admin_actuals.intro') %></p>
 
+  <% if (seasonContext?.invalidRequestedSeason) { %>
+    <div class="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+  <% } %>
+
   <% if (saveError) { %>
     <div class="alert"><%= saveError %></div>
   <% } %>

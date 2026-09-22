@@ -26,6 +26,10 @@
     </form>
   </div>
 
+  <% if (seasonContext?.invalidRequestedSeason) { %>
+    <div class="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+  <% } %>
+
   <div class="admin-race-data-toolbar">
     <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>">
       <a class="admin-race-data-tab <%= viewMode === 'drivers' ? 'is-active' : '' %>"
