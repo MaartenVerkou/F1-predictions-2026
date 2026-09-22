@@ -280,19 +280,28 @@ function applyTeamLineupHistory(db, {
     });
   }
   const tx = db.transaction(() => {
-    for (const operation of plan.operations) {
-      if (operation.type === "delete") {
-        db.prepare("DELETE FROM driver_team_assignments WHERE id = ? AND season_id = ?")
-          .run(operation.assignmentId, safeSeasonId);
-      } else if (operation.type === "update") {
-        db.prepare(
-          "UPDATE driver_team_assignments SET driver_id = ?, team_id = ?, seat_number = ?, from_round = ?, to_round = ?, source = ?, updated_at = ? WHERE id = ? AND season_id = ?"
-        ).run(operation.driverId, operation.teamId, operation.seatNumber, operation.fromRound, operation.toRound, String(operation.source), now, operation.assignmentId, safeSeasonId);
-      } else if (operation.type === "insert") {
-        db.prepare(
-          "INSERT INTO driver_team_assignments (season_id, driver_id, team_id, seat_number, from_round, to_round, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(safeSeasonId, operation.driverId, operation.teamId, operation.seatNumber, operation.fromRound, operation.toRound, String(operation.source), now, now);
-      }
+    const deletes = plan.operations.filter((operation) => operation.type === "delete");
+    const updates = plan.operations.filter((operation) => operation.type === "update");
+    const inserts = plan.operations.filter((operation) => operation.type === "insert");
+    for (const operation of deletes) {
+      db.prepare("DELETE FROM driver_team_assignments WHERE id = ? AND season_id = ?")
+        .run(operation.assignmentId, safeSeasonId);
+    }
+    // Stage changed rows away from their old unique (driver, from_round) keys so
+    // swaps can be applied without a transient uniqueness conflict.
+    updates.forEach((operation, index) => {
+      db.prepare("UPDATE driver_team_assignments SET from_round = ?, to_round = NULL, updated_at = ? WHERE id = ? AND season_id = ?")
+        .run(1000000 + index, now, operation.assignmentId, safeSeasonId);
+    });
+    for (const operation of updates) {
+      db.prepare(
+        "UPDATE driver_team_assignments SET driver_id = ?, team_id = ?, seat_number = ?, from_round = ?, to_round = ?, source = ?, updated_at = ? WHERE id = ? AND season_id = ?"
+      ).run(operation.driverId, operation.teamId, operation.seatNumber, operation.fromRound, operation.toRound, String(operation.source), now, operation.assignmentId, safeSeasonId);
+    }
+    for (const operation of inserts) {
+      db.prepare(
+        "INSERT INTO driver_team_assignments (season_id, driver_id, team_id, seat_number, from_round, to_round, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).run(safeSeasonId, operation.driverId, operation.teamId, operation.seatNumber, operation.fromRound, operation.toRound, String(operation.source), now, now);
     }
     return plan;
   });

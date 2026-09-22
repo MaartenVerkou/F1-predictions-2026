@@ -1,6 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const Database = require("better-sqlite3");
 const {
+  applyTeamLineupHistory,
   assertHistoricalCorrection,
   assertAssignmentIntervals,
   buildLineupProjection,
@@ -229,4 +231,40 @@ test("team history plan can remove all assignments for one seat", () => {
     seatPeriods: { 1: [], 2: [{ id: 102, driverId: 2, fromRound: 1 }] }
   });
   assert.deepEqual(plan.operations, [{ type: "delete", assignmentId: 101, fromRound: 1, toRound: null }]);
+});
+
+test("team history applies a two-seat swap without a unique-key collision", () => {
+  const db = new Database(":memory:");
+  db.exec(`
+    CREATE TABLE teams (id INTEGER PRIMARY KEY, display_name TEXT, active INTEGER DEFAULT 1);
+    CREATE TABLE season_teams (season_id INTEGER, team_id INTEGER, display_name_override TEXT, display_order INTEGER, active INTEGER DEFAULT 1);
+    CREATE TABLE drivers (id INTEGER PRIMARY KEY, display_name TEXT, active INTEGER DEFAULT 1);
+    CREATE TABLE season_drivers (season_id INTEGER, driver_id INTEGER, display_name_override TEXT, active INTEGER DEFAULT 1);
+    CREATE TABLE races (id INTEGER PRIMARY KEY, season_id INTEGER, round_number INTEGER);
+    CREATE TABLE driver_team_assignments (
+      id INTEGER PRIMARY KEY,
+      season_id INTEGER, driver_id INTEGER, team_id INTEGER, from_round INTEGER, to_round INTEGER,
+      seat_number INTEGER, source TEXT, created_at TEXT, updated_at TEXT,
+      UNIQUE(season_id, driver_id, from_round)
+    );
+  `);
+  db.prepare("INSERT INTO teams (id, display_name) VALUES (10, 'Alpha')").run();
+  db.prepare("INSERT INTO season_teams (season_id, team_id, display_order) VALUES (1, 10, 1)").run();
+  db.prepare("INSERT INTO drivers (id, display_name) VALUES (1, 'Driver A'), (2, 'Driver B')").run();
+  db.prepare("INSERT INTO season_drivers (season_id, driver_id) VALUES (1, 1), (1, 2)").run();
+  db.prepare("INSERT INTO races (season_id, round_number) VALUES (1, 1), (1, 2)").run();
+  db.prepare("INSERT INTO driver_team_assignments (id, season_id, driver_id, team_id, from_round, seat_number, source, created_at, updated_at) VALUES (101, 1, 1, 10, 1, 1, 'seed', 'now', 'now'), (102, 1, 2, 10, 1, 2, 'seed', 'now', 'now')").run();
+  applyTeamLineupHistory(db, {
+    seasonId: 1,
+    teamId: 10,
+    seatPeriods: {
+      1: [{ id: 101, driverId: 2, fromRound: 1 }],
+      2: [{ id: 102, driverId: 1, fromRound: 1 }]
+    }
+  });
+  assert.deepEqual(db.prepare("SELECT id, driver_id, seat_number FROM driver_team_assignments ORDER BY id").all(), [
+    { id: 101, driver_id: 2, seat_number: 1 },
+    { id: 102, driver_id: 1, seat_number: 2 }
+  ]);
+  db.close();
 });
