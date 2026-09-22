@@ -2,6 +2,8 @@
 
 See `proposal.md` for the motivation and scope. The existing code already has canonical Inputs tables, normalized race evidence, actual snapshots, canonical answer helpers, and a leaderboard model, but the boundaries are incomplete: actual derivation is duplicated in the admin route and backfill script, scoring is duplicated across routes, and the global `actuals` table is not season-scoped. The preview must remain sanitized and production PostgreSQL must remain untouched until explicit approval.
 
+The durable boundary and its ownership consequences are recorded in [ADR 0006](../../../adr/0006-inputs-canonical-boundary.md).
+
 ## Goals / Non-Goals
 
 **Goals:**
