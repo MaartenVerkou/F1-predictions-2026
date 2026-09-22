@@ -62,3 +62,10 @@ test("shared table styles define header and first-row boundaries", () => {
   assert.match(styles, /tbody tr:first-child > th/);
   assert.match(styles, /border-bottom: 2px solid color-mix/);
 });
+
+test("lineup period metadata stays adjacent to the driver name", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const periodRule = styles.match(/\.admin-lineup-period\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(periodRule, /justify-content:\s*flex-start/);
+  assert.doesNotMatch(periodRule, /justify-content:\s*space-between/);
+});
