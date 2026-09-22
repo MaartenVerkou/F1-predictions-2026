@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { listAdminSeasons, resolveAdminSeasonContext } = require("../src/admin-season-context");
+const { assertSeasonMutationAllowed, listAdminSeasons, resolveAdminSeasonContext } = require("../src/admin-season-context");
 
 function buildDb() {
   const seasons = [
@@ -56,4 +56,16 @@ test("requested season is selected without falling back when invalid", () => {
   assert.equal(missing.selected, null);
   assert.equal(missing.invalidRequestedSeason, true);
   assert.equal(missing.isValid, false);
+});
+
+test("lifecycle mutation guard distinguishes preparation, active, and historical edits", () => {
+  const db = buildDb();
+  const planned = resolveAdminSeasonContext(db, { requestedSeason: 2027, currentSeason: 2026 });
+  const active = resolveAdminSeasonContext(db, { requestedSeason: 2026, currentSeason: 2026 });
+  const archived = resolveAdminSeasonContext(db, { requestedSeason: 2025, currentSeason: 2026 });
+  assert.throws(() => assertSeasonMutationAllowed(planned), /preparation action/);
+  assert.doesNotThrow(() => assertSeasonMutationAllowed(planned, { preparation: true }));
+  assert.doesNotThrow(() => assertSeasonMutationAllowed(active));
+  assert.throws(() => assertSeasonMutationAllowed(archived), /read-only/);
+  assert.doesNotThrow(() => assertSeasonMutationAllowed(archived, { historicalCorrection: true }));
 });

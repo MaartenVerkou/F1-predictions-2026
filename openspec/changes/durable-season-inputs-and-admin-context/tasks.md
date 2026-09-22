@@ -3,7 +3,7 @@
 - [x] 1.1 Add a shared season catalog/context resolver that returns season identity, status, editability, syncability, and data counts without falling back from an invalid requested season.
 - [x] 1.2 Replace the Inputs numeric season field and Open button with a labeled season selector and preserve the selected season across tabs, rounds, redirects, and mutation forms.
 - [x] 1.3 Add server-side lifecycle guards for planned, active, and archived seasons, including explicit historical/preparation confirmation and active-season-only automatic sync.
-- [ ] 1.4 Add season-context coverage for missing, planned, active, and archived seasons in route and permission tests.
+- [x] 1.4 Add season-context coverage for missing, planned, active, and archived seasons in route and permission tests.
 
 ## 2. Canonical driver/team data integrity
 
