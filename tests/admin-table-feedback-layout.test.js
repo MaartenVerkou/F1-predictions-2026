@@ -51,6 +51,16 @@ test("drivers table shows profile metadata without duplicating team assignments"
   assert.match(driversView, /colspan="5"/);
 });
 
+test("teams table exposes compact power-unit metadata and editor input", () => {
+  const view = readView("admin_inputs.ejs");
+  const start = view.indexOf('data-selectable-table="teams"');
+  const end = view.indexOf('data-selectable-table="races"');
+  const teamsView = view.slice(start, end);
+  assert.match(teamsView, /power_unit/);
+  assert.match(teamsView, /power_unit_short/);
+  assert.match(teamsView, /maxlength="3" pattern="\[A-Za-z\]\{3\}"/);
+});
+
 test("inputs exposes shared historical confirmation and advanced data states", () => {
   const view = readView("admin_inputs.ejs");
   assert.match(view, /data-admin-season-policy/);

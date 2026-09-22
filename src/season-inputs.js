@@ -55,7 +55,7 @@ function normalizeDriverCode(value) {
 function normalizeNationalityCode(value) {
   if (value == null || String(value).trim() === "") return null;
   const code = String(value).trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(code)) throw new Error("Nationality code must contain exactly two letters.");
+  if (!/^[A-Z]{3}$/.test(code)) throw new Error("Nationality code must contain exactly three letters.");
   return code;
 }
 
@@ -84,6 +84,13 @@ function normalizeEntityCode(value, label) {
   if (value == null || String(value).trim() === "") return null;
   const code = String(value).trim().toUpperCase();
   if (!/^[A-Z0-9]{2,8}$/.test(code)) throw new Error(`${label} must contain 2-8 letters or numbers.`);
+  return code;
+}
+
+function normalizeTeamCode(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const code = String(value).trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(code)) throw new Error("Team code must contain exactly three letters.");
   return code;
 }
 
@@ -185,7 +192,7 @@ function ensureSeasonInputsSchema(db) {
     );
     CREATE TABLE IF NOT EXISTS teams (
       id ${identityType}, slug TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
-      short_name TEXT, team_code TEXT, base_country_code TEXT, f1_entry_year INTEGER,
+      short_name TEXT, team_code TEXT, base_country_code TEXT, f1_entry_year INTEGER, power_unit TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS races (
@@ -250,6 +257,7 @@ function ensureSeasonInputsSchema(db) {
   addColumnIfMissing("teams", "team_code", "TEXT");
   addColumnIfMissing("teams", "base_country_code", "TEXT");
   addColumnIfMissing("teams", "f1_entry_year", "INTEGER");
+  addColumnIfMissing("teams", "power_unit", "TEXT");
   addColumnIfMissing("races", "race_code", "TEXT");
   addColumnIfMissing("races", "country_code", "TEXT");
   addColumnIfMissing("races", "circuit_name", "TEXT");
@@ -314,21 +322,22 @@ function upsertDriver(db, {
   return Number(result.lastInsertRowid);
 }
 
-function upsertTeam(db, { slug, displayName, shortName = null, teamCode, baseCountryCode, f1EntryYear, now = new Date().toISOString() }) {
+function upsertTeam(db, { slug, displayName, shortName = null, teamCode, baseCountryCode, f1EntryYear, powerUnit, now = new Date().toISOString() }) {
   const safeName = String(displayName || "").trim();
   const safeSlug = slugify(slug || safeName);
-  const existing = db.prepare("SELECT id, team_code, base_country_code, f1_entry_year FROM teams WHERE slug = ? LIMIT 1").get(safeSlug);
-  const nextTeamCode = teamCode === undefined ? existing?.team_code || null : normalizeEntityCode(teamCode, "Team code");
+  const existing = db.prepare("SELECT id, team_code, base_country_code, f1_entry_year, power_unit FROM teams WHERE slug = ? LIMIT 1").get(safeSlug);
+  const nextTeamCode = teamCode === undefined ? existing?.team_code || null : normalizeTeamCode(teamCode);
   const nextBaseCountryCode = baseCountryCode === undefined ? existing?.base_country_code || null : normalizeCountryCode(baseCountryCode, "Base country code");
   const nextF1EntryYear = f1EntryYear === undefined ? existing?.f1_entry_year || null : normalizeF1EntryYear(f1EntryYear);
+  const nextPowerUnit = powerUnit === undefined ? existing?.power_unit || null : (String(powerUnit || "").trim() || null);
   if (existing) {
-    db.prepare("UPDATE teams SET display_name = ?, short_name = ?, team_code = ?, base_country_code = ?, f1_entry_year = ?, updated_at = ? WHERE id = ?")
-      .run(safeName, shortName, nextTeamCode, nextBaseCountryCode, nextF1EntryYear, now, Number(existing.id));
+    db.prepare("UPDATE teams SET display_name = ?, short_name = ?, team_code = ?, base_country_code = ?, f1_entry_year = ?, power_unit = ?, updated_at = ? WHERE id = ?")
+      .run(safeName, shortName, nextTeamCode, nextBaseCountryCode, nextF1EntryYear, nextPowerUnit, now, Number(existing.id));
     return Number(existing.id);
   }
   const result = db.prepare(
-    "INSERT INTO teams (slug, display_name, short_name, team_code, base_country_code, f1_entry_year, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(safeSlug, safeName, shortName, nextTeamCode, nextBaseCountryCode, nextF1EntryYear, now, now);
+    "INSERT INTO teams (slug, display_name, short_name, team_code, base_country_code, f1_entry_year, power_unit, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(safeSlug, safeName, shortName, nextTeamCode, nextBaseCountryCode, nextF1EntryYear, nextPowerUnit, now, now);
   return Number(result.lastInsertRowid);
 }
 
@@ -595,6 +604,7 @@ module.exports = {
   normalizeNationalityCode,
   normalizeDateOfBirth,
   normalizeEntityCode,
+  normalizeTeamCode,
   normalizeCountryCode,
   normalizeF1EntryYear,
   calculateDriverAge,

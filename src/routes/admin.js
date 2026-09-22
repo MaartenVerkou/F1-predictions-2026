@@ -2659,7 +2659,8 @@ function registerAdminRoutes(app, deps) {
           shortName: row.short_name,
           teamCode: req.body.team_code,
           baseCountryCode: req.body.base_country_code,
-          f1EntryYear: req.body.f1_entry_year
+          f1EntryYear: req.body.f1_entry_year,
+          powerUnit: req.body.power_unit
         });
         const nextDisplayOrder = displayOrder == null ? Number(row.display_order || 0) : displayOrder;
         const orderBasis = requestedOrderBasis || row.order_basis || "manual";

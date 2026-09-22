@@ -528,6 +528,8 @@
     "base_country": "Pays de base",
     "f1_since": "Saison F1",
     "f1_since_short": "F1 {year}",
+    "power_unit": "Unité de puissance",
+    "power_unit_short": "PU {value}",
     "race_code": "Code",
     "country": "Pays",
     "circuit": "Circuit",

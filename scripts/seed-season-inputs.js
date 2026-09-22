@@ -96,6 +96,7 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
         teamCode: teamProfile.team_code,
         baseCountryCode: teamProfile.base_country_code,
         f1EntryYear: teamProfile.f1_entry_year,
+        powerUnit: teamProfile.power_unit,
         now
       });
       teamIds.set(teamName, id);

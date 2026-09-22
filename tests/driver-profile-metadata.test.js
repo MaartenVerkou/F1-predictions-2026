@@ -17,13 +17,13 @@ const {
 
 test("driver profile metadata normalizes and validates canonical fields", () => {
   assert.equal(normalizeDriverCode(" rus "), "RUS");
-  assert.equal(normalizeNationalityCode("gb"), "GB");
+  assert.equal(normalizeNationalityCode("gbr"), "GBR");
   assert.equal(normalizeDateOfBirth("1998-02-15"), "1998-02-15");
   assert.equal(normalizeDriverCode(""), null);
   assert.equal(normalizeNationalityCode(""), null);
   assert.equal(normalizeDateOfBirth(""), null);
   assert.throws(() => normalizeDriverCode("RUS1"), /three letters/);
-  assert.throws(() => normalizeNationalityCode("GBR"), /two letters/);
+  assert.throws(() => normalizeNationalityCode("GB"), /three letters/);
   assert.throws(() => normalizeDateOfBirth("1998-02-31"), /valid date/);
   const db = new Database(":memory:");
   try {
@@ -43,7 +43,7 @@ test("driver age is derived from the selected season reference race", () => {
       slug: "george-russell",
       displayName: "George Russell",
       driverCode: "RUS",
-      nationalityCode: "GB",
+      nationalityCode: "GBR",
       dateOfBirth: "1998-02-15"
     });
     upsertSeasonDriver(db, { seasonId: season.id, driverId, driverNumber: "63" });
@@ -56,7 +56,7 @@ test("driver age is derived from the selected season reference race", () => {
     });
     const driver = listSeasonInputs(db, 2026).drivers[0];
     assert.equal(driver.driver_code, "RUS");
-    assert.equal(driver.nationality_code, "GB");
+    assert.equal(driver.nationality_code, "GBR");
     assert.equal(driver.date_of_birth, "1998-02-15");
     assert.equal(driver.age, 28);
     assert.equal(calculateDriverAge("1998-02-15", "2026-03-08"), 28);

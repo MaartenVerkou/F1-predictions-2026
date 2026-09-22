@@ -72,6 +72,8 @@
     "base_country": "Base country",
     "f1_since": "F1 entry season",
     "f1_since_short": "F1 {year}",
+    "power_unit": "Power unit",
+    "power_unit_short": "PU {value}",
     "race_code": "Code",
     "country": "Country",
     "circuit": "Circuit",

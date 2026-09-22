@@ -18,6 +18,8 @@ const REQUIRED_ADMIN_INPUT_KEYS = [
   "base_country",
   "f1_since",
   "f1_since_short",
+  "power_unit",
+  "power_unit_short",
   "race_code",
   "country",
   "circuit",
