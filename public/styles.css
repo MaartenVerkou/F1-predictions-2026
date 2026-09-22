@@ -2029,6 +2029,52 @@ button:disabled {
   gap: 18px;
 }
 
+.admin-season-policy {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 88%, var(--accent) 12%);
+  font-size: 13px;
+}
+
+.admin-season-policy.is-archived {
+  border-color: color-mix(in srgb, var(--alert-border) 72%, var(--border));
+  background: color-mix(in srgb, var(--card) 88%, var(--alert-bg) 12%);
+}
+
+.admin-history-dialog {
+  max-width: min(420px, calc(100vw - 32px));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  color: var(--text);
+  background: var(--card);
+}
+
+.admin-history-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+.admin-history-dialog h2 {
+  margin: 0;
+}
+
+.admin-history-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.admin-inputs-advanced-link {
+  text-decoration: none;
+}
+
 .admin-inputs-season-form {
   display: flex;
   align-items: end;

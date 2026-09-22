@@ -41,6 +41,7 @@ const {
 const {
   assertSeasonMutationAllowed,
   listAdminSeasons,
+  readSeasonMutationFlags,
   resolveAdminSeasonContext
 } = require("../admin-season-context");
 
@@ -2545,6 +2546,7 @@ function registerAdminRoutes(app, deps) {
       : [];
     catalog.impact = getSeasonInputImpact(season);
     catalog.mappings = seasonContext.selected ? listSeasonMappings(db, season) : [];
+    const unresolvedMappingCount = catalog.mappings.filter((mapping) => mapping.status !== "resolved").length;
     return res.render("admin_inputs", {
       user,
       season,
@@ -2552,6 +2554,7 @@ function registerAdminRoutes(app, deps) {
       lineupRound,
       teamLineupHistory,
       catalog,
+      unresolvedMappingCount,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
       inputsReady: Boolean(catalog.season) && seasonContext.isValid,
@@ -2604,10 +2607,11 @@ function registerAdminRoutes(app, deps) {
       requestedSeason: season,
       currentSeason: CURRENT_SEASON
     });
+    const requestFlags = readSeasonMutationFlags(req);
     const preparationSelected = context.status === "planned"
-      && String(req.body.preparation_confirmed || "1") === "1";
+      && (requestFlags.preparation || !Object.prototype.hasOwnProperty.call(req.body || {}, "preparation_confirmed"));
     assertSeasonMutationAllowed(context, {
-      historicalCorrection: options.historicalCorrection === true || String(req.body.historical_correction || "") === "1",
+      historicalCorrection: options.historicalCorrection === true || requestFlags.historicalCorrection,
       preparation: options.preparation === true || preparationSelected
     });
     return context;
@@ -2671,7 +2675,8 @@ function registerAdminRoutes(app, deps) {
         userId: adminUser?.id || null,
         season,
         entityType,
-        entityId
+        entityId,
+        historicalCorrection: readSeasonMutationFlags(req).historicalCorrection
       });
       return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "success", "Entity updated.");
     } catch (err) {
@@ -2718,7 +2723,8 @@ function registerAdminRoutes(app, deps) {
         userId: adminUser?.id || null,
         season,
         teamId,
-        direction
+        direction,
+        historicalCorrection: readSeasonMutationFlags(req).historicalCorrection
       });
       return redirectInputs(res, season, "teams", "success", "Team order updated.", extra);
     } catch (err) {
@@ -2771,7 +2777,8 @@ function registerAdminRoutes(app, deps) {
         userId: adminUser?.id || null,
         season,
         entityType,
-        entityId
+        entityId,
+        historicalCorrection: readSeasonMutationFlags(req).historicalCorrection
       });
       const message = entityType === "assignment" ? "Assignment removed." : `${entityType === "driver" ? "Driver" : "Team"} removed from season inputs.`;
       return redirectInputs(res, season, tab, "success", message);
@@ -2803,7 +2810,8 @@ function registerAdminRoutes(app, deps) {
       logEvent("info", "admin_inputs_driver_created", {
         userId: adminUser?.id || null,
         season,
-        driverId
+        driverId,
+        historicalCorrection: readSeasonMutationFlags(req).historicalCorrection
       });
       return redirectInputs(res, season, "drivers", "success", "Driver added to season.");
     } catch (err) {
@@ -2817,7 +2825,7 @@ function registerAdminRoutes(app, deps) {
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
-      requireSeasonMutation(req, season, { historicalCorrection: true });
+      requireSeasonMutation(req, season);
       if (!catalog.season) throw new Error("Season inputs are not available.");
       if (!Number.isInteger(roundNumber) || roundNumber < 1 || roundNumber > catalog.races.length) {
         throw new Error("Choose a valid season round.");
@@ -2845,6 +2853,7 @@ function registerAdminRoutes(app, deps) {
         season,
         roundNumber,
         changedSeats: result.operations.length,
+        historicalCorrection: historicalCorrectionConfirmed,
         affectedRounds: {
           from: roundNumber,
           to: catalog.races.length
@@ -2905,7 +2914,8 @@ function registerAdminRoutes(app, deps) {
         season,
         teamId,
         changedAssignments: result.operations.length,
-        affectedFromRound: result.affectedFromRound
+        affectedFromRound: result.affectedFromRound,
+        historicalCorrection: historicalCorrectionConfirmed
       });
       return redirectInputs(res, season, "teams", "success", `Team lineup saved (${result.operations.length} changes).`);
     } catch (err) {
@@ -2926,7 +2936,7 @@ function registerAdminRoutes(app, deps) {
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
-      requireSeasonMutation(req, season, { historicalCorrection: true });
+      requireSeasonMutation(req, season);
       if (!catalog.season || !catalog.drivers.some((row) => Number(row.id) === driverId) || !catalog.teams.some((row) => Number(row.id) === teamId)) {
         throw new Error("Choose a driver and team from this season.");
       }
@@ -2955,7 +2965,8 @@ function registerAdminRoutes(app, deps) {
         teamId,
         seatNumber,
         fromRound,
-        toRound
+        toRound,
+        historicalCorrection: readSeasonMutationFlags(req).historicalCorrection
       });
       return redirectInputs(res, season, "assignments", "success", "Assignment saved.");
     } catch (err) {
@@ -2986,7 +2997,7 @@ function registerAdminRoutes(app, deps) {
         alias: req.body.alias,
         source: "admin"
       });
-      logEvent("info", "admin_inputs_alias_added", { userId: adminUser?.id || null, season, entityType, entityId });
+      logEvent("info", "admin_inputs_alias_added", { userId: adminUser?.id || null, season, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, tab, "success", "Alias saved.");
     } catch (err) {
       return redirectInputs(res, season, tab, "error", err.message);
@@ -3011,7 +3022,7 @@ function registerAdminRoutes(app, deps) {
         throw new Error("The canonical entity is not part of this season.");
       }
       addProviderReference(db, { entityType, entityId, provider, providerKey, providerLabel: req.body.provider_label || null });
-      logEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider });
+      logEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, "mappings", "success", "Provider mapping saved.");
     } catch (err) {
       return redirectInputs(res, season, "mappings", "error", err.message);
@@ -3041,7 +3052,7 @@ function registerAdminRoutes(app, deps) {
       const table = mappingType === "alias" ? "entity_aliases" : "entity_provider_refs";
       const result = db.prepare(`UPDATE ${table} SET entity_type = ?, entity_id = ? WHERE id = ?`).run(entityType, entityId, mappingId);
       if (Number(result.changes || 0) !== 1) throw new Error("Mapping was not found.");
-      logEvent("info", "admin_inputs_mapping_resolved", { userId: adminUser?.id || null, season, mappingType, mappingId, entityType, entityId });
+      logEvent("info", "admin_inputs_mapping_resolved", { userId: adminUser?.id || null, season, mappingType, mappingId, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, "mappings", "success", "Mapping resolved.");
     } catch (err) {
       return redirectInputs(res, season, "mappings", "error", err.message);

@@ -62,6 +62,14 @@ function resolveAdminSeasonContext(db, { requestedSeason, currentSeason }) {
   };
 }
 
+function readSeasonMutationFlags(req) {
+  const body = req?.body || {};
+  return {
+    historicalCorrection: String(body.historical_correction || "") === "1",
+    preparation: String(body.preparation_confirmed || "") === "1"
+  };
+}
+
 function assertSeasonMutationAllowed(context, { historicalCorrection = false, preparation = false } = {}) {
   if (!context?.selected || !context.isValid) {
     throw new Error("The selected season is not available.");
@@ -79,6 +87,7 @@ module.exports = {
   SEASON_STATUSES,
   normalizeSeasonStatus,
   listAdminSeasons,
+  readSeasonMutationFlags,
   resolveAdminSeasonContext,
   assertSeasonMutationAllowed
 };

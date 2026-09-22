@@ -21,6 +21,20 @@
     </form>
   </div>
 
+  <div class="admin-season-policy <%= seasonContext?.status === 'archived' ? 'is-archived' : '' %>" data-admin-season-policy data-season-status="<%= seasonContext?.status || '' %>" <%= ['archived', 'planned'].includes(seasonContext?.status) ? '' : 'hidden' %>>
+    <strong><%= seasonContext?.status === 'archived' ? t('admin_inputs.archived_policy_title', { season }) : t('admin_inputs.planned_policy_title', { season }) %></strong>
+    <span><%= seasonContext?.status === 'archived' ? t('admin_inputs.archived_policy_help') : t('admin_inputs.planned_policy_help') %></span>
+  </div>
+
+  <dialog class="admin-history-dialog" data-admin-history-dialog aria-labelledby="admin-history-dialog-title">
+    <h2 id="admin-history-dialog-title"><%= t('admin_inputs.historical_dialog_title') %></h2>
+    <p data-admin-history-dialog-message><%= t('admin_inputs.historical_dialog_help') %></p>
+    <div class="admin-history-dialog-actions">
+      <button type="button" class="secondary" data-admin-history-cancel><%= t('admin_inputs.cancel') %></button>
+      <button type="button" data-admin-history-confirm><%= t('admin_inputs.historical_dialog_confirm') %></button>
+    </div>
+  </dialog>
+
   <% if (seasonContext?.invalidRequestedSeason) { %>
     <div class="admin-feedback-context">
       <div class="alert" role="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
@@ -47,11 +61,16 @@
     <p class="muted admin-inputs-impact"><%= t('admin_inputs.impact_summary', { evidence: catalog.impact?.evidenceSnapshots || 0, snapshots: catalog.impact?.actualSnapshots || 0, values: catalog.impact?.actualValues || 0 }) %></p>
 
     <nav class="admin-inputs-tabs" aria-label="<%= t('admin_inputs.tabs') %>">
-      <% ['drivers', 'teams', 'assignments', 'races', 'mappings'].forEach((name) => { %>
+      <% ['drivers', 'teams', 'races'].forEach((name) => { %>
         <a class="admin-race-data-tab <%= tab === name ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=<%= name %>">
           <%= t('admin_inputs.tab_' + name) %>
         </a>
       <% }) %>
+      <% if (Number(unresolvedMappingCount || 0) > 0 || tab === 'mappings') { %>
+        <a class="admin-race-data-tab <%= tab === 'mappings' ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=mappings">
+          <%= t('admin_inputs.data_quality') %><% if (Number(unresolvedMappingCount || 0) > 0) { %> · <%= unresolvedMappingCount %><% } %>
+        </a>
+      <% } %>
     </nav>
 
     <% if (tab === 'drivers') { %>
@@ -65,12 +84,12 @@
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
       </div>
-      <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver">
+      <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver" data-season-mutation>
         <%- csrfField() %>
         <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
       </form>
-      <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" hidden>
+      <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" data-season-mutation hidden>
         <%- csrfField() %>
         <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
@@ -84,7 +103,7 @@
             <% catalog.drivers.forEach((driver) => { %>
               <% const assignment = catalog.assignments.find((item) => Number(item.driver_id) === Number(driver.id) && Number(item.from_round) <= 1 && (item.to_round == null || Number(item.to_round) >= 1)); %>
               <tr data-selectable-row data-edit-target="driver-editor-<%= driver.id %>" data-row-label="<%= driver.display_name_override || driver.display_name %>" tabindex="0"><td><%= driver.driver_number || '—' %></td><th scope="row"><%= driver.display_name_override || driver.display_name %></th><td><%= assignment?.team_name || '—' %></td><td><%= Number(driver.season_active) ? t('admin_inputs.yes') : t('admin_inputs.no') %></td></tr>
-              <tr id="driver-editor-<%= driver.id %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="4"><form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="driver"><input type="hidden" name="entity_id" value="<%= driver.id %>"><label><%= t('admin_inputs.driver') %><input name="display_name" value="<%= driver.display_name %>" required></label><label><%= t('admin_inputs.driver_number') %><input name="driver_number" type="number" min="1" max="99" value="<%= driver.driver_number || '' %>" required></label><label class="admin-inputs-checkbox-field"><span><%= t('admin_inputs.active') %></span><input name="season_active" type="checkbox" value="1" <%= Number(driver.season_active) ? 'checked' : '' %>></label><button class="secondary" type="submit"><%= t('admin_inputs.save_driver') %></button></form></td></tr>
+              <tr id="driver-editor-<%= driver.id %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="4"><form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="driver"><input type="hidden" name="entity_id" value="<%= driver.id %>"><label><%= t('admin_inputs.driver') %><input name="display_name" value="<%= driver.display_name %>" required></label><label><%= t('admin_inputs.driver_number') %><input name="driver_number" type="number" min="1" max="99" value="<%= driver.driver_number || '' %>" required></label><label class="admin-inputs-checkbox-field"><span><%= t('admin_inputs.active') %></span><input name="season_active" type="checkbox" value="1" <%= Number(driver.season_active) ? 'checked' : '' %>></label><button class="secondary" type="submit"><%= t('admin_inputs.save_driver') %></button></form></td></tr>
             <% }) %>
             <tr id="admin-inputs-new-driver-row" class="admin-inputs-new-row" data-new-driver-row hidden><td><label class="sr-only" for="new-driver-number"><%= t('admin_inputs.driver_number') %></label><input id="new-driver-number" name="driver_number" form="admin-inputs-new-driver-form" type="number" min="1" max="99" required></td><th scope="row"><label class="sr-only" for="new-driver-name"><%= t('admin_inputs.driver_name') %></label><input id="new-driver-name" name="display_name" form="admin-inputs-new-driver-form" required></th><td>—</td><td><%= t('admin_inputs.yes') %> <button class="secondary" type="submit" form="admin-inputs-new-driver-form"><%= t('admin_inputs.save') %></button></td></tr>
           </tbody>
@@ -98,10 +117,11 @@
         </div>
         <div class="admin-inputs-toolbar-end">
           <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
+          <a class="secondary admin-inputs-advanced-link" href="/admin/inputs?season=<%= season %>&tab=assignments"><%= t('admin_inputs.assignment_history') %></a>
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
       </div>
-      <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" hidden>
+      <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" data-season-mutation hidden>
         <%- csrfField() %>
         <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
@@ -115,7 +135,7 @@
             <% teamLineupHistory.forEach((lineupTeam, index) => { %>
               <% const team = catalog.teams.find((item) => Number(item.id) === Number(lineupTeam.teamId)); %>
               <tr data-selectable-row data-edit-target="team-editor-<%= lineupTeam.teamId %>" data-row-label="<%= lineupTeam.teamName %>" tabindex="0">
-                <td class="admin-inputs-team-order"><div class="admin-order-buttons"><form method="post" action="/admin/inputs/team-order"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="up" <%= index === 0 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_up') %>" aria-label="<%= t('admin_inputs.move_up') %>">&#8593;</button></form><form method="post" action="/admin/inputs/team-order"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="down" <%= index === teamLineupHistory.length - 1 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_down') %>" aria-label="<%= t('admin_inputs.move_down') %>">&#8595;</button></form></div></td>
+                <td class="admin-inputs-team-order"><div class="admin-order-buttons"><form method="post" action="/admin/inputs/team-order" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="up" <%= index === 0 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_up') %>" aria-label="<%= t('admin_inputs.move_up') %>">&#8593;</button></form><form method="post" action="/admin/inputs/team-order" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="down" <%= index === teamLineupHistory.length - 1 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_down') %>" aria-label="<%= t('admin_inputs.move_down') %>">&#8595;</button></form></div></td>
                 <th scope="row"><%= lineupTeam.teamName %></th>
                 <% [1, 2].forEach((seatNumber) => { const periods = lineupTeam.seats[seatNumber] || []; %>
                   <td class="admin-inputs-lineup-history-cell">
@@ -129,8 +149,8 @@
               </tr>
               <tr id="team-editor-<%= lineupTeam.teamId %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="5">
                 <div class="admin-inputs-team-editor">
-                  <form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form admin-inputs-team-details-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="team"><input type="hidden" name="entity_id" value="<%= lineupTeam.teamId %>"><label><%= t('admin_inputs.team') %><input name="display_name" value="<%= team?.display_name || lineupTeam.teamName %>" required></label><label class="admin-inputs-checkbox-field"><span><%= t('admin_inputs.active') %></span><input name="season_active" type="checkbox" value="1" <%= Number(team?.season_active) ? 'checked' : '' %>></label><button class="secondary" type="submit"><%= t('admin_inputs.save_team') %></button></form>
-                  <form method="post" action="/admin/inputs/team-history" class="admin-inputs-lineup-history-form" data-lineup-history-form data-lineup-remove-confirm="<%= t('admin_inputs.remove_period_confirm') %>">
+                  <form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form admin-inputs-team-details-form" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="team"><input type="hidden" name="entity_id" value="<%= lineupTeam.teamId %>"><label><%= t('admin_inputs.team') %><input name="display_name" value="<%= team?.display_name || lineupTeam.teamName %>" required></label><label class="admin-inputs-checkbox-field"><span><%= t('admin_inputs.active') %></span><input name="season_active" type="checkbox" value="1" <%= Number(team?.season_active) ? 'checked' : '' %>></label><button class="secondary" type="submit"><%= t('admin_inputs.save_team') %></button></form>
+                  <form method="post" action="/admin/inputs/team-history" class="admin-inputs-lineup-history-form" data-lineup-history-form data-season-mutation data-lineup-remove-confirm="<%= t('admin_inputs.remove_period_confirm') %>">
                     <%- csrfField() %><%- seasonPreparationField %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>">
                     <div class="admin-inputs-lineup-seats">
                       <% [1, 2].forEach((seatNumber) => { const periods = lineupTeam.seats[seatNumber] || []; %>
@@ -176,9 +196,9 @@
         </table>
       </div>
     <% } else if (tab === 'assignments') { %>
-      <div class="admin-inputs-table-toolbar" data-table-toolbar="assignments" data-table-capabilities="read-only">
-        <div class="admin-inputs-toolbar-start"><strong><%= t('admin_inputs.lineup_history') %></strong></div>
-        <div class="admin-inputs-toolbar-end"><span class="muted"><%= t('admin_inputs.lineup_history_help') %></span></div>
+          <div class="admin-inputs-table-toolbar" data-table-toolbar="assignments" data-table-capabilities="read-only">
+            <div class="admin-inputs-toolbar-start"><a class="secondary admin-inputs-advanced-link" href="/admin/inputs?season=<%= season %>&tab=teams">← <%= t('admin_inputs.back_to_teams') %></a><strong><%= t('admin_inputs.lineup_history') %></strong></div>
+            <div class="admin-inputs-toolbar-end"><span class="muted"><%= t('admin_inputs.lineup_history_help') %></span></div>
       </div>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_assignments') %>" tabindex="0">
         <table class="table compact admin-inputs-table" data-selectable-table="assignments">
@@ -198,7 +218,7 @@
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_races') %>" tabindex="0">
         <table class="table compact admin-inputs-table" data-selectable-table="races">
           <thead><tr><th><%= t('admin_inputs.round') %></th><th><%= t('admin_inputs.race') %></th><th><%= t('admin_inputs.status') %></th></tr></thead>
-          <tbody><% catalog.races.forEach((race) => { %><tr data-selectable-row data-edit-target="race-editor-<%= race.id %>" data-row-label="<%= race.display_name %>" tabindex="0"><td>R<%= race.round_number %></td><th scope="row"><%= race.display_name %></th><td><%= race.calendar_state %></td></tr><tr id="race-editor-<%= race.id %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="3"><form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form"><%- csrfField() %><%- seasonPreparationField %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="race"><input type="hidden" name="entity_id" value="<%= race.id %>"><label><%= t('admin_inputs.race') %><input name="display_name" value="<%= race.display_name %>" required></label><label><%= t('admin_inputs.status') %><select name="calendar_state"><% ['scheduled','completed','cancelled','partial'].forEach((state) => { %><option value="<%= state %>" <%= race.calendar_state === state ? 'selected' : '' %>><%= state %></option><% }) %></select></label><button class="secondary" type="submit"><%= t('admin_inputs.save_race') %></button></form></td></tr><% }) %></tbody>
+              <tbody><% catalog.races.forEach((race) => { %><tr data-selectable-row data-edit-target="race-editor-<%= race.id %>" data-row-label="<%= race.display_name %>" tabindex="0"><td>R<%= race.round_number %></td><th scope="row"><%= race.display_name %></th><td><%= race.calendar_state %></td></tr><tr id="race-editor-<%= race.id %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="3"><form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form" data-season-mutation><%- csrfField() %><%- seasonPreparationField %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="race"><input type="hidden" name="entity_id" value="<%= race.id %>"><label><%= t('admin_inputs.race') %><input name="display_name" value="<%= race.display_name %>" required></label><label><%= t('admin_inputs.status') %><select name="calendar_state"><% ['scheduled','completed','cancelled','partial'].forEach((state) => { %><option value="<%= state %>" <%= race.calendar_state === state ? 'selected' : '' %>><%= state %></option><% }) %></select></label><button class="secondary" type="submit"><%= t('admin_inputs.save_race') %></button></form></td></tr><% }) %></tbody>
         </table>
       </div>
     <% } else { %>
@@ -210,7 +230,7 @@
         <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_mappings') %>" tabindex="0">
           <table class="table compact admin-inputs-table">
             <thead><tr><th><%= t('admin_inputs.provider') %></th><th><%= t('admin_inputs.entity_type') %></th><th><%= t('admin_inputs.source_label') %></th><th><%= t('admin_inputs.canonical_candidate') %></th><th><%= t('admin_inputs.status') %></th><th></th></tr></thead>
-            <tbody><% unresolvedMappings.forEach((mapping) => { const candidates = mapping.entityType === 'driver' ? catalog.drivers : mapping.entityType === 'team' ? catalog.teams : catalog.races; %><tr><td><%= mapping.provider || mapping.mappingType %></td><td><%= mapping.entityType %></td><td><%= mapping.sourceLabel %></td><td><%= mapping.canonicalName || '—' %></td><td><%= mapping.status %></td><td><form method="post" action="/admin/inputs/mappings/resolve" class="admin-inline-form"><%- csrfField() %><%- seasonPreparationField %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="mapping_type" value="<%= mapping.mappingType %>"><input type="hidden" name="mapping_id" value="<%= mapping.id %>"><input type="hidden" name="entity_type" value="<%= mapping.entityType %>"><select name="entity_id" aria-label="<%= t('admin_inputs.canonical_candidate') %>"><% candidates.forEach((candidate) => { %><option value="<%= candidate.id %>"><%= candidate.display_name_override || candidate.display_name %></option><% }) %></select><button class="secondary" type="submit"><%= t('admin_inputs.resolve') %></button></form></td></tr><% }) %></tbody>
+                <tbody><% unresolvedMappings.forEach((mapping) => { const candidates = mapping.entityType === 'driver' ? catalog.drivers : mapping.entityType === 'team' ? catalog.teams : catalog.races; %><tr><td><%= mapping.provider || mapping.mappingType %></td><td><%= mapping.entityType %></td><td><%= mapping.sourceLabel %></td><td><%= mapping.canonicalName || '—' %></td><td><%= mapping.status %></td><td><form method="post" action="/admin/inputs/mappings/resolve" class="admin-inline-form" data-season-mutation><%- csrfField() %><%- seasonPreparationField %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="mapping_type" value="<%= mapping.mappingType %>"><input type="hidden" name="mapping_id" value="<%= mapping.id %>"><input type="hidden" name="entity_type" value="<%= mapping.entityType %>"><select name="entity_id" aria-label="<%= t('admin_inputs.canonical_candidate') %>"><% candidates.forEach((candidate) => { %><option value="<%= candidate.id %>"><%= candidate.display_name_override || candidate.display_name %></option><% }) %></select><button class="secondary" type="submit"><%= t('admin_inputs.resolve') %></button></form></td></tr><% }) %></tbody>
           </table>
         </div>
       <% } %>

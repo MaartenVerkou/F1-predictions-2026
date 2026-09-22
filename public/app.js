@@ -1002,6 +1002,67 @@ const initScrollToEndButton = () => {
   updateVisibility();
 };
 
+const initAdminSeasonMutationConfirmation = () => {
+  const policy = document.querySelector('[data-admin-season-policy]');
+  const dialog = document.querySelector('[data-admin-history-dialog]');
+  if (!policy || !dialog || policy.dataset.seasonStatus !== 'archived') return;
+
+  const message = dialog.querySelector('[data-admin-history-dialog-message]');
+  const confirmButton = dialog.querySelector('[data-admin-history-confirm]');
+  const cancelButton = dialog.querySelector('[data-admin-history-cancel]');
+  const forms = Array.from(document.querySelectorAll('form[data-season-mutation]'));
+  let pending = null;
+
+  const submitConfirmed = () => {
+    if (!pending) return;
+    const { form, submitter } = pending;
+    let input = form.querySelector('input[name="historical_correction"][data-historical-confirmation]');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'historical_correction';
+      input.dataset.historicalConfirmation = '1';
+      form.appendChild(input);
+    }
+    input.value = '1';
+    form.dataset.historicalConfirmed = '1';
+    pending = null;
+    if (dialog.open) dialog.close();
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit(submitter || undefined);
+    } else {
+      form.submit();
+    }
+  };
+
+  forms.forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.historicalConfirmed === '1') return;
+      const existingConfirmation = form.querySelector('input[name="historical_correction"]:checked');
+      if (existingConfirmation) return;
+      event.preventDefault();
+      pending = { form, submitter: event.submitter || null };
+      if (typeof dialog.showModal !== 'function') {
+        const confirmed = window.confirm(message?.textContent || 'Confirm historical correction?');
+        if (confirmed) submitConfirmed();
+        else pending = null;
+        return;
+      }
+      dialog.showModal();
+      confirmButton?.focus();
+    });
+  });
+
+  confirmButton?.addEventListener('click', submitConfirmed);
+  cancelButton?.addEventListener('click', () => {
+    pending = null;
+    if (dialog.open) dialog.close();
+  });
+  dialog.addEventListener('close', () => {
+    pending = null;
+  });
+};
+
 const initAdminInputTables = () => {
   document.querySelectorAll('[data-selectable-table]').forEach((table) => {
     const tableName = table.dataset.selectableTable || '';
@@ -1157,6 +1218,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNamedGuestSaveFeedback();
   initPredictionsAutosave();
   initAdminActualsUnsavedState();
+  initAdminSeasonMutationConfirmation();
   initAdminInputTables();
   initAdminLineupHistoryEditors();
   initSignupPasswordMatch();

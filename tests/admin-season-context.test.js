@@ -1,6 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { assertSeasonMutationAllowed, listAdminSeasons, resolveAdminSeasonContext } = require("../src/admin-season-context");
+const {
+  assertSeasonMutationAllowed,
+  listAdminSeasons,
+  readSeasonMutationFlags,
+  resolveAdminSeasonContext
+} = require("../src/admin-season-context");
 
 function buildDb() {
   const seasons = [
@@ -68,4 +73,18 @@ test("lifecycle mutation guard distinguishes preparation, active, and historical
   assert.doesNotThrow(() => assertSeasonMutationAllowed(active));
   assert.throws(() => assertSeasonMutationAllowed(archived), /read-only/);
   assert.doesNotThrow(() => assertSeasonMutationAllowed(archived, { historicalCorrection: true }));
+});
+
+test("season mutation flags require explicit request values", () => {
+  assert.deepEqual(readSeasonMutationFlags({ body: {} }), {
+    historicalCorrection: false,
+    preparation: false
+  });
+  assert.deepEqual(readSeasonMutationFlags({ body: {
+    historical_correction: "1",
+    preparation_confirmed: "1"
+  } }), {
+    historicalCorrection: true,
+    preparation: true
+  });
 });

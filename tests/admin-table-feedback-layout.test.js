@@ -38,6 +38,17 @@ test("team lineup overview explains periods before the team toolbar", () => {
   assert.doesNotMatch(view, /admin-inputs-lineup-form/);
 });
 
+test("inputs exposes shared historical confirmation and advanced data states", () => {
+  const view = readView("admin_inputs.ejs");
+  assert.match(view, /data-admin-season-policy/);
+  assert.match(view, /data-admin-history-dialog/);
+  assert.match(view, /data-season-mutation/);
+  assert.match(view, /assignment_history/);
+  assert.match(view, /data_quality/);
+  const navigation = view.slice(view.indexOf('<nav class="admin-inputs-tabs"'), view.indexOf('</nav>') + 6);
+  assert.doesNotMatch(navigation, /assignments/);
+});
+
 test("shared table styles define header and first-row boundaries", () => {
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
   assert.match(styles, /admin-feedback-context/);

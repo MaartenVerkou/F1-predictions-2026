@@ -14,7 +14,18 @@ const REQUIRED_ADMIN_INPUT_KEYS = [
   "save_race",
   "save_assignment",
   "save_alias",
-  "save_provider"
+  "save_provider",
+  "assignment_history",
+  "back_to_teams",
+  "data_quality",
+  "archived_policy_title",
+  "archived_policy_help",
+  "planned_policy_title",
+  "planned_policy_help",
+  "historical_dialog_title",
+  "historical_dialog_help",
+  "historical_dialog_confirm",
+  "cancel"
 ];
 
 test("all admin input locales explain each save action", () => {
