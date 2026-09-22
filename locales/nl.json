@@ -107,6 +107,7 @@
     "assignment_history": "Opstellingshistorie",
     "back_to_teams": "Teams",
     "data_quality": "Datakwaliteit",
+    "archived_policy_short": "Bevestig vóór opslaan van archiefwijzigingen.",
     "archived_policy_title": "Seizoen {season} is gearchiveerd",
     "archived_policy_help": "Wijzigingen zijn standaard geblokkeerd. Bij opslaan volgt bevestiging van een historische correctie.",
     "planned_policy_title": "Seizoen {season} is gepland",

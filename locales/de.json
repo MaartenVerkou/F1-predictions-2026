@@ -564,6 +564,7 @@
     "assignment_history": "Aufstellungshistorie",
     "back_to_teams": "Teams",
     "data_quality": "Datenqualität",
+    "archived_policy_short": "Vor dem Speichern archivierter Änderungen bestätigen.",
     "archived_policy_title": "Saison {season} ist archiviert",
     "archived_policy_help": "Änderungen sind standardmäßig gesperrt. Beim Speichern wird eine Bestätigung der historischen Korrektur geöffnet.",
     "planned_policy_title": "Saison {season} ist geplant",

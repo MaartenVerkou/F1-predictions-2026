@@ -13,17 +13,15 @@
       <select id="admin-inputs-season" name="season" onchange="this.form.submit()">
         <% (availableSeasons || []).forEach((availableSeason) => { %>
           <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>>
-            <%= availableSeason.label %> · <%= availableSeason.statusLabel %>
+            <%= availableSeason.label %><% if (availableSeason.status !== 'active') { %> · <%= availableSeason.statusLabel %><% } %>
           </option>
         <% }) %>
       </select>
+      <% if (seasonContext?.status === 'archived') { %>
+        <span class="admin-season-policy-flat" data-admin-season-policy data-season-status="archived"><%= t('admin_inputs.archived_policy_short') %></span>
+      <% } %>
       <input type="hidden" name="tab" value="<%= tab %>" />
     </form>
-  </div>
-
-  <div class="admin-season-policy <%= seasonContext?.status === 'archived' ? 'is-archived' : '' %>" data-admin-season-policy data-season-status="<%= seasonContext?.status || '' %>" <%= ['archived', 'planned'].includes(seasonContext?.status) ? '' : 'hidden' %>>
-    <strong><%= seasonContext?.status === 'archived' ? t('admin_inputs.archived_policy_title', { season }) : t('admin_inputs.planned_policy_title', { season }) %></strong>
-    <span><%= seasonContext?.status === 'archived' ? t('admin_inputs.archived_policy_help') : t('admin_inputs.planned_policy_help') %></span>
   </div>
 
   <dialog class="admin-history-dialog" data-admin-history-dialog aria-labelledby="admin-history-dialog-title">
@@ -50,25 +48,6 @@
         <% if (query?.success) { %><div class="alert success" role="status"><%= query.success %></div><% } %>
       </div>
     <% } %>
-    <% const seasonImpact = catalog.impact || {}; const hasImpactSummary = Number(seasonImpact.evidenceSnapshots || 0) > 0 || Number(seasonImpact.actualSnapshots || 0) > 0 || Number(seasonImpact.actualValues || 0) > 0; %>
-    <div class="admin-inputs-summary" aria-label="<%= catalog.season.year %> season summary">
-      <div class="admin-inputs-season-meta">
-        <strong><%= catalog.season.year %></strong>
-        <% if (!['archived', 'planned'].includes(catalog.season.status)) { %>
-          <span class="admin-inputs-status admin-inputs-status--<%= catalog.season.status %>"><%= catalog.season.status %></span>
-        <% } %>
-      </div>
-      <div class="admin-inputs-counts muted">
-        <span><%= t('admin_inputs.driver_count', { count: catalog.drivers.length }) %></span>
-        <span><%= t('admin_inputs.team_count', { count: catalog.teams.length }) %></span>
-        <span><%= t('admin_inputs.race_count', { count: catalog.races.length }) %></span>
-        <span><%= t('admin_inputs.assignment_count', { count: catalog.assignments.length }) %></span>
-      </div>
-    </div>
-    <% if (hasImpactSummary) { %>
-      <p class="muted admin-inputs-impact"><%= t('admin_inputs.impact_summary', { evidence: seasonImpact.evidenceSnapshots || 0, snapshots: seasonImpact.actualSnapshots || 0, values: seasonImpact.actualValues || 0 }) %></p>
-    <% } %>
-
     <nav class="admin-inputs-tabs" aria-label="<%= t('admin_inputs.tabs') %>">
       <% ['drivers', 'teams', 'races'].forEach((name) => { %>
         <a class="admin-race-data-tab <%= tab === name ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=<%= name %>">

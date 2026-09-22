@@ -18,6 +18,7 @@ const REQUIRED_ADMIN_INPUT_KEYS = [
   "assignment_history",
   "back_to_teams",
   "data_quality",
+  "archived_policy_short",
   "archived_policy_title",
   "archived_policy_help",
   "planned_policy_title",
