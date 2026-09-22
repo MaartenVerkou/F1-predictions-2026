@@ -37,6 +37,20 @@ test("team lineup overview keeps the toolbar concise", () => {
   assert.doesNotMatch(view, /admin-inputs-lineup-form/);
 });
 
+test("drivers table shows profile metadata without duplicating team assignments", () => {
+  const view = readView("admin_inputs.ejs");
+  const start = view.indexOf('admin-inputs-driver-table');
+  const end = view.indexOf('data-selectable-table="teams"');
+  const driversView = view.slice(start, end);
+  assert.match(driversView, /admin-inputs-driver-table/);
+  assert.match(driversView, /driver_code/);
+  assert.match(driversView, /nationality_code/);
+  assert.match(driversView, /date_of_birth/);
+  assert.match(driversView, /driver\.age/);
+  assert.doesNotMatch(driversView, /assignment\?\.team_name/);
+  assert.match(driversView, /colspan="5"/);
+});
+
 test("inputs exposes shared historical confirmation and advanced data states", () => {
   const view = readView("admin_inputs.ejs");
   assert.match(view, /data-admin-season-policy/);

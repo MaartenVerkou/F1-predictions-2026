@@ -2583,6 +2583,17 @@ button:disabled {
   font-size: 13px;
 }
 
+.admin-inputs-driver-table {
+  min-width: 620px;
+  table-layout: fixed;
+}
+
+.admin-inputs-driver-table .admin-inputs-driver-col-number { width: 8%; }
+.admin-inputs-driver-table .admin-inputs-driver-col-name { width: 38%; }
+.admin-inputs-driver-table .admin-inputs-driver-col-code { width: 15%; }
+.admin-inputs-driver-table .admin-inputs-driver-col-nationality { width: 21%; }
+.admin-inputs-driver-table .admin-inputs-driver-col-age { width: 18%; }
+
 .admin-inputs-table th,
 .admin-inputs-table td {
   padding: 8px 10px;

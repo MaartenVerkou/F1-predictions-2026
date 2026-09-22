@@ -2637,7 +2637,13 @@ function registerAdminRoutes(app, deps) {
       if (entityType === "driver") {
         const row = catalog.drivers.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Driver is not part of this season.");
-        upsertDriver(db, { slug: row.slug, displayName });
+        upsertDriver(db, {
+          slug: row.slug,
+          displayName,
+          driverCode: req.body.driver_code,
+          nationalityCode: req.body.nationality_code,
+          dateOfBirth: req.body.date_of_birth
+        });
         upsertSeasonDriver(db, {
           seasonId: catalog.season.id,
           driverId: entityId,
@@ -2775,6 +2781,9 @@ function registerAdminRoutes(app, deps) {
     const displayName = String(req.body.display_name || "").trim();
     const slug = String(req.body.slug || "").trim();
     const driverNumber = String(req.body.driver_number || "").trim() || null;
+    const driverCode = req.body.driver_code;
+    const nationalityCode = req.body.nationality_code;
+    const dateOfBirth = req.body.date_of_birth;
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
@@ -2782,7 +2791,10 @@ function registerAdminRoutes(app, deps) {
       if (!catalog.season || !displayName) throw new Error("A season and driver name are required.");
       const driverId = upsertDriver(db, {
         slug: slug || displayName,
-        displayName
+        displayName,
+        driverCode,
+        nationalityCode,
+        dateOfBirth
       });
       upsertSeasonDriver(db, {
         seasonId: catalog.season.id,

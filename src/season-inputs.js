@@ -45,6 +45,59 @@ function normalizeDriverNumber(value) {
   return String(number);
 }
 
+function normalizeDriverCode(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const code = String(value).trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(code)) throw new Error("Driver code must contain exactly three letters.");
+  return code;
+}
+
+function normalizeNationalityCode(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const code = String(value).trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) throw new Error("Nationality code must contain exactly two letters.");
+  return code;
+}
+
+function parseIsoDate(value) {
+  const match = String(value || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+    ? date
+    : null;
+}
+
+function normalizeDateOfBirth(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const date = parseIsoDate(value);
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(String(value).trim())) {
+    throw new Error("Date of birth must be a valid date in YYYY-MM-DD format.");
+  }
+  return String(value).trim();
+}
+
+function calculateDriverAge(dateOfBirth, referenceDate) {
+  const birth = parseIsoDate(dateOfBirth);
+  const reference = parseIsoDate(referenceDate);
+  if (!birth || !reference || birth > reference) return null;
+  let age = reference.getUTCFullYear() - birth.getUTCFullYear();
+  const birthdayHasPassed = reference.getUTCMonth() > birth.getUTCMonth()
+    || (reference.getUTCMonth() === birth.getUTCMonth() && reference.getUTCDate() >= birth.getUTCDate());
+  if (!birthdayHasPassed) age -= 1;
+  return age >= 0 ? age : null;
+}
+
+function seasonAgeReferenceDate(year, races = []) {
+  const firstScheduledRace = races.find((race) => parseIsoDate(race.scheduled_date));
+  return firstScheduledRace?.scheduled_date
+    ? String(firstScheduledRace.scheduled_date).slice(0, 10)
+    : `${Number(year)}-01-01`;
+}
+
 function driverNumberForSort(value) {
   const safeValue = String(value ?? "").trim();
   if (!/^\d+$/.test(safeValue)) return null;
@@ -90,7 +143,8 @@ function ensureSeasonInputsSchema(db) {
     );
     CREATE TABLE IF NOT EXISTS drivers (
       id ${identityType}, slug TEXT NOT NULL UNIQUE, given_name TEXT NOT NULL,
-      family_name TEXT NOT NULL, display_name TEXT NOT NULL,
+      family_name TEXT NOT NULL, display_name TEXT NOT NULL, driver_code TEXT,
+      nationality_code TEXT, date_of_birth TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS teams (
@@ -156,6 +210,9 @@ function ensureSeasonInputsSchema(db) {
   addColumnIfMissing("season_teams", "order_basis", "TEXT NOT NULL DEFAULT 'manual'");
   addColumnIfMissing("driver_team_assignments", "seat_number", "INTEGER NOT NULL DEFAULT 1");
   addColumnIfMissing("races", "scheduled_timezone", "TEXT");
+  addColumnIfMissing("drivers", "driver_code", "TEXT");
+  addColumnIfMissing("drivers", "nationality_code", "TEXT");
+  addColumnIfMissing("drivers", "date_of_birth", "TEXT");
 
   if (hasColumn("season_drivers", "active")) {
     db.exec(
@@ -186,19 +243,31 @@ function createOrGetSeason(db, { year, label = String(year), status = "active", 
   return { id: Number(result.lastInsertRowid), year: Number(year), label: String(label), status: String(status) };
 }
 
-function upsertDriver(db, { slug, displayName, givenName, familyName, now = new Date().toISOString() }) {
+function upsertDriver(db, {
+  slug,
+  displayName,
+  givenName,
+  familyName,
+  driverCode,
+  nationalityCode,
+  dateOfBirth,
+  now = new Date().toISOString()
+}) {
   const safeName = String(displayName || `${givenName || ""} ${familyName || ""}`).trim();
   const parts = splitDisplayName(safeName);
   const safeSlug = slugify(slug || safeName);
-  const existing = db.prepare("SELECT id FROM drivers WHERE slug = ? LIMIT 1").get(safeSlug);
+  const existing = db.prepare("SELECT id, driver_code, nationality_code, date_of_birth FROM drivers WHERE slug = ? LIMIT 1").get(safeSlug);
+  const nextDriverCode = driverCode === undefined ? existing?.driver_code || null : normalizeDriverCode(driverCode);
+  const nextNationalityCode = nationalityCode === undefined ? existing?.nationality_code || null : normalizeNationalityCode(nationalityCode);
+  const nextDateOfBirth = dateOfBirth === undefined ? existing?.date_of_birth || null : normalizeDateOfBirth(dateOfBirth);
   if (existing) {
-    db.prepare("UPDATE drivers SET given_name = ?, family_name = ?, display_name = ?, updated_at = ? WHERE id = ?")
-      .run(givenName || parts.givenName, familyName || parts.familyName, safeName, now, Number(existing.id));
+    db.prepare("UPDATE drivers SET given_name = ?, family_name = ?, display_name = ?, driver_code = ?, nationality_code = ?, date_of_birth = ?, updated_at = ? WHERE id = ?")
+      .run(givenName || parts.givenName, familyName || parts.familyName, safeName, nextDriverCode, nextNationalityCode, nextDateOfBirth, now, Number(existing.id));
     return Number(existing.id);
   }
   const result = db.prepare(
-    "INSERT INTO drivers (slug, given_name, family_name, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(safeSlug, givenName || parts.givenName, familyName || parts.familyName, safeName, now, now);
+    "INSERT INTO drivers (slug, given_name, family_name, display_name, driver_code, nationality_code, date_of_birth, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(safeSlug, givenName || parts.givenName, familyName || parts.familyName, safeName, nextDriverCode, nextNationalityCode, nextDateOfBirth, now, now);
   return Number(result.lastInsertRowid);
 }
 
@@ -412,11 +481,15 @@ function listSeasonInputs(db, year) {
   const seasonId = Number(season.id);
   const assignments = db.prepare("SELECT a.*, d.display_name AS driver_name, t.display_name AS team_name, st.display_order FROM driver_team_assignments a JOIN drivers d ON d.id = a.driver_id JOIN teams t ON t.id = a.team_id LEFT JOIN season_teams st ON st.season_id = a.season_id AND st.team_id = a.team_id WHERE a.season_id = ? ORDER BY COALESCE(st.display_order, 9999), a.seat_number, a.from_round, d.display_name").all(seasonId);
   assertAssignmentIntervals(assignments);
+  const races = db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId);
+  const ageReferenceDate = seasonAgeReferenceDate(season.year, races);
+  const drivers = sortSeasonDrivers(db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.id").all(seasonId))
+    .map((driver) => ({ ...driver, age: calculateDriverAge(driver.date_of_birth, ageReferenceDate) }));
   return {
     season: { ...season, id: seasonId, year: Number(season.year) },
-    drivers: sortSeasonDrivers(db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.id").all(seasonId)),
+    drivers,
     teams: db.prepare("SELECT t.*, st.display_name_override, st.display_order, st.order_basis FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? ORDER BY COALESCE(st.display_order, 9999), t.display_name").all(seasonId),
-    races: db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId),
+    races,
     assignments,
     unresolved: []
   };
@@ -468,6 +541,11 @@ module.exports = {
   listSeasonMappings,
   normalizeEntityKey,
   normalizeDriverNumber,
+  normalizeDriverCode,
+  normalizeNationalityCode,
+  normalizeDateOfBirth,
+  calculateDriverAge,
+  seasonAgeReferenceDate,
   parseReference,
   removeSeasonMembership,
   referenceFor,

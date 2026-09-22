@@ -98,7 +98,15 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
 
     const driverIds = new Map();
     for (const driverName of roster.drivers || []) {
-      const id = upsertDriver(db, { displayName: driverName, slug: slugify(driverName), now });
+      const profile = roster.driver_profiles?.[driverName] || {};
+      const id = upsertDriver(db, {
+        displayName: driverName,
+        slug: slugify(driverName),
+        driverCode: profile.driver_code,
+        nationalityCode: profile.nationality_code,
+        dateOfBirth: profile.date_of_birth,
+        now
+      });
       driverIds.set(driverName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, alias: driverName, source: "seed", now });
       addProviderReference(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, provider: "jolpica", providerKey: providerKeyForDriver(driverName), providerLabel: driverName, now });

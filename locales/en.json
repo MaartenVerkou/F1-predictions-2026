@@ -103,6 +103,10 @@
     ,"add_driver": "Add driver"
     ,"driver_name": "Driver name"
     ,"driver_number": "Driver number"
+    ,"driver_code": "Code"
+    ,"nationality": "Nationality"
+    ,"date_of_birth": "Date of birth"
+    ,"age": "Age"
     ,"optional": "Optional"
     ,"empty_seat": "Empty seat"
     ,"save_lineup": "Save lineup",

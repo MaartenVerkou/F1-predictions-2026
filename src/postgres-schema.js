@@ -163,6 +163,9 @@ CREATE TABLE IF NOT EXISTS drivers (
   given_name TEXT NOT NULL,
   family_name TEXT NOT NULL,
   display_name TEXT NOT NULL,
+  driver_code TEXT,
+  nationality_code TEXT,
+  date_of_birth TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -404,6 +407,9 @@ CREATE INDEX IF NOT EXISTS idx_admin_ideas_status_updated
 
 function ensurePostgresSchema(db) {
   db.exec(POSTGRES_SCHEMA_SQL);
+  db.exec("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS driver_code TEXT");
+  db.exec("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS nationality_code TEXT");
+  db.exec("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS date_of_birth TEXT");
 }
 
 module.exports = {
