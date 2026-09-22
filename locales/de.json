@@ -553,7 +553,7 @@
     "optional": "Optional",
     "empty_seat": "Leerer Sitz",
     "save_lineup": "Line-up speichern",
-    "advanced_team_settings": "Erweiterte Teamidentität und Reihenfolge",
+    "team_settings": "Teameinstellungen",
     "historical_warning": "Für diese Runde sind bereits Quelldaten oder geprüfte Ist-Ergebnisse vorhanden. Das Speichern ändert die kanonische Line-up für diese und folgende Runden.",
     "historical_confirm": "Ich verstehe, dass dies eine historische Korrektur ist."
   },

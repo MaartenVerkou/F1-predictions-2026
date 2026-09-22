@@ -553,7 +553,7 @@
     "optional": "Facultatif",
     "empty_seat": "Siège vide",
     "save_lineup": "Enregistrer la composition",
-    "advanced_team_settings": "Identité et ordre avancés de l'équipe",
+    "team_settings": "Paramètres de l'équipe",
     "historical_warning": "Cette manche contient déjà des données importées ou des résultats vérifiés. L'enregistrement modifie la composition canonique pour cette manche et les suivantes.",
     "historical_confirm": "Je comprends qu'il s'agit d'une correction historique."
   },

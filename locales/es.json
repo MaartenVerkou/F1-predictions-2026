@@ -553,7 +553,7 @@
     "optional": "Opcional",
     "empty_seat": "Asiento vacío",
     "save_lineup": "Guardar alineación",
-    "advanced_team_settings": "Identidad y orden avanzados del equipo",
+    "team_settings": "Configuración del equipo",
     "historical_warning": "Esta ronda ya tiene datos importados o resultados revisados. Guardar cambia la alineación canónica para esta ronda y las siguientes.",
     "historical_confirm": "Entiendo que esto es una corrección histórica."
   },

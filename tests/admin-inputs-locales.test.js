@@ -9,6 +9,7 @@ const REQUIRED_ADMIN_INPUT_KEYS = [
   "remove",
   "move_up",
   "move_down",
+  "team_settings",
   "save_driver",
   "save_team",
   "save_race",
