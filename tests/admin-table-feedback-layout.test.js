@@ -23,14 +23,16 @@ test("admin feedback uses the shared context wrapper", () => {
   }
 });
 
-test("historical lineup warning is above the team toolbar", () => {
+test("team lineup overview explains periods before the team toolbar", () => {
   const view = readView("admin_inputs.ejs");
-  const warning = view.indexOf("admin-inputs-history-warning");
+  const help = view.indexOf("admin-inputs-lineup-help");
   const toolbar = view.indexOf('data-table-toolbar="teams"');
-  assert.ok(warning >= 0);
+  assert.ok(help >= 0);
   assert.ok(toolbar >= 0);
-  assert.ok(warning < toolbar, "warning should not interrupt the toolbar/table gap");
-  assert.match(view.slice(warning, toolbar), /form="admin-inputs-lineup-form"/);
+  assert.ok(help < toolbar, "lineup guidance should stay above the toolbar");
+  assert.match(view, /data-lineup-history-form/);
+  assert.doesNotMatch(view, /admin-inputs-lineup-round-form/);
+  assert.doesNotMatch(view, /admin-inputs-lineup-form/);
 });
 
 test("shared table styles define header and first-row boundaries", () => {
