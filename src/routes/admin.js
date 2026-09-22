@@ -3260,6 +3260,7 @@ function registerAdminRoutes(app, deps) {
       selectedSnapshotMeta,
       pendingReviewTargets,
       requiresPastUnlock,
+      allowPastEdit,
       isFutureRaceTarget,
       hasDraft: Boolean(draftActuals),
       saveError,

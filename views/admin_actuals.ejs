@@ -12,6 +12,7 @@ const targetTimingLabel = (target) => {
   if (target.timing === 'future') return t('admin_actuals.timing_future');
   return t('admin_actuals.timing_current_race');
 };
+const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === 'archived' && allowPastEdit && selectedRaceTarget);
 %>
 
 <div class="card admin-page-card admin-actuals-page">
@@ -78,7 +79,7 @@ const targetTimingLabel = (target) => {
     <% } %>
   </div>
 
-  <% if (actualsTarget === 'current') { %>
+  <% if (actualsTarget === 'current' && seasonContext?.syncable) { %>
     <div class="admin-actions admin-actuals-actions">
       <form method="post" action="/admin/actuals/autofill-current-season" class="admin-inline-form">
     <%- csrfField() %>
@@ -116,7 +117,7 @@ const targetTimingLabel = (target) => {
       'closest_qualifying_teammates'
     ]); %>
     <% const multiActualDriverFieldIds = new Set(['lowest_grid_win_position']); %>
-    <fieldset class="admin-fieldset-reset" <%= requiresPastUnlock ? 'disabled' : '' %>>
+    <fieldset class="admin-fieldset-reset" <%= (requiresPastUnlock || seasonReadOnly) ? 'disabled' : '' %>>
 
     <% questions.forEach(question => { 
       const sourceOptions = sourceOptionsFor(question);
