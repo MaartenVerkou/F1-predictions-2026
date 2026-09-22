@@ -46,7 +46,7 @@
       "Sao Paulo Grand Prix": { "start": "2026-11-08T18:00:00Z", "timezone": "America/Sao_Paulo" },
       "Las Vegas Grand Prix": { "start": "2026-11-22T04:00:00Z", "timezone": "America/Los_Angeles" },
       "Qatar Grand Prix": { "start": "2026-11-29T16:00:00Z", "timezone": "Asia/Qatar" },
-      "Abu Dhabi Grand Prix": { "start": "2026-12-06T13:00:00Z", "timezone": "Asia/Abu_Dhabi" }
+      "Abu Dhabi Grand Prix": { "start": "2026-12-06T13:00:00Z", "timezone": "Asia/Dubai" }
     }
   }
 }
