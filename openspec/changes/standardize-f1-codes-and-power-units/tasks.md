@@ -12,4 +12,4 @@
 ## 3. Verification and preview
 
 - [x] 3.1 Add normalization, migration, persistence, locale, and seeded power-unit tests.
-- [ ] 3.2 Run syntax checks, full tests, strict OpenSpec validation, rebuild and seed the isolated preview, verify teams/drivers in the UI, and confirm production health/data remain unchanged.
+- [x] 3.2 Run syntax checks, full tests, strict OpenSpec validation, rebuild and seed the isolated preview, verify teams/drivers in the UI, and confirm production health/data remain unchanged.
