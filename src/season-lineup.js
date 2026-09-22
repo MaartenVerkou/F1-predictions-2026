@@ -160,10 +160,15 @@ function normalizeTeamHistoryPeriods({ teamId, seatNumber, periods = [], driverI
       id,
       seasonId: null,
       driverId,
+      driver_id: driverId,
       teamId: Number(teamId),
+      team_id: Number(teamId),
       seatNumber: Number(seatNumber),
+      seat_number: Number(seatNumber),
       fromRound,
-      toRound
+      from_round: fromRound,
+      toRound,
+      to_round: toRound
     };
   }).filter(Boolean);
 }
