@@ -26,5 +26,5 @@
 ## 5. Verification and preview
 
 - [x] 5.1 Run syntax, focused tests, and the full Node 22 test suite; validate OpenSpec strictly.
-- [ ] 5.2 Rebuild the sanitized preview from the exact feature commit and verify `/healthz` reports PostgreSQL.
-- [ ] 5.3 Verify archived 2025 cancellation/confirmation and active 2026 lineup/mapping flows in the preview browser; leave production unchanged.
+- [x] 5.2 Rebuild the sanitized preview from the exact feature commit and verify `/healthz` reports PostgreSQL.
+- [x] 5.3 Verify archived 2025 cancellation/confirmation and active 2026 lineup/mapping flows in the preview browser; leave production unchanged.
