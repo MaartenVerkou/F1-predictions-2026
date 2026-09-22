@@ -54,7 +54,9 @@
     <div class="admin-inputs-summary" aria-label="<%= catalog.season.year %> season summary">
       <div class="admin-inputs-season-meta">
         <strong><%= catalog.season.year %></strong>
-        <span class="admin-inputs-status admin-inputs-status--<%= catalog.season.status %>"><%= catalog.season.status %></span>
+        <% if (!['archived', 'planned'].includes(catalog.season.status)) { %>
+          <span class="admin-inputs-status admin-inputs-status--<%= catalog.season.status %>"><%= catalog.season.status %></span>
+        <% } %>
       </div>
       <div class="admin-inputs-counts muted">
         <span><%= t('admin_inputs.driver_count', { count: catalog.drivers.length }) %></span>
