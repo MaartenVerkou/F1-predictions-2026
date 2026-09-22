@@ -80,6 +80,29 @@ function normalizeDateOfBirth(value) {
   return String(value).trim();
 }
 
+function normalizeEntityCode(value, label) {
+  if (value == null || String(value).trim() === "") return null;
+  const code = String(value).trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,8}$/.test(code)) throw new Error(`${label} must contain 2-8 letters or numbers.`);
+  return code;
+}
+
+function normalizeCountryCode(value, label = "Country code") {
+  if (value == null || String(value).trim() === "") return null;
+  const code = String(value).trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) throw new Error(`${label} must contain exactly two letters.`);
+  return code;
+}
+
+function normalizeF1EntryYear(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const year = Number(String(value).trim());
+  if (!Number.isInteger(year) || year < 1950 || year > 2200) {
+    throw new Error("F1 entry season must be a four-digit year from 1950 onward.");
+  }
+  return year;
+}
+
 function calculateDriverAge(dateOfBirth, referenceDate) {
   const birth = parseIsoDate(dateOfBirth);
   const reference = parseIsoDate(referenceDate);
@@ -162,12 +185,13 @@ function ensureSeasonInputsSchema(db) {
     );
     CREATE TABLE IF NOT EXISTS teams (
       id ${identityType}, slug TEXT NOT NULL UNIQUE, display_name TEXT NOT NULL,
-      short_name TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+      short_name TEXT, team_code TEXT, base_country_code TEXT, f1_entry_year INTEGER,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS races (
       id ${identityType}, season_id INTEGER NOT NULL, round_number INTEGER NOT NULL,
       slug TEXT NOT NULL, display_name TEXT NOT NULL, scheduled_date TEXT,
-      scheduled_timezone TEXT,
+      scheduled_timezone TEXT, race_code TEXT, country_code TEXT, circuit_name TEXT,
       calendar_state TEXT NOT NULL DEFAULT 'scheduled', created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
       UNIQUE(season_id, round_number), UNIQUE(season_id, slug)
     );
@@ -223,6 +247,12 @@ function ensureSeasonInputsSchema(db) {
   addColumnIfMissing("season_teams", "order_basis", "TEXT NOT NULL DEFAULT 'manual'");
   addColumnIfMissing("driver_team_assignments", "seat_number", "INTEGER NOT NULL DEFAULT 1");
   addColumnIfMissing("races", "scheduled_timezone", "TEXT");
+  addColumnIfMissing("teams", "team_code", "TEXT");
+  addColumnIfMissing("teams", "base_country_code", "TEXT");
+  addColumnIfMissing("teams", "f1_entry_year", "INTEGER");
+  addColumnIfMissing("races", "race_code", "TEXT");
+  addColumnIfMissing("races", "country_code", "TEXT");
+  addColumnIfMissing("races", "circuit_name", "TEXT");
   addColumnIfMissing("drivers", "driver_code", "TEXT");
   addColumnIfMissing("drivers", "nationality_code", "TEXT");
   addColumnIfMissing("drivers", "date_of_birth", "TEXT");
@@ -284,31 +314,37 @@ function upsertDriver(db, {
   return Number(result.lastInsertRowid);
 }
 
-function upsertTeam(db, { slug, displayName, shortName = null, now = new Date().toISOString() }) {
+function upsertTeam(db, { slug, displayName, shortName = null, teamCode, baseCountryCode, f1EntryYear, now = new Date().toISOString() }) {
   const safeName = String(displayName || "").trim();
   const safeSlug = slugify(slug || safeName);
-  const existing = db.prepare("SELECT id FROM teams WHERE slug = ? LIMIT 1").get(safeSlug);
+  const existing = db.prepare("SELECT id, team_code, base_country_code, f1_entry_year FROM teams WHERE slug = ? LIMIT 1").get(safeSlug);
+  const nextTeamCode = teamCode === undefined ? existing?.team_code || null : normalizeEntityCode(teamCode, "Team code");
+  const nextBaseCountryCode = baseCountryCode === undefined ? existing?.base_country_code || null : normalizeCountryCode(baseCountryCode, "Base country code");
+  const nextF1EntryYear = f1EntryYear === undefined ? existing?.f1_entry_year || null : normalizeF1EntryYear(f1EntryYear);
   if (existing) {
-    db.prepare("UPDATE teams SET display_name = ?, short_name = ?, updated_at = ? WHERE id = ?")
-      .run(safeName, shortName, now, Number(existing.id));
+    db.prepare("UPDATE teams SET display_name = ?, short_name = ?, team_code = ?, base_country_code = ?, f1_entry_year = ?, updated_at = ? WHERE id = ?")
+      .run(safeName, shortName, nextTeamCode, nextBaseCountryCode, nextF1EntryYear, now, Number(existing.id));
     return Number(existing.id);
   }
   const result = db.prepare(
-    "INSERT INTO teams (slug, display_name, short_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
-  ).run(safeSlug, safeName, shortName, now, now);
+    "INSERT INTO teams (slug, display_name, short_name, team_code, base_country_code, f1_entry_year, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(safeSlug, safeName, shortName, nextTeamCode, nextBaseCountryCode, nextF1EntryYear, now, now);
   return Number(result.lastInsertRowid);
 }
 
-function upsertRace(db, { seasonId, roundNumber, slug, displayName, scheduledDate = null, scheduledTimezone = null, calendarState = "scheduled", now = new Date().toISOString() }) {
-  const existing = db.prepare("SELECT id FROM races WHERE season_id = ? AND round_number = ? LIMIT 1").get(Number(seasonId), Number(roundNumber));
+function upsertRace(db, { seasonId, roundNumber, slug, displayName, scheduledDate = null, scheduledTimezone = null, raceCode, countryCode, circuitName, calendarState = "scheduled", now = new Date().toISOString() }) {
+  const existing = db.prepare("SELECT id, race_code, country_code, circuit_name FROM races WHERE season_id = ? AND round_number = ? LIMIT 1").get(Number(seasonId), Number(roundNumber));
+  const nextRaceCode = raceCode === undefined ? existing?.race_code || null : normalizeEntityCode(raceCode, "Race code");
+  const nextCountryCode = countryCode === undefined ? existing?.country_code || null : normalizeCountryCode(countryCode);
+  const nextCircuitName = circuitName === undefined ? existing?.circuit_name || null : (String(circuitName || "").trim() || null);
   if (existing) {
-    db.prepare("UPDATE races SET slug = ?, display_name = ?, scheduled_date = ?, scheduled_timezone = ?, calendar_state = ?, updated_at = ? WHERE id = ?")
-      .run(String(slug), String(displayName), scheduledDate, scheduledTimezone, String(calendarState), now, Number(existing.id));
+    db.prepare("UPDATE races SET slug = ?, display_name = ?, scheduled_date = ?, scheduled_timezone = ?, race_code = ?, country_code = ?, circuit_name = ?, calendar_state = ?, updated_at = ? WHERE id = ?")
+      .run(String(slug), String(displayName), scheduledDate, scheduledTimezone, nextRaceCode, nextCountryCode, nextCircuitName, String(calendarState), now, Number(existing.id));
     return Number(existing.id);
   }
   const result = db.prepare(
-    "INSERT INTO races (season_id, round_number, slug, display_name, scheduled_date, scheduled_timezone, calendar_state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(Number(seasonId), Number(roundNumber), String(slug), String(displayName), scheduledDate, scheduledTimezone, String(calendarState), now, now);
+    "INSERT INTO races (season_id, round_number, slug, display_name, scheduled_date, scheduled_timezone, race_code, country_code, circuit_name, calendar_state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(Number(seasonId), Number(roundNumber), String(slug), String(displayName), scheduledDate, scheduledTimezone, nextRaceCode, nextCountryCode, nextCircuitName, String(calendarState), now, now);
   return Number(result.lastInsertRowid);
 }
 
@@ -558,6 +594,9 @@ module.exports = {
   normalizeDriverCode,
   normalizeNationalityCode,
   normalizeDateOfBirth,
+  normalizeEntityCode,
+  normalizeCountryCode,
+  normalizeF1EntryYear,
   calculateDriverAge,
   deriveRaceCalendarStatus,
   seasonAgeReferenceDate,

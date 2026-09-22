@@ -64,6 +64,9 @@ function copySeason(db, sourceSeason, targetSeason, status, { replacement = fals
       displayName: row.display_name,
       scheduledDate: calendar[row.display_name]?.start || null,
       scheduledTimezone: calendar[row.display_name]?.timezone || null,
+      raceCode: calendar[row.display_name]?.code || row.race_code,
+      countryCode: calendar[row.display_name]?.country_code || row.country_code,
+      circuitName: calendar[row.display_name]?.circuit || row.circuit_name,
       calendarState: row.calendar_state,
       now
     });

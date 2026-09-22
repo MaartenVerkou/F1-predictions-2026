@@ -175,6 +175,9 @@ CREATE TABLE IF NOT EXISTS teams (
   slug TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
   short_name TEXT,
+  team_code TEXT,
+  base_country_code TEXT,
+  f1_entry_year INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -187,6 +190,9 @@ CREATE TABLE IF NOT EXISTS races (
   display_name TEXT NOT NULL,
   scheduled_date TEXT,
   scheduled_timezone TEXT,
+  race_code TEXT,
+  country_code TEXT,
+  circuit_name TEXT,
   calendar_state TEXT NOT NULL DEFAULT 'scheduled',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -410,6 +416,12 @@ function ensurePostgresSchema(db) {
   db.exec("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS driver_code TEXT");
   db.exec("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS nationality_code TEXT");
   db.exec("ALTER TABLE drivers ADD COLUMN IF NOT EXISTS date_of_birth TEXT");
+  db.exec("ALTER TABLE teams ADD COLUMN IF NOT EXISTS team_code TEXT");
+  db.exec("ALTER TABLE teams ADD COLUMN IF NOT EXISTS base_country_code TEXT");
+  db.exec("ALTER TABLE teams ADD COLUMN IF NOT EXISTS f1_entry_year INTEGER");
+  db.exec("ALTER TABLE races ADD COLUMN IF NOT EXISTS race_code TEXT");
+  db.exec("ALTER TABLE races ADD COLUMN IF NOT EXISTS country_code TEXT");
+  db.exec("ALTER TABLE races ADD COLUMN IF NOT EXISTS circuit_name TEXT");
 }
 
 module.exports = {

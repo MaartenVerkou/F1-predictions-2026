@@ -83,5 +83,18 @@
     "Racing Bulls",
     "Red Bull Racing",
     "Williams"
-  ]
+  ],
+  "team_profiles": {
+    "Alpine": {"team_code": "ALP", "base_country_code": "GB", "f1_entry_year": 2021},
+    "Aston Martin": {"team_code": "AMR", "base_country_code": "GB", "f1_entry_year": 2021},
+    "Audi": {"team_code": "AUD", "base_country_code": "CH", "f1_entry_year": 2026},
+    "Cadillac": {"team_code": "CAD", "base_country_code": "GB", "f1_entry_year": 2026},
+    "Ferrari": {"team_code": "FER", "base_country_code": "IT", "f1_entry_year": 1950},
+    "Haas F1 Team": {"team_code": "HAS", "base_country_code": "US", "f1_entry_year": 2016},
+    "McLaren": {"team_code": "MCL", "base_country_code": "GB", "f1_entry_year": 1966},
+    "Mercedes": {"team_code": "MER", "base_country_code": "GB", "f1_entry_year": 2010},
+    "Racing Bulls": {"team_code": "RB", "base_country_code": "IT", "f1_entry_year": 2006},
+    "Red Bull Racing": {"team_code": "RBR", "base_country_code": "GB", "f1_entry_year": 2005},
+    "Williams": {"team_code": "WIL", "base_country_code": "GB", "f1_entry_year": 1978}
+  }
 }

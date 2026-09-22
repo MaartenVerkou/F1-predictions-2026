@@ -88,7 +88,16 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
     const seasonRow = createOrGetSeason(db, { year: season, label: String(season), now });
     const teamIds = new Map();
     for (const teamName of roster.teams || []) {
-      const id = upsertTeam(db, { displayName: teamName, slug: slugify(teamName), shortName: teamName, now });
+      const teamProfile = roster.team_profiles?.[teamName] || {};
+      const id = upsertTeam(db, {
+        displayName: teamName,
+        slug: slugify(teamName),
+        shortName: teamName,
+        teamCode: teamProfile.team_code,
+        baseCountryCode: teamProfile.base_country_code,
+        f1EntryYear: teamProfile.f1_entry_year,
+        now
+      });
       teamIds.set(teamName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, alias: teamName, source: "seed", now });
       addProviderReference(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, provider: "jolpica", providerKey: slugify(teamName), providerLabel: teamName, now });
@@ -134,6 +143,9 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
         displayName: raceName,
         scheduledDate: calendar[raceName]?.start || null,
         scheduledTimezone: calendar[raceName]?.timezone || null,
+        raceCode: calendar[raceName]?.code,
+        countryCode: calendar[raceName]?.country_code,
+        circuitName: calendar[raceName]?.circuit,
         calendarState: "scheduled",
         now
       });

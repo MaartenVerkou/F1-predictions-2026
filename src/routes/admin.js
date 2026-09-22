@@ -2653,7 +2653,14 @@ function registerAdminRoutes(app, deps) {
       } else if (entityType === "team") {
         const row = catalog.teams.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Team is not part of this season.");
-        upsertTeam(db, { slug: row.slug, displayName, shortName: row.short_name });
+        upsertTeam(db, {
+          slug: row.slug,
+          displayName,
+          shortName: row.short_name,
+          teamCode: req.body.team_code,
+          baseCountryCode: req.body.base_country_code,
+          f1EntryYear: req.body.f1_entry_year
+        });
         const nextDisplayOrder = displayOrder == null ? Number(row.display_order || 0) : displayOrder;
         const orderBasis = requestedOrderBasis || row.order_basis || "manual";
         if (!Number.isInteger(nextDisplayOrder) || nextDisplayOrder < 0) throw new Error("Display order must be a non-negative number.");
@@ -2672,6 +2679,9 @@ function registerAdminRoutes(app, deps) {
           displayName,
           scheduledDate: row.scheduled_date,
           scheduledTimezone: row.scheduled_timezone,
+          raceCode: req.body.race_code,
+          countryCode: req.body.country_code,
+          circuitName: req.body.circuit_name,
           calendarState
         });
       } else {
