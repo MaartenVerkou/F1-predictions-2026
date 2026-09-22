@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   assertHistoricalCorrection,
+  assertAssignmentIntervals,
   buildLineupProjection,
   buildLineupPlan,
   historicalCorrectionRequired
@@ -99,6 +100,21 @@ test("projection respects the replacement round cutoff", () => {
     ],
     roundNumber: 6
   })[0].seats[0].driverId, 3);
+});
+
+test("assignment interval validation rejects overlapping driver and seat history", () => {
+  assert.throws(() => assertAssignmentIntervals([
+    { id: 1, driver_id: 1, team_id: 10, seat_number: 1, from_round: 1, to_round: 5 },
+    { id: 2, driver_id: 1, team_id: 20, seat_number: 1, from_round: 5, to_round: null }
+  ]), /overlapping team assignments/);
+  assert.throws(() => assertAssignmentIntervals([
+    { id: 1, driver_id: 1, team_id: 10, seat_number: 1, from_round: 1, to_round: null },
+    { id: 2, driver_id: 2, team_id: 10, seat_number: 1, from_round: 2, to_round: null }
+  ]), /seat 1 has overlapping/);
+  assert.doesNotThrow(() => assertAssignmentIntervals([
+    { id: 1, driver_id: 1, team_id: 10, seat_number: 1, from_round: 1, to_round: 4 },
+    { id: 2, driver_id: 1, team_id: 20, seat_number: 1, from_round: 5, to_round: null }
+  ]));
 });
 
 test("empty seat closes the active assignment without inserting a driver", () => {

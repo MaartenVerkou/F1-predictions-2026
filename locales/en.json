@@ -44,6 +44,7 @@
     "intro": "Canonical drivers, teams, race rounds and their relationships used by race data, questions and actuals.",
     "season": "Season",
     "open": "Open",
+    "invalid_season": "Season {season} is not available.",
     "not_seeded": "Canonical season inputs are not seeded yet.",
     "tabs": "Input views",
     "tab_drivers": "Drivers",
@@ -69,7 +70,11 @@
     "active": "Active",
     "yes": "Yes",
     "no": "No",
-    "mappings_empty": "No aliases or provider mappings are recorded yet.",
+    "mappings_empty": "All provider names and aliases are currently resolved.",
+    "mapping_queue": "Unresolved mappings",
+    "mapping_queue_help": "Resolve these before importing results.",
+    "source_label": "Source label",
+    "canonical_candidate": "Canonical candidate",
     "save": "Save",
     "edit": "Edit",
     "remove": "Remove",
@@ -101,7 +106,9 @@
     ,"driver_number": "Driver number"
     ,"optional": "Optional"
     ,"empty_seat": "Empty seat"
-    ,"save_lineup": "Save lineup"
+    ,"save_lineup": "Save lineup",
+    "lineup_history": "Line-up history",
+    "lineup_history_help": "Read-only; edit the round-aware team line-up above."
     ,"historical_warning": "This round already has imported evidence or reviewed actuals. Saving changes the canonical lineup used for this round and later rounds."
     ,"historical_confirm": "I understand this is a historical correction."
   },

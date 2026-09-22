@@ -21,6 +21,7 @@ const {
   addEntityAlias,
   addProviderReference,
   listSeasonInputs,
+  listSeasonMappings,
   upsertDriver,
   upsertDriverTeamAssignment,
   upsertRace,
@@ -34,6 +35,11 @@ const {
   buildLineupProjection,
   historicalCorrectionRequired
 } = require("../season-lineup");
+const {
+  assertSeasonMutationAllowed,
+  listAdminSeasons,
+  resolveAdminSeasonContext
+} = require("../admin-season-context");
 
 
 function auditResultLabel(row) {
@@ -1193,8 +1199,9 @@ function registerAdminRoutes(app, deps) {
       .map(mapAdminIdeaRow);
   }
 
-  function getSnapshotRoundOptions() {
-    return { maxRoundNumber: getRaces().length };
+  function getSnapshotRoundOptions(season = CURRENT_SEASON) {
+    const catalog = listSeasonInputs(db, season);
+    return { maxRoundNumber: catalog.races.length || getRaces().length };
   }
 
   function findLatestRoundSnapshotForSeason(season) {
@@ -2507,8 +2514,14 @@ function registerAdminRoutes(app, deps) {
     const tab = ["drivers", "teams", "assignments", "races", "mappings"].includes(requestedTab)
       ? requestedTab
       : "teams";
-    const season = Number(req.query.season || CURRENT_SEASON);
-    const catalog = listSeasonInputs(db, season);
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: req.query.season,
+      currentSeason: CURRENT_SEASON
+    });
+    const season = Number(seasonContext.year || CURRENT_SEASON);
+    const catalog = seasonContext.selected
+      ? listSeasonInputs(db, season)
+      : { season: null, drivers: [], teams: [], races: [], assignments: [], unresolved: [] };
     const explicitRound = Number(req.query.round);
     const latestEvidenceRound = Number(
       db.prepare("SELECT MAX(round_number) AS round_number FROM race_data_snapshots WHERE season = ?").get(Number(season))?.round_number || 0
@@ -2530,6 +2543,7 @@ function registerAdminRoutes(app, deps) {
       : [];
     const lineupReviewState = getLineupReviewState(season, lineupRound);
     catalog.impact = getSeasonInputImpact(season);
+    catalog.mappings = seasonContext.selected ? listSeasonMappings(db, season) : [];
     return res.render("admin_inputs", {
       user,
       season,
@@ -2538,7 +2552,9 @@ function registerAdminRoutes(app, deps) {
       lineupProjection,
       lineupReviewState,
       catalog,
-      inputsReady: Boolean(catalog.season),
+      seasonContext,
+      availableSeasons: seasonContext.availableSeasons,
+      inputsReady: Boolean(catalog.season) && seasonContext.isValid,
       query: req.query
     });
   });
@@ -2583,6 +2599,18 @@ function registerAdminRoutes(app, deps) {
     return res.redirect(`/admin/inputs?${params.toString()}`);
   }
 
+  function requireSeasonMutation(req, season, options = {}) {
+    const context = resolveAdminSeasonContext(db, {
+      requestedSeason: season,
+      currentSeason: CURRENT_SEASON
+    });
+    assertSeasonMutationAllowed(context, {
+      historicalCorrection: options.historicalCorrection === true || String(req.body.historical_correction || "") === "1",
+      preparation: options.preparation === true || String(req.body.preparation_confirmed || "") === "1"
+    });
+    return context;
+  }
+
   app.post("/admin/inputs/entity", requireAdmin, (req, res) => {
     const season = Number(req.body.season || CURRENT_SEASON);
     const entityType = String(req.body.entity_type || "").trim().toLowerCase();
@@ -2596,6 +2624,7 @@ function registerAdminRoutes(app, deps) {
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
+      requireSeasonMutation(req, season);
       if (!catalog.season || !Number.isInteger(entityId) || entityId <= 0 || !displayName) {
         throw new Error("A valid season, entity and display name are required.");
       }
@@ -2657,6 +2686,7 @@ function registerAdminRoutes(app, deps) {
     const adminUser = getCurrentUser(req);
     const extra = Number.isInteger(round) && round > 0 ? { round } : {};
     try {
+      requireSeasonMutation(req, season);
       if (!catalog.season || !Number.isInteger(teamId) || teamId <= 0) {
         throw new Error("A valid team is required.");
       }
@@ -2702,6 +2732,7 @@ function registerAdminRoutes(app, deps) {
     const adminUser = getCurrentUser(req);
     const tab = entityType === "driver" ? "drivers" : entityType === "team" ? "teams" : "assignments";
     try {
+      requireSeasonMutation(req, season);
       if (!catalog.season || !Number.isInteger(entityId) || entityId <= 0) {
         throw new Error("A valid season input is required.");
       }
@@ -2755,6 +2786,7 @@ function registerAdminRoutes(app, deps) {
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
+      requireSeasonMutation(req, season);
       if (!catalog.season || !displayName) throw new Error("A season and driver name are required.");
       const driverId = upsertDriver(db, {
         slug: slug || displayName,
@@ -2783,6 +2815,7 @@ function registerAdminRoutes(app, deps) {
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
+      requireSeasonMutation(req, season, { historicalCorrection: true });
       if (!catalog.season) throw new Error("Season inputs are not available.");
       if (!Number.isInteger(roundNumber) || roundNumber < 1 || roundNumber > catalog.races.length) {
         throw new Error("Choose a valid season round.");
@@ -2834,6 +2867,7 @@ function registerAdminRoutes(app, deps) {
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
     try {
+      requireSeasonMutation(req, season, { historicalCorrection: true });
       if (!catalog.season || !catalog.drivers.some((row) => Number(row.id) === driverId) || !catalog.teams.some((row) => Number(row.id) === teamId)) {
         throw new Error("Choose a driver and team from this season.");
       }
@@ -2875,6 +2909,7 @@ function registerAdminRoutes(app, deps) {
     const tab = String(req.body.tab || "mappings");
     const adminUser = getCurrentUser(req);
     try {
+      requireSeasonMutation(req, season);
       const entityType = String(req.body.entity_type || "").trim().toLowerCase();
       const entityId = Number(req.body.entity_id);
       if (!["driver", "team", "race"].includes(entityType) || !Number.isInteger(entityId) || entityId <= 0) {
@@ -2903,6 +2938,7 @@ function registerAdminRoutes(app, deps) {
     const season = Number(req.body.season || CURRENT_SEASON);
     const adminUser = getCurrentUser(req);
     try {
+      requireSeasonMutation(req, season);
       const entityType = String(req.body.entity_type || "").trim().toLowerCase();
       const entityId = Number(req.body.entity_id);
       const provider = String(req.body.provider || "").trim();
@@ -3057,11 +3093,16 @@ function registerAdminRoutes(app, deps) {
   app.get("/admin/race-data", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
-    const roster = getRoster();
-    const races = getRaces();
-    const evidenceRows = listRaceDataSnapshots(db, CURRENT_SEASON);
-    const importRows = listRaceDataImports(db, CURRENT_SEASON);
-    const snapshotRows = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: req.query.season,
+      currentSeason: CURRENT_SEASON
+    });
+    const season = Number(seasonContext.year || CURRENT_SEASON);
+    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
+    const races = catalog?.races?.map((race) => race.display_name) || [];
+    const evidenceRows = listRaceDataSnapshots(db, season);
+    const importRows = listRaceDataImports(db, season);
+    const snapshotRows = listLatestSnapshotsForSeason(db, season, {
       maxRoundNumber: races.length
     });
     const viewMode =
@@ -3075,10 +3116,10 @@ function registerAdminRoutes(app, deps) {
         : Number(evidenceRows.at(-1)?.round_number || 1);
     const roundRoster = buildRoundAwareRoster({
       db,
-      season: CURRENT_SEASON,
+      season,
       roundNumber: defaultRound,
       races,
-      fallbackRoster: roster
+      fallbackRoster: { drivers: [], teams: [], races }
     });
     const view = buildRaceDataAuditView({
       races,
@@ -3093,7 +3134,9 @@ function registerAdminRoutes(app, deps) {
       : {};
     return res.render("admin_race_data", {
       user,
-      season: CURRENT_SEASON,
+      season,
+      seasonContext,
+      availableSeasons: seasonContext.availableSeasons,
       locale,
       view,
       viewMode,
@@ -3111,10 +3154,15 @@ function registerAdminRoutes(app, deps) {
     const locale = res.locals.locale || "en";
     const saveError = req.query.error ? String(req.query.error) : null;
     const saveSuccess = req.query.success ? String(req.query.success) : null;
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: req.query.season,
+      currentSeason: CURRENT_SEASON
+    });
+    const season = Number(seasonContext.year || CURRENT_SEASON);
     const questions = getQuestions(locale);
-    const baseRoster = getRoster();
-    const races = getRaces();
-    const actualRows = db.prepare("SELECT * FROM actuals").all();
+    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
+    const races = catalog?.races?.map((race) => race.display_name) || [];
+    const actualRows = seasonContext.syncable ? db.prepare("SELECT * FROM actuals").all() : [];
     const persistedActuals = actualRows.reduce((acc, row) => {
       acc[row.question_id] = row.value;
       return acc;
@@ -3123,6 +3171,7 @@ function registerAdminRoutes(app, deps) {
       req.session &&
       req.session.adminActualsDraft &&
       typeof req.session.adminActualsDraft === "object" &&
+      seasonContext.syncable &&
       req.session.adminActualsDraft.target === "current" &&
       req.session.adminActualsDraft.values &&
       typeof req.session.adminActualsDraft.values === "object"
@@ -3134,7 +3183,7 @@ function registerAdminRoutes(app, deps) {
     const latestSnapshotByRound = new Map(
       latestSnapshots.map((snapshot) => [Number(snapshot.round_number), snapshot])
     );
-    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
+    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
     const requestedTarget = String(req.query.target || "").trim();
     const latestRoundNumber =
       Number.isFinite(Number(latestRoundSnapshot?.round_number))
@@ -3189,14 +3238,17 @@ function registerAdminRoutes(app, deps) {
     const requiresPastUnlock = isPastRaceTarget && !allowPastEdit;
     const roster = buildRoundAwareRoster({
       db,
-      season: CURRENT_SEASON,
+      season,
       roundNumber: selectedRoundNumber || latestRoundNumber || races.length || 1,
       races,
-      fallbackRoster: baseRoster
+      fallbackRoster: { drivers: [], teams: [], races }
     });
     res.render("admin_actuals", {
       user,
       questions,
+      season,
+      seasonContext,
+      availableSeasons: seasonContext.availableSeasons,
       roster,
       races,
       actuals,
@@ -3215,6 +3267,14 @@ function registerAdminRoutes(app, deps) {
 
   app.post("/admin/actuals/autofill-current-season", requireAdmin, async (req, res) => {
     try {
+      const requestedSeason = Number(req.body.season || CURRENT_SEASON);
+      const seasonContext = resolveAdminSeasonContext(db, {
+        requestedSeason,
+        currentSeason: CURRENT_SEASON
+      });
+      if (requestedSeason !== CURRENT_SEASON || !seasonContext.syncable) {
+        throw new Error("Automatic live sync is restricted to the active season.");
+      }
       const questions = getQuestions();
       const roster = getRoster();
       const races = getRaces();
@@ -3272,14 +3332,14 @@ function registerAdminRoutes(app, deps) {
       }
       summary.push("unsaved until you click Save actuals");
 
-      const redirectTo = `/admin/actuals?success=${encodeURIComponent(summary.join(" | "))}`;
+      const redirectTo = `/admin/actuals?season=${encodeURIComponent(requestedSeason)}&success=${encodeURIComponent(summary.join(" | "))}`;
       if (req.session) {
         return req.session.save(() => res.redirect(redirectTo));
       }
       return res.redirect(redirectTo);
     } catch (err) {
       return res.redirect(
-        `/admin/actuals?error=${encodeURIComponent(`Autofill failed: ${err.message}`)}`
+        `/admin/actuals?season=${encodeURIComponent(Number(req.body.season || CURRENT_SEASON))}&error=${encodeURIComponent(`Autofill failed: ${err.message}`)}`
       );
     }
   });
@@ -3287,6 +3347,14 @@ function registerAdminRoutes(app, deps) {
   app.post("/admin/actuals/run-auto-update", requireAdmin, async (req, res) => {
     const adminUser = getCurrentUser(req);
     try {
+      const requestedSeason = Number(req.body.season || CURRENT_SEASON);
+      const seasonContext = resolveAdminSeasonContext(db, {
+        requestedSeason,
+        currentSeason: CURRENT_SEASON
+      });
+      if (requestedSeason !== CURRENT_SEASON || !seasonContext.syncable) {
+        throw new Error("Automatic live sync is restricted to the active season.");
+      }
       const result = await runActualsAutoUpdate({
         season: CURRENT_SEASON,
         dbPath,
@@ -3326,7 +3394,7 @@ function registerAdminRoutes(app, deps) {
         });
       }
 
-      return res.redirect(`/admin/actuals?success=${encodeURIComponent(summary.join(" | "))}`);
+      return res.redirect(`/admin/actuals?season=${encodeURIComponent(requestedSeason)}&success=${encodeURIComponent(summary.join(" | "))}`);
     } catch (err) {
       if (typeof logEvent === "function") {
         logEvent("warn", "admin_actuals_auto_update_failed", {
@@ -3339,20 +3407,32 @@ function registerAdminRoutes(app, deps) {
         });
       }
       return res.redirect(
-        `/admin/actuals?error=${encodeURIComponent(`Automatic season sync failed: ${err.message}`)}`
+        `/admin/actuals?season=${encodeURIComponent(Number(req.body.season || CURRENT_SEASON))}&error=${encodeURIComponent(`Automatic season sync failed: ${err.message}`)}`
       );
     }
   });
 
   app.post("/admin/actuals/review", requireAdmin, (req, res) => {
     const adminUser = getCurrentUser(req);
+    const season = Number(req.body.season || req.query.season || CURRENT_SEASON);
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: season,
+      currentSeason: CURRENT_SEASON
+    });
     const snapshotId = Number(req.body.snapshotId || 0);
     const target = String(req.body.target || "current").trim() || "current";
     const unlockPast = String(req.body.unlockPast || "").trim() === "1";
-    const snapshot = findSnapshotById(db, snapshotId, getSnapshotRoundOptions());
+    let snapshot = null;
+    try {
+      assertSeasonMutationAllowed(seasonContext, { historicalCorrection: unlockPast });
+      snapshot = findSnapshotById(db, snapshotId, getSnapshotRoundOptions(season));
+      if (snapshot && Number(snapshot.season) !== season) snapshot = null;
+    } catch (err) {
+      return res.redirect(`/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}&error=${encodeURIComponent(err.message)}`);
+    }
     if (!snapshot) {
       return res.redirect(
-        `/admin/actuals?target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent("Snapshot not found.")}`
+        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent("Snapshot not found.")}`
       );
     }
 
@@ -3364,14 +3444,20 @@ function registerAdminRoutes(app, deps) {
       ? `R${snapshot.round_number} - ${String(snapshot.round_name || "").trim() || `Round ${snapshot.round_number}`}`
       : `Snapshot #${snapshot.id}`;
     return res.redirect(
-      `/admin/actuals?target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&success=${encodeURIComponent(`${label} marked as reviewed.`)}`
+      `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&success=${encodeURIComponent(`${label} marked as reviewed.`)}`
     );
   });
 
   app.post("/admin/actuals", requireAdmin, (req, res) => {
     const adminUser = getCurrentUser(req);
     const questions = getQuestions();
-    const races = getRaces();
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: season,
+      currentSeason: CURRENT_SEASON
+    });
+    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
+    const races = catalog?.races?.map((race) => race.display_name) || [];
     const now = new Date().toISOString();
     const selectedTarget = String(req.body.actualsTarget || "current").trim() || "current";
     const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
@@ -3383,10 +3469,10 @@ function registerAdminRoutes(app, deps) {
         selectedRoundNumber > races.length)
     ) {
       return res.redirect(
-        `/admin/actuals?error=${encodeURIComponent("Selected race is outside the configured calendar.")}`
+        `/admin/actuals?season=${encodeURIComponent(season)}&error=${encodeURIComponent("Selected race is outside the configured calendar.")}`
       );
     }
-    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
+    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
     const latestRoundNumber =
       Number.isFinite(Number(latestRoundSnapshot?.round_number))
         ? Number(latestRoundSnapshot.round_number)
@@ -3397,9 +3483,15 @@ function registerAdminRoutes(app, deps) {
       selectedRoundNumber < latestRoundNumber;
     const allowPastEdit = String(req.body.unlockPast || "").trim() === "1";
 
+    try {
+      assertSeasonMutationAllowed(seasonContext, { historicalCorrection: allowPastEdit });
+    } catch (err) {
+      return res.redirect(`/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent(err.message)}`);
+    }
+
     if (isPastRaceTarget && !allowPastEdit) {
       return res.redirect(
-        `/admin/actuals?target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent("Unlock past-race editing before saving changes.")}`
+        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent("Unlock past-race editing before saving changes.")}`
       );
     }
 
@@ -3410,7 +3502,7 @@ function registerAdminRoutes(app, deps) {
       let successMessage;
       try {
         const snapshotResult = upsertActualsSnapshot({
-          season: CURRENT_SEASON,
+          season,
           roundNumber: selectedRoundNumber,
           roundName,
           valuesByQuestion,
@@ -3425,13 +3517,13 @@ function registerAdminRoutes(app, deps) {
           : `No values saved for R${selectedRoundNumber} - ${roundName}.`;
       } catch (err) {
         return res.redirect(
-          `/admin/actuals?target=${encodeURIComponent(selectedTarget)}&unlockPast=${allowPastEdit ? "1" : "0"}&error=${encodeURIComponent(err.message)}`
+          `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&unlockPast=${allowPastEdit ? "1" : "0"}&error=${encodeURIComponent(err.message)}`
         );
       }
       if (req.session) {
         delete req.session.adminActualsDraft;
       }
-      const redirectTo = `/admin/actuals?target=${encodeURIComponent(selectedTarget)}${allowPastEdit ? "&unlockPast=1" : ""}&success=${encodeURIComponent(successMessage)}`;
+      const redirectTo = `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}${allowPastEdit ? "&unlockPast=1" : ""}&success=${encodeURIComponent(successMessage)}`;
       if (req.session) {
         return req.session.save(() => res.redirect(redirectTo));
       }
@@ -3462,9 +3554,9 @@ function registerAdminRoutes(app, deps) {
 
     let successMessage = "Actuals saved.";
     try {
-      const latestRoundSnapshot = findLatestRoundSnapshotForSeason(CURRENT_SEASON);
+      const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
       const archivedSnapshot = upsertActualsSnapshot({
-        season: CURRENT_SEASON,
+        season,
         roundNumber: latestRoundSnapshot?.round_number || null,
         roundName: String(latestRoundSnapshot?.round_name || "").trim(),
         valuesByQuestion,
@@ -3486,7 +3578,7 @@ function registerAdminRoutes(app, deps) {
       successMessage = `Actuals saved. Snapshot archive skipped: ${archiveErr.message}`;
     }
 
-    const redirectTo = `/admin/actuals?success=${encodeURIComponent(successMessage)}`;
+    const redirectTo = `/admin/actuals?season=${encodeURIComponent(season)}&success=${encodeURIComponent(successMessage)}`;
     if (req.session) {
       return req.session.save(() => res.redirect(redirectTo));
     }

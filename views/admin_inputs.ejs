@@ -1,5 +1,6 @@
 <%- include('partials/header', { title: t('admin_inputs.title'), user }) %>
-<%- include('partials/admin_nav', { active: 'inputs' }) %>
+<%- include('partials/admin_nav', { active: 'inputs', season }) %>
+<% const seasonPreparationField = seasonContext?.status === 'planned' ? '<input type="hidden" name="preparation_confirmed" value="1">' : ''; %>
 
 <div class="card admin-page-card admin-inputs-page">
   <div class="admin-race-data-heading">
@@ -9,20 +10,28 @@
     </div>
     <form method="get" action="/admin/inputs" class="admin-inputs-season-form">
       <label for="admin-inputs-season"><%= t('admin_inputs.season') %></label>
-      <input id="admin-inputs-season" name="season" type="number" min="2000" max="2100" value="<%= season %>" />
+      <select id="admin-inputs-season" name="season" onchange="this.form.submit()">
+        <% (availableSeasons || []).forEach((availableSeason) => { %>
+          <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>>
+            <%= availableSeason.label %> · <%= availableSeason.statusLabel %>
+          </option>
+        <% }) %>
+      </select>
       <input type="hidden" name="tab" value="<%= tab %>" />
       <input type="hidden" name="round" value="<%= lineupRound %>" />
-      <button class="secondary" type="submit"><%= t('admin_inputs.open') %></button>
     </form>
   </div>
 
-  <% if (!inputsReady) { %>
+  <% if (seasonContext?.invalidRequestedSeason) { %>
+    <div class="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+  <% } else if (!inputsReady) { %>
     <div class="alert"><%= t('admin_inputs.not_seeded') %></div>
   <% } else { %>
     <% if (query?.error) { %><div class="alert"><%= query.error %></div><% } %>
     <% if (query?.success) { %><div class="alert success"><%= query.success %></div><% } %>
     <div class="admin-inputs-summary muted">
       <span><strong><%= catalog.season.label %></strong></span>
+      <span><%= catalog.season.status %></span>
       <span><%= t('admin_inputs.driver_count', { count: catalog.drivers.length }) %></span>
       <span><%= t('admin_inputs.team_count', { count: catalog.teams.length }) %></span>
       <span><%= t('admin_inputs.race_count', { count: catalog.races.length }) %></span>
@@ -51,10 +60,12 @@
       </div>
       <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver">
         <%- csrfField() %>
+        <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
       </form>
       <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" hidden>
         <%- csrfField() %>
+        <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
         <input type="hidden" name="entity_type" value="">
         <input type="hidden" name="entity_id" value="">
@@ -89,12 +100,14 @@
       </div>
       <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" hidden>
         <%- csrfField() %>
+        <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
         <input type="hidden" name="entity_type" value="">
         <input type="hidden" name="entity_id" value="">
       </form>
       <form id="admin-inputs-lineup-form" method="post" action="/admin/inputs/lineup" class="admin-inputs-lineup-form">
         <%- csrfField() %>
+        <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
         <input type="hidden" name="round" value="<%= lineupRound %>">
         <% if (lineupReviewState?.requiresConfirmation) { %>
@@ -133,26 +146,14 @@
       </div>
       <button type="submit" form="admin-inputs-lineup-form"><%= t('admin_inputs.save_lineup') %></button>
     <% } else if (tab === 'assignments') { %>
-      <form method="post" action="/admin/inputs/assignment" class="admin-inputs-assignment-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><label><%= t('admin_inputs.driver') %><select name="driver_id" required><% catalog.drivers.forEach((driver) => { %><option value="<%= driver.id %>"><%= driver.display_name %></option><% }) %></select></label><label><%= t('admin_inputs.team') %><select name="team_id" required><% catalog.teams.forEach((team) => { %><option value="<%= team.id %>"><%= team.display_name %></option><% }) %></select></label><label><%= t('admin_inputs.seat') %><select name="seat_number"><option value="1"><%= t('admin_inputs.driver_1') %></option><option value="2"><%= t('admin_inputs.driver_2') %></option></select></label><label><%= t('admin_inputs.from_round') %><input name="from_round" type="number" min="1" max="<%= catalog.races.length %>" value="1" required></label><label><%= t('admin_inputs.to_round') %><input name="to_round" type="number" min="1" max="<%= catalog.races.length %>"></label><label><%= t('admin_inputs.source') %><input name="source" value="admin"></label><button type="submit"><%= t('admin_inputs.save_assignment') %></button></form>
       <div class="admin-inputs-table-toolbar" data-table-toolbar="assignments">
-        <div class="admin-inputs-toolbar-start">
-          <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
-        </div>
-        <div class="admin-inputs-toolbar-end">
-          <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
-          <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
-        </div>
+        <div class="admin-inputs-toolbar-start"><strong><%= t('admin_inputs.lineup_history') %></strong></div>
+        <div class="admin-inputs-toolbar-end"><span class="muted"><%= t('admin_inputs.lineup_history_help') %></span></div>
       </div>
-      <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" hidden>
-        <%- csrfField() %>
-        <input type="hidden" name="season" value="<%= season %>">
-        <input type="hidden" name="entity_type" value="">
-        <input type="hidden" name="entity_id" value="">
-      </form>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_assignments') %>" tabindex="0">
         <table class="table compact admin-inputs-table" data-selectable-table="assignments">
-          <thead><tr><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.seat') %></th><th><%= t('admin_inputs.from_round') %></th><th><%= t('admin_inputs.to_round') %></th><th><%= t('admin_inputs.source') %></th></tr></thead>
-          <tbody><% catalog.assignments.forEach((assignment) => { %><tr data-selectable-row data-edit-target="assignment-editor-<%= assignment.id %>" data-row-label="<%= assignment.driver_name %> — <%= assignment.team_name %>" tabindex="0"><th scope="row"><%= assignment.driver_name %></th><td><%= assignment.team_name %></td><td><%= assignment.seat_number || 1 %></td><td>R<%= assignment.from_round %></td><td><%= assignment.to_round == null ? '—' : 'R' + assignment.to_round %></td><td><%= assignment.source %></td></tr><tr id="assignment-editor-<%= assignment.id %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="6"><form method="post" action="/admin/inputs/assignment" class="admin-inputs-row-edit-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="id" value="<%= assignment.id %>"><label><%= t('admin_inputs.driver') %><select name="driver_id" required><% catalog.drivers.forEach((driver) => { %><option value="<%= driver.id %>" <%= Number(driver.id) === Number(assignment.driver_id) ? 'selected' : '' %>><%= driver.display_name_override || driver.display_name %></option><% }) %></select></label><label><%= t('admin_inputs.team') %><select name="team_id" required><% catalog.teams.forEach((team) => { %><option value="<%= team.id %>" <%= Number(team.id) === Number(assignment.team_id) ? 'selected' : '' %>><%= team.display_name_override || team.display_name %></option><% }) %></select></label><label><%= t('admin_inputs.seat') %><select name="seat_number"><option value="1" <%= Number(assignment.seat_number || 1) === 1 ? 'selected' : '' %>><%= t('admin_inputs.driver_1') %></option><option value="2" <%= Number(assignment.seat_number || 1) === 2 ? 'selected' : '' %>><%= t('admin_inputs.driver_2') %></option></select></label><label><%= t('admin_inputs.from_round') %><input name="from_round" type="number" min="1" max="<%= catalog.races.length %>" value="<%= assignment.from_round %>" required></label><label><%= t('admin_inputs.to_round') %><input name="to_round" type="number" min="1" max="<%= catalog.races.length %>" value="<%= assignment.to_round == null ? '' : assignment.to_round %>"></label><label><%= t('admin_inputs.source') %><input name="source" value="<%= assignment.source %>"></label><button class="secondary" type="submit"><%= t('admin_inputs.save_assignment') %></button></form></td></tr><% }) %></tbody>
+          <thead><tr><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.seat') %></th><th><%= t('admin_inputs.from_round') %></th><th><%= t('admin_inputs.to_round') %></th></tr></thead>
+          <tbody><% catalog.assignments.forEach((assignment) => { %><tr data-selectable-row data-row-label="<%= assignment.driver_name %> — <%= assignment.team_name %>" tabindex="0"><th scope="row"><%= assignment.driver_name %></th><td><%= assignment.team_name %></td><td><%= assignment.seat_number || 1 %></td><td>R<%= assignment.from_round %></td><td><%= assignment.to_round == null ? '—' : 'R' + assignment.to_round %></td></tr><% }) %></tbody>
         </table>
       </div>
     <% } else if (tab === 'races') { %>
@@ -166,14 +167,23 @@
       </div>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_races') %>" tabindex="0">
         <table class="table compact admin-inputs-table" data-selectable-table="races">
-          <thead><tr><th><%= t('admin_inputs.round') %></th><th><%= t('admin_inputs.race') %></th><th><%= t('admin_inputs.slug') %></th><th><%= t('admin_inputs.status') %></th></tr></thead>
-          <tbody><% catalog.races.forEach((race) => { %><tr data-selectable-row data-edit-target="race-editor-<%= race.id %>" data-row-label="<%= race.display_name %>" tabindex="0"><td>R<%= race.round_number %></td><th scope="row"><%= race.display_name %></th><td><%= race.slug %></td><td><%= race.calendar_state %></td></tr><tr id="race-editor-<%= race.id %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="4"><form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="race"><input type="hidden" name="entity_id" value="<%= race.id %>"><label><%= t('admin_inputs.race') %><input name="display_name" value="<%= race.display_name %>" required></label><label><%= t('admin_inputs.status') %><select name="calendar_state"><% ['scheduled','completed','cancelled','partial'].forEach((state) => { %><option value="<%= state %>" <%= race.calendar_state === state ? 'selected' : '' %>><%= state %></option><% }) %></select></label><button class="secondary" type="submit"><%= t('admin_inputs.save_race') %></button></form></td></tr><% }) %></tbody>
+          <thead><tr><th><%= t('admin_inputs.round') %></th><th><%= t('admin_inputs.race') %></th><th><%= t('admin_inputs.status') %></th></tr></thead>
+          <tbody><% catalog.races.forEach((race) => { %><tr data-selectable-row data-edit-target="race-editor-<%= race.id %>" data-row-label="<%= race.display_name %>" tabindex="0"><td>R<%= race.round_number %></td><th scope="row"><%= race.display_name %></th><td><%= race.calendar_state %></td></tr><tr id="race-editor-<%= race.id %>" class="admin-inputs-row-editor-row" data-row-editor hidden><td colspan="3"><form method="post" action="/admin/inputs/entity" class="admin-inputs-row-edit-form"><%- csrfField() %><%- seasonPreparationField %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="entity_type" value="race"><input type="hidden" name="entity_id" value="<%= race.id %>"><label><%= t('admin_inputs.race') %><input name="display_name" value="<%= race.display_name %>" required></label><label><%= t('admin_inputs.status') %><select name="calendar_state"><% ['scheduled','completed','cancelled','partial'].forEach((state) => { %><option value="<%= state %>" <%= race.calendar_state === state ? 'selected' : '' %>><%= state %></option><% }) %></select></label><button class="secondary" type="submit"><%= t('admin_inputs.save_race') %></button></form></td></tr><% }) %></tbody>
         </table>
       </div>
     <% } else { %>
-      <div class="alert"><%= t('admin_inputs.mappings_empty') %></div>
-      <form method="post" action="/admin/inputs/alias" class="admin-inputs-assignment-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="tab" value="mappings"><label><%= t('admin_inputs.entity_type') %><select name="entity_type"><option value="driver"><%= t('admin_inputs.driver') %></option><option value="team"><%= t('admin_inputs.team') %></option><option value="race"><%= t('admin_inputs.race') %></option></select></label><label><%= t('admin_inputs.entity_id') %><input name="entity_id" type="number" min="1" required></label><label><%= t('admin_inputs.alias') %><input name="alias" required></label><button type="submit"><%= t('admin_inputs.save_alias') %></button></form>
-      <form method="post" action="/admin/inputs/provider-ref" class="admin-inputs-assignment-form"><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><label><%= t('admin_inputs.entity_type') %><select name="entity_type"><option value="driver"><%= t('admin_inputs.driver') %></option><option value="team"><%= t('admin_inputs.team') %></option><option value="race"><%= t('admin_inputs.race') %></option></select></label><label><%= t('admin_inputs.entity_id') %><input name="entity_id" type="number" min="1" required></label><label><%= t('admin_inputs.provider') %><input name="provider" value="jolpica" required></label><label><%= t('admin_inputs.provider_key') %><input name="provider_key" required></label><button type="submit"><%= t('admin_inputs.save_provider') %></button></form>
+      <% const unresolvedMappings = (catalog.mappings || []).filter((mapping) => mapping.status !== 'resolved'); %>
+      <% if (!unresolvedMappings.length) { %>
+        <div class="alert"><%= t('admin_inputs.mappings_empty') %></div>
+      <% } else { %>
+        <div class="admin-inputs-table-toolbar"><strong><%= t('admin_inputs.mapping_queue') %></strong><span class="muted"><%= t('admin_inputs.mapping_queue_help') %></span></div>
+        <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_mappings') %>" tabindex="0">
+          <table class="table compact admin-inputs-table">
+            <thead><tr><th><%= t('admin_inputs.provider') %></th><th><%= t('admin_inputs.entity_type') %></th><th><%= t('admin_inputs.source_label') %></th><th><%= t('admin_inputs.canonical_candidate') %></th><th><%= t('admin_inputs.status') %></th></tr></thead>
+            <tbody><% unresolvedMappings.forEach((mapping) => { %><tr><td><%= mapping.mappingType %></td><td><%= mapping.entityType %></td><td><%= mapping.sourceLabel %></td><td><%= mapping.canonicalName || '—' %></td><td><%= mapping.status %></td></tr><% }) %></tbody>
+          </table>
+        </div>
+      <% } %>
     <% } %>
   <% } %>
 </div>

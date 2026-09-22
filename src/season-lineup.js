@@ -25,9 +25,52 @@ function teamName(team) {
   return team.display_name_override || team.display_name || team.name || `Team ${team.id}`;
 }
 
+function assertAssignmentIntervals(assignments = []) {
+  const normalized = assignments.map((assignment) => {
+    const fromRound = Number(assignment.from_round);
+    const toRound = assignment.to_round == null || assignment.to_round === ""
+      ? null
+      : Number(assignment.to_round);
+    const seatNumber = Number(assignment.seat_number || 1);
+    if (!Number.isInteger(fromRound) || fromRound < 1) {
+      throw new Error(`Assignment ${assignment.id || "new"} must start at a positive round.`);
+    }
+    if (toRound != null && (!Number.isInteger(toRound) || toRound < fromRound)) {
+      throw new Error(`Assignment ${assignment.id || "new"} has an invalid end round.`);
+    }
+    if (![1, 2].includes(seatNumber)) {
+      throw new Error(`Assignment ${assignment.id || "new"} must use seat 1 or 2.`);
+    }
+    return {
+      ...assignment,
+      fromRound,
+      toRound,
+      seatNumber,
+      driverId: Number(assignment.driver_id),
+      teamId: Number(assignment.team_id)
+    };
+  });
+  const overlaps = (left, right) => left.fromRound <= (right.toRound ?? Number.MAX_SAFE_INTEGER)
+    && right.fromRound <= (left.toRound ?? Number.MAX_SAFE_INTEGER);
+  for (let index = 0; index < normalized.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < normalized.length; otherIndex += 1) {
+      const left = normalized[index];
+      const right = normalized[otherIndex];
+      if (left.driverId === right.driverId && overlaps(left, right)) {
+        throw new Error(`Driver ${left.driverId} has overlapping team assignments.`);
+      }
+      if (left.teamId === right.teamId && left.seatNumber === right.seatNumber && overlaps(left, right)) {
+        throw new Error(`Team ${left.teamId} seat ${left.seatNumber} has overlapping assignments.`);
+      }
+    }
+  }
+  return normalized;
+}
+
 function buildLineupProjection({ teams = [], drivers = [], assignments = [], roundNumber }) {
   const round = Number(roundNumber);
   if (!Number.isInteger(round) || round < 1) throw new Error("Round number must be a positive integer.");
+  assertAssignmentIntervals(assignments);
   return [...teams]
     .filter((team) => team.active == null || Number(team.active) === 1 || team.active === true)
     .sort((left, right) => Number(left.display_order || 9999) - Number(right.display_order || 9999)
@@ -172,6 +215,7 @@ function applySeasonLineup(db, {
 
 module.exports = {
   applySeasonLineup,
+  assertAssignmentIntervals,
   assertHistoricalCorrection,
   buildLineupPlan,
   buildLineupProjection,

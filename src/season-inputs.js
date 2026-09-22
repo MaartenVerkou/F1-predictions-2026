@@ -320,6 +320,41 @@ function resolveEntity(db, { entityType, seasonId = null, provider = null, provi
   return { status: "unresolved", entity: null };
 }
 
+function listSeasonMappings(db, year) {
+  const season = db.prepare("SELECT id FROM seasons WHERE year = ? LIMIT 1").get(Number(year));
+  if (!season) return [];
+  const mappings = [];
+  const providerRows = db.prepare(
+    "SELECT entity_type, entity_id, provider, provider_key, provider_label FROM entity_provider_refs ORDER BY provider, provider_key"
+  ).all();
+  providerRows.forEach((row) => {
+    const entity = findEntityById(db, row.entity_type, row.entity_id);
+    mappings.push({
+      mappingType: "provider",
+      entityType: row.entity_type,
+      sourceLabel: row.provider_label || row.provider_key,
+      sourceKey: `${row.provider}:${row.provider_key}`,
+      canonicalName: entity?.display_name || null,
+      status: entity ? "resolved" : "unresolved"
+    });
+  });
+  const aliasRows = db.prepare(
+    "SELECT entity_type, entity_id, alias, season_id FROM entity_aliases WHERE season_id IS NULL OR season_id = ? ORDER BY normalized_alias"
+  ).all(Number(season.id));
+  aliasRows.forEach((row) => {
+    const entity = findEntityById(db, row.entity_type, row.entity_id);
+    mappings.push({
+      mappingType: "alias",
+      entityType: row.entity_type,
+      sourceLabel: row.alias,
+      sourceKey: row.alias,
+      canonicalName: entity?.display_name || null,
+      status: entity ? "resolved" : "unresolved"
+    });
+  });
+  return mappings;
+}
+
 function assignmentForRound(db, { seasonId, driverId, roundNumber }) {
   const row = db.prepare(
     "SELECT a.*, t.display_name AS team_name FROM driver_team_assignments a JOIN teams t ON t.id = a.team_id WHERE a.season_id = ? AND a.driver_id = ? AND a.from_round <= ? AND (a.to_round IS NULL OR a.to_round >= ?) ORDER BY a.from_round DESC LIMIT 1"
@@ -350,6 +385,7 @@ module.exports = {
   ensureSeasonInputsSchema,
   findEntityById,
   listSeasonInputs,
+  listSeasonMappings,
   normalizeEntityKey,
   normalizeDriverNumber,
   parseReference,
