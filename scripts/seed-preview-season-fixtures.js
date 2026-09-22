@@ -14,7 +14,7 @@ const {
 } = require("../src/season-inputs");
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "..", "data");
-const RACES_PATH = path.join(DATA_DIR, "races.json");
+const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
