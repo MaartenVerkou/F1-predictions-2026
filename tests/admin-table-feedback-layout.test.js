@@ -59,6 +59,7 @@ test("teams table exposes compact power-unit metadata and editor input", () => {
   assert.match(teamsView, /power_unit/);
   assert.match(teamsView, /power_unit_short/);
   assert.match(teamsView, /maxlength="3" pattern="\[A-Za-z\]\{3\}"/);
+  assert.match(view, /name="base_country_code"[\s\S]*?maxlength="3" pattern="\[A-Za-z\]\{3\}"/);
 });
 
 test("inputs exposes shared historical confirmation and advanced data states", () => {
