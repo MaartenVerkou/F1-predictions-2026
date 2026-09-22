@@ -2184,6 +2184,17 @@ button:disabled {
   padding: 0 2px 2px;
 }
 
+.admin-inputs-view-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.admin-inputs-view-toolbar .admin-race-data-tabs {
+  min-width: 0;
+}
+
 .admin-inputs-page .admin-inputs-lineup-help {
   margin: 0;
 }
@@ -2223,8 +2234,20 @@ button:disabled {
 }
 
 .admin-inputs-team-table {
-  min-width: 760px;
+  min-width: 840px;
   table-layout: fixed;
+}
+
+.admin-inputs-team-table .admin-inputs-team-col-order {
+  width: 7%;
+}
+
+.admin-inputs-team-table .admin-inputs-team-col-name {
+  width: 23%;
+}
+
+.admin-inputs-team-table .admin-inputs-team-col-driver {
+  width: 35%;
 }
 
 .admin-inputs-team-table th,
@@ -2234,12 +2257,7 @@ button:disabled {
 
 .admin-inputs-team-table th:first-child,
 .admin-inputs-team-table td:first-child {
-  width: 64px;
-}
-
-.admin-inputs-team-table th:last-child,
-.admin-inputs-team-table td:last-child {
-  width: 90px;
+  width: auto;
 }
 
 .admin-inputs-team-table thead th {
@@ -2404,6 +2422,7 @@ button:disabled {
   align-items: baseline;
   justify-content: flex-start;
   gap: 10px;
+  min-width: 0;
   padding: 3px 0;
 }
 
@@ -2412,6 +2431,8 @@ button:disabled {
 }
 
 .admin-lineup-period strong {
+  min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
 }

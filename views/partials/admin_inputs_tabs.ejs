@@ -1,0 +1,12 @@
+<nav class="admin-race-data-tabs admin-inputs-tabs" aria-label="<%= t('admin_inputs.tabs') %>">
+  <% ['drivers', 'teams', 'races'].forEach((name) => { %>
+    <a class="admin-race-data-tab <%= tab === name ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=<%= name %>">
+      <%= t('admin_inputs.tab_' + name) %>
+    </a>
+  <% }) %>
+  <% if (Number(unresolvedMappingCount || 0) > 0 || tab === 'mappings') { %>
+    <a class="admin-race-data-tab <%= tab === 'mappings' ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=mappings">
+      <%= t('admin_inputs.data_quality') %><% if (Number(unresolvedMappingCount || 0) > 0) { %> · <%= unresolvedMappingCount %><% } %>
+    </a>
+  <% } %>
+</nav>

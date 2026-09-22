@@ -43,18 +43,22 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.match(view, /data-admin-history-dialog/);
   assert.match(view, /data-season-mutation/);
   assert.match(view, /assignment_history/);
-  assert.match(view, /data_quality/);
   assert.doesNotMatch(view, /data-hide-until-selection/);
   assert.match(view, /data-table-edit disabled/);
   assert.match(view, /data-table-remove/);
   assert.match(view, /data-table-remove[^\n]*disabled/);
+  assert.match(view, /admin-inputs-view-toolbar/);
+  assert.doesNotMatch(view, /data-table-selection/);
+  assert.match(view, /partials\/admin_inputs_tabs/);
   assert.match(view, /archived_policy_short/);
   assert.doesNotMatch(view, /admin-inputs-summary/);
   assert.doesNotMatch(view, /impact_summary/);
   assert.doesNotMatch(view, /season_active/);
   assert.doesNotMatch(view, /admin_inputs\.active/);
-  const navigation = view.slice(view.indexOf('<nav class="admin-inputs-tabs"'), view.indexOf('</nav>') + 6);
-  assert.doesNotMatch(navigation, /assignments/);
+  const tabs = readView("partials/admin_inputs_tabs.ejs");
+  assert.match(tabs, /admin-race-data-tabs/);
+  assert.match(tabs, /data_quality/);
+  assert.doesNotMatch(tabs, /assignments/);
 });
 
 test("race inputs show the localized scheduled start", () => {
@@ -78,4 +82,6 @@ test("lineup period metadata stays adjacent to the driver name", () => {
   const periodRule = styles.match(/\.admin-lineup-period\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(periodRule, /justify-content:\s*flex-start/);
   assert.doesNotMatch(periodRule, /justify-content:\s*space-between/);
+  assert.match(periodRule, /min-width:\s*0/);
+  assert.match(styles, /admin-inputs-team-col-driver/);
 });
