@@ -31,6 +31,8 @@ test("team lineup overview explains periods before the team toolbar", () => {
   assert.ok(toolbar >= 0);
   assert.ok(help < toolbar, "lineup guidance should stay above the toolbar");
   assert.match(view, /data-lineup-history-form/);
+  assert.match(view, /data-lineup-history-status/);
+  assert.match(view, /admin_inputs\.lineup_changes_pending/);
   assert.match(view, /class="admin-inputs-lineup-history-form"[\s\S]*name="historical_correction"/);
   assert.doesNotMatch(view, /admin-inputs-lineup-round-form/);
   assert.doesNotMatch(view, /admin-inputs-lineup-form/);

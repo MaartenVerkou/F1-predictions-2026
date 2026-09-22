@@ -2418,6 +2418,11 @@ button:disabled {
   font-size: 12px;
 }
 
+.admin-inputs-lineup-history-status {
+  color: var(--text);
+  font-weight: 600;
+}
+
 .admin-inputs-history-confirm {
   display: inline-flex;
   align-items: center;

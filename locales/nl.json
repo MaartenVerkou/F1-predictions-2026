@@ -102,6 +102,7 @@
     "optional": "Optioneel",
     "empty_seat": "Lege stoel",
     "save_lineup": "Line-up opslaan",
+    "lineup_changes_pending": "Wijzigingen staan klaar — sla de line-up op om ze toe te passen.",
     "lineup_history": "Line-upgeschiedenis",
     "lineup_history_help": "Alleen lezen voor controle; wijzig periodes bij Teams.",
     "lineup_editor_help": "Beheer elke stoel als een periode van een coureur. Laat de eindronde leeg voor de huidige coureur.",

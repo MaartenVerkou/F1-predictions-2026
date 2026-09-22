@@ -161,6 +161,7 @@
                       <% }) %>
                     </div>
                     <div class="admin-inputs-lineup-history-actions">
+                      <span class="admin-inputs-lineup-history-status muted" data-lineup-history-status hidden role="status" aria-live="polite"><%= t('admin_inputs.lineup_changes_pending') %></span>
                       <button type="submit"><%= t('admin_inputs.save_lineup') %></button>
                       <% if (Number(catalog.impact?.evidenceSnapshots || 0) > 0 || Number(catalog.impact?.actualSnapshots || 0) > 0) { %>
                         <label class="admin-inputs-history-confirm"><input type="checkbox" name="historical_correction" value="1"> <span><%= t('admin_inputs.historical_confirm') %></span></label>

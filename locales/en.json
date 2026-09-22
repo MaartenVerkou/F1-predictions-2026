@@ -108,6 +108,7 @@
     ,"optional": "Optional"
     ,"empty_seat": "Empty seat"
     ,"save_lineup": "Save lineup",
+    "lineup_changes_pending": "Changes are pending — save the line-up to apply them.",
     "lineup_history": "Line-up history",
     "lineup_history_help": "Read-only diagnostic history; edit periods in Teams.",
     "lineup_editor_help": "Maintain each seat as driver periods. Leave the end round empty for the current driver.",

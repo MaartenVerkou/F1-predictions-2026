@@ -1104,6 +1104,14 @@ const initAdminInputTables = () => {
 
 const initAdminLineupHistoryEditors = () => {
   document.querySelectorAll('[data-lineup-history-form]').forEach((form) => {
+    const status = form.querySelector('[data-lineup-history-status]');
+    const markDirty = () => {
+      form.dataset.lineupDirty = '1';
+      if (status) status.hidden = false;
+    };
+
+    form.addEventListener('input', markDirty);
+    form.addEventListener('change', markDirty);
     form.addEventListener('click', (event) => {
       const addButton = event.target.closest('[data-lineup-add-period]');
       if (addButton && form.contains(addButton)) {
@@ -1113,13 +1121,17 @@ const initAdminLineupHistoryEditors = () => {
         if (!list || !template) return;
         list.appendChild(template.content.cloneNode(true));
         list.lastElementChild?.querySelector('select, input')?.focus();
+        markDirty();
         return;
       }
       const removeButton = event.target.closest('[data-lineup-remove-period]');
       if (!removeButton || !form.contains(removeButton)) return;
       const message = form.dataset.lineupRemoveConfirm || 'Remove this period?';
       if (!window.confirm(message)) return;
-      removeButton.closest('[data-lineup-period-row]')?.remove();
+      const row = removeButton.closest('[data-lineup-period-row]');
+      if (!row) return;
+      row.remove();
+      markDirty();
     });
   });
 };

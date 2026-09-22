@@ -559,6 +559,7 @@
     "optional": "Facultatif",
     "empty_seat": "Siège vide",
     "save_lineup": "Enregistrer la composition",
+    "lineup_changes_pending": "Modifications en attente — enregistrez la composition pour les appliquer.",
     "lineup_history": "Historique des compositions",
     "lineup_history_help": "Historique en lecture seule ; modifiez les périodes dans Équipes.",
     "lineup_editor_help": "Gérez chaque siège par périodes de pilote. Laissez la manche de fin vide pour le pilote actuel.",
