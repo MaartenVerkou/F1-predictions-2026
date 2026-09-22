@@ -2203,6 +2203,21 @@ button:disabled {
   text-align: center;
 }
 
+.admin-inputs-data-table-wrap {
+  margin-top: 0;
+}
+
+.admin-inputs-table.table th,
+.admin-inputs-table.table td {
+  border-right: 0;
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+.admin-inputs-table.table thead th {
+  border-bottom: 2px solid color-mix(in srgb, var(--border) 55%, var(--text));
+}
+
 .admin-inputs-table thead th {
   border-bottom: 2px solid color-mix(in srgb, var(--border) 55%, var(--text));
 }
