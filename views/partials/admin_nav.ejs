@@ -1,4 +1,4 @@
-<% const seasonQuery = season != null && Number.isFinite(Number(season)) ? `?season=${encodeURIComponent(Number(season))}` : ''; %>
+<% const seasonQuery = typeof season !== 'undefined' && season != null && Number.isFinite(Number(season)) ? `?season=${encodeURIComponent(Number(season))}` : ''; %>
 <nav class="admin-nav" aria-label="Admin navigation">
   <a class="admin-nav-link <%= active === 'overview' ? 'is-active' : '' %>" href="/admin/overview"><%= t('admin.nav_overview') %></a>
   <a class="admin-nav-link <%= active === 'inputs' ? 'is-active' : '' %>" href="/admin/inputs<%= seasonQuery %>"><%= t('admin.nav_inputs') %></a>
