@@ -2418,6 +2418,15 @@ button:disabled {
   font-size: 12px;
 }
 
+.admin-inputs-history-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .admin-inputs-history-warning {
   display: grid;
   gap: 8px;
