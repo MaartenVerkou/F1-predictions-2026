@@ -73,6 +73,8 @@
     "edit": "Bewerken",
     "remove": "Verwijderen",
     "remove_confirm": "{label} uit dit seizoen verwijderen? Historische data blijft behouden.",
+    "move_up": "Omhoog",
+    "move_down": "Omlaag",
     "save_driver": "Naam coureur opslaan",
     "save_team": "Team opslaan",
     "save_race": "Race opslaan",

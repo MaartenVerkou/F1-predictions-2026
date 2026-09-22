@@ -74,6 +74,8 @@
     "edit": "Edit",
     "remove": "Remove",
     "remove_confirm": "Remove “{label}” from this season? Historical data will be kept.",
+    "move_up": "Move up",
+    "move_down": "Move down",
     "save_driver": "Save driver name",
     "save_team": "Save team",
     "save_race": "Save race",

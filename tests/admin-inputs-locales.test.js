@@ -7,6 +7,8 @@ const LOCALES = ["de", "en", "es", "fr", "nl"];
 const REQUIRED_ADMIN_INPUT_KEYS = [
   "save",
   "remove",
+  "move_up",
+  "move_down",
   "save_driver",
   "save_team",
   "save_race",

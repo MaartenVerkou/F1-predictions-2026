@@ -530,6 +530,8 @@
     "edit": "Editar",
     "remove": "Eliminar",
     "remove_confirm": "¿Eliminar {label} de esta temporada? Los datos históricos se conservarán.",
+    "move_up": "Subir",
+    "move_down": "Bajar",
     "save_driver": "Guardar nombre del piloto",
     "save_team": "Guardar equipo",
     "save_race": "Guardar carrera",

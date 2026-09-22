@@ -530,6 +530,8 @@
     "edit": "Bearbeiten",
     "remove": "Entfernen",
     "remove_confirm": "{label} aus dieser Saison entfernen? Historische Daten bleiben erhalten.",
+    "move_up": "Nach oben",
+    "move_down": "Nach unten",
     "save_driver": "Fahrernamen speichern",
     "save_team": "Team speichern",
     "save_race": "Rennen speichern",

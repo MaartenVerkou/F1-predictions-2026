@@ -2589,8 +2589,9 @@ function registerAdminRoutes(app, deps) {
     const entityId = Number(req.body.entity_id);
     const displayName = String(req.body.display_name || "").trim();
     const calendarState = String(req.body.calendar_state || "scheduled").trim().toLowerCase() || "scheduled";
-    const displayOrder = Number(req.body.display_order || 0);
-    const orderBasis = String(req.body.order_basis || "manual").trim().toLowerCase() || "manual";
+    const displayOrderRaw = String(req.body.display_order || "").trim();
+    const displayOrder = displayOrderRaw === "" ? null : Number(displayOrderRaw);
+    const requestedOrderBasis = String(req.body.order_basis || "").trim().toLowerCase();
     const seasonActive = String(req.body.season_active || "") === "1";
     const catalog = listSeasonInputs(db, season);
     const adminUser = getCurrentUser(req);
@@ -2613,9 +2614,11 @@ function registerAdminRoutes(app, deps) {
         const row = catalog.teams.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Team is not part of this season.");
         upsertTeam(db, { slug: row.slug, displayName, shortName: row.short_name, active: Number(row.active) !== 0 });
-        if (!Number.isInteger(displayOrder) || displayOrder < 0) throw new Error("Display order must be a non-negative number.");
+        const nextDisplayOrder = displayOrder == null ? Number(row.display_order || 0) : displayOrder;
+        const orderBasis = requestedOrderBasis || row.order_basis || "manual";
+        if (!Number.isInteger(nextDisplayOrder) || nextDisplayOrder < 0) throw new Error("Display order must be a non-negative number.");
         if (!["official", "previous_standings", "manual"].includes(orderBasis)) throw new Error("Unsupported order basis.");
-        upsertSeasonTeam(db, { seasonId: catalog.season.id, teamId: entityId, displayOrder, orderBasis, active: seasonActive });
+        upsertSeasonTeam(db, { seasonId: catalog.season.id, teamId: entityId, displayOrder: nextDisplayOrder, orderBasis, active: seasonActive });
       } else if (entityType === "race") {
         const row = catalog.races.find((item) => Number(item.id) === entityId);
         if (!row) throw new Error("Race is not part of this season.");
@@ -2642,6 +2645,52 @@ function registerAdminRoutes(app, deps) {
       return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "success", "Entity updated.");
     } catch (err) {
       return redirectInputs(res, season, entityType === "race" ? "races" : `${entityType}s`, "error", err.message);
+    }
+  });
+
+  app.post("/admin/inputs/team-order", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const teamId = Number(req.body.team_id);
+    const direction = String(req.body.direction || "").trim().toLowerCase();
+    const round = Number(req.body.round);
+    const catalog = listSeasonInputs(db, season);
+    const adminUser = getCurrentUser(req);
+    const extra = Number.isInteger(round) && round > 0 ? { round } : {};
+    try {
+      if (!catalog.season || !Number.isInteger(teamId) || teamId <= 0) {
+        throw new Error("A valid team is required.");
+      }
+      if (!["up", "down"].includes(direction)) throw new Error("Choose a valid team direction.");
+      const index = catalog.teams.findIndex((team) => Number(team.id) === teamId);
+      if (index < 0) throw new Error("Team is not part of this season.");
+      const swapIndex = direction === "up" ? index - 1 : index + 1;
+      if (swapIndex < 0 || swapIndex >= catalog.teams.length) {
+        return redirectInputs(res, season, "teams", null, null, extra);
+      }
+
+      const reordered = catalog.teams.slice();
+      const current = reordered[index];
+      reordered[index] = reordered[swapIndex];
+      reordered[swapIndex] = current;
+      const now = new Date().toISOString();
+      const updateOrder = db.prepare(
+        "UPDATE season_teams SET display_order = ?, order_basis = 'manual', updated_at = ? WHERE season_id = ? AND team_id = ?"
+      );
+      const tx = db.transaction(() => {
+        reordered.forEach((team, orderIndex) => {
+          updateOrder.run(orderIndex + 1, now, catalog.season.id, Number(team.id));
+        });
+      });
+      tx();
+      logEvent("info", "admin_inputs_team_reordered", {
+        userId: adminUser?.id || null,
+        season,
+        teamId,
+        direction
+      });
+      return redirectInputs(res, season, "teams", "success", "Team order updated.", extra);
+    } catch (err) {
+      return redirectInputs(res, season, "teams", "error", err.message, extra);
     }
   });
 
