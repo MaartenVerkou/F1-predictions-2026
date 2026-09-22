@@ -11,4 +11,4 @@
 ## 3. Verification
 
 - [x] 3.1 Add tests for normalization, persistence, and seeded metadata.
-- [ ] 3.2 Run syntax checks, full tests, OpenSpec validation, preview seed/UI checks, and production health checks without changing production data.
+- [x] 3.2 Run syntax checks, full tests, OpenSpec validation, preview seed/UI checks, and production health checks without changing production data.
