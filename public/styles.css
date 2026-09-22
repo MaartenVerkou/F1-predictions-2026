@@ -2042,6 +2042,10 @@ button:disabled {
   font-size: 13px;
 }
 
+.admin-season-policy[hidden] {
+  display: none;
+}
+
 .admin-season-policy.is-archived {
   border-color: color-mix(in srgb, var(--alert-border) 72%, var(--border));
   background: color-mix(in srgb, var(--card) 88%, var(--alert-bg) 12%);
