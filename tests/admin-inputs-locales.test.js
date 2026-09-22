@@ -52,3 +52,14 @@ test("all admin input locales explain each save action", () => {
     }
   }
 });
+
+test("compact team metadata uses readable labels", () => {
+  const expectedSince = { de: "seit {year}", en: "since {year}", es: "desde {year}", fr: "depuis {year}", nl: "sinds {year}" };
+  for (const locale of LOCALES) {
+    const translations = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "..", "locales", `${locale}.json`), "utf8")
+    );
+    assert.equal(translations.admin_inputs.f1_since_short, expectedSince[locale]);
+    assert.match(translations.admin_inputs.power_unit_short, /^PU\s*:/);
+  }
+});

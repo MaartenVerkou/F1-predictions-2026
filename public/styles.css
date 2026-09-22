@@ -2304,6 +2304,8 @@ button:disabled {
 }
 
 .admin-inputs-data-table-wrap {
+  min-width: 0;
+  max-width: 100%;
   margin-top: 0;
 }
 
@@ -2324,6 +2326,8 @@ button:disabled {
   font-size: 11px;
   font-weight: 500;
   line-height: 1.25;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .admin-inputs-table.table th,
@@ -2576,6 +2580,45 @@ button:disabled {
 }
 
 @media (max-width: 760px) {
+  .admin-inputs-page .admin-inputs-view-toolbar {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .admin-inputs-page .admin-inputs-toolbar-end {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .admin-inputs-page .admin-inputs-table-toolbar {
+    gap: 6px;
+  }
+
+  .admin-inputs-page .admin-inputs-table th,
+  .admin-inputs-page .admin-inputs-table td {
+    padding: 7px 8px;
+  }
+
+  .admin-inputs-page .admin-inputs-team-table .admin-inputs-entity-meta,
+  .admin-inputs-page .admin-inputs-driver-table .admin-inputs-entity-meta,
+  .admin-inputs-page .admin-inputs-race-table .admin-inputs-entity-meta {
+    white-space: normal;
+  }
+
+  .admin-inputs-page .admin-inputs-row-editor-row td {
+    min-width: 0;
+  }
+
+  .admin-inputs-page .admin-inputs-row-edit-form {
+    min-width: 0;
+  }
+
+  .admin-inputs-page .admin-inputs-row-edit-form input,
+  .admin-inputs-page .admin-inputs-row-edit-form select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .admin-inputs-lineup-seats {
     grid-template-columns: 1fr;
   }
@@ -2602,6 +2645,38 @@ button:disabled {
 .admin-inputs-driver-table .admin-inputs-driver-col-code { width: 15%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-nationality { width: 21%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-age { width: 18%; }
+
+.admin-inputs-race-table {
+  min-width: 680px;
+  table-layout: fixed;
+}
+
+.admin-inputs-race-table th:nth-child(1),
+.admin-inputs-race-table td:nth-child(1) { width: 9%; }
+.admin-inputs-race-table th:nth-child(2),
+.admin-inputs-race-table td:nth-child(2) { width: 39%; white-space: normal; }
+.admin-inputs-race-table th:nth-child(3),
+.admin-inputs-race-table td:nth-child(3) { width: 29%; }
+.admin-inputs-race-table th:nth-child(4),
+.admin-inputs-race-table td:nth-child(4) { width: 23%; }
+
+.admin-inputs-mapping-table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+
+.admin-inputs-mapping-table th:nth-child(1),
+.admin-inputs-mapping-table td:nth-child(1) { width: 13%; }
+.admin-inputs-mapping-table th:nth-child(2),
+.admin-inputs-mapping-table td:nth-child(2) { width: 13%; }
+.admin-inputs-mapping-table th:nth-child(3),
+.admin-inputs-mapping-table td:nth-child(3),
+.admin-inputs-mapping-table th:nth-child(4),
+.admin-inputs-mapping-table td:nth-child(4) { width: 20%; white-space: normal; overflow-wrap: anywhere; }
+.admin-inputs-mapping-table th:nth-child(5),
+.admin-inputs-mapping-table td:nth-child(5) { width: 12%; }
+.admin-inputs-mapping-table th:nth-child(6),
+.admin-inputs-mapping-table td:nth-child(6) { width: 22%; }
 
 .admin-inputs-table th,
 .admin-inputs-table td {

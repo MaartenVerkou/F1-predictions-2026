@@ -62,6 +62,20 @@ test("teams table exposes compact power-unit metadata and editor input", () => {
   assert.match(view, /name="base_country_code"[\s\S]*?maxlength="3" pattern="\[A-Za-z\]\{3\}"/);
 });
 
+test("all input tables use explicit responsive table variants", () => {
+  const view = readView("admin_inputs.ejs");
+  assert.match(view, /admin-inputs-driver-table/);
+  assert.match(view, /admin-inputs-team-table/);
+  assert.match(view, /admin-inputs-race-table/);
+  assert.match(view, /admin-inputs-mapping-table/);
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(styles, /\.admin-inputs-data-table-wrap\s*\{[\s\S]*?max-width:\s*100%/);
+  assert.match(styles, /\.admin-inputs-race-table\s*\{/);
+  assert.match(styles, /\.admin-inputs-mapping-table\s*\{/);
+  assert.match(styles, /\.admin-inputs-page \.admin-inputs-view-toolbar\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.match(styles, /overflow-wrap:\s*anywhere/);
+});
+
 test("inputs exposes shared historical confirmation and advanced data states", () => {
   const view = readView("admin_inputs.ejs");
   assert.match(view, /data-admin-season-policy/);
