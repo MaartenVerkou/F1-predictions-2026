@@ -97,7 +97,7 @@ function normalizeTeamCode(value) {
 function normalizeCountryCode(value, label = "Country code") {
   if (value == null || String(value).trim() === "") return null;
   const code = String(value).trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(code)) throw new Error(`${label} must contain exactly two letters.`);
+  if (!/^[A-Z]{3}$/.test(code)) throw new Error(`${label} must contain exactly three letters.`);
   return code;
 }
 

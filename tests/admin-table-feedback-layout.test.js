@@ -89,7 +89,10 @@ test("race inputs show the localized scheduled start", () => {
   const view = readView("admin_inputs.ejs");
   assert.match(view, /admin_inputs\.race_start/);
   assert.match(view, /formatRaceStart/);
+  assert.match(view, /formatRaceOffset/);
+  assert.match(view, /timeZoneName: 'shortOffset'/);
   assert.match(view, /scheduled_timezone/);
+  assert.match(view, /\(<%= raceOffset %>\)/);
   assert.match(view, /colspan="4"/);
 });
 

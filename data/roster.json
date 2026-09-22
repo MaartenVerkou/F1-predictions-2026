@@ -85,16 +85,16 @@
     "Williams"
   ],
   "team_profiles": {
-    "Alpine": {"team_code": "ALP", "base_country_code": "GB", "f1_entry_year": 2021, "power_unit": "Mercedes"},
-    "Aston Martin": {"team_code": "AMR", "base_country_code": "GB", "f1_entry_year": 2021, "power_unit": "Honda"},
-    "Audi": {"team_code": "AUD", "base_country_code": "CH", "f1_entry_year": 2026, "power_unit": "Audi"},
-    "Cadillac": {"team_code": "CAD", "base_country_code": "GB", "f1_entry_year": 2026, "power_unit": "Ferrari"},
-    "Ferrari": {"team_code": "FER", "base_country_code": "IT", "f1_entry_year": 1950, "power_unit": "Ferrari"},
-    "Haas F1 Team": {"team_code": "HAS", "base_country_code": "US", "f1_entry_year": 2016, "power_unit": "Ferrari"},
-    "McLaren": {"team_code": "MCL", "base_country_code": "GB", "f1_entry_year": 1966, "power_unit": "Mercedes"},
-    "Mercedes": {"team_code": "MER", "base_country_code": "GB", "f1_entry_year": 2010, "power_unit": "Mercedes"},
-    "Racing Bulls": {"team_code": "RBU", "base_country_code": "IT", "f1_entry_year": 2006, "power_unit": "Red Bull Ford"},
-    "Red Bull Racing": {"team_code": "RBR", "base_country_code": "GB", "f1_entry_year": 2005, "power_unit": "Red Bull Ford"},
-    "Williams": {"team_code": "WIL", "base_country_code": "GB", "f1_entry_year": 1978, "power_unit": "Mercedes"}
+    "Alpine": {"team_code": "ALP", "base_country_code": "GBR", "f1_entry_year": 2021, "power_unit": "Mercedes"},
+    "Aston Martin": {"team_code": "AMR", "base_country_code": "GBR", "f1_entry_year": 2021, "power_unit": "Honda"},
+    "Audi": {"team_code": "AUD", "base_country_code": "SUI", "f1_entry_year": 2026, "power_unit": "Audi"},
+    "Cadillac": {"team_code": "CAD", "base_country_code": "GBR", "f1_entry_year": 2026, "power_unit": "Ferrari"},
+    "Ferrari": {"team_code": "FER", "base_country_code": "ITA", "f1_entry_year": 1950, "power_unit": "Ferrari"},
+    "Haas F1 Team": {"team_code": "HAS", "base_country_code": "USA", "f1_entry_year": 2016, "power_unit": "Ferrari"},
+    "McLaren": {"team_code": "MCL", "base_country_code": "GBR", "f1_entry_year": 1966, "power_unit": "Mercedes"},
+    "Mercedes": {"team_code": "MER", "base_country_code": "GBR", "f1_entry_year": 2010, "power_unit": "Mercedes"},
+    "Racing Bulls": {"team_code": "RBU", "base_country_code": "ITA", "f1_entry_year": 2006, "power_unit": "Red Bull Ford"},
+    "Red Bull Racing": {"team_code": "RBR", "base_country_code": "GBR", "f1_entry_year": 2005, "power_unit": "Red Bull Ford"},
+    "Williams": {"team_code": "WIL", "base_country_code": "GBR", "f1_entry_year": 1978, "power_unit": "Mercedes"}
   }
 }

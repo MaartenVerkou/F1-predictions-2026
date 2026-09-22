@@ -23,12 +23,12 @@ function createDb() {
 test("entity metadata normalizers accept canonical values and reject malformed values", () => {
   assert.equal(normalizeEntityCode(" mer ", "Team code"), "MER");
   assert.equal(normalizeTeamCode(" rbu "), "RBU");
-  assert.equal(normalizeCountryCode("gb"), "GB");
+  assert.equal(normalizeCountryCode("gbr"), "GBR");
   assert.equal(normalizeF1EntryYear("2026"), 2026);
   assert.equal(normalizeEntityCode("", "Team code"), null);
   assert.throws(() => normalizeEntityCode("too-long-code", "Team code"), /Team code/);
   assert.throws(() => normalizeTeamCode("RB"), /three letters/);
-  assert.throws(() => normalizeCountryCode("GBR"), /Country code/);
+  assert.throws(() => normalizeCountryCode("GB"), /three letters/);
   assert.throws(() => normalizeF1EntryYear("1949"), /F1 entry season/);
 });
 
@@ -40,7 +40,7 @@ test("team and race metadata persists through the season catalog", () => {
       displayName: "Mercedes",
       slug: "mercedes",
       teamCode: "mer",
-      baseCountryCode: "gb",
+      baseCountryCode: "gbr",
       f1EntryYear: 2010,
       powerUnit: "Mercedes"
     });
@@ -53,7 +53,7 @@ test("team and race metadata persists through the season catalog", () => {
       scheduledDate: "2026-03-08T04:00:00Z",
       scheduledTimezone: "Australia/Melbourne",
       raceCode: "aus",
-      countryCode: "au",
+      countryCode: "aus",
       circuitName: "Albert Park Circuit"
     });
 
@@ -65,7 +65,7 @@ test("team and race metadata persists through the season catalog", () => {
         f1_entry_year: catalog.teams[0].f1_entry_year,
         power_unit: catalog.teams[0].power_unit
       },
-      { team_code: "MER", base_country_code: "GB", f1_entry_year: 2010, power_unit: "Mercedes" }
+      { team_code: "MER", base_country_code: "GBR", f1_entry_year: 2010, power_unit: "Mercedes" }
     );
     assert.deepEqual(
       catalog.races[0] && {
@@ -76,7 +76,7 @@ test("team and race metadata persists through the season catalog", () => {
       },
       {
         race_code: "AUS",
-        country_code: "AU",
+        country_code: "AUS",
         circuit_name: "Albert Park Circuit",
         scheduled_timezone: "Australia/Melbourne"
       }
@@ -93,13 +93,13 @@ test("omitting metadata on a later upsert preserves researched values", () => {
       displayName: "Ferrari",
       slug: "ferrari",
       teamCode: "FER",
-      baseCountryCode: "IT",
+      baseCountryCode: "ITA",
       f1EntryYear: 1950,
       powerUnit: "Ferrari"
     });
     upsertTeam(db, { displayName: "Ferrari", slug: "ferrari", shortName: "Ferrari" });
     const row = db.prepare("SELECT team_code, base_country_code, f1_entry_year, power_unit FROM teams WHERE id = ?").get(teamId);
-    assert.deepEqual(row, { team_code: "FER", base_country_code: "IT", f1_entry_year: 1950, power_unit: "Ferrari" });
+    assert.deepEqual(row, { team_code: "FER", base_country_code: "ITA", f1_entry_year: 1950, power_unit: "Ferrari" });
   } finally {
     db.close();
   }
