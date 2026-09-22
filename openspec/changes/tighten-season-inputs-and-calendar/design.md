@@ -22,7 +22,7 @@ The admin Inputs page is intentionally dense, but the current Teams view adds a 
 
 ### 1. Preserve the existing race list and enrich its schedule
 
-Keep `data/races.json.races` as the compatibility-free list of canonical display names used by the app. Add a `calendar.2026` map keyed by those names, with `start` as an ISO UTC instant and `timezone` as an IANA venue timezone. The seed script passes these values to the existing `races.scheduled_date` field and a new nullable `races.scheduled_timezone` field. This avoids renumbering evidence while making the schedule authoritative for the current model.
+Keep `data/races.json.races` as the compatibility-free list of canonical display names used by the app. Add a `calendar.2026` map keyed by those names, with `start` as an ISO UTC instant and `timezone` as an IANA venue timezone. The seed script passes these values to the existing `races.scheduled_date` field and a new nullable `races.scheduled_timezone` field. Preview season copying looks up the target year's map instead of copying another year's dates, so unpublished years remain explicitly unscheduled. This avoids renumbering evidence while making the schedule authoritative for the current model.
 
 Alternatives rejected: replacing the `races` array with objects would require changing multiple roster/results consumers; storing local wall-clock strings without a timezone would make later display and export ambiguous.
 

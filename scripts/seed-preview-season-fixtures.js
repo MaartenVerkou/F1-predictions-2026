@@ -1,6 +1,7 @@
 "use strict";
 
 const path = require("path");
+const fs = require("fs");
 const { createAppDatabase } = require("../src/app-database");
 const {
   createOrGetSeason,
@@ -13,6 +14,11 @@ const {
 } = require("../src/season-inputs");
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "..", "data");
+const RACES_PATH = path.join(DATA_DIR, "races.json");
+
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
+}
 
 function copySeason(db, sourceSeason, targetSeason, status, { replacement = false } = {}) {
   const now = new Date().toISOString();
@@ -24,6 +30,7 @@ function copySeason(db, sourceSeason, targetSeason, status, { replacement = fals
     status,
     now
   });
+  const calendar = readJson(RACES_PATH).calendar?.[String(targetSeason)] || {};
 
   db.prepare("DELETE FROM driver_team_assignments WHERE season_id = ?").run(target.id);
   db.prepare("DELETE FROM races WHERE season_id = ?").run(target.id);
@@ -55,8 +62,8 @@ function copySeason(db, sourceSeason, targetSeason, status, { replacement = fals
       roundNumber: row.round_number,
       slug: row.slug,
       displayName: row.display_name,
-      scheduledDate: row.scheduled_date,
-      scheduledTimezone: row.scheduled_timezone,
+      scheduledDate: calendar[row.display_name]?.start || null,
+      scheduledTimezone: calendar[row.display_name]?.timezone || null,
       calendarState: row.calendar_state,
       now
     });
