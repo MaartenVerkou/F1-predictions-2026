@@ -2211,6 +2211,15 @@ button:disabled {
   min-height: 32px;
 }
 
+.admin-inputs-view-toolbar .admin-inputs-toolbar-end > button,
+.admin-inputs-view-toolbar .admin-inputs-toolbar-end > .admin-inputs-advanced-link {
+  min-height: 34px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
 .admin-inputs-selection {
   max-width: min(32vw, 260px);
   overflow: hidden;
@@ -2420,8 +2429,8 @@ button:disabled {
 .admin-lineup-period {
   display: flex;
   align-items: baseline;
-  justify-content: flex-start;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 8px;
   min-width: 0;
   padding: 3px 0;
 }
@@ -2432,15 +2441,18 @@ button:disabled {
 
 .admin-lineup-period strong {
   min-width: 0;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: right;
 }
 
 .admin-lineup-period span {
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
+  text-align: right;
 }
 
 .admin-inputs-team-editor {
