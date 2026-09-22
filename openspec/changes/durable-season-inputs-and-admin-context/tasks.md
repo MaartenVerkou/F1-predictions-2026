@@ -10,7 +10,7 @@
 - [x] 2.1 Audit and harden the canonical tables and repository helpers so immutable driver/team identities, season membership, driver numbers, display order, and active state remain separate.
 - [x] 2.2 Add shared effective-round projection validation for non-overlapping driver intervals, team-seat occupancy, and duplicate driver occupancy.
 - [ ] 2.3 Route Inputs, Race data, Questions option resolution, and Actuals display lookups through the same effective-round projection service.
-- [ ] 2.4 Add regression tests for renames, driver numbers, team swaps, mid-season replacement, round boundaries, and historical evidence identity preservation.
+- [x] 2.4 Add regression tests for renames, driver numbers, team swaps, mid-season replacement, round boundaries, and historical evidence identity preservation.
 
 ## 3. Reusable admin table interaction
 
