@@ -1,5 +1,7 @@
 "use strict";
 
+const { assertAssignmentIntervals } = require("./season-lineup");
+
 const ENTITY_TYPES = Object.freeze({
   DRIVER: "driver",
   TEAM: "team",
@@ -119,6 +121,12 @@ function ensureSeasonInputsSchema(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_driver_team_assignments_lookup
       ON driver_team_assignments(season_id, driver_id, from_round, to_round);
+    CREATE INDEX IF NOT EXISTS idx_driver_team_assignments_seat_lookup
+      ON driver_team_assignments(season_id, team_id, seat_number, from_round, to_round);
+    CREATE INDEX IF NOT EXISTS idx_season_drivers_driver_lookup
+      ON season_drivers(driver_id, season_id);
+    CREATE INDEX IF NOT EXISTS idx_season_teams_team_lookup
+      ON season_teams(team_id, season_id);
     CREATE TABLE IF NOT EXISTS entity_aliases (
       id ${identityType}, entity_type TEXT NOT NULL, entity_id INTEGER NOT NULL, season_id INTEGER,
       alias TEXT NOT NULL, normalized_alias TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'admin',
@@ -366,12 +374,14 @@ function listSeasonInputs(db, year) {
   const season = db.prepare("SELECT * FROM seasons WHERE year = ? LIMIT 1").get(Number(year));
   if (!season) return { season: null, drivers: [], teams: [], races: [], assignments: [], unresolved: [] };
   const seasonId = Number(season.id);
+  const assignments = db.prepare("SELECT a.*, d.display_name AS driver_name, t.display_name AS team_name, st.display_order FROM driver_team_assignments a JOIN drivers d ON d.id = a.driver_id JOIN teams t ON t.id = a.team_id LEFT JOIN season_teams st ON st.season_id = a.season_id AND st.team_id = a.team_id WHERE a.season_id = ? ORDER BY COALESCE(st.display_order, 9999), a.seat_number, a.from_round, d.display_name").all(seasonId);
+  assertAssignmentIntervals(assignments);
   return {
     season: { ...season, id: seasonId, year: Number(season.year) },
     drivers: sortSeasonDrivers(db.prepare("SELECT d.*, sd.driver_number, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ? ORDER BY d.id").all(seasonId)),
     teams: db.prepare("SELECT t.*, st.display_name_override, st.display_order, st.order_basis, st.active AS season_active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ? ORDER BY COALESCE(st.display_order, 9999), t.display_name").all(seasonId),
     races: db.prepare("SELECT * FROM races WHERE season_id = ? ORDER BY round_number").all(seasonId),
-    assignments: db.prepare("SELECT a.*, d.display_name AS driver_name, t.display_name AS team_name, st.display_order FROM driver_team_assignments a JOIN drivers d ON d.id = a.driver_id JOIN teams t ON t.id = a.team_id LEFT JOIN season_teams st ON st.season_id = a.season_id AND st.team_id = a.team_id WHERE a.season_id = ? ORDER BY COALESCE(st.display_order, 9999), a.seat_number, a.from_round, d.display_name").all(seasonId),
+    assignments,
     unresolved: []
   };
 }
