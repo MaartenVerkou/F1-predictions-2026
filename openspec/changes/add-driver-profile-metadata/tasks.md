@@ -13,4 +13,4 @@
 ## 3. Verification and preview
 
 - [x] 3.1 Add focused tests for schema migration, normalization, age calculation, route validation, and rendered table structure.
-- [ ] 3.2 Run OpenSpec validation and the project test gates, then rebuild and smoke-test the isolated preview without changing production.
+- [x] 3.2 Run OpenSpec validation and the project test gates, then rebuild and smoke-test the isolated preview without changing production.
