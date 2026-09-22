@@ -1,6 +1,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const Database = require("better-sqlite3");
+const fs = require("node:fs");
+const path = require("node:path");
 const {
   createOrGetSeason,
   ensureSeasonInputsSchema,
@@ -37,5 +39,17 @@ test("race schedule stores the instant and venue timezone", () => {
     assert.ok(db.prepare("PRAGMA table_info(races)").all().some((column) => column.name === "scheduled_timezone"));
   } finally {
     db.close();
+  }
+});
+
+test("the season calendar is keyed by the established race names", () => {
+  const raceData = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "..", "data", "races.json"), "utf8").replace(/^\uFEFF/, "")
+  );
+  const schedule = raceData.calendar?.["2026"] || {};
+  assert.equal(Object.keys(schedule).length, raceData.races.length);
+  for (const raceName of raceData.races) {
+    assert.equal(typeof schedule[raceName]?.start, "string", `${raceName} needs a start instant`);
+    assert.equal(typeof schedule[raceName]?.timezone, "string", `${raceName} needs a timezone`);
   }
 });
