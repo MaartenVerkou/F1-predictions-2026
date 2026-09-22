@@ -50,15 +50,22 @@
         <% if (query?.success) { %><div class="alert success" role="status"><%= query.success %></div><% } %>
       </div>
     <% } %>
-    <div class="admin-inputs-summary muted">
-      <span><strong><%= catalog.season.label %></strong></span>
-      <span><%= catalog.season.status %></span>
-      <span><%= t('admin_inputs.driver_count', { count: catalog.drivers.length }) %></span>
-      <span><%= t('admin_inputs.team_count', { count: catalog.teams.length }) %></span>
-      <span><%= t('admin_inputs.race_count', { count: catalog.races.length }) %></span>
-      <span><%= t('admin_inputs.assignment_count', { count: catalog.assignments.length }) %></span>
+    <% const seasonImpact = catalog.impact || {}; const hasImpactSummary = Number(seasonImpact.evidenceSnapshots || 0) > 0 || Number(seasonImpact.actualSnapshots || 0) > 0 || Number(seasonImpact.actualValues || 0) > 0; %>
+    <div class="admin-inputs-summary" aria-label="<%= catalog.season.year %> season summary">
+      <div class="admin-inputs-season-meta">
+        <strong><%= catalog.season.year %></strong>
+        <span class="admin-inputs-status admin-inputs-status--<%= catalog.season.status %>"><%= catalog.season.status %></span>
+      </div>
+      <div class="admin-inputs-counts muted">
+        <span><%= t('admin_inputs.driver_count', { count: catalog.drivers.length }) %></span>
+        <span><%= t('admin_inputs.team_count', { count: catalog.teams.length }) %></span>
+        <span><%= t('admin_inputs.race_count', { count: catalog.races.length }) %></span>
+        <span><%= t('admin_inputs.assignment_count', { count: catalog.assignments.length }) %></span>
+      </div>
     </div>
-    <p class="muted admin-inputs-impact"><%= t('admin_inputs.impact_summary', { evidence: catalog.impact?.evidenceSnapshots || 0, snapshots: catalog.impact?.actualSnapshots || 0, values: catalog.impact?.actualValues || 0 }) %></p>
+    <% if (hasImpactSummary) { %>
+      <p class="muted admin-inputs-impact"><%= t('admin_inputs.impact_summary', { evidence: seasonImpact.evidenceSnapshots || 0, snapshots: seasonImpact.actualSnapshots || 0, values: seasonImpact.actualValues || 0 }) %></p>
+    <% } %>
 
     <nav class="admin-inputs-tabs" aria-label="<%= t('admin_inputs.tabs') %>">
       <% ['drivers', 'teams', 'races'].forEach((name) => { %>
@@ -76,12 +83,12 @@
     <% if (tab === 'drivers') { %>
       <div class="admin-inputs-table-toolbar" data-table-toolbar="drivers" data-table-capabilities="edit,add,remove">
         <div class="admin-inputs-toolbar-start">
-          <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
-          <button type="button" data-add-driver-row>+ <%= t('admin_inputs.add_driver') %></button>
+          <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
         </div>
         <div class="admin-inputs-toolbar-end">
-          <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
-          <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
+          <button type="button" data-add-driver-row>+ <%= t('admin_inputs.add_driver') %></button>
+          <button class="secondary" type="button" data-table-edit data-hide-until-selection disabled hidden><%= t('admin_inputs.edit') %></button>
+          <button class="secondary" type="button" data-table-remove data-hide-until-selection data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled hidden><%= t('admin_inputs.remove') %></button>
         </div>
       </div>
       <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver" data-season-mutation>
@@ -113,12 +120,12 @@
       <p class="muted admin-inputs-lineup-help"><%= t('admin_inputs.lineup_editor_help') %></p>
       <div class="admin-inputs-table-toolbar" data-table-toolbar="teams" data-table-capabilities="edit,remove,reorder">
         <div class="admin-inputs-toolbar-start">
-          <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
+          <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
         </div>
         <div class="admin-inputs-toolbar-end">
-          <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
           <a class="secondary admin-inputs-advanced-link" href="/admin/inputs?season=<%= season %>&tab=assignments"><%= t('admin_inputs.assignment_history') %></a>
-          <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
+          <button class="secondary" type="button" data-table-edit data-hide-until-selection disabled hidden><%= t('admin_inputs.edit') %></button>
+          <button class="secondary" type="button" data-table-remove data-hide-until-selection data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled hidden><%= t('admin_inputs.remove') %></button>
         </div>
       </div>
       <form id="admin-inputs-remove-form" method="post" action="/admin/inputs/remove" data-season-mutation hidden>
@@ -209,10 +216,10 @@
     <% } else if (tab === 'races') { %>
       <div class="admin-inputs-table-toolbar" data-table-toolbar="races" data-table-capabilities="edit">
         <div class="admin-inputs-toolbar-start">
-          <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
+          <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
         </div>
         <div class="admin-inputs-toolbar-end">
-          <span class="admin-inputs-selection" data-table-selection aria-live="polite"></span>
+          <button class="secondary" type="button" data-table-edit data-hide-until-selection disabled hidden><%= t('admin_inputs.edit') %></button>
         </div>
       </div>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_races') %>" tabindex="0">

@@ -1075,9 +1075,10 @@ const initAdminInputTables = () => {
     const selection = toolbar.querySelector('[data-table-selection]');
     const rows = Array.from(table.querySelectorAll('[data-selectable-row]'));
     let selectedRow = null;
+    const hideUntilSelection = (control) => control?.hasAttribute('data-hide-until-selection');
 
-    if (editButton && !can('edit')) editButton.hidden = true;
-    if (removeButton && !can('remove')) removeButton.hidden = true;
+    if (editButton && (!can('edit') || hideUntilSelection(editButton))) editButton.hidden = true;
+    if (removeButton && (!can('remove') || hideUntilSelection(removeButton))) removeButton.hidden = true;
     toolbar.querySelectorAll('[data-add-driver-row]').forEach((button) => {
       if (!can('add')) button.hidden = true;
     });
@@ -1094,8 +1095,14 @@ const initAdminInputTables = () => {
         row.setAttribute('aria-selected', 'false');
       });
       selectedRow = null;
-      if (editButton) editButton.disabled = true;
-      if (removeButton) removeButton.disabled = true;
+      if (editButton) {
+        editButton.disabled = true;
+        if (hideUntilSelection(editButton)) editButton.hidden = true;
+      }
+      if (removeButton) {
+        removeButton.disabled = true;
+        if (hideUntilSelection(removeButton)) removeButton.hidden = true;
+      }
       if (selection) selection.textContent = '';
     };
 
@@ -1107,8 +1114,14 @@ const initAdminInputTables = () => {
         candidate.setAttribute('aria-selected', String(isSelected));
       });
       selectedRow = row;
-      if (editButton && can('edit')) editButton.disabled = false;
-      if (removeButton && can('remove')) removeButton.disabled = false;
+      if (editButton && can('edit')) {
+        editButton.disabled = false;
+        if (hideUntilSelection(editButton)) editButton.hidden = false;
+      }
+      if (removeButton && can('remove')) {
+        removeButton.disabled = false;
+        if (hideUntilSelection(removeButton)) removeButton.hidden = false;
+      }
       if (selection) selection.textContent = row.dataset.rowLabel || '';
     };
 
