@@ -2299,6 +2299,125 @@ button:disabled {
   min-width: 190px;
 }
 
+.admin-inputs-lineup-help {
+  margin: 0 0 12px;
+}
+
+.admin-inputs-lineup-history-cell {
+  min-width: 210px;
+  white-space: normal !important;
+  vertical-align: top;
+}
+
+.admin-lineup-period {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.admin-lineup-period + .admin-lineup-period {
+  border-top: 1px dashed var(--border);
+}
+
+.admin-lineup-period strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-lineup-period span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-inputs-team-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-inputs-team-details-form,
+.admin-inputs-lineup-history-form {
+  margin: 0;
+}
+
+.admin-inputs-lineup-history-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-inputs-lineup-seats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-inputs-lineup-seat {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.admin-inputs-lineup-seat legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-inputs-lineup-seat [data-lineup-period-rows] {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-lineup-period-editor {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 90px 90px auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.admin-lineup-period-editor label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-lineup-period-editor select,
+.admin-lineup-period-editor input {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-lineup-period-remove {
+  min-width: 32px;
+  padding-inline: 8px;
+}
+
+.admin-lineup-period-add {
+  justify-self: start;
+  margin-top: 8px;
+}
+
+.admin-inputs-lineup-history-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-inputs-lineup-history-actions .muted {
+  font-size: 12px;
+}
+
 .admin-inputs-history-warning {
   display: grid;
   gap: 8px;
@@ -2310,6 +2429,16 @@ button:disabled {
   align-items: center;
   gap: 7px;
   font-weight: 600;
+}
+
+@media (max-width: 760px) {
+  .admin-inputs-lineup-seats {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-lineup-period-editor {
+    grid-template-columns: minmax(0, 1fr) 78px 78px auto;
+  }
 }
 
 .admin-inputs-table {

@@ -1102,6 +1102,28 @@ const initAdminInputTables = () => {
   });
 };
 
+const initAdminLineupHistoryEditors = () => {
+  document.querySelectorAll('[data-lineup-history-form]').forEach((form) => {
+    form.addEventListener('click', (event) => {
+      const addButton = event.target.closest('[data-lineup-add-period]');
+      if (addButton && form.contains(addButton)) {
+        const seat = addButton.closest('[data-lineup-period-list]');
+        const list = seat?.querySelector('[data-lineup-period-rows]');
+        const template = seat?.querySelector('template[data-lineup-period-template]');
+        if (!list || !template) return;
+        list.appendChild(template.content.cloneNode(true));
+        list.lastElementChild?.querySelector('select, input')?.focus();
+        return;
+      }
+      const removeButton = event.target.closest('[data-lineup-remove-period]');
+      if (!removeButton || !form.contains(removeButton)) return;
+      const message = form.dataset.lineupRemoveConfirm || 'Remove this period?';
+      if (!window.confirm(message)) return;
+      removeButton.closest('[data-lineup-period-row]')?.remove();
+    });
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
   initHeaderOffsets();
@@ -1124,6 +1146,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initPredictionsAutosave();
   initAdminActualsUnsavedState();
   initAdminInputTables();
+  initAdminLineupHistoryEditors();
   initSignupPasswordMatch();
   initScrollToEndButton();
 });

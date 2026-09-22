@@ -109,7 +109,14 @@
     ,"empty_seat": "Empty seat"
     ,"save_lineup": "Save lineup",
     "lineup_history": "Line-up history",
-    "lineup_history_help": "Read-only; edit the round-aware team line-up above."
+    "lineup_history_help": "Read-only diagnostic history; edit periods in Teams.",
+    "lineup_editor_help": "Maintain each seat as driver periods. Leave the end round empty for the current driver.",
+    "lineup_period_empty": "No driver assigned",
+    "present": "present",
+    "add_period": "Add period",
+    "remove_period": "Remove period",
+    "remove_period_confirm": "Remove this driver period? The change may affect historical data.",
+    "historical_warning_short": "Past changes require confirmation."
     ,"historical_warning": "This round already has imported evidence or reviewed actuals. Saving changes the canonical lineup used for this round and later rounds."
     ,"historical_confirm": "I understand this is a historical correction."
   },

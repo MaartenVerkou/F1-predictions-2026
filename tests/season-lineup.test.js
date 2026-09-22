@@ -5,6 +5,8 @@ const {
   assertAssignmentIntervals,
   buildLineupProjection,
   buildLineupPlan,
+  buildTeamLineupHistory,
+  buildTeamLineupHistoryPlan,
   historicalCorrectionRequired
 } = require("../src/season-lineup");
 
@@ -15,7 +17,8 @@ const teams = [
 const drivers = [
   { id: 1, display_name: "Driver A" },
   { id: 2, display_name: "Driver B" },
-  { id: 3, display_name: "Driver C" }
+  { id: 3, display_name: "Driver C" },
+  { id: 4, display_name: "Driver D" }
 ];
 const assignments = [
   { id: 101, season_id: 2026, team_id: 10, driver_id: 1, seat_number: 1, from_round: 1, to_round: null },
@@ -148,4 +151,82 @@ test("historical corrections require explicit confirmation", () => {
   assert.equal(historicalCorrectionRequired({ roundNumber: 6, reviewedRounds: [6], evidenceRounds: [] }), true);
   assert.throws(() => assertHistoricalCorrection({ roundNumber: 6, evidenceRounds: [8] }), /Historical correction confirmation is required/);
   assert.doesNotThrow(() => assertHistoricalCorrection({ roundNumber: 6, evidenceRounds: [8], historicalCorrectionConfirmed: true }));
+});
+
+test("team history groups periods by seat in chronological order", () => {
+  const history = buildTeamLineupHistory({
+    teams,
+    drivers,
+    assignments: [
+      { id: 402, team_id: 10, driver_id: 2, seat_number: 1, from_round: 7, to_round: null },
+      { id: 401, team_id: 10, driver_id: 1, seat_number: 1, from_round: 1, to_round: 6 },
+      { id: 403, team_id: 10, driver_id: 3, seat_number: 2, from_round: 1, to_round: null }
+    ]
+  });
+  assert.deepEqual(history[0].seats[1].map((period) => [period.driverId, period.fromRound, period.toRound]), [[1, 1, 6], [2, 7, null]]);
+  assert.equal(history[0].seats[2][0].driverName, "Driver C");
+});
+
+test("team history plan preserves stable rows and inserts a replacement period", () => {
+  const plan = buildTeamLineupHistoryPlan({
+    teams,
+    drivers,
+    assignments,
+    teamId: 10,
+    seasonRoundCount: 22,
+    seatPeriods: {
+      1: [
+        { id: 101, driverId: 1, fromRound: 1, toRound: 5 },
+        { driverId: 4, fromRound: 6 }
+      ],
+      2: [{ id: 102, driverId: 2, fromRound: 1 }]
+    }
+  });
+  assert.deepEqual(plan.operations.map((operation) => operation.type), ["update", "insert"]);
+  assert.equal(plan.operations[0].assignmentId, 101);
+  assert.equal(plan.operations[1].fromRound, 6);
+  assert.equal(plan.affectedFromRound, 1);
+});
+
+test("team history rejects overlapping periods before writing", () => {
+  assert.throws(() => buildTeamLineupHistoryPlan({
+    teams,
+    drivers,
+    assignments,
+    teamId: 10,
+    seasonRoundCount: 22,
+    seatPeriods: {
+      1: [
+        { id: 101, driverId: 1, fromRound: 1, toRound: 6 },
+        { driverId: 4, fromRound: 6 }
+      ],
+      2: [{ id: 102, driverId: 2, fromRound: 1 }]
+    }
+  }), /seat 1 has overlapping/);
+});
+
+test("team history rejects a driver assigned to another team in the same period", () => {
+  assert.throws(() => buildTeamLineupHistoryPlan({
+    teams,
+    drivers,
+    assignments,
+    teamId: 10,
+    seasonRoundCount: 22,
+    seatPeriods: {
+      1: [{ id: 101, driverId: 3, fromRound: 1 }],
+      2: [{ id: 102, driverId: 2, fromRound: 1 }]
+    }
+  }), /overlapping team assignments/);
+});
+
+test("team history plan can remove all assignments for one seat", () => {
+  const plan = buildTeamLineupHistoryPlan({
+    teams,
+    drivers,
+    assignments,
+    teamId: 10,
+    seasonRoundCount: 22,
+    seatPeriods: { 1: [], 2: [{ id: 102, driverId: 2, fromRound: 1 }] }
+  });
+  assert.deepEqual(plan.operations, [{ type: "delete", assignmentId: 101, fromRound: 1, toRound: null }]);
 });

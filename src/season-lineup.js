@@ -93,6 +93,207 @@ function buildLineupProjection({ teams = [], drivers = [], assignments = [], rou
     }));
 }
 
+function buildTeamLineupHistory({ teams = [], drivers = [], assignments = [] }) {
+  const normalizedAssignments = assertAssignmentIntervals(assignments);
+  const sortedTeams = [...teams]
+    .filter((team) => team.active == null || Number(team.active) === 1 || team.active === true)
+    .sort((left, right) => Number(left.display_order || 9999) - Number(right.display_order || 9999)
+      || teamName(left).localeCompare(teamName(right)));
+  return sortedTeams.map((team) => {
+    const teamAssignments = normalizedAssignments
+      .filter((assignment) => assignment.teamId === Number(team.id))
+      .sort((left, right) => left.seatNumber - right.seatNumber
+        || left.fromRound - right.fromRound
+        || Number(left.id || 0) - Number(right.id || 0));
+    const seats = [1, 2].reduce((result, seatNumber) => {
+      result[seatNumber] = teamAssignments
+        .filter((assignment) => assignment.seatNumber === seatNumber)
+        .map((assignment) => ({
+          id: assignment.id == null ? null : Number(assignment.id),
+          seatNumber,
+          driverId: assignment.driverId,
+          driverName: driverName(drivers, assignment.driverId),
+          fromRound: assignment.fromRound,
+          toRound: assignment.toRound,
+          source: assignment.source || null
+        }));
+      return result;
+    }, {});
+    return {
+      teamId: Number(team.id),
+      teamName: teamName(team),
+      displayOrder: Number(team.display_order || 0),
+      active: team.active == null || Number(team.active) === 1 || team.active === true,
+      seats
+    };
+  });
+}
+
+function optionalPositiveInteger(value, label) {
+  if (value == null || String(value).trim() === "") return null;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) throw new Error(`${label} must be a positive integer.`);
+  return number;
+}
+
+function normalizeTeamHistoryPeriods({ teamId, seatNumber, periods = [], driverIds, seasonRoundCount }) {
+  const maxRound = Number(seasonRoundCount);
+  if (!Number.isInteger(maxRound) || maxRound < 1) throw new Error("The season has no valid rounds.");
+  return periods.map((period, index) => {
+    const id = optionalPositiveInteger(period.id ?? period.assignmentId ?? period.assignment_id, "Assignment id");
+    const driverId = optionalPositiveInteger(period.driverId ?? period.driver_id, "Driver");
+    const fromRound = optionalPositiveInteger(period.fromRound ?? period.from_round, "From round");
+    const toRound = optionalPositiveInteger(period.toRound ?? period.to_round, "To round");
+    const hasAnyValue = id != null || driverId != null || fromRound != null || toRound != null;
+    if (!hasAnyValue) return null;
+    if (driverId == null || fromRound == null) {
+      throw new Error(`Seat ${seatNumber} period ${index + 1} needs a driver and start round.`);
+    }
+    if (fromRound > maxRound || (toRound != null && toRound > maxRound)) {
+      throw new Error(`Seat ${seatNumber} period ${index + 1} must use rounds in this season.`);
+    }
+    if (toRound != null && toRound < fromRound) {
+      throw new Error(`Seat ${seatNumber} period ${index + 1} ends before it starts.`);
+    }
+    if (!driverIds.has(driverId)) throw new Error(`Driver ${driverId} is not part of this season.`);
+    return {
+      id,
+      seasonId: null,
+      driverId,
+      teamId: Number(teamId),
+      seatNumber: Number(seatNumber),
+      fromRound,
+      toRound
+    };
+  }).filter(Boolean);
+}
+
+function buildTeamLineupHistoryPlan({
+  teams = [],
+  drivers = [],
+  assignments = [],
+  teamId,
+  seatPeriods = {},
+  seasonRoundCount,
+  source = "admin-team-lineup"
+}) {
+  const safeTeamId = optionalPositiveInteger(teamId, "Team");
+  const teamIds = new Set(teams.map((team) => Number(team.id)));
+  if (!teamIds.has(safeTeamId)) throw new Error(`Team ${safeTeamId} is not part of this season.`);
+  const normalizedAssignments = assertAssignmentIntervals(assignments);
+  const existing = normalizedAssignments.filter((assignment) => assignment.teamId === safeTeamId);
+  const existingById = new Map(existing.filter((assignment) => assignment.id != null).map((assignment) => [Number(assignment.id), assignment]));
+  const driverIds = new Set(drivers.map((driver) => Number(driver.id)));
+  const desired = [1, 2].flatMap((seatNumber) => normalizeTeamHistoryPeriods({
+    teamId: safeTeamId,
+    seatNumber,
+    periods: seatPeriods[seatNumber] || seatPeriods[String(seatNumber)] || [],
+    driverIds,
+    seasonRoundCount
+  }));
+  const desiredIds = new Set();
+  desired.forEach((period) => {
+    if (period.id != null) {
+      if (desiredIds.has(period.id)) throw new Error(`Assignment ${period.id} is listed more than once.`);
+      if (!existingById.has(period.id)) throw new Error(`Assignment ${period.id} does not belong to this team.`);
+      desiredIds.add(period.id);
+    }
+  });
+  const candidate = normalizedAssignments
+    .filter((assignment) => assignment.teamId !== safeTeamId)
+    .concat(desired);
+  assertAssignmentIntervals(candidate);
+  const operations = [];
+  existing.forEach((assignment) => {
+    if (!desiredIds.has(Number(assignment.id))) operations.push({
+      type: "delete",
+      assignmentId: Number(assignment.id),
+      fromRound: assignment.fromRound,
+      toRound: assignment.toRound
+    });
+  });
+  desired.forEach((period) => {
+    if (period.id == null) {
+      operations.push({ type: "insert", ...period, source });
+      return;
+    }
+    const current = existingById.get(period.id);
+    if (Number(current.driverId) !== Number(period.driverId)
+      || Number(current.seatNumber) !== Number(period.seatNumber)
+      || Number(current.fromRound) !== Number(period.fromRound)
+      || (current.toRound == null ? null : Number(current.toRound)) !== period.toRound) {
+      operations.push({ type: "update", ...period, source, assignmentId: period.id, previous: current });
+    }
+  });
+  const affectedRounds = operations.flatMap((operation) => [operation.fromRound, operation.previous?.fromRound, operation.toRound, operation.previous?.toRound])
+    .filter((round) => Number.isInteger(Number(round)) && Number(round) > 0)
+    .map(Number);
+  return {
+    teamId: safeTeamId,
+    desired,
+    operations,
+    affectedFromRound: affectedRounds.length ? Math.min(...affectedRounds) : null,
+    source
+  };
+}
+
+function applyTeamLineupHistory(db, {
+  seasonId,
+  teamId,
+  seatPeriods,
+  source = "admin-team-lineup",
+  now = new Date().toISOString(),
+  reviewedRounds = [],
+  evidenceRounds = [],
+  historicalCorrectionConfirmed = false
+}) {
+  const safeSeasonId = optionalPositiveInteger(seasonId, "Season");
+  const teams = db.prepare(
+    "SELECT t.*, st.display_name_override, st.display_order, st.active FROM season_teams st JOIN teams t ON t.id = st.team_id WHERE st.season_id = ?"
+  ).all(safeSeasonId);
+  const drivers = db.prepare(
+    "SELECT d.*, sd.display_name_override, sd.active AS season_active FROM season_drivers sd JOIN drivers d ON d.id = sd.driver_id WHERE sd.season_id = ?"
+  ).all(safeSeasonId);
+  const assignments = db.prepare(
+    "SELECT * FROM driver_team_assignments WHERE season_id = ? ORDER BY from_round, id"
+  ).all(safeSeasonId);
+  const plan = buildTeamLineupHistoryPlan({
+    teams,
+    drivers,
+    assignments,
+    teamId,
+    seatPeriods,
+    seasonRoundCount: db.prepare("SELECT COUNT(*) AS count FROM races WHERE season_id = ?").get(safeSeasonId)?.count,
+    source
+  });
+  if (plan.affectedFromRound != null) {
+    assertHistoricalCorrection({
+      roundNumber: plan.affectedFromRound,
+      reviewedRounds,
+      evidenceRounds,
+      historicalCorrectionConfirmed
+    });
+  }
+  const tx = db.transaction(() => {
+    for (const operation of plan.operations) {
+      if (operation.type === "delete") {
+        db.prepare("DELETE FROM driver_team_assignments WHERE id = ? AND season_id = ?")
+          .run(operation.assignmentId, safeSeasonId);
+      } else if (operation.type === "update") {
+        db.prepare(
+          "UPDATE driver_team_assignments SET driver_id = ?, team_id = ?, seat_number = ?, from_round = ?, to_round = ?, source = ?, updated_at = ? WHERE id = ? AND season_id = ?"
+        ).run(operation.driverId, operation.teamId, operation.seatNumber, operation.fromRound, operation.toRound, String(operation.source), now, operation.assignmentId, safeSeasonId);
+      } else if (operation.type === "insert") {
+        db.prepare(
+          "INSERT INTO driver_team_assignments (season_id, driver_id, team_id, seat_number, from_round, to_round, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(safeSeasonId, operation.driverId, operation.teamId, operation.seatNumber, operation.fromRound, operation.toRound, String(operation.source), now, now);
+      }
+    }
+    return plan;
+  });
+  return tx();
+}
+
 function normalizeDesiredSeats({ teams, desiredSeats }) {
   const teamIds = new Set(teams.map((team) => Number(team.id)));
   const bySeat = new Map();
@@ -215,9 +416,12 @@ function applySeasonLineup(db, {
 
 module.exports = {
   applySeasonLineup,
+  applyTeamLineupHistory,
   assertAssignmentIntervals,
   assertHistoricalCorrection,
   buildLineupPlan,
   buildLineupProjection,
+  buildTeamLineupHistory,
+  buildTeamLineupHistoryPlan,
   historicalCorrectionRequired
 };

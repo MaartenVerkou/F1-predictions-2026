@@ -31,8 +31,11 @@ const {
 } = require("../season-inputs");
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
 const {
+  applyTeamLineupHistory,
   applySeasonLineup,
   buildLineupProjection,
+  buildTeamLineupHistory,
+  buildTeamLineupHistoryPlan,
   historicalCorrectionRequired
 } = require("../season-lineup");
 const {
@@ -2533,15 +2536,13 @@ function registerAdminRoutes(app, deps) {
     const lineupRound = catalog.races.length
       ? Math.min(Math.max(Number.isInteger(requestedRound) ? requestedRound : 1, 1), catalog.races.length)
       : 1;
-    const lineupProjection = catalog.season
-      ? buildLineupProjection({
+    const teamLineupHistory = catalog.season
+      ? buildTeamLineupHistory({
           teams: catalog.teams,
           drivers: catalog.drivers,
-          assignments: catalog.assignments,
-          roundNumber: lineupRound
+          assignments: catalog.assignments
         })
       : [];
-    const lineupReviewState = getLineupReviewState(season, lineupRound);
     catalog.impact = getSeasonInputImpact(season);
     catalog.mappings = seasonContext.selected ? listSeasonMappings(db, season) : [];
     return res.render("admin_inputs", {
@@ -2549,8 +2550,7 @@ function registerAdminRoutes(app, deps) {
       season,
       tab,
       lineupRound,
-      lineupProjection,
-      lineupReviewState,
+      teamLineupHistory,
       catalog,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
@@ -2853,6 +2853,63 @@ function registerAdminRoutes(app, deps) {
       return redirectInputs(res, season, "teams", "success", `Lineup saved (${result.operations.length} changes).`, { round: roundNumber });
     } catch (err) {
       return redirectInputs(res, season, "teams", "error", err.message, { round: roundNumber });
+    }
+  });
+
+  app.post("/admin/inputs/team-history", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const teamId = Number(req.body.team_id);
+    const catalog = listSeasonInputs(db, season);
+    const adminUser = getCurrentUser(req);
+    const historicalCorrectionConfirmed = String(req.body.historical_correction || "") === "1";
+    const values = (value) => Array.isArray(value) ? value : value == null ? [] : [value];
+    const readPeriods = (seatNumber) => {
+      const ids = values(req.body[`seat_${seatNumber}_assignment_id`]);
+      const driverIds = values(req.body[`seat_${seatNumber}_driver_id`]);
+      const fromRounds = values(req.body[`seat_${seatNumber}_from_round`]);
+      const toRounds = values(req.body[`seat_${seatNumber}_to_round`]);
+      const length = Math.max(ids.length, driverIds.length, fromRounds.length, toRounds.length);
+      return Array.from({ length }, (_, index) => ({
+        id: ids[index],
+        driverId: driverIds[index],
+        fromRound: fromRounds[index],
+        toRound: toRounds[index]
+      }));
+    };
+    try {
+      requireSeasonMutation(req, season, { historicalCorrection: historicalCorrectionConfirmed });
+      if (!catalog.season) throw new Error("Season inputs are not available.");
+      if (!Number.isInteger(teamId) || teamId <= 0) throw new Error("Choose a valid team.");
+      const seatPeriods = { 1: readPeriods(1), 2: readPeriods(2) };
+      const plan = buildTeamLineupHistoryPlan({
+        teams: catalog.teams,
+        drivers: catalog.drivers,
+        assignments: catalog.assignments,
+        teamId,
+        seatPeriods,
+        seasonRoundCount: catalog.races.length
+      });
+      const reviewState = plan.affectedFromRound == null
+        ? { reviewedRounds: [], evidenceRounds: [] }
+        : getLineupReviewState(season, plan.affectedFromRound);
+      const result = applyTeamLineupHistory(db, {
+        seasonId: catalog.season.id,
+        teamId,
+        seatPeriods,
+        reviewedRounds: reviewState.reviewedRounds,
+        evidenceRounds: reviewState.evidenceRounds,
+        historicalCorrectionConfirmed
+      });
+      logEvent("info", "admin_inputs_team_history_updated", {
+        userId: adminUser?.id || null,
+        season,
+        teamId,
+        changedAssignments: result.operations.length,
+        affectedFromRound: result.affectedFromRound
+      });
+      return redirectInputs(res, season, "teams", "success", `Team lineup saved (${result.operations.length} changes).`);
+    } catch (err) {
+      return redirectInputs(res, season, "teams", "error", err.message);
     }
   });
 
