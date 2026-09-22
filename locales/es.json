@@ -531,6 +531,7 @@
     "mapping_queue_help": "Resuélvelos antes de importar resultados.",
     "source_label": "Etiqueta de origen",
     "canonical_candidate": "Candidato canónico",
+    "resolve": "Resolver",
     "save": "Guardar",
     "edit": "Editar",
     "remove": "Eliminar",

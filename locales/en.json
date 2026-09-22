@@ -75,6 +75,7 @@
     "mapping_queue_help": "Resolve these before importing results.",
     "source_label": "Source label",
     "canonical_candidate": "Canonical candidate",
+    "resolve": "Resolve",
     "save": "Save",
     "edit": "Edit",
     "remove": "Remove",

@@ -531,6 +531,7 @@
     "mapping_queue_help": "Vor dem Import von Ergebnissen auflösen.",
     "source_label": "Quellbezeichnung",
     "canonical_candidate": "Kanonischer Kandidat",
+    "resolve": "Zuordnen",
     "save": "Speichern",
     "edit": "Bearbeiten",
     "remove": "Entfernen",

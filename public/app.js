@@ -1007,11 +1007,19 @@ const initAdminInputTables = () => {
     const tableName = table.dataset.selectableTable || '';
     const toolbar = document.querySelector(`[data-table-toolbar="${tableName}"]`);
     if (!toolbar) return;
+    const capabilities = new Set(String(toolbar.dataset.tableCapabilities || '').split(',').map((value) => value.trim()).filter(Boolean));
+    const can = (capability) => capabilities.has(capability);
     const editButton = toolbar.querySelector('[data-table-edit]');
     const removeButton = toolbar.querySelector('[data-table-remove]');
     const selection = toolbar.querySelector('[data-table-selection]');
     const rows = Array.from(table.querySelectorAll('[data-selectable-row]'));
     let selectedRow = null;
+
+    if (editButton && !can('edit')) editButton.hidden = true;
+    if (removeButton && !can('remove')) removeButton.hidden = true;
+    toolbar.querySelectorAll('[data-add-driver-row]').forEach((button) => {
+      if (!can('add')) button.hidden = true;
+    });
 
     const closeEditors = () => {
       table.querySelectorAll('[data-row-editor]').forEach((editor) => {
@@ -1038,8 +1046,8 @@ const initAdminInputTables = () => {
         candidate.setAttribute('aria-selected', String(isSelected));
       });
       selectedRow = row;
-      if (editButton) editButton.disabled = false;
-      if (removeButton) removeButton.disabled = false;
+      if (editButton && can('edit')) editButton.disabled = false;
+      if (removeButton && can('remove')) removeButton.disabled = false;
       if (selection) selection.textContent = row.dataset.rowLabel || '';
     };
 

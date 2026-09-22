@@ -48,7 +48,7 @@
     </nav>
 
     <% if (tab === 'drivers') { %>
-      <div class="admin-inputs-table-toolbar" data-table-toolbar="drivers">
+      <div class="admin-inputs-table-toolbar" data-table-toolbar="drivers" data-table-capabilities="edit,add,remove">
         <div class="admin-inputs-toolbar-start">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
           <button type="button" data-add-driver-row>+ <%= t('admin_inputs.add_driver') %></button>
@@ -89,7 +89,7 @@
         <label for="lineup-round"><%= t('admin_inputs.lineup_round') %></label>
         <select id="lineup-round" name="round" onchange="this.form.submit()"><% catalog.races.forEach((race) => { %><option value="<%= race.round_number %>" <%= Number(race.round_number) === Number(lineupRound) ? 'selected' : '' %>>R<%= race.round_number %> — <%= race.display_name %></option><% }) %></select>
       </form>
-      <div class="admin-inputs-table-toolbar" data-table-toolbar="teams">
+      <div class="admin-inputs-table-toolbar" data-table-toolbar="teams" data-table-capabilities="edit,remove,reorder">
         <div class="admin-inputs-toolbar-start">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
         </div>
@@ -146,7 +146,7 @@
       </div>
       <button type="submit" form="admin-inputs-lineup-form"><%= t('admin_inputs.save_lineup') %></button>
     <% } else if (tab === 'assignments') { %>
-      <div class="admin-inputs-table-toolbar" data-table-toolbar="assignments">
+      <div class="admin-inputs-table-toolbar" data-table-toolbar="assignments" data-table-capabilities="read-only">
         <div class="admin-inputs-toolbar-start"><strong><%= t('admin_inputs.lineup_history') %></strong></div>
         <div class="admin-inputs-toolbar-end"><span class="muted"><%= t('admin_inputs.lineup_history_help') %></span></div>
       </div>
@@ -157,7 +157,7 @@
         </table>
       </div>
     <% } else if (tab === 'races') { %>
-      <div class="admin-inputs-table-toolbar" data-table-toolbar="races">
+      <div class="admin-inputs-table-toolbar" data-table-toolbar="races" data-table-capabilities="edit">
         <div class="admin-inputs-toolbar-start">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
         </div>
@@ -179,8 +179,8 @@
         <div class="admin-inputs-table-toolbar"><strong><%= t('admin_inputs.mapping_queue') %></strong><span class="muted"><%= t('admin_inputs.mapping_queue_help') %></span></div>
         <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_mappings') %>" tabindex="0">
           <table class="table compact admin-inputs-table">
-            <thead><tr><th><%= t('admin_inputs.provider') %></th><th><%= t('admin_inputs.entity_type') %></th><th><%= t('admin_inputs.source_label') %></th><th><%= t('admin_inputs.canonical_candidate') %></th><th><%= t('admin_inputs.status') %></th></tr></thead>
-            <tbody><% unresolvedMappings.forEach((mapping) => { %><tr><td><%= mapping.mappingType %></td><td><%= mapping.entityType %></td><td><%= mapping.sourceLabel %></td><td><%= mapping.canonicalName || '—' %></td><td><%= mapping.status %></td></tr><% }) %></tbody>
+            <thead><tr><th><%= t('admin_inputs.provider') %></th><th><%= t('admin_inputs.entity_type') %></th><th><%= t('admin_inputs.source_label') %></th><th><%= t('admin_inputs.canonical_candidate') %></th><th><%= t('admin_inputs.status') %></th><th></th></tr></thead>
+            <tbody><% unresolvedMappings.forEach((mapping) => { const candidates = mapping.entityType === 'driver' ? catalog.drivers : mapping.entityType === 'team' ? catalog.teams : catalog.races; %><tr><td><%= mapping.provider || mapping.mappingType %></td><td><%= mapping.entityType %></td><td><%= mapping.sourceLabel %></td><td><%= mapping.canonicalName || '—' %></td><td><%= mapping.status %></td><td><form method="post" action="/admin/inputs/mappings/resolve" class="admin-inline-form"><%- csrfField() %><%- seasonPreparationField %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="mapping_type" value="<%= mapping.mappingType %>"><input type="hidden" name="mapping_id" value="<%= mapping.id %>"><input type="hidden" name="entity_type" value="<%= mapping.entityType %>"><select name="entity_id" aria-label="<%= t('admin_inputs.canonical_candidate') %>"><% candidates.forEach((candidate) => { %><option value="<%= candidate.id %>"><%= candidate.display_name_override || candidate.display_name %></option><% }) %></select><button class="secondary" type="submit"><%= t('admin_inputs.resolve') %></button></form></td></tr><% }) %></tbody>
           </table>
         </div>
       <% } %>

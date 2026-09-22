@@ -338,8 +338,13 @@ function listSeasonMappings(db, year) {
   providerRows.forEach((row) => {
     const entity = findEntityById(db, row.entity_type, row.entity_id);
     mappings.push({
+      id: Number(row.id),
       mappingType: "provider",
       entityType: row.entity_type,
+      provider: row.provider,
+      providerKey: row.provider_key,
+      entityId: Number(row.entity_id),
+      seasonId: null,
       sourceLabel: row.provider_label || row.provider_key,
       sourceKey: `${row.provider}:${row.provider_key}`,
       canonicalName: entity?.display_name || null,
@@ -352,8 +357,13 @@ function listSeasonMappings(db, year) {
   aliasRows.forEach((row) => {
     const entity = findEntityById(db, row.entity_type, row.entity_id);
     mappings.push({
+      id: Number(row.id),
       mappingType: "alias",
       entityType: row.entity_type,
+      provider: null,
+      providerKey: null,
+      entityId: Number(row.entity_id),
+      seasonId: row.season_id == null ? null : Number(row.season_id),
       sourceLabel: row.alias,
       sourceKey: row.alias,
       canonicalName: entity?.display_name || null,

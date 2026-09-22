@@ -2961,6 +2961,36 @@ function registerAdminRoutes(app, deps) {
     }
   });
 
+  app.post("/admin/inputs/mappings/resolve", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const mappingType = String(req.body.mapping_type || "").trim().toLowerCase();
+    const mappingId = Number(req.body.mapping_id);
+    const entityType = String(req.body.entity_type || "").trim().toLowerCase();
+    const entityId = Number(req.body.entity_id);
+    const adminUser = getCurrentUser(req);
+    try {
+      requireSeasonMutation(req, season);
+      if (!["alias", "provider"].includes(mappingType) || !Number.isInteger(mappingId) || mappingId <= 0) {
+        throw new Error("Choose a valid mapping.");
+      }
+      if (!["driver", "team", "race"].includes(entityType) || !Number.isInteger(entityId) || entityId <= 0) {
+        throw new Error("Choose a valid canonical candidate.");
+      }
+      const catalog = listSeasonInputs(db, season);
+      const entityRows = entityType === "driver" ? catalog.drivers : entityType === "team" ? catalog.teams : catalog.races;
+      if (!catalog.season || !entityRows.some((row) => Number(row.id) === entityId)) {
+        throw new Error("The canonical candidate is not part of this season.");
+      }
+      const table = mappingType === "alias" ? "entity_aliases" : "entity_provider_refs";
+      const result = db.prepare(`UPDATE ${table} SET entity_type = ?, entity_id = ? WHERE id = ?`).run(entityType, entityId, mappingId);
+      if (Number(result.changes || 0) !== 1) throw new Error("Mapping was not found.");
+      logEvent("info", "admin_inputs_mapping_resolved", { userId: adminUser?.id || null, season, mappingType, mappingId, entityType, entityId });
+      return redirectInputs(res, season, "mappings", "success", "Mapping resolved.");
+    } catch (err) {
+      return redirectInputs(res, season, "mappings", "error", err.message);
+    }
+  });
+
   app.get("/admin/questions", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
