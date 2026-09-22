@@ -2604,9 +2604,11 @@ function registerAdminRoutes(app, deps) {
       requestedSeason: season,
       currentSeason: CURRENT_SEASON
     });
+    const preparationSelected = context.status === "planned"
+      && String(req.body.preparation_confirmed || "1") === "1";
     assertSeasonMutationAllowed(context, {
       historicalCorrection: options.historicalCorrection === true || String(req.body.historical_correction || "") === "1",
-      preparation: options.preparation === true || String(req.body.preparation_confirmed || "") === "1"
+      preparation: options.preparation === true || preparationSelected
     });
     return context;
   }
@@ -3177,7 +3179,7 @@ function registerAdminRoutes(app, deps) {
       typeof req.session.adminActualsDraft.values === "object"
         ? req.session.adminActualsDraft.values
         : null;
-    const latestSnapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
+    const latestSnapshots = listLatestSnapshotsForSeason(db, season, {
       maxRoundNumber: races.length
     });
     const latestSnapshotByRound = new Map(
