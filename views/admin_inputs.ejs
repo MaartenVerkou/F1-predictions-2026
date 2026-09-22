@@ -98,7 +98,6 @@
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="teams" data-table-capabilities="edit,remove,reorder">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
         <div class="admin-inputs-toolbar-end">
-          <a class="secondary admin-inputs-advanced-link" href="/admin/inputs?season=<%= season %>&tab=assignments"><%= t('admin_inputs.assignment_history') %></a>
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
@@ -175,18 +174,6 @@
               </td></tr>
             <% }) %>
           </tbody>
-        </table>
-      </div>
-    <% } else if (tab === 'assignments') { %>
-      <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-          <div class="admin-inputs-table-toolbar" data-table-toolbar="assignments" data-table-capabilities="read-only">
-            <div class="admin-inputs-toolbar-start"><a class="secondary admin-inputs-advanced-link" href="/admin/inputs?season=<%= season %>&tab=teams">← <%= t('admin_inputs.back_to_teams') %></a><strong><%= t('admin_inputs.lineup_history') %></strong></div>
-            <div class="admin-inputs-toolbar-end"><span class="muted"><%= t('admin_inputs.lineup_history_help') %></span></div>
-      </div>
-      <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_assignments') %>" tabindex="0">
-        <table class="table compact admin-inputs-table" data-selectable-table="assignments">
-          <thead><tr><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.seat') %></th><th><%= t('admin_inputs.from_round') %></th><th><%= t('admin_inputs.to_round') %></th></tr></thead>
-          <tbody><% catalog.assignments.forEach((assignment) => { %><tr data-selectable-row data-row-label="<%= assignment.driver_name %> — <%= assignment.team_name %>" tabindex="0"><th scope="row"><%= assignment.driver_name %></th><td><%= assignment.team_name %></td><td><%= assignment.seat_number || 1 %></td><td>R<%= assignment.from_round %></td><td><%= assignment.to_round == null ? '—' : 'R' + assignment.to_round %></td></tr><% }) %></tbody>
         </table>
       </div>
     <% } else if (tab === 'races') { %>

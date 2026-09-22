@@ -16,8 +16,6 @@ const REQUIRED_ADMIN_INPUT_KEYS = [
   "save_assignment",
   "save_alias",
   "save_provider",
-  "assignment_history",
-  "back_to_teams",
   "data_quality",
   "archived_policy_short",
   "archived_policy_title",

@@ -2516,7 +2516,7 @@ function registerAdminRoutes(app, deps) {
   app.get("/admin/inputs", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const requestedTab = String(req.query.tab || "").trim().toLowerCase();
-    const tab = ["drivers", "teams", "assignments", "races", "mappings"].includes(requestedTab)
+    const tab = ["drivers", "teams", "races", "mappings"].includes(requestedTab)
       ? requestedTab
       : "teams";
     const seasonContext = resolveAdminSeasonContext(db, {

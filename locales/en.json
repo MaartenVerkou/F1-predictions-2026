@@ -107,9 +107,6 @@
     ,"empty_seat": "Empty seat"
     ,"save_lineup": "Save lineup",
     "lineup_changes_pending": "Changes are pending — save the line-up to apply them.",
-    "lineup_history": "Line-up history",
-    "assignment_history": "Line-up history",
-    "back_to_teams": "Teams",
     "data_quality": "Data quality",
     "archived_policy_short": "Confirm before saving archived changes.",
     "archived_policy_title": "Season {season} is archived",
@@ -120,7 +117,6 @@
     "historical_dialog_help": "This changes archived season data and will be recorded in the admin audit log.",
     "historical_dialog_confirm": "Continue with historical correction",
     "cancel": "Cancel",
-    "lineup_history_help": "Read-only diagnostic history; edit periods in Teams.",
     "lineup_editor_help": "Maintain each seat as driver periods. Leave the end round empty for the current driver.",
     "lineup_period_empty": "No driver assigned",
     "present": "present",

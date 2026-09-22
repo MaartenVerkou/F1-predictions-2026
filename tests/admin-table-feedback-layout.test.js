@@ -42,7 +42,7 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.match(view, /data-admin-season-policy/);
   assert.match(view, /data-admin-history-dialog/);
   assert.match(view, /data-season-mutation/);
-  assert.match(view, /assignment_history/);
+  assert.doesNotMatch(view, /tab=assignments/);
   assert.doesNotMatch(view, /data-hide-until-selection/);
   assert.match(view, /data-table-edit disabled/);
   assert.match(view, /data-table-remove/);
