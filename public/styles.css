@@ -2026,7 +2026,7 @@ button:disabled {
 }
 
 .admin-inputs-page {
-  gap: 12px;
+  gap: 10px;
 }
 
 .admin-season-policy {
@@ -2226,6 +2226,10 @@ button:disabled {
   min-height: 32px;
   margin: 0;
   padding: 0 2px;
+}
+
+.admin-inputs-page .admin-inputs-lineup-help {
+  margin: 0;
 }
 
 .admin-inputs-toolbar-start,
