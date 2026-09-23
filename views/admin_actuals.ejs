@@ -1,5 +1,5 @@
 <%- include('partials/header', { title: t('admin_actuals.page_title'), user }) %>
-<%- include('partials/admin_nav', { active: 'actuals' }) %>
+<%- include('partials/admin_nav', { active: 'actuals', season }) %>
 <% const formatAdminDate = (value) => {
   if (!value) return '-';
   if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
@@ -12,21 +12,40 @@ const targetTimingLabel = (target) => {
   if (target.timing === 'future') return t('admin_actuals.timing_future');
   return t('admin_actuals.timing_current_race');
 };
+const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === 'archived' && allowPastEdit && selectedRaceTarget);
 %>
 
 <div class="card admin-page-card admin-actuals-page">
   <h1><%= t('admin_actuals.heading') %></h1>
   <p class="muted admin-page-intro"><%= t('admin_actuals.intro') %></p>
 
-  <% if (saveError) { %>
-    <div class="alert"><%= saveError %></div>
+  <% if (seasonContext?.invalidRequestedSeason) { %>
+    <div class="admin-feedback-context">
+      <div class="alert" role="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    </div>
   <% } %>
-  <% if (saveSuccess) { %>
-    <div class="alert admin-success"><%= saveSuccess %></div>
+
+  <% if (saveError || saveSuccess) { %>
+    <div class="admin-feedback-context">
+      <% if (saveError) { %>
+        <div class="alert" role="alert"><%= saveError %></div>
+      <% } %>
+      <% if (saveSuccess) { %>
+        <div class="alert admin-success" role="status"><%= saveSuccess %></div>
+      <% } %>
+    </div>
   <% } %>
 
   <div class="admin-actuals-target-row" data-admin-race-review-workspace>
     <form method="get" action="/admin/actuals" class="admin-target-form admin-actuals-target-form" data-admin-actuals-target-form>
+      <label class="admin-field admin-target-field">
+        <span class="muted"><%= t('admin_inputs.season') %></span>
+        <select name="season" onchange="this.form.submit()">
+          <% (availableSeasons || []).forEach((availableSeason) => { %>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %> · <%= availableSeason.statusLabel %></option>
+          <% }) %>
+        </select>
+      </label>
       <label class="admin-field admin-target-field">
         <span class="muted"><%= t('admin_actuals.target_label') %></span>
         <select name="target" onchange="this.form.submit()">
@@ -49,6 +68,7 @@ const targetTimingLabel = (target) => {
 
     <% if (selectedRaceTarget && selectedRaceTarget.timing === 'past' && requiresPastUnlock) { %>
       <form method="get" action="/admin/actuals" class="admin-inline-form admin-target-action">
+        <input type="hidden" name="season" value="<%= season %>" />
         <input type="hidden" name="target" value="<%= actualsTarget %>" />
         <input type="hidden" name="unlockPast" value="1" />
         <button type="submit" class="secondary"><%= t('admin_actuals.continue_make_changes') %></button>
@@ -56,6 +76,7 @@ const targetTimingLabel = (target) => {
     <% } else if (selectedRaceTarget && selectedRaceTarget.snapshotId && selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'pending') { %>
       <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-target-action">
     <%- csrfField() %>
+        <input type="hidden" name="season" value="<%= season %>" />
         <input type="hidden" name="snapshotId" value="<%= selectedSnapshotMeta.id %>" />
         <input type="hidden" name="target" value="<%= actualsTarget %>" />
         <% if (selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
@@ -68,14 +89,16 @@ const targetTimingLabel = (target) => {
     <% } %>
   </div>
 
-  <% if (actualsTarget === 'current') { %>
+  <% if (actualsTarget === 'current' && seasonContext?.syncable) { %>
     <div class="admin-actions admin-actuals-actions">
       <form method="post" action="/admin/actuals/autofill-current-season" class="admin-inline-form">
     <%- csrfField() %>
+        <input type="hidden" name="season" value="<%= season %>" />
         <button type="submit" class="secondary"><%= t('admin_actuals.preview_autofill') %></button>
       </form>
       <form method="post" action="/admin/actuals/run-auto-update" class="admin-inline-form">
     <%- csrfField() %>
+        <input type="hidden" name="season" value="<%= season %>" />
         <button type="submit" class="secondary"><%= t('admin_actuals.run_sync_now') %></button>
       </form>
       <span class="muted admin-actions-help"><%= t('admin_actuals.sync_help') %></span>
@@ -84,14 +107,15 @@ const targetTimingLabel = (target) => {
 
   <form method="post" action="/admin/actuals" data-admin-actuals-form data-initial-dirty="<%= hasDraft ? 'true' : 'false' %>">
     <%- csrfField() %>
+    <input type="hidden" name="season" value="<%= season %>" />
     <input type="hidden" name="actualsTarget" value="<%= actualsTarget %>" />
     <% if (selectedRaceTarget && selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
       <input type="hidden" name="unlockPast" value="1" />
     <% } %>
     <% const sourceOptionsFor = (question) => {
-      if (question.options_source === 'drivers') return roster.drivers;
-      if (question.options_source === 'teams') return roster.teams;
-      if (question.options_source === 'races') return races;
+      if (question.options_source === 'drivers') return roster.driver_options || roster.drivers;
+      if (question.options_source === 'teams') return roster.team_options || roster.teams;
+      if (question.options_source === 'races') return roster.race_options || races;
       return [];
     }; %>
     <% const multiActualSingleChoiceIds = new Set([
@@ -103,11 +127,13 @@ const targetTimingLabel = (target) => {
       'closest_qualifying_teammates'
     ]); %>
     <% const multiActualDriverFieldIds = new Set(['lowest_grid_win_position']); %>
-    <fieldset class="admin-fieldset-reset" <%= requiresPastUnlock ? 'disabled' : '' %>>
+    <fieldset class="admin-fieldset-reset" <%= (requiresPastUnlock || seasonReadOnly) ? 'disabled' : '' %>>
 
     <% questions.forEach(question => { 
       const sourceOptions = sourceOptionsFor(question);
       const options = (question.options || []).concat(sourceOptions || []);
+      const optionValue = (option) => typeof option === 'object' ? option.value : option;
+      const optionLabel = (option) => typeof option === 'object' ? option.label : option;
       const type = question.type || 'text';
       let saved = actuals[question.id];
       if (saved) {
@@ -131,7 +157,7 @@ const targetTimingLabel = (target) => {
               <select class="ranking-select" name="<%= question.id %>_<%= i %>">
                 <option value=""><%= t('questions.select_position') %> <%= i %></option>
                 <% options.forEach(option => { %>
-                  <option value="<%= option %>" <%= selections[i - 1] === option ? 'selected' : '' %>><%= option %></option>
+                  <option value="<%= optionValue(option) %>" <%= selections[i - 1] === optionValue(option) || selections[i - 1] === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
                 <% }) %>
               </select>
             <% } %>
@@ -142,8 +168,8 @@ const targetTimingLabel = (target) => {
           <div class="checkbox-grid">
             <% options.forEach(option => { %>
               <label class="muted">
-                <input type="checkbox" name="<%= question.id %>" value="<%= option %>" <%= selections.includes(option) ? 'checked' : '' %> />
-                <%= option %>
+                <input type="checkbox" name="<%= question.id %>" value="<%= optionValue(option) %>" <%= selections.includes(optionValue(option)) || selections.includes(option) ? 'checked' : '' %> />
+                <%= optionLabel(option) %>
               </label>
             <% }) %>
           </div>
@@ -151,7 +177,7 @@ const targetTimingLabel = (target) => {
           <select name="<%= question.id %>">
             <option value=""><%= t('questions.select_one') %></option>
             <% options.forEach(option => { %>
-              <option value="<%= option %>" <%= saved === option ? 'selected' : '' %>><%= option %></option>
+              <option value="<%= optionValue(option) %>" <%= saved === optionValue(option) || saved === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
             <% }) %>
           </select>
         <% } else if (type === 'multi_select') { 
@@ -160,8 +186,8 @@ const targetTimingLabel = (target) => {
           <div class="checkbox-grid">
             <% options.forEach(option => { %>
               <label class="muted">
-                <input type="checkbox" name="<%= question.id %>" value="<%= option %>" <%= selections.includes(option) ? 'checked' : '' %> />
-                <%= option %>
+                <input type="checkbox" name="<%= question.id %>" value="<%= optionValue(option) %>" <%= selections.includes(optionValue(option)) || selections.includes(option) ? 'checked' : '' %> />
+                <%= optionLabel(option) %>
               </label>
             <% }) %>
           </div>
@@ -200,7 +226,7 @@ const targetTimingLabel = (target) => {
             <select name="<%= question.id %>_winner" data-toggle-diff="<%= question.id %>">
               <option value=""><%= t('questions.select_winner') %></option>
               <% (question.options || []).forEach(option => { %>
-                <option value="<%= option %>" <%= savedObj.winner === option ? 'selected' : '' %>><%= option %></option>
+                <option value="<%= optionValue(option) %>" <%= savedObj.winner === optionValue(option) || savedObj.winner === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
               <% }) %>
               <option value="tie" <%= savedObj.winner === 'tie' ? 'selected' : '' %>><%= t('questions.tie') %></option>
             </select>
@@ -234,8 +260,8 @@ const targetTimingLabel = (target) => {
             </label>
             <select name="<%= question.id %>_driver" data-toggle-driver="<%= question.id %>">
               <option value=""><%= t('questions.select_driver_if_yes') %></option>
-              <% roster.drivers.forEach(option => { %>
-                <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
+              <% (roster.driver_options || roster.drivers).forEach(option => { %>
+                <option value="<%= optionValue(option) %>" <%= savedObj.driver === optionValue(option) || savedObj.driver === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
               <% }) %>
             </select>
           </div>
@@ -260,8 +286,8 @@ const targetTimingLabel = (target) => {
             </div>
             <select name="<%= question.id %>_driver">
               <option value=""><%= t('questions.select_driver') %></option>
-              <% roster.drivers.forEach(option => { %>
-                <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
+              <% (roster.driver_options || roster.drivers).forEach(option => { %>
+                <option value="<%= optionValue(option) %>" <%= savedObj.driver === optionValue(option) || savedObj.driver === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
               <% }) %>
             </select>
           </div>
@@ -275,14 +301,14 @@ const targetTimingLabel = (target) => {
               <select name="<%= question.id %>_value">
                 <option value=""><%= t('questions.select_position') %></option>
                 <% positionOptions.forEach(option => { %>
-                  <option value="<%= option %>" <%= savedObj.value === option ? 'selected' : '' %>><%= option %></option>
+                  <option value="<%= optionValue(option) %>" <%= savedObj.value === optionValue(option) || savedObj.value === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
                 <% }) %>
               </select>
               <div class="checkbox-grid">
-                <% roster.drivers.forEach(option => { %>
+                <% (roster.driver_options || roster.drivers).forEach(option => { %>
                   <label class="muted">
-                    <input type="checkbox" name="<%= question.id %>_driver" value="<%= option %>" <%= driverSelections.includes(option) ? 'checked' : '' %> />
-                    <%= option %>
+                    <input type="checkbox" name="<%= question.id %>_driver" value="<%= optionValue(option) %>" <%= driverSelections.includes(optionValue(option)) || driverSelections.includes(option) ? 'checked' : '' %> />
+                    <%= optionLabel(option) %>
                   </label>
                 <% }) %>
               </div>
@@ -292,13 +318,13 @@ const targetTimingLabel = (target) => {
               <select name="<%= question.id %>_value">
                 <option value=""><%= t('questions.select_position') %></option>
                 <% positionOptions.forEach(option => { %>
-                  <option value="<%= option %>" <%= savedObj.value === option ? 'selected' : '' %>><%= option %></option>
+                  <option value="<%= optionValue(option) %>" <%= savedObj.value === optionValue(option) || savedObj.value === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
                 <% }) %>
               </select>
               <select name="<%= question.id %>_driver">
                 <option value=""><%= t('questions.select_driver') %></option>
-                <% roster.drivers.forEach(option => { %>
-                  <option value="<%= option %>" <%= savedObj.driver === option ? 'selected' : '' %>><%= option %></option>
+                <% (roster.driver_options || roster.drivers).forEach(option => { %>
+                  <option value="<%= optionValue(option) %>" <%= savedObj.driver === optionValue(option) || savedObj.driver === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
                 <% }) %>
               </select>
             </div>
@@ -352,4 +378,3 @@ const targetTimingLabel = (target) => {
 </div>
 
 <%- include('partials/footer') %>
-

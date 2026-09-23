@@ -6,12 +6,17 @@
   <p class="muted">
     Enable/disable questions and override points for simulation. Changes apply immediately to prediction forms, actuals, and leaderboard scoring.
   </p>
+  <p class="muted"><strong>Global settings</strong> · These question and scoring rules are shared by every season.</p>
 
-  <% if (saveError) { %>
-    <div class="alert"><%= saveError %></div>
-  <% } %>
-  <% if (saveSuccess) { %>
-    <p class="muted"><%= saveSuccess %></p>
+  <% if (saveError || saveSuccess) { %>
+    <div class="admin-feedback-context">
+      <% if (saveError) { %>
+        <div class="alert" role="alert"><%= saveError %></div>
+      <% } %>
+      <% if (saveSuccess) { %>
+        <p class="muted" role="status"><%= saveSuccess %></p>
+      <% } %>
+    </div>
   <% } %>
 
   <% const formatValue = (value) => {

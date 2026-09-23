@@ -1002,6 +1002,208 @@ const initScrollToEndButton = () => {
   updateVisibility();
 };
 
+const initAdminSeasonMutationConfirmation = () => {
+  const policy = document.querySelector('[data-admin-season-policy]');
+  const dialog = document.querySelector('[data-admin-history-dialog]');
+  if (!policy || !dialog || policy.dataset.seasonStatus !== 'archived') return;
+
+  const message = dialog.querySelector('[data-admin-history-dialog-message]');
+  const confirmButton = dialog.querySelector('[data-admin-history-confirm]');
+  const cancelButton = dialog.querySelector('[data-admin-history-cancel]');
+  const forms = Array.from(document.querySelectorAll('form[data-season-mutation]'));
+  let pending = null;
+
+  const submitConfirmed = () => {
+    if (!pending) return;
+    const { form, submitter } = pending;
+    let input = form.querySelector('input[name="historical_correction"][data-historical-confirmation]');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'historical_correction';
+      input.dataset.historicalConfirmation = '1';
+      form.appendChild(input);
+    }
+    input.value = '1';
+    form.dataset.historicalConfirmed = '1';
+    pending = null;
+    if (dialog.open) dialog.close();
+    if (typeof form.requestSubmit === 'function') {
+      form.requestSubmit(submitter || undefined);
+    } else {
+      form.submit();
+    }
+  };
+
+  forms.forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      if (form.dataset.historicalConfirmed === '1') return;
+      const existingConfirmation = form.querySelector('input[name="historical_correction"]:checked');
+      if (existingConfirmation) return;
+      event.preventDefault();
+      pending = { form, submitter: event.submitter || null };
+      if (typeof dialog.showModal !== 'function') {
+        const confirmed = window.confirm(message?.textContent || 'Confirm historical correction?');
+        if (confirmed) submitConfirmed();
+        else pending = null;
+        return;
+      }
+      dialog.showModal();
+      confirmButton?.focus();
+    });
+  });
+
+  confirmButton?.addEventListener('click', submitConfirmed);
+  cancelButton?.addEventListener('click', () => {
+    pending = null;
+    if (dialog.open) dialog.close();
+  });
+  dialog.addEventListener('close', () => {
+    pending = null;
+  });
+};
+
+const initAdminInputTables = () => {
+  document.querySelectorAll('[data-selectable-table]').forEach((table) => {
+    const tableName = table.dataset.selectableTable || '';
+    const toolbar = document.querySelector(`[data-table-toolbar="${tableName}"]`);
+    if (!toolbar) return;
+    const capabilities = new Set(String(toolbar.dataset.tableCapabilities || '').split(',').map((value) => value.trim()).filter(Boolean));
+    const can = (capability) => capabilities.has(capability);
+    const editButton = toolbar.querySelector('[data-table-edit]');
+    const removeButton = toolbar.querySelector('[data-table-remove]');
+    const selection = toolbar.querySelector('[data-table-selection]');
+    const rows = Array.from(table.querySelectorAll('[data-selectable-row]'));
+    let selectedRow = null;
+    if (editButton && !can('edit')) editButton.hidden = true;
+    if (removeButton && !can('remove')) removeButton.hidden = true;
+    toolbar.querySelectorAll('[data-add-driver-row]').forEach((button) => {
+      if (!can('add')) button.hidden = true;
+    });
+
+    const closeEditors = () => {
+      table.querySelectorAll('[data-row-editor]').forEach((editor) => {
+        editor.hidden = true;
+      });
+    };
+
+    const clearSelection = () => {
+      rows.forEach((row) => {
+        row.classList.remove('is-selected');
+        row.setAttribute('aria-selected', 'false');
+      });
+      selectedRow = null;
+      if (editButton) {
+        editButton.disabled = true;
+      }
+      if (removeButton) {
+        removeButton.disabled = true;
+      }
+      if (selection) selection.textContent = '';
+    };
+
+    const selectRow = (row) => {
+      closeEditors();
+      rows.forEach((candidate) => {
+        const isSelected = candidate === row;
+        candidate.classList.toggle('is-selected', isSelected);
+        candidate.setAttribute('aria-selected', String(isSelected));
+      });
+      selectedRow = row;
+      if (editButton && can('edit')) {
+        editButton.disabled = false;
+      }
+      if (removeButton && can('remove')) {
+        removeButton.disabled = false;
+      }
+      if (selection) selection.textContent = row.dataset.rowLabel || '';
+    };
+
+    rows.forEach((row) => {
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('a, button, input, select, textarea, label')) return;
+        selectRow(row);
+      });
+      row.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        selectRow(row);
+      });
+    });
+
+    editButton?.addEventListener('click', () => {
+      if (!selectedRow) return;
+      const editor = document.getElementById(selectedRow.dataset.editTarget || '');
+      if (!editor) return;
+      closeEditors();
+      editor.hidden = false;
+      editor.querySelector('input, select, textarea')?.focus();
+    });
+
+    removeButton?.addEventListener('click', () => {
+      if (!selectedRow) return;
+      const form = document.getElementById('admin-inputs-remove-form');
+      if (!form) return;
+      const label = selectedRow.dataset.rowLabel || '';
+      const template = removeButton.dataset.removeConfirm || '';
+      const message = template.replace('{label}', label);
+      if (!window.confirm(message)) return;
+      const type = tableName === 'drivers' ? 'driver' : tableName === 'teams' ? 'team' : tableName === 'assignments' ? 'assignment' : '';
+      const entityId = selectedRow.dataset.editTarget?.replace(/^(?:driver|team|assignment|race)-editor-/, '');
+      if (!type || !entityId) return;
+      form.elements.entity_type.value = type;
+      form.elements.entity_id.value = entityId;
+      form.requestSubmit();
+    });
+
+    const addDriverButton = toolbar.querySelector('[data-add-driver-row]');
+    if (addDriverButton) {
+      addDriverButton.addEventListener('click', () => {
+        closeEditors();
+        clearSelection();
+        const newRow = table.querySelector('[data-new-driver-row]');
+        if (!newRow) return;
+        newRow.hidden = !newRow.hidden;
+        if (!newRow.hidden) newRow.querySelector('input')?.focus();
+      });
+    }
+  });
+};
+
+const initAdminLineupHistoryEditors = () => {
+  document.querySelectorAll('[data-lineup-history-form]').forEach((form) => {
+    const status = form.querySelector('[data-lineup-history-status]');
+    const markDirty = () => {
+      form.dataset.lineupDirty = '1';
+      if (status) status.hidden = false;
+    };
+
+    form.addEventListener('input', markDirty);
+    form.addEventListener('change', markDirty);
+    form.addEventListener('click', (event) => {
+      const addButton = event.target.closest('[data-lineup-add-period]');
+      if (addButton && form.contains(addButton)) {
+        const seat = addButton.closest('[data-lineup-period-list]');
+        const list = seat?.querySelector('[data-lineup-period-rows]');
+        const template = seat?.querySelector('template[data-lineup-period-template]');
+        if (!list || !template) return;
+        list.appendChild(template.content.cloneNode(true));
+        list.lastElementChild?.querySelector('select, input')?.focus();
+        markDirty();
+        return;
+      }
+      const removeButton = event.target.closest('[data-lineup-remove-period]');
+      if (!removeButton || !form.contains(removeButton)) return;
+      const message = form.dataset.lineupRemoveConfirm || 'Remove this period?';
+      if (!window.confirm(message)) return;
+      const row = removeButton.closest('[data-lineup-period-row]');
+      if (!row) return;
+      row.remove();
+      markDirty();
+    });
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
   initHeaderOffsets();
@@ -1023,6 +1225,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initNamedGuestSaveFeedback();
   initPredictionsAutosave();
   initAdminActualsUnsavedState();
+  initAdminSeasonMutationConfirmation();
+  initAdminInputTables();
+  initAdminLineupHistoryEditors();
   initSignupPasswordMatch();
   initScrollToEndButton();
 });

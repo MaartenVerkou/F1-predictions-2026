@@ -10,11 +10,15 @@
 <div class="card admin-page-card">
   <h1>Admin analysis</h1>
   <p class="muted">Create simulation groups and manage existing test groups.</p>
-  <% if (adminError) { %>
-    <div class="alert"><%= adminError %></div>
-  <% } %>
-  <% if (adminSuccess) { %>
-    <p class="muted"><%= adminSuccess %></p>
+  <% if (adminError || adminSuccess) { %>
+    <div class="admin-feedback-context">
+      <% if (adminError) { %>
+        <div class="alert" role="alert"><%= adminError %></div>
+      <% } %>
+      <% if (adminSuccess) { %>
+        <p class="muted" role="status"><%= adminSuccess %></p>
+      <% } %>
+    </div>
   <% } %>
 
   <h2>Create test group</h2>

@@ -66,11 +66,15 @@
     </div>
   </div>
 
-  <% if (adminError) { %>
-    <div class="alert"><%= adminError %></div>
-  <% } %>
-  <% if (adminSuccess) { %>
-    <div class="alert admin-success"><%= adminSuccess %></div>
+  <% if (adminError || adminSuccess) { %>
+    <div class="admin-feedback-context">
+      <% if (adminError) { %>
+        <div class="alert" role="alert"><%= adminError %></div>
+      <% } %>
+      <% if (adminSuccess) { %>
+        <div class="alert admin-success" role="status"><%= adminSuccess %></div>
+      <% } %>
+    </div>
   <% } %>
 
   <section class="admin-page-section">

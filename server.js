@@ -18,6 +18,12 @@ const {
 } = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
+const { ensureRaceDataSchema } = require("./src/race-data-evidence");
+const { ensureSeasonInputsSchema, listSeasonInputs } = require("./src/season-inputs");
+const {
+  buildCanonicalCatalog,
+  canonicalizeQuestionValue
+} = require("./src/canonical-answers");
 
 function loadDotEnvIfPresent(filePath = path.join(__dirname, ".env")) {
   if (!fs.existsSync(filePath)) return;
@@ -472,6 +478,117 @@ if (db.dialect === "sqlite") {
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS seasons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year INTEGER NOT NULL UNIQUE,
+    label TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS drivers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    given_name TEXT NOT NULL,
+    family_name TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS teams (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    short_name TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS races (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id INTEGER NOT NULL,
+    round_number INTEGER NOT NULL,
+    slug TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    scheduled_date TEXT,
+    calendar_state TEXT NOT NULL DEFAULT 'scheduled',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(season_id, round_number),
+    UNIQUE(season_id, slug)
+  );
+
+  CREATE TABLE IF NOT EXISTS season_drivers (
+    season_id INTEGER NOT NULL,
+    driver_id INTEGER NOT NULL,
+    driver_number TEXT,
+    display_name_override TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(season_id, driver_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS season_teams (
+    season_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    display_name_override TEXT,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    order_basis TEXT NOT NULL DEFAULT 'manual',
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY(season_id, team_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS driver_team_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season_id INTEGER NOT NULL,
+    driver_id INTEGER NOT NULL,
+    team_id INTEGER NOT NULL,
+    from_round INTEGER NOT NULL,
+    to_round INTEGER,
+    seat_number INTEGER NOT NULL DEFAULT 1,
+    source TEXT NOT NULL DEFAULT 'admin',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(season_id, driver_id, from_round)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_driver_team_assignments_lookup
+    ON driver_team_assignments(season_id, driver_id, from_round, to_round);
+
+  CREATE TABLE IF NOT EXISTS entity_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER NOT NULL,
+    season_id INTEGER,
+    alias TEXT NOT NULL,
+    normalized_alias TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT 'admin',
+    created_at TEXT NOT NULL,
+    UNIQUE(entity_type, season_id, normalized_alias)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_entity_aliases_lookup
+    ON entity_aliases(entity_type, season_id, normalized_alias);
+
+  CREATE TABLE IF NOT EXISTS entity_provider_refs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    provider_key TEXT NOT NULL,
+    provider_label TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE(provider, provider_key),
+    UNIQUE(entity_type, entity_id, provider)
+  );
+
   CREATE TABLE IF NOT EXISTS actual_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     season INTEGER NOT NULL,
@@ -486,8 +603,53 @@ if (db.dialect === "sqlite") {
     review_status TEXT NOT NULL DEFAULT 'reviewed',
     reviewed_at TEXT,
     reviewed_by_user_id INTEGER,
+    source_data_import_id INTEGER,
+    source_data_snapshot_id INTEGER,
     FOREIGN KEY(created_by_user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS race_data_imports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    season INTEGER NOT NULL,
+    sync_id TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    requested_rounds INTEGER NOT NULL DEFAULT 0,
+    completed_rounds INTEGER NOT NULL DEFAULT 0,
+    reconstructed INTEGER NOT NULL DEFAULT 0,
+    source_note TEXT,
+    error_message TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_race_data_imports_season_started
+    ON race_data_imports(season, started_at);
+
+  CREATE TABLE IF NOT EXISTS race_data_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    import_id INTEGER,
+    season INTEGER NOT NULL,
+    round_number INTEGER NOT NULL,
+    round_name TEXT,
+    sync_id TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_note TEXT,
+    parser_version TEXT NOT NULL DEFAULT 'evidence-v1',
+    calendar_state TEXT NOT NULL DEFAULT 'completed',
+    reconstructed INTEGER NOT NULL DEFAULT 0,
+    coverage_status TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(season, round_number, sync_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_season_round
+    ON race_data_snapshots(season, round_number, created_at);
+  CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_import
+    ON race_data_snapshots(import_id, round_number);
 
   CREATE TABLE IF NOT EXISTS actual_snapshot_values (
     snapshot_id INTEGER NOT NULL,
@@ -678,6 +840,8 @@ function ensureQuestionSettingsColumns() {
 
 ensureQuestionSettingsColumns();
 ensureActualSnapshotColumns(db);
+ensureRaceDataSchema(db);
+ensureSeasonInputsSchema(db);
 
 function seedAdminIdeas() {
   const now = new Date().toISOString();
@@ -1497,9 +1661,9 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
       includeExcluded,
       includeMeta
     });
-    return attachLastSeasonReferences(
+    return attachCanonicalCatalog(attachLastSeasonReferences(
       localizeQuestions(adjustedFallback, resolvedLocale)
-    );
+    ));
   }
 
   const parsed = readJsonFile(QUESTIONS_PATH);
@@ -1515,9 +1679,9 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
     includeExcluded,
     includeMeta
   });
-  return attachLastSeasonReferences(
+  return attachCanonicalCatalog(attachLastSeasonReferences(
     localizeQuestions(adjustedQuestions, resolvedLocale)
-  );
+  ));
 }
 
 function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
@@ -1572,16 +1736,39 @@ function attachLastSeasonReferences(questions) {
   }));
 }
 
+function attachCanonicalCatalog(questions) {
+  let catalog = { driver: [], team: [], race: [] };
+  try {
+    catalog = buildCanonicalCatalog(listSeasonInputs(db, CURRENT_SEASON));
+  } catch (err) {
+    // The question catalogue remains usable while the canonical input tables are unavailable.
+  }
+  return (questions || []).map((question) => {
+    const attached = { ...question };
+    Object.defineProperty(attached, "_canonicalCatalog", {
+      value: catalog,
+      enumerable: false,
+      configurable: true
+    });
+    return attached;
+  });
+}
+
 function getRoster() {
   if (!fs.existsSync(ROSTER_PATH)) {
     return { drivers: [], teams: [] };
   }
   const parsed = readJsonFile(ROSTER_PATH);
   if (!parsed) return { drivers: [], teams: [] };
-  return {
+  const roster = {
     drivers: Array.isArray(parsed.drivers) ? parsed.drivers : [],
     teams: Array.isArray(parsed.teams) ? parsed.teams : []
   };
+  const catalog = buildCanonicalCatalog(listSeasonInputs(db, CURRENT_SEASON));
+  roster.driver_options = catalog.driver;
+  roster.team_options = catalog.team;
+  roster.race_options = catalog.race;
+  return roster;
 }
 
 function getRaces() {
@@ -2733,6 +2920,8 @@ function clampNumber(value, min, max) {
 }
 
 function serializeAnswerFromRequest(question, body) {
+  const catalog = buildCanonicalCatalog(listSeasonInputs(db, CURRENT_SEASON));
+  const canonical = (value) => canonicalizeQuestionValue(question, value, catalog);
   const type = question?.type || "text";
   if (type === "ranking") {
     const count = Number(question.count) || 3;
@@ -2745,13 +2934,13 @@ function serializeAnswerFromRequest(question, body) {
       }
     }
     if (selections.length === 0) return null;
-    return JSON.stringify(selections);
+    return JSON.stringify(canonical(selections));
   }
   if (type === "multi_select" || type === "multi_select_limited") {
     const selected = body?.[question.id];
     if (!selected) return null;
     const selections = Array.isArray(selected) ? selected : [selected];
-    return JSON.stringify(selections);
+    return JSON.stringify(canonical(selections));
   }
   if (type === "teammate_battle") {
     const winner = body?.[`${question.id}_winner`];
@@ -2760,13 +2949,13 @@ function serializeAnswerFromRequest(question, body) {
       return null;
     }
     const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
-    return JSON.stringify({ winner, diff });
+    return JSON.stringify(canonical({ winner, diff }));
   }
   if (type === "boolean_with_optional_driver") {
     const choice = body?.[question.id];
     const driver = body?.[`${question.id}_driver`];
     if (!choice) return null;
-    return JSON.stringify({ choice, driver });
+    return JSON.stringify(canonical({ choice, driver }));
   }
   if (type === "numeric_with_driver") {
     const valueRaw = body?.[`${question.id}_value`];
@@ -2775,7 +2964,7 @@ function serializeAnswerFromRequest(question, body) {
       return null;
     }
     const value = clampNumber(valueRaw, 0, 999);
-    return JSON.stringify({ value, driver });
+    return JSON.stringify(canonical({ value, driver }));
   }
   if (type === "single_choice_with_driver") {
     const value = body?.[`${question.id}_value`];
@@ -2783,7 +2972,7 @@ function serializeAnswerFromRequest(question, body) {
     if ((!value || value === "") && (!driver || driver === "")) {
       return null;
     }
-    return JSON.stringify({ value, driver });
+    return JSON.stringify(canonical({ value, driver }));
   }
   const answer = body?.[question.id];
   if (answer === undefined || answer === "") return null;
@@ -2792,7 +2981,7 @@ function serializeAnswerFromRequest(question, body) {
     if (value == null) return null;
     return String(value);
   }
-  return String(answer).trim();
+  return String(canonical(String(answer).trim()));
 }
 
 const THROTTLE_WINDOW_MS = 15 * 60 * 1000;

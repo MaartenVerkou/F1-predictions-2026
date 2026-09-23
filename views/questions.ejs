@@ -308,15 +308,20 @@
 
       <% questions.forEach(question => { 
         const sourceOptions = question.options_source === 'drivers'
-          ? roster.drivers
+          ? (roster.driver_options || roster.drivers)
           : question.options_source === 'teams'
-            ? roster.teams
+            ? (roster.team_options || roster.teams)
             : question.options_source === 'races'
-              ? races
+              ? (roster.race_options || races)
               : [];
         const options = (question.options || []).concat(sourceOptions || []);
         const optionLabels = question.option_labels || {};
-        const getOptionLabel = (option) => optionLabels[option] || option;
+        const optionValue = (option) => typeof option === 'object' ? option.value : option;
+        const getOptionLabel = (option) => {
+          const value = optionValue(option);
+          const label = typeof option === 'object' ? option.label : option;
+          return optionLabels[value] || optionLabels[label] || label;
+        };
         const type = question.type || 'text';
         const lastSeason = question.last_season || null;
         const hasLastSeasonReference = Boolean(lastSeason);
@@ -374,7 +379,7 @@
                 <select class="ranking-select" name="<%= question.id %>_<%= i %>">
                   <option value=""><%= t('questions.select_position') %> <%= i %></option>
                   <% options.forEach(option => { %>
-                    <option value="<%= option %>" <%= saved[i - 1] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+                    <option value="<%= optionValue(option) %>" <%= saved[i - 1] === optionValue(option) || saved[i - 1] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
                   <% }) %>
                 </select>
               <% } %>
@@ -383,7 +388,7 @@
             <select name="<%= question.id %>">
               <option value=""><%= t('questions.select_one') %></option>
               <% options.forEach(option => { %>
-                <option value="<%= option %>" <%= answers[question.id] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+                <option value="<%= optionValue(option) %>" <%= answers[question.id] === optionValue(option) || answers[question.id] === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
               <% }) %>
             </select>
           <% } else if (type === 'multi_select' || type === 'multi_select_limited') { 
@@ -395,7 +400,7 @@
           <div class="checkbox-grid <%= useRaceTileGrid ? 'checkbox-grid-race-picks' : '' %>" data-limit="<%= limit %>">
             <% options.forEach(option => { %>
               <label class="muted <%= useRaceTileGrid ? 'choice-tile checkbox-tile' : '' %>">
-                <input class="<%= useRaceTileGrid ? 'choice-tile-input' : '' %>" type="checkbox" name="<%= question.id %>" value="<%= option %>" <%= saved.includes(option) ? 'checked' : '' %> />
+                <input class="<%= useRaceTileGrid ? 'choice-tile-input' : '' %>" type="checkbox" name="<%= question.id %>" value="<%= optionValue(option) %>" <%= saved.includes(optionValue(option)) || saved.includes(option) ? 'checked' : '' %> />
                 <% if (useRaceTileGrid) { %>
                   <span class="choice-tile-body">
                     <span class="choice-tile-title"><%= getOptionLabel(option) %></span>
@@ -414,7 +419,7 @@
               <select name="<%= question.id %>_winner" data-toggle-diff="<%= question.id %>">
                 <option value=""><%= t('questions.select_winner') %></option>
                 <% (question.options || []).forEach(option => { %>
-                  <option value="<%= option %>" <%= saved.winner === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+                  <option value="<%= optionValue(option) %>" <%= saved.winner === optionValue(option) || saved.winner === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
                 <% }) %>
                 <option value="tie" <%= saved.winner === 'tie' ? 'selected' : '' %>><%= t('questions.tie') %></option>
               </select>
@@ -449,8 +454,8 @@
               </label>
               <select name="<%= question.id %>_driver" data-toggle-driver="<%= question.id %>">
                 <option value=""><%= t('questions.select_driver_if_yes') %></option>
-                <% roster.drivers.forEach(option => { %>
-                  <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
+                <% (roster.driver_options || roster.drivers).forEach(option => { %>
+                  <option value="<%= optionValue(option) %>" <%= saved.driver === optionValue(option) || saved.driver === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
                 <% }) %>
               </select>
             </div>
@@ -462,28 +467,28 @@
               <input type="number" name="<%= question.id %>_value" placeholder="<%= t('questions.number') %>" min="0" max="999" value="<%= saved.value ?? '' %>" />
               <select name="<%= question.id %>_driver">
                 <option value=""><%= t('questions.select_driver') %></option>
-                <% roster.drivers.forEach(option => { %>
-                  <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
+                <% (roster.driver_options || roster.drivers).forEach(option => { %>
+                  <option value="<%= optionValue(option) %>" <%= saved.driver === optionValue(option) || saved.driver === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
                 <% }) %>
               </select>
             </div>
           <% } else if (type === 'single_choice_with_driver') { 
             let saved = {};
             try { saved = JSON.parse(answers[question.id] || '{}'); } catch (err) { saved = {}; }
-            const driverOptions = roster.drivers;
+            const driverOptions = roster.driver_options || roster.drivers;
             const positionOptions = question.options || [];
           %>
             <div class="inline-actions">
               <select name="<%= question.id %>_value">
                 <option value=""><%= t('questions.select_position') %></option>
                 <% positionOptions.forEach(option => { %>
-                  <option value="<%= option %>" <%= saved.value === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
+                  <option value="<%= optionValue(option) %>" <%= saved.value === optionValue(option) || saved.value === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
                 <% }) %>
               </select>
               <select name="<%= question.id %>_driver">
                 <option value=""><%= t('questions.select_driver') %></option>
                 <% driverOptions.forEach(option => { %>
-                  <option value="<%= option %>" <%= saved.driver === option ? 'selected' : '' %>><%= option %></option>
+                  <option value="<%= optionValue(option) %>" <%= saved.driver === optionValue(option) || saved.driver === option ? 'selected' : '' %>><%= getOptionLabel(option) %></option>
                 <% }) %>
               </select>
             </div>
@@ -619,4 +624,3 @@
 </script>
 
 <%- include('partials/footer') %>
-
