@@ -1,0 +1,210 @@
+<%- include('partials/header', { title: t('admin_race_data.page_title'), user }) %>
+<%- include('partials/admin_nav', { active: 'race-data', season }) %>
+
+<div class="card admin-page-card admin-race-data-page">
+  <div class="admin-race-data-heading">
+    <div>
+      <h1><%= t('admin_race_data.heading') %></h1>
+      <p class="muted admin-page-intro"><%= t('admin_race_data.intro') %></p>
+      <p class="muted admin-race-data-cutoff">
+        <%= t('admin_race_data.cutoff') %>: <strong><%= view.selectedRound?.label || '—' %></strong>
+        <% if (selectedImport) { %>
+          · <%= selectedImport.reconstructed ? t('admin_race_data.reconstructed') : t('admin_race_data.import_status') %>:
+          <strong><%= selectedImport.status %></strong>
+        <% } %>
+      </p>
+    </div>
+    <form method="get" action="/admin/race-data" class="admin-inputs-season-form">
+      <label for="admin-race-data-season"><%= t('admin_inputs.season') %></label>
+      <select id="admin-race-data-season" name="season" onchange="this.form.submit()">
+        <% (availableSeasons || []).forEach((availableSeason) => { %>
+          <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %> · <%= availableSeason.statusLabel %></option>
+        <% }) %>
+      </select>
+      <input type="hidden" name="view" value="<%= viewMode %>" />
+      <input type="hidden" name="round" value="<%= view.selectedRoundNumber || 1 %>" />
+    </form>
+  </div>
+
+  <% if (seasonContext?.invalidRequestedSeason) { %>
+    <div class="admin-feedback-context">
+      <div class="alert" role="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    </div>
+  <% } %>
+
+  <div class="admin-race-data-toolbar">
+    <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>">
+      <a class="admin-race-data-tab <%= viewMode === 'drivers' ? 'is-active' : '' %>"
+         href="/admin/race-data?season=<%= season %>&view=drivers&round=<%= view.selectedRoundNumber %>"
+         role="tab" aria-selected="<%= viewMode === 'drivers' ? 'true' : 'false' %>">
+        <%= t('admin_race_data.drivers_view') %>
+      </a>
+      <a class="admin-race-data-tab <%= viewMode === 'constructors' ? 'is-active' : '' %>"
+         href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>"
+         role="tab" aria-selected="<%= viewMode === 'constructors' ? 'true' : 'false' %>">
+        <%= t('admin_race_data.constructors_view') %>
+      </a>
+    </div>
+    <form method="get" action="/admin/race-data" class="admin-race-data-round-form">
+      <input type="hidden" name="view" value="<%= viewMode %>" />
+      <input type="hidden" name="season" value="<%= season %>" />
+      <label for="admin-race-data-round"><%= t('admin_race_data.round_label') %></label>
+      <select id="admin-race-data-round" name="round" onchange="this.form.submit()">
+        <% view.rounds.forEach((round) => { %>
+          <option value="<%= round.roundNumber %>" <%= round.roundNumber === view.selectedRoundNumber ? 'selected' : '' %>>
+            <%= round.label %>
+          </option>
+        <% }) %>
+      </select>
+      <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_round') %></button></noscript>
+    </form>
+  </div>
+
+  <div class="admin-race-data-legend muted">
+    <span><strong><%= t('admin_race_data.legend') %>:</strong></span>
+    <span><%= t('admin_race_data.legend_finish') %></span>
+    <span><%= t('admin_race_data.legend_retired') %></span>
+    <span><%= t('admin_race_data.legend_dns') %></span>
+    <span><%= t('admin_race_data.legend_dnq') %></span>
+    <span><%= t('admin_race_data.legend_nc') %></span>
+    <span><%= t('admin_race_data.legend_unavailable') %></span>
+  </div>
+
+  <div class="admin-race-data-table-wrap">
+    <% const rows = viewMode === 'constructors' ? view.constructors : view.drivers; %>
+    <table class="admin-race-data-matrix">
+      <thead>
+        <tr>
+          <th scope="col" class="admin-race-data-sticky admin-race-data-rank"><%= t('admin_race_data.position') %></th>
+          <th scope="col" class="admin-race-data-sticky admin-race-data-entity">
+            <%= viewMode === 'constructors' ? t('admin_race_data.constructor') : t('admin_race_data.driver') %>
+          </th>
+          <% if (viewMode === 'drivers') { %>
+            <th scope="col" class="admin-race-data-sticky admin-race-data-team"><%= t('admin_race_data.team') %></th>
+          <% } %>
+          <% view.rounds.forEach((round) => { %>
+            <th scope="col" class="admin-race-data-round-head">
+              <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>">R<%= round.roundNumber %></a>
+            </th>
+          <% }) %>
+          <th scope="col" class="admin-race-data-summary"><%= t('admin_race_data.points') %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach((row, index) => { %>
+          <tr>
+            <td class="admin-race-data-sticky admin-race-data-rank"><%= row.championshipPosition || index + 1 %></td>
+            <th scope="row" class="admin-race-data-sticky admin-race-data-entity"><%= row.name %></th>
+            <% if (viewMode === 'drivers') { %>
+              <td class="admin-race-data-sticky admin-race-data-team"><%= row.constructor || '—' %></td>
+            <% } %>
+            <% row.cells.forEach((cell, cellIndex) => { %>
+              <td class="admin-race-data-cell state-<%= cell.state %> <%= cell.label === '—' ? 'is-empty' : '' %>"
+                  title="<%= cell.title %>">
+                <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %>"><%= cell.label %></a>
+              </td>
+            <% }) %>
+            <td class="admin-race-data-summary"><%= row.points == null ? '—' : row.points %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <section class="admin-race-data-detail" aria-labelledby="admin-race-data-detail-heading">
+    <div class="admin-race-data-detail-heading">
+      <div>
+        <h2 id="admin-race-data-detail-heading"><%= view.selectedRound?.label || t('admin_race_data.no_round') %></h2>
+        <% if (view.selectedRound?.evidence) { %>
+          <p class="muted">
+            <%= t('admin_race_data.source_status') %>:
+            <strong><%= view.selectedSummary?.status || 'incomplete' %></strong>
+            · <%= t('admin_race_data.fetched') %>:
+            <%= view.selectedRound.evidence.fetched_at || view.selectedRound.evidence.payload?.fetchedAt || '—' %>
+            · <%= view.selectedRound.evidence.source_type || '—' %>
+            <% if (view.selectedRound.evidence.reconstructed) { %>
+              · <%= t('admin_race_data.reconstructed') %>
+            <% } %>
+          </p>
+          <% if (view.selectedRound.state === 'cancelled') { %>
+            <p class="muted"><%= t('admin_race_data.cancelled_round') %></p>
+          <% } else if (view.selectedRound.state === 'incomplete') { %>
+            <p class="muted"><%= t('admin_race_data.partial_round') %></p>
+          <% } %>
+        <% } else { %>
+          <p class="muted">
+            <%= view.selectedRound?.state === 'future'
+              ? t('admin_race_data.future_round')
+              : view.selectedRound?.state === 'cancelled'
+                ? t('admin_race_data.cancelled_round')
+                : t('admin_race_data.no_evidence') %>
+          </p>
+        <% } %>
+      </div>
+      <% if (selectedSnapshot) { %>
+        <a class="secondary button" href="/admin/actuals?season=<%= season %>&target=round:<%= view.selectedRoundNumber %>">
+          <%= t('admin_race_data.open_actuals') %>
+        </a>
+      <% } %>
+    </div>
+
+    <% if (view.selectedEvidence) { %>
+      <div class="admin-race-data-coverage">
+        <% const coverage = view.selectedEvidence.payload?.coverage?.sources || {}; %>
+        <span><strong><%= t('admin_race_data.coverage') %>:</strong></span>
+        <span>Race <%= coverage.race?.count || 0 %></span>
+        <span>Qualifying <%= coverage.qualifying?.count || 0 %></span>
+        <span>Sprint <%= coverage.sprint?.count || 0 %></span>
+        <span>Driver standings <%= coverage.driverStandings?.count || 0 %></span>
+        <span>Constructor standings <%= coverage.constructorStandings?.count || 0 %></span>
+      </div>
+      <div class="admin-race-data-detail-table-wrap">
+        <table class="admin-race-data-detail-table">
+          <thead>
+            <tr>
+              <th><%= t('admin_race_data.driver') %></th>
+              <th><%= t('admin_race_data.constructor') %></th>
+              <th><%= t('admin_race_data.grid') %></th>
+              <th><%= t('admin_race_data.qualifying_short') %></th>
+              <th><%= t('admin_race_data.sprint') %></th>
+              <th><%= t('admin_race_data.race') %></th>
+              <th><%= t('admin_race_data.status') %></th>
+              <th><%= t('admin_race_data.points_short') %></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% view.detailRows.forEach((row) => { %>
+              <tr>
+                <th scope="row"><%= row.driver %></th>
+                <td><%= row.constructor || '—' %></td>
+                <td><%= row.grid == null ? '—' : row.grid %></td>
+                <td><%= row.qualifyingPosition == null ? '—' : row.qualifyingPosition %></td>
+                <td>
+                  <%= row.sprintPosition == null ? '—' : row.sprintPosition %>
+                  <% if (row.sprintPoints != null && row.sprintPoints > 0) { %>
+                    <small>+<%= row.sprintPoints %></small>
+                  <% } %>
+                </td>
+                <td><%= row.racePosition || row.raceLabel || '—' %></td>
+                <td><%= row.raceStatus || row.sprintStatus || '—' %></td>
+                <td><%= row.racePoints == null ? '—' : row.racePoints %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% if (Object.keys(derivedActuals || {}).length > 0) { %>
+        <details class="admin-race-data-derived">
+          <summary><%= t('admin_race_data.derived_actuals') %> (<%= Object.keys(derivedActuals).length %>)</summary>
+          <dl>
+            <% Object.entries(derivedActuals).forEach(([questionId, value]) => { %>
+              <div><dt><%= questionId %></dt><dd><%= value %></dd></div>
+            <% }) %>
+          </dl>
+        </details>
+      <% } %>
+    <% } else { %>
+      <div class="alert"><%= t('admin_race_data.no_evidence_detail') %></div>
+    <% } %>
+  </section>
+</div>

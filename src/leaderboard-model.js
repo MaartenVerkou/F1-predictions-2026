@@ -1,5 +1,7 @@
 "use strict";
 
+const { canonicalizeQuestionValue } = require("./canonical-answers");
+
 function normalizeParticipantId(value) {
   return String(value ?? "").trim();
 }
@@ -24,7 +26,11 @@ function normalizeResponse(row) {
 
 function parseLeaderboardStoredValue(question, raw) {
   if (raw == null || raw === "") return null;
-  if (Array.isArray(raw) || (raw && typeof raw === "object")) return raw;
+  let parsed;
+  if (Array.isArray(raw) || (raw && typeof raw === "object")) {
+    parsed = raw;
+    return canonicalizeQuestionValue(question, parsed, question?._canonicalCatalog);
+  }
   const text = String(raw).trim();
   if (!text) return null;
   const type = question?.type || "text";
@@ -38,17 +44,18 @@ function parseLeaderboardStoredValue(question, raw) {
     type === "single_choice_with_driver"
   ) {
     try {
-      return JSON.parse(text);
+      parsed = JSON.parse(text);
     } catch (err) {
       return null;
     }
-  }
-  if (text.startsWith("[") || text.startsWith("{")) {
+  } else if (text.startsWith("[") || text.startsWith("{")) {
     try {
-      return JSON.parse(text);
+      parsed = JSON.parse(text);
     } catch (err) {}
+  } else {
+    parsed = raw;
   }
-  return raw;
+  return canonicalizeQuestionValue(question, parsed, question?._canonicalCatalog);
 }
 
 function leaderboardValuesMatch(actualValue, predictedValue) {

@@ -23,6 +23,54 @@
     "Sergio Perez",
     "Valtteri Bottas"
   ],
+  "driver_numbers": {
+    "Alexander Albon": 23,
+    "Arvid Lindblad": 41,
+    "Carlos Sainz Jr.": 55,
+    "Charles Leclerc": 16,
+    "Esteban Ocon": 31,
+    "Fernando Alonso": 14,
+    "Franco Colapinto": 43,
+    "Gabriel Bortoleto": 5,
+    "George Russell": 63,
+    "Isack Hadjar": 6,
+    "Kimi Antonelli": 12,
+    "Lance Stroll": 18,
+    "Lando Norris": 1,
+    "Lewis Hamilton": 44,
+    "Liam Lawson": 30,
+    "Max Verstappen": 3,
+    "Nico Hulkenberg": 27,
+    "Oliver Bearman": 87,
+    "Oscar Piastri": 81,
+    "Pierre Gasly": 10,
+    "Sergio Perez": 11,
+    "Valtteri Bottas": 77
+  },
+  "driver_profiles": {
+    "Alexander Albon": {"driver_code": "ALB", "nationality_code": "THA", "date_of_birth": "1996-03-23"},
+    "Arvid Lindblad": {"driver_code": "LIN", "nationality_code": "GBR", "date_of_birth": "2007-08-08"},
+    "Carlos Sainz Jr.": {"driver_code": "SAI", "nationality_code": "ESP", "date_of_birth": "1994-09-01"},
+    "Charles Leclerc": {"driver_code": "LEC", "nationality_code": "MON", "date_of_birth": "1997-10-16"},
+    "Esteban Ocon": {"driver_code": "OCO", "nationality_code": "FRA", "date_of_birth": "1996-09-17"},
+    "Fernando Alonso": {"driver_code": "ALO", "nationality_code": "ESP", "date_of_birth": "1981-07-29"},
+    "Franco Colapinto": {"driver_code": "COL", "nationality_code": "ARG", "date_of_birth": "2003-05-27"},
+    "Gabriel Bortoleto": {"driver_code": "BOR", "nationality_code": "BRA", "date_of_birth": "2004-10-14"},
+    "George Russell": {"driver_code": "RUS", "nationality_code": "GBR", "date_of_birth": "1998-02-15"},
+    "Isack Hadjar": {"driver_code": "HAD", "nationality_code": "FRA", "date_of_birth": "2004-09-28"},
+    "Kimi Antonelli": {"driver_code": "ANT", "nationality_code": "ITA", "date_of_birth": "2006-08-25"},
+    "Lance Stroll": {"driver_code": "STR", "nationality_code": "CAN", "date_of_birth": "1998-10-29"},
+    "Lando Norris": {"driver_code": "NOR", "nationality_code": "GBR", "date_of_birth": "1999-11-13"},
+    "Lewis Hamilton": {"driver_code": "HAM", "nationality_code": "GBR", "date_of_birth": "1985-01-07"},
+    "Liam Lawson": {"driver_code": "LAW", "nationality_code": "NZL", "date_of_birth": "2002-02-11"},
+    "Max Verstappen": {"driver_code": "VER", "nationality_code": "NED", "date_of_birth": "1997-09-30"},
+    "Nico Hulkenberg": {"driver_code": "HUL", "nationality_code": "GER", "date_of_birth": "1987-08-19"},
+    "Oliver Bearman": {"driver_code": "BEA", "nationality_code": "GBR", "date_of_birth": "2005-05-08"},
+    "Oscar Piastri": {"driver_code": "PIA", "nationality_code": "AUS", "date_of_birth": "2001-04-06"},
+    "Pierre Gasly": {"driver_code": "GAS", "nationality_code": "FRA", "date_of_birth": "1996-02-07"},
+    "Sergio Perez": {"driver_code": "PER", "nationality_code": "MEX", "date_of_birth": "1990-01-26"},
+    "Valtteri Bottas": {"driver_code": "BOT", "nationality_code": "FIN", "date_of_birth": "1989-08-28"}
+  },
   "teams": [
     "Alpine",
     "Aston Martin",
@@ -35,6 +83,18 @@
     "Racing Bulls",
     "Red Bull Racing",
     "Williams"
-  ]
+  ],
+  "team_profiles": {
+    "Alpine": {"team_code": "ALP", "base_country_code": "GBR", "f1_entry_year": 2021, "power_unit": "Mercedes"},
+    "Aston Martin": {"team_code": "AMR", "base_country_code": "GBR", "f1_entry_year": 2021, "power_unit": "Honda"},
+    "Audi": {"team_code": "AUD", "base_country_code": "SUI", "f1_entry_year": 2026, "power_unit": "Audi"},
+    "Cadillac": {"team_code": "CAD", "base_country_code": "GBR", "f1_entry_year": 2026, "power_unit": "Ferrari"},
+    "Ferrari": {"team_code": "FER", "base_country_code": "ITA", "f1_entry_year": 1950, "power_unit": "Ferrari"},
+    "Haas F1 Team": {"team_code": "HAS", "base_country_code": "USA", "f1_entry_year": 2016, "power_unit": "Ferrari"},
+    "McLaren": {"team_code": "MCL", "base_country_code": "GBR", "f1_entry_year": 1966, "power_unit": "Mercedes"},
+    "Mercedes": {"team_code": "MER", "base_country_code": "GBR", "f1_entry_year": 2010, "power_unit": "Mercedes"},
+    "Racing Bulls": {"team_code": "RBU", "base_country_code": "ITA", "f1_entry_year": 2006, "power_unit": "Red Bull Ford"},
+    "Red Bull Racing": {"team_code": "RBR", "base_country_code": "GBR", "f1_entry_year": 2005, "power_unit": "Red Bull Ford"},
+    "Williams": {"team_code": "WIL", "base_country_code": "GBR", "f1_entry_year": 1978, "power_unit": "Mercedes"}
+  }
 }
-
