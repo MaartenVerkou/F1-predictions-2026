@@ -1,8 +1,8 @@
 ## 0. Finish the Inputs foundation
 
 - [x] 0.1 Add the remaining canonical-season-inputs tests for renames, provider aliases, ambiguous mappings, legacy values, round cutoffs, cross-season isolation, and seat occupancy.
-- [ ] 0.2 Add the remaining race-data audit comparison and route/integration tests for persisted evidence, missing-source states, read-only access, and cutoff totals.
-- [ ] 0.3 Add archived Inputs mutation lifecycle tests for confirmation/no-confirmation paths and run strict OpenSpec validation plus the supported project checks.
+- [x] 0.2 Add the remaining race-data audit comparison and route/integration tests for persisted evidence, missing-source states, read-only access, and cutoff totals.
+- [x] 0.3 Add archived Inputs mutation lifecycle tests for confirmation/no-confirmation paths and run strict OpenSpec validation plus the supported project checks.
 - [ ] 0.4 Refresh the sanitized preview at the exact feature commit, verify PostgreSQL health and the Inputs → Questions → Race data → Actuals flow, then document approval before archiving prior changes.
 
 ## 1. Catalog contract and readiness

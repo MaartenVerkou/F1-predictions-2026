@@ -5,7 +5,8 @@ const assert = require("node:assert/strict");
 const {
   auditResultLabel,
   auditSourceState,
-  buildRaceDataAuditView
+  buildRaceDataAuditView,
+  registerAdminRoutes
 } = require("../src/routes/admin");
 
 test("auditResultLabel preserves classified and non-classified outcomes", () => {
@@ -136,4 +137,21 @@ test("buildRaceDataAuditView uses selected cutoff standings and mutes later roun
   assert.equal(view.drivers[0].championshipPosition, 1);
   assert.equal(view.drivers[0].cells[1].state, "future");
   assert.equal(view.cutoffRoundNumber, 1);
+});
+
+test("race data is exposed as a read-only admin workspace", () => {
+  const routes = {};
+  const app = {
+    get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers.at(-1); }
+  };
+  registerAdminRoutes(app, {
+    db: {},
+    requireAdmin: () => {},
+    getCurrentUser: () => ({ id: 1 }),
+    logEvent: () => {}
+  });
+
+  assert.equal(typeof routes["GET /admin/race-data"], "function");
+  assert.equal(routes["POST /admin/race-data"], undefined);
 });

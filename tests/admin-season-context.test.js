@@ -1,11 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const Database = require("better-sqlite3");
 const {
   assertSeasonMutationAllowed,
   listAdminSeasons,
   readSeasonMutationFlags,
   resolveAdminSeasonContext
 } = require("../src/admin-season-context");
+const { ensureSeasonInputsSchema } = require("../src/season-inputs");
+const { registerAdminRoutes } = require("../src/routes/admin");
 
 function buildDb() {
   const seasons = [
@@ -87,4 +90,61 @@ test("season mutation flags require explicit request values", () => {
     historicalCorrection: true,
     preparation: true
   });
+});
+
+test("archived Inputs mutations require explicit historical correction confirmation", () => {
+  const db = new Database(":memory:");
+  db.dialect = "sqlite";
+  ensureSeasonInputsSchema(db);
+  db.exec(`
+    CREATE TABLE race_data_snapshots (id INTEGER PRIMARY KEY, season INTEGER NOT NULL);
+    CREATE TABLE actual_snapshots (id INTEGER PRIMARY KEY, season INTEGER NOT NULL);
+    CREATE TABLE actual_snapshot_values (snapshot_id INTEGER NOT NULL, question_id TEXT NOT NULL, value TEXT NOT NULL);
+    INSERT INTO seasons (id, year, label, status, created_at, updated_at)
+      VALUES (1, 2025, '2025', 'archived', 'now', 'now');
+    INSERT INTO drivers (id, slug, given_name, family_name, display_name, created_at, updated_at)
+      VALUES (1, 'archived-driver', 'Archived', 'Driver', 'Archived Driver', 'now', 'now');
+    INSERT INTO season_drivers (season_id, driver_id, created_at, updated_at)
+      VALUES (1, 1, 'now', 'now');
+  `);
+
+  const routes = {};
+  const app = {
+    get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers.at(-1); }
+  };
+  registerAdminRoutes(app, {
+    db,
+    requireAdmin: () => {},
+    getCurrentUser: () => ({ id: 7 }),
+    logEvent: () => {}
+  });
+  const update = routes["POST /admin/inputs/entity"];
+  assert.equal(typeof update, "function");
+
+  const invoke = (historicalCorrection) => {
+    const response = {};
+    update(
+      {
+        body: {
+          season: "2025",
+          entity_type: "driver",
+          entity_id: "1",
+          display_name: "Corrected Archived Driver",
+          ...(historicalCorrection ? { historical_correction: "1" } : {})
+        }
+      },
+      { redirect(location) { response.location = location; } }
+    );
+    return response.location;
+  };
+
+  const rejectedLocation = invoke(false);
+  assert.match(rejectedLocation, /Archived\+seasons\+are\+read-only/);
+  assert.equal(db.prepare("SELECT display_name FROM drivers WHERE id = 1").get().display_name, "Archived Driver");
+
+  const acceptedLocation = invoke(true);
+  assert.match(acceptedLocation, /Entity\+updated/);
+  assert.equal(db.prepare("SELECT display_name FROM drivers WHERE id = 1").get().display_name, "Corrected Archived Driver");
+  db.close();
 });

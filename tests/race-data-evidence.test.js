@@ -4,6 +4,12 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   buildEvidenceBundle,
+  completeRaceDataImport,
+  createRaceDataImport,
+  ensureRaceDataSchema,
+  findRaceDataSnapshot,
+  listRaceDataSnapshots,
+  saveRaceDataSnapshot,
   summarizeEvidence
 } = require("../src/race-data-evidence");
 
@@ -114,4 +120,55 @@ test("summarizeEvidence reports source row counts", () => {
     driverStandingsCount: 20,
     constructorStandingsCount: 10
   });
+});
+
+test("persisted evidence is reusable by round and idempotent for the same sync", (t) => {
+  const Database = require("better-sqlite3");
+  const db = new Database(":memory:");
+  db.dialect = "sqlite";
+  db.exec(`
+    CREATE TABLE actual_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_data_import_id INTEGER,
+      source_data_snapshot_id INTEGER
+    );
+  `);
+  ensureRaceDataSchema(db);
+  t.after(() => db.close());
+
+  const importId = createRaceDataImport(db, {
+    season: 2026,
+    syncId: "sync-r6",
+    requestedRounds: 1,
+    sourceNote: "test import"
+  });
+  const evidence = {
+    roundName: "Monaco Grand Prix",
+    coverage: { status: "complete", sources: { race: { count: 1 } } },
+    race: { rows: [{ driver: "driver:1", constructor: "team:10", position: 1 }] }
+  };
+  const firstId = saveRaceDataSnapshot(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    syncId: "sync-r6",
+    importId,
+    fetchedAt: "2026-09-21T00:00:00.000Z",
+    evidence
+  });
+  const secondId = saveRaceDataSnapshot(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    syncId: "sync-r6",
+    importId,
+    fetchedAt: "2026-09-21T00:00:00.000Z",
+    evidence
+  });
+
+  assert.equal(secondId, firstId);
+  assert.equal(listRaceDataSnapshots(db, 2026).length, 1);
+  assert.deepEqual(findRaceDataSnapshot(db, 2026, 6).payload.race.rows[0], evidence.race.rows[0]);
+  assert.equal(completeRaceDataImport(db, importId, { completedRounds: 1 }), 1);
+  assert.equal(db.prepare("SELECT status, completed_rounds FROM race_data_imports WHERE id = ?").get(importId).status, "completed");
 });
