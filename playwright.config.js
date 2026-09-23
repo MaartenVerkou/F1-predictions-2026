@@ -9,6 +9,7 @@ const stateDir = path.join(__dirname, ".tmp", "playwright-state");
 
 module.exports = defineConfig({
   testDir: "./tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.js",
   timeout: 30_000,
   workers: 1,
   expect: {
@@ -27,7 +28,7 @@ module.exports = defineConfig({
     }
   ],
   webServer: {
-    command: "node scripts/seed-season-inputs.js && node server.js",
+    command: "node server.js",
     url: `${BASE_URL}/healthz`,
     reuseExistingServer: !process.env.CI,
     timeout: 20_000,
