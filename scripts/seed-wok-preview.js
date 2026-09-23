@@ -13,6 +13,7 @@ const {
 const roster = require("../data/roster.json");
 const races = require("../data/races.json").races;
 const { DRIVER_TEAM_ASSIGNMENTS, seedSeasonInputs } = require("./seed-season-inputs");
+const { seedPreviewSeasonFixtures } = require("./seed-preview-season-fixtures");
 const { listSeasonInputs, upsertDriver, upsertSeasonDriver } = require("../src/season-inputs");
 const { buildCanonicalCatalog } = require("../src/canonical-answers");
 const { applySeasonLineup, buildLineupProjection } = require("../src/season-lineup");
@@ -240,13 +241,15 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
     return { importId, snapshots };
   });
   const result = transaction();
+  const seasons = seedPreviewSeasonFixtures(database);
   return {
     sourceType: PREVIEW_SOURCE,
     importId: result.importId,
     snapshotCount: result.snapshots.length,
     rounds: result.snapshots.map((item) => item.round),
     sanitized: true,
-    replacement
+    replacement,
+    seasons
   };
 }
 
