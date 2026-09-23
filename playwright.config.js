@@ -27,7 +27,7 @@ module.exports = defineConfig({
     }
   ],
   webServer: {
-    command: "node server.js",
+    command: "node scripts/seed-season-inputs.js && node server.js",
     url: `${BASE_URL}/healthz`,
     reuseExistingServer: !process.env.CI,
     timeout: 20_000,

@@ -2942,7 +2942,7 @@ button:disabled {
     align-items: stretch;
   }
 }
-\n@media (max-width: 720px) {
+@media (max-width: 720px) {
   .account-page,
   .about-page {
     gap: 14px;
