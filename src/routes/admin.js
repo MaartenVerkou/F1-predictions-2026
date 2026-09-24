@@ -13,6 +13,7 @@ const {
   upsertSnapshotForRound
 } = require("../actuals-snapshots");
 const {
+  findRaceDataSnapshot,
   listRaceDataImports,
   listRaceDataSnapshots,
   summarizeEvidence
@@ -31,6 +32,7 @@ const {
   upsertTeam
 } = require("../season-inputs");
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
+const { buildSeasonCatalog } = require("../season-catalog");
 const {
   applyTeamLineupHistory,
   applySeasonLineup,
@@ -67,9 +69,27 @@ function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
   return Number(roundNumber) > Number(latestEvidenceRound || 0) ? "future" : "not_synced";
 }
 
-function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster }) {
+function attachSeasonCatalogToQuestions(questions, seasonCatalog) {
+  const canonical = seasonCatalog?.canonical || { driver: [], team: [], race: [] };
+  return (questions || []).map((question) => {
+    const attached = { ...question };
+    Object.defineProperty(attached, "_canonicalCatalog", {
+      value: canonical,
+      enumerable: false,
+      configurable: true
+    });
+    Object.defineProperty(attached, "_catalogRevision", {
+      value: seasonCatalog?.catalogRevision || null,
+      enumerable: false,
+      configurable: true
+    });
+    return attached;
+  });
+}
+
+function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster, seasonCatalog }) {
   const base = fallbackRoster || { drivers: [], teams: [], races: races || [] };
-  const catalog = listSeasonInputs(db, season);
+  const catalog = seasonCatalog || listSeasonInputs(db, season);
   if (!catalog.season || !Number.isInteger(Number(roundNumber)) || Number(roundNumber) < 1) return base;
   const projection = buildLineupProjection({
     teams: catalog.teams,
@@ -83,10 +103,23 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster 
       .map((seat) => [String(seat.driverName), String(seat.driverName)])
   ).values());
   const teams = projection.map((team) => team.teamName);
+  const driverEntities = Array.from(new Map(
+    projection.flatMap((team) => team.seats)
+      .filter((seat) => seat.driverId != null && seat.driverName)
+      .map((seat) => [Number(seat.driverId), {
+        id: Number(seat.driverId),
+        name: String(seat.driverName)
+      }])
+  ).values());
+  const teamEntities = projection
+    .filter((team) => team.teamId != null && team.teamName)
+    .map((team) => ({ id: Number(team.teamId), name: String(team.teamName) }));
   return {
     ...base,
     drivers: drivers.length ? drivers : base.drivers || [],
     teams: teams.length ? teams : base.teams || [],
+    driver_entities: driverEntities,
+    team_entities: teamEntities,
     driver_options: drivers.length ? drivers : base.driver_options || base.drivers || [],
     team_options: teams.length ? teams : base.team_options || base.teams || [],
     race_options: races || base.race_options || base.races || [],
@@ -94,7 +127,7 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster 
   };
 }
 
-function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound }) {
+function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound, catalogRevision = null }) {
   const evidenceByRound = new Map(
     evidenceRows.map((row) => [Number(row.round_number), row])
   );
@@ -153,13 +186,34 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   const selectedConstructorStandings = selectedPayload?.standings?.constructors || [];
   const selectedDriverMap = new Map(selectedDriverStandings.map((row) => [row.entity, row]));
   const selectedConstructorMap = new Map(selectedConstructorStandings.map((row) => [row.entity, row]));
+  const selectedDriverIdMap = new Map(
+    selectedDriverStandings
+      .filter((row) => row.entity_id != null)
+      .map((row) => [Number(row.entity_id), row])
+  );
+  const selectedConstructorIdMap = new Map(
+    selectedConstructorStandings
+      .filter((row) => row.entity_id != null)
+      .map((row) => [Number(row.entity_id), row])
+  );
 
   const drivers = Array.isArray(roster?.drivers) ? roster.drivers : [];
   const teams = Array.isArray(roster?.teams) ? roster.teams : [];
-  const driverRows = drivers.map((driver) => {
+  const driverEntities = Array.isArray(roster?.driver_entities)
+    ? roster.driver_entities
+    : drivers.map((name) => ({ id: null, name }));
+  const teamEntities = Array.isArray(roster?.team_entities)
+    ? roster.team_entities
+    : teams.map((name) => ({ id: null, name }));
+  const driverRows = driverEntities.map((entity) => {
+    const driver = entity.name;
     const cells = rounds.map((round) => {
       const raceRows = round.evidence?.payload?.race?.rows || [];
-      const row = raceRows.find((item) => item.driver === driver) || null;
+      const row = raceRows.find((item) =>
+        entity.id != null
+          ? Number(item.driver_id) === Number(entity.id)
+          : item.driver === driver
+      ) || null;
       const afterCutoff = round.roundNumber > cutoffRoundNumber;
       return {
         label: afterCutoff ? "—" : round.evidence ? auditResultLabel(row) : "—",
@@ -174,10 +228,13 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
         row
       };
     });
-    const standing = selectedDriverMap.get(driver) || null;
+    const standing = (entity.id != null ? selectedDriverIdMap.get(Number(entity.id)) : null)
+      || selectedDriverMap.get(driver)
+      || null;
     const constructor = cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
     return {
       name: driver,
+      id: entity.id,
       constructor,
       cells,
       points: standing?.points ?? null,
@@ -185,7 +242,8 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     };
   });
 
-  const constructorRows = teams.map((team) => {
+  const constructorRows = teamEntities.map((entity) => {
+    const team = entity.name;
     const cells = rounds.map((round) => {
       if (round.roundNumber > cutoffRoundNumber) {
         return { label: "—", state: "future", title: "After selected cutoff" };
@@ -196,7 +254,11 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       const raceRows = round.evidence.payload?.race?.rows || [];
       const sprintRows = round.evidence.payload?.sprint?.rows || [];
       const points = raceRows
-        .filter((row) => row.constructor === team)
+        .filter((row) =>
+          entity.id != null
+            ? Number(row.team_id) === Number(entity.id)
+            : row.constructor === team
+        )
         .concat(sprintRows.filter((row) => row.constructor === team))
         .reduce((total, row) => total + Number(row.points || 0), 0);
       return {
@@ -205,9 +267,12 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
         title: points + " points from race and sprint"
       };
     });
-    const standing = selectedConstructorMap.get(team) || null;
+    const standing = (entity.id != null ? selectedConstructorIdMap.get(Number(entity.id)) : null)
+      || selectedConstructorMap.get(team)
+      || null;
     return {
       name: team,
+      id: entity.id,
       cells,
       points: standing?.points ?? null,
       championshipPosition: standing?.position ?? null
@@ -262,7 +327,8 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     detailRows,
     latestEvidence,
     latestEvidenceRound,
-    snapshotRows
+    snapshotRows,
+    catalogRevision
   };
 }
 
@@ -1227,7 +1293,12 @@ function registerAdminRoutes(app, deps) {
     createdByUserId = null,
     label = "",
     reviewStatus = REVIEW_STATUS_REVIEWED,
-    preserveReviewIfUnchanged = false
+    preserveReviewIfUnchanged = false,
+    catalogRevision = null,
+    evidenceRevision = null,
+    derivationVersion = "actuals-v1",
+    manualCorrection = null,
+    publishedAt = null
   }) {
     return upsertSnapshotForRound(db, {
       season,
@@ -1239,7 +1310,12 @@ function registerAdminRoutes(app, deps) {
       createdByUserId,
       label,
       reviewStatus,
-      preserveReviewIfUnchanged
+      preserveReviewIfUnchanged,
+      catalogRevision,
+      evidenceRevision,
+      derivationVersion,
+      manualCorrection,
+      publishedAt
     });
   }
 
@@ -3069,13 +3145,27 @@ function registerAdminRoutes(app, deps) {
     const locale = res.locals.locale || "en";
     const saveError = req.query.error ? String(req.query.error) : null;
     const saveSuccess = req.query.success ? String(req.query.success) : null;
-    const questions = getQuestions(locale, {
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: req.query.season,
+      currentSeason: CURRENT_SEASON
+    });
+    const season = Number(seasonContext.year || CURRENT_SEASON);
+    const sourceQuestions = getQuestions(locale, {
       includeExcluded: true,
       includeMeta: true
     });
+    const catalog = seasonContext.selected
+      ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
+      : null;
+    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
     res.render("admin_questions", {
       user,
       questions,
+      season,
+      seasonContext,
+      availableSeasons: seasonContext.availableSeasons,
+      catalogRevision: catalog?.catalogRevision || null,
+      catalogReadiness: catalog?.readiness || null,
       saveError,
       saveSuccess
     });
@@ -3203,7 +3293,9 @@ function registerAdminRoutes(app, deps) {
       currentSeason: CURRENT_SEASON
     });
     const season = Number(seasonContext.year || CURRENT_SEASON);
-    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
+    const catalog = seasonContext.selected
+      ? buildSeasonCatalog(db, season, { questions: getQuestions(locale) })
+      : null;
     const races = catalog?.races?.map((race) => race.display_name) || [];
     const evidenceRows = listRaceDataSnapshots(db, season);
     const importRows = listRaceDataImports(db, season);
@@ -3224,14 +3316,16 @@ function registerAdminRoutes(app, deps) {
       season,
       roundNumber: defaultRound,
       races,
-      fallbackRoster: { drivers: [], teams: [], races }
+      fallbackRoster: { drivers: [], teams: [], races },
+      seasonCatalog: catalog
     });
     const view = buildRaceDataAuditView({
       races,
       roster: roundRoster,
       evidenceRows,
       snapshotRows,
-      selectedRound: defaultRound
+      selectedRound: defaultRound,
+      catalogRevision: catalog?.catalogRevision || null
     });
     const selectedSnapshot = view.selectedRound?.snapshot || null;
     const derivedActuals = selectedSnapshot
@@ -3250,7 +3344,9 @@ function registerAdminRoutes(app, deps) {
       importRows,
       selectedImport: view.selectedImportId
         ? importRows.find((item) => item.id === view.selectedImportId) || null
-        : null
+        : null,
+      catalogRevision: catalog?.catalogRevision || null,
+      catalogReadiness: catalog?.readiness || null
     });
   });
 
@@ -3264,8 +3360,11 @@ function registerAdminRoutes(app, deps) {
       currentSeason: CURRENT_SEASON
     });
     const season = Number(seasonContext.year || CURRENT_SEASON);
-    const questions = getQuestions(locale);
-    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
+    const sourceQuestions = getQuestions(locale);
+    const catalog = seasonContext.selected
+      ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
+      : null;
+    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
     const races = catalog?.races?.map((race) => race.display_name) || [];
     const actualRows = seasonContext.syncable ? db.prepare("SELECT * FROM actuals").all() : [];
     const persistedActuals = actualRows.reduce((acc, row) => {
@@ -3346,7 +3445,8 @@ function registerAdminRoutes(app, deps) {
       season,
       roundNumber: selectedRoundNumber || latestRoundNumber || races.length || 1,
       races,
-      fallbackRoster: { drivers: [], teams: [], races }
+      fallbackRoster: { drivers: [], teams: [], races },
+      seasonCatalog: catalog
     });
     res.render("admin_actuals", {
       user,
@@ -3367,7 +3467,9 @@ function registerAdminRoutes(app, deps) {
       isFutureRaceTarget,
       hasDraft: Boolean(draftActuals),
       saveError,
-      saveSuccess
+      saveSuccess,
+      catalogRevision: catalog?.catalogRevision || null,
+      catalogReadiness: catalog?.readiness || null
     });
   });
 
@@ -3556,13 +3658,16 @@ function registerAdminRoutes(app, deps) {
 
   app.post("/admin/actuals", requireAdmin, (req, res) => {
     const adminUser = getCurrentUser(req);
-    const questions = getQuestions();
     const season = Number(req.body.season || CURRENT_SEASON);
     const seasonContext = resolveAdminSeasonContext(db, {
       requestedSeason: season,
       currentSeason: CURRENT_SEASON
     });
-    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
+    const sourceQuestions = getQuestions();
+    const catalog = seasonContext.selected
+      ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
+      : null;
+    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
     const races = catalog?.races?.map((race) => race.display_name) || [];
     const now = new Date().toISOString();
     const selectedTarget = String(req.body.actualsTarget || "current").trim() || "current";
@@ -3604,6 +3709,7 @@ function registerAdminRoutes(app, deps) {
     const valuesByQuestion = buildStoredActualsFromBody(req.body, questions, races, now);
 
     if (selectedRoundNumber != null) {
+      const evidenceSnapshot = findRaceDataSnapshot(db, season, selectedRoundNumber);
       const roundName = races[selectedRoundNumber - 1] || `Round ${selectedRoundNumber}`;
       let successMessage;
       try {
@@ -3616,7 +3722,13 @@ function registerAdminRoutes(app, deps) {
           sourceNote: "Manual save from admin actuals race selector",
           createdByUserId: adminUser?.id,
           label: `R${selectedRoundNumber} - ${roundName}`,
-          reviewStatus: REVIEW_STATUS_REVIEWED
+          reviewStatus: REVIEW_STATUS_REVIEWED,
+          catalogRevision: catalog?.catalogRevision || null,
+          evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.payload?.payloadRevision || null,
+          manualCorrection: allowPastEdit ? {
+            reason: "historical_correction",
+            round: selectedRoundNumber
+          } : null
         });
         successMessage = snapshotResult?.snapshotId
           ? `Snapshot saved for R${selectedRoundNumber} - ${roundName} and marked reviewed.`
@@ -3661,6 +3773,9 @@ function registerAdminRoutes(app, deps) {
     let successMessage = "Actuals saved.";
     try {
       const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
+      const evidenceSnapshot = latestRoundSnapshot?.round_number
+        ? findRaceDataSnapshot(db, season, latestRoundSnapshot.round_number)
+        : null;
       const archivedSnapshot = upsertActualsSnapshot({
         season,
         roundNumber: latestRoundSnapshot?.round_number || null,
@@ -3672,7 +3787,9 @@ function registerAdminRoutes(app, deps) {
         label: latestRoundSnapshot?.round_number
           ? `R${latestRoundSnapshot.round_number} - ${String(latestRoundSnapshot?.round_name || "Manual update").trim() || "Manual update"}`
           : `Manual save ${now.slice(0, 10)}`,
-        reviewStatus: REVIEW_STATUS_REVIEWED
+        reviewStatus: REVIEW_STATUS_REVIEWED,
+        catalogRevision: catalog?.catalogRevision || null,
+        evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.payload?.payloadRevision || null
       });
       if (archivedSnapshot?.snapshotId) {
         const label = latestRoundSnapshot?.round_number

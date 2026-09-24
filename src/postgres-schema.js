@@ -290,7 +290,12 @@ CREATE TABLE IF NOT EXISTS actual_snapshots (
   reviewed_at TEXT,
   reviewed_by_user_id INTEGER,
   source_data_import_id INTEGER,
-  source_data_snapshot_id INTEGER
+  source_data_snapshot_id INTEGER,
+  catalog_revision TEXT,
+  evidence_revision TEXT,
+  derivation_version TEXT,
+  published_at TEXT,
+  manual_correction_json TEXT
 );
 
 CREATE TABLE IF NOT EXISTS race_data_imports (
@@ -325,6 +330,11 @@ CREATE TABLE IF NOT EXISTS race_data_snapshots (
   parser_version TEXT NOT NULL DEFAULT 'evidence-v1',
   calendar_state TEXT NOT NULL DEFAULT 'completed',
   reconstructed INTEGER NOT NULL DEFAULT 0,
+  catalog_revision TEXT,
+  source_identity TEXT,
+  payload_revision TEXT,
+  cutoff_round INTEGER,
+  unresolved_count INTEGER NOT NULL DEFAULT 0,
   coverage_status TEXT NOT NULL,
   payload_json TEXT NOT NULL,
   created_at TEXT NOT NULL,

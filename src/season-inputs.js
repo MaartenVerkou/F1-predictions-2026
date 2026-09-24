@@ -485,10 +485,17 @@ function listSeasonMappings(db, year) {
   const season = db.prepare("SELECT id FROM seasons WHERE year = ? LIMIT 1").get(Number(year));
   if (!season) return [];
   const mappings = [];
+  const seasonId = Number(season.id);
+  const seasonEntityIds = {
+    driver: new Set(db.prepare("SELECT driver_id FROM season_drivers WHERE season_id = ?").all(seasonId).map((row) => Number(row.driver_id))),
+    team: new Set(db.prepare("SELECT team_id FROM season_teams WHERE season_id = ?").all(seasonId).map((row) => Number(row.team_id))),
+    race: new Set(db.prepare("SELECT id FROM races WHERE season_id = ?").all(seasonId).map((row) => Number(row.id)))
+  };
   const providerRows = db.prepare(
-    "SELECT entity_type, entity_id, provider, provider_key, provider_label FROM entity_provider_refs ORDER BY provider, provider_key"
+    "SELECT id, entity_type, entity_id, provider, provider_key, provider_label FROM entity_provider_refs ORDER BY provider, provider_key"
   ).all();
   providerRows.forEach((row) => {
+    if (!seasonEntityIds[row.entity_type]?.has(Number(row.entity_id))) return;
     const entity = findEntityById(db, row.entity_type, row.entity_id);
     mappings.push({
       id: Number(row.id),
@@ -505,9 +512,10 @@ function listSeasonMappings(db, year) {
     });
   });
   const aliasRows = db.prepare(
-    "SELECT entity_type, entity_id, alias, season_id FROM entity_aliases WHERE season_id IS NULL OR season_id = ? ORDER BY normalized_alias"
-  ).all(Number(season.id));
+    "SELECT id, entity_type, entity_id, alias, season_id FROM entity_aliases WHERE season_id IS NULL OR season_id = ? ORDER BY normalized_alias"
+  ).all(seasonId);
   aliasRows.forEach((row) => {
+    if (!seasonEntityIds[row.entity_type]?.has(Number(row.entity_id))) return;
     const entity = findEntityById(db, row.entity_type, row.entity_id);
     mappings.push({
       id: Number(row.id),

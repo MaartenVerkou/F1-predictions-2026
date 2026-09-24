@@ -7,8 +7,7 @@ const {
   ensureActualSnapshotColumns,
   fetchSnapshotValues,
   findLatestSnapshotForRound,
-  normalizeReviewStatus,
-  snapshotValuesEqual
+  upsertSnapshotForRound
 } = require("../src/actuals-snapshots");
 const {
   buildEvidenceBundle,
@@ -23,6 +22,8 @@ const {
 const { createAppDatabase } = require("../src/app-database");
 const { ensurePostgresSchema } = require("../src/postgres-schema");
 const { resolveConfiguredRaceName } = require("../src/race-names");
+const { buildPersistedDataFromEvidence } = require("../src/race-evidence-derivation");
+const { buildSeasonCatalog } = require("../src/season-catalog");
 
 const ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
@@ -766,83 +767,6 @@ function getRoundName(data, races, roundNumber) {
   );
 }
 
-function canonicalDriverParts(name) {
-  const parts = String(name || "").trim().split(/\s+/);
-  return {
-    givenName: parts.shift() || "",
-    familyName: parts.join(" ")
-  };
-}
-
-function buildApiRowFromEvidence(row) {
-  return {
-    position: row.position == null ? (row.positionText || "") : String(row.position),
-    grid: row.grid == null ? "" : String(row.grid),
-    points: row.points == null ? "0" : String(row.points),
-    status: row.status || "",
-    laps: row.laps == null ? "" : String(row.laps),
-    Driver: canonicalDriverParts(row.driver),
-    Constructor: { name: row.constructor || "" }
-  };
-}
-
-function buildPersistedDataFromEvidence(evidenceRows, season) {
-  const results = [];
-  const qualifying = [];
-  const sprints = [];
-  const driverStandingsByRound = new Map();
-  const constructorStandingsByRound = new Map();
-  const driverOfTheDayByRound = new Map();
-
-  for (const row of evidenceRows || []) {
-    const payload = row.payload || {};
-    const round = Number(row.round_number);
-    if (!Number.isFinite(round)) continue;
-    const raceRows = (payload.race?.rows || []).map(buildApiRowFromEvidence);
-    results.push({
-      round,
-      raceName: payload.roundName || row.round_name || ("Round " + round),
-      date: payload.race?.date || null,
-      Circuit: { circuitName: payload.race?.circuit || null },
-      Results: raceRows
-    });
-    const qualifyingRows = (payload.qualifying?.rows || []).map(buildApiRowFromEvidence);
-    if (qualifyingRows.length) qualifying.push({
-      round,
-      QualifyingResults: qualifyingRows
-    });
-    const sprintRows = (payload.sprint?.rows || []).map(buildApiRowFromEvidence);
-    if (sprintRows.length) sprints.push({
-      round,
-      SprintResults: sprintRows
-    });
-    driverStandingsByRound.set(round, (payload.standings?.drivers || []).map((item) => ({
-      position: item.position == null ? "" : String(item.position),
-      points: item.points == null ? "0" : String(item.points),
-      Driver: canonicalDriverParts(item.entity)
-    })));
-    constructorStandingsByRound.set(round, (payload.standings?.constructors || []).map((item) => ({
-      position: item.position == null ? "" : String(item.position),
-      points: item.points == null ? "0" : String(item.points),
-      Constructor: { name: item.entity }
-    })));
-    if (payload.external?.driverOfTheDay) {
-      driverOfTheDayByRound.set(round, payload.external.driverOfTheDay);
-    }
-  }
-
-  return {
-    season: Number(season),
-    results: results.sort((a, b) => a.round - b.round),
-    qualifying: qualifying.sort((a, b) => a.round - b.round),
-    sprints: sprints.sort((a, b) => a.round - b.round),
-    completedRounds: results.map((row) => row.round),
-    driverStandingsByRound,
-    constructorStandingsByRound,
-    driverOfTheDayByRound
-  };
-}
-
 function deriveSnapshotsFromPersistedEvidence(db, {
   season,
   rounds,
@@ -956,71 +880,6 @@ function ensureActualsSchema(db) {
   ensureRaceDataSchema(db);
 }
 
-function upsertSnapshot(db, { season, roundNumber, roundName, values, now }) {
-  const existing = findLatestSnapshotForRound(db, season, roundNumber);
-  const nextValues = Object.entries(values || {}).filter(([, value]) => value != null && value !== "");
-  if (nextValues.length === 0) return null;
-
-  if (existing) {
-    const existingValues = fetchSnapshotValues(db, existing.id);
-    const valuesChanged = !snapshotValuesEqual(existingValues, values);
-    if (!valuesChanged) {
-      return {
-        snapshotId: Number(existing.id),
-        valuesChanged: false,
-        reviewStatus: normalizeReviewStatus(existing.review_status)
-      };
-    }
-  }
-
-  const nextReviewStatus = REVIEW_STATUS_PENDING;
-  const insertSnapshot = db.prepare(
-    `
-    INSERT INTO actual_snapshots (
-      season,
-      round_number,
-      round_name,
-      label,
-      source_type,
-      source_note,
-      created_at,
-      updated_at,
-      created_by_user_id,
-      review_status,
-      reviewed_at,
-      reviewed_by_user_id
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL)
-    `
-  );
-  const insertValue = db.prepare(
-    `
-    INSERT INTO actual_snapshot_values (snapshot_id, question_id, value)
-    VALUES (?, ?, ?)
-    `
-  );
-  const snapshotInfo = insertSnapshot.run(
-    season,
-    roundNumber,
-    roundName,
-    `R${roundNumber} - ${roundName}`,
-    "autofill_backfill",
-    BACKFILL_SOURCE_NOTE,
-    now,
-    now,
-    nextReviewStatus
-  );
-  const snapshotId = Number(snapshotInfo.lastInsertRowid);
-  nextValues.forEach(([questionId, value]) => {
-    insertValue.run(snapshotId, questionId, value);
-  });
-  return {
-    snapshotId,
-    valuesChanged: true,
-    reviewStatus: nextReviewStatus
-  };
-}
-
 function writeActualsAndSnapshots(db, {
   season,
   rounds,
@@ -1069,12 +928,19 @@ function writeActualsAndSnapshots(db, {
         roundName: snapshot.roundName,
         ...snapshot.comparison
       });
-      const snapshotResult = upsertSnapshot(db, {
+      const snapshotResult = upsertSnapshotForRound(db, {
         season,
         roundNumber: snapshot.roundNumber,
         roundName: snapshot.roundName,
-        values: snapshot.values,
-        now
+        valuesByQuestion: snapshot.values,
+        sourceType: "autofill_backfill",
+        sourceNote: BACKFILL_SOURCE_NOTE,
+        label: `R${snapshot.roundNumber} - ${snapshot.roundName}`,
+        reviewStatus: REVIEW_STATUS_PENDING,
+        preserveReviewIfUnchanged: true,
+        catalogRevision: snapshot.evidence?.catalogRevision || null,
+        evidenceRevision: snapshot.evidence?.payloadRevision || null,
+        derivationVersion: "evidence-derivation-v1"
       });
       snapshot.id = snapshotResult?.snapshotId || null;
       linkEvidenceToActualSnapshot(db, snapshot.id, snapshot.evidenceId, importId);
@@ -1178,6 +1044,23 @@ async function main() {
       ensureActualsSchema(db);
       existingActuals = loadExistingActuals(db);
       const syncId = "backfill-" + args.season + "-" + Date.now();
+      const seasonCatalog = buildSeasonCatalog(db, args.season, { questions });
+      snapshots.forEach((snapshot) => {
+        const sourceEvidence = snapshot.evidence || {};
+        snapshot.evidence = buildEvidenceBundle({
+          data,
+          roster,
+          roundNumber: snapshot.roundNumber,
+          roundName: snapshot.roundName,
+          fetchedAt: sourceEvidence.fetchedAt,
+          sourceUrls: sourceEvidence.sourceUrls || {},
+          canonicalCatalog: seasonCatalog.canonical,
+          catalogRevision: seasonCatalog.catalogRevision,
+          cutoffRound: snapshot.roundNumber,
+          sourceIdentity: syncId + ":r" + snapshot.roundNumber,
+          payloadRevision: "evidence-v2:" + snapshot.roundNumber
+        });
+      });
       importId = createRaceDataImport(db, {
         season: args.season,
         syncId,

@@ -62,7 +62,12 @@ function teamNameFromApi(constructor, rosterTeams = []) {
 function canonicalId(catalog, kind, label) {
   const options = catalog?.[kind] || catalog?.[`${kind}s`] || [];
   const key = normalizeLookupKey(label);
-  const match = options.find((option) => normalizeLookupKey(option.label || option.display_name || option.displayName) === key || normalizeLookupKey(option.slug) === key);
+  const reference = String(label || "").trim().toLowerCase();
+  const match = options.find((option) =>
+    String(option.value || "").trim().toLowerCase() === reference
+      || normalizeLookupKey(option.label || option.display_name || option.displayName) === key
+      || normalizeLookupKey(option.slug) === key
+  );
   return match ? Number(match.id) : null;
 }
 
@@ -132,7 +137,19 @@ function normalizeCoverage({ race, qualifying, sprint, driverStandings, construc
   };
 }
 
-function buildEvidenceBundle({ data, roster, roundNumber, roundName, fetchedAt, sourceUrls = {}, canonicalCatalog = null }) {
+function buildEvidenceBundle({
+  data,
+  roster,
+  roundNumber,
+  roundName,
+  fetchedAt,
+  sourceUrls = {},
+  canonicalCatalog = null,
+  catalogRevision = null,
+  cutoffRound = null,
+  sourceIdentity = null,
+  payloadRevision = null
+}) {
   const round = Number(roundNumber);
   const race = (data?.results || []).find((item) => Number(item?.round) === round) || {};
   const qualifyingRace =
@@ -161,12 +178,32 @@ function buildEvidenceBundle({ data, roster, roundNumber, roundName, fetchedAt, 
     driverStandings: normalizedDriverStandings,
     constructorStandings: normalizedConstructorStandings
   });
+  const unresolved = canonicalCatalog
+    ? {
+        raceDrivers: raceRows.filter((row) => row.driver && row.driver_id == null).length,
+        raceTeams: raceRows.filter((row) => row.constructor && row.team_id == null).length,
+        qualifyingDrivers: qualifyingRows.filter((row) => row.driver && row.driver_id == null).length,
+        qualifyingTeams: qualifyingRows.filter((row) => row.constructor && row.team_id == null).length,
+        sprintDrivers: sprintRows.filter((row) => row.driver && row.driver_id == null).length,
+        sprintTeams: sprintRows.filter((row) => row.constructor && row.team_id == null).length,
+        standingsDrivers: normalizedDriverStandings.filter((row) => row.entity && row.entity_id == null).length,
+        standingsTeams: normalizedConstructorStandings.filter((row) => row.entity && row.entity_id == null).length
+      }
+    : null;
+  if (unresolved && Object.values(unresolved).some((value) => value > 0)) {
+    coverage.status = "incomplete";
+  }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     season: parseNum(data?.season, null),
     roundNumber: round,
     roundName: String(roundName || race?.raceName || `Round ${round}`).trim(),
     fetchedAt: fetchedAt || new Date().toISOString(),
+    catalogRevision: String(catalogRevision || "").trim() || null,
+    cutoffRound: parseNum(cutoffRound, round),
+    sourceIdentity: String(sourceIdentity || "").trim() || null,
+    payloadRevision: String(payloadRevision || "").trim() || null,
+    unresolved,
     sourceUrls: {
       race: sourceUrls.race || null,
       qualifying: sourceUrls.qualifying || null,
@@ -241,6 +278,8 @@ function ensureRaceDataSchema(db) {
       "parser_version TEXT NOT NULL DEFAULT 'evidence-v1', " +
       "calendar_state TEXT NOT NULL DEFAULT 'completed', " +
       "reconstructed INTEGER NOT NULL DEFAULT 0, coverage_status TEXT NOT NULL, " +
+      "catalog_revision TEXT, source_identity TEXT, payload_revision TEXT, cutoff_round INTEGER, " +
+      "unresolved_count INTEGER NOT NULL DEFAULT 0, " +
       "payload_json TEXT NOT NULL, created_at TEXT NOT NULL, " +
       "UNIQUE(season, round_number, sync_id)); " +
     "CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_season_round " +
@@ -254,7 +293,12 @@ function ensureRaceDataSchema(db) {
     ["import_id", "INTEGER"],
     ["parser_version", "TEXT NOT NULL DEFAULT 'evidence-v1'"],
     ["calendar_state", "TEXT NOT NULL DEFAULT 'completed'"],
-    ["reconstructed", "INTEGER NOT NULL DEFAULT 0"]
+    ["reconstructed", "INTEGER NOT NULL DEFAULT 0"],
+    ["catalog_revision", "TEXT"],
+    ["source_identity", "TEXT"],
+    ["payload_revision", "TEXT"],
+    ["cutoff_round", "INTEGER"],
+    ["unresolved_count", "INTEGER NOT NULL DEFAULT 0"]
   ];
   for (const [name, type] of additions) {
     if (!snapshotColumns.has(name)) {
@@ -351,6 +395,10 @@ function saveRaceDataSnapshot(db, {
   parserVersion = "evidence-v1",
   calendarState = "completed",
   reconstructed = false,
+  catalogRevision = null,
+  sourceIdentity = null,
+  payloadRevision = null,
+  cutoffRound = null,
   evidence
 }) {
   const safeSeason = parseNum(season);
@@ -360,6 +408,9 @@ function saveRaceDataSnapshot(db, {
   }
   const payload = JSON.stringify(evidence);
   const now = new Date().toISOString();
+  const safeCutoffRound = cutoffRound == null
+    ? parseNum(evidence.cutoffRound, safeRound)
+    : parseNum(cutoffRound, safeRound);
   const existing = db
     .prepare(
       `SELECT id FROM race_data_snapshots
@@ -372,7 +423,8 @@ function saveRaceDataSnapshot(db, {
       `UPDATE race_data_snapshots
        SET import_id = ?, round_name = ?, fetched_at = ?, source_type = ?, source_note = ?,
            parser_version = ?, calendar_state = ?, reconstructed = ?,
-           coverage_status = ?, payload_json = ?, created_at = ?
+           catalog_revision = ?, source_identity = ?, payload_revision = ?, cutoff_round = ?,
+           unresolved_count = ?, coverage_status = ?, payload_json = ?, created_at = ?
        WHERE id = ?`
     ).run(
       importId == null ? null : Number(importId),
@@ -383,6 +435,11 @@ function saveRaceDataSnapshot(db, {
       String(parserVersion || "evidence-v1"),
       String(calendarState || "completed"),
       reconstructed ? 1 : 0,
+      String(catalogRevision || evidence.catalogRevision || "").trim() || null,
+      String(sourceIdentity || evidence.sourceIdentity || "").trim() || null,
+      String(payloadRevision || evidence.payloadRevision || "").trim() || null,
+      safeCutoffRound,
+      evidence.unresolved ? Object.values(evidence.unresolved).reduce((total, value) => total + Number(value || 0), 0) : 0,
       String(evidence?.coverage?.status || "incomplete"),
       payload,
       now,
@@ -395,8 +452,9 @@ function saveRaceDataSnapshot(db, {
       `INSERT INTO race_data_snapshots (
         import_id, season, round_number, round_name, sync_id, fetched_at, source_type,
         source_note, parser_version, calendar_state, reconstructed,
-        coverage_status, payload_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
+       coverage_status, payload_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       importId == null ? null : Number(importId),
@@ -410,6 +468,11 @@ function saveRaceDataSnapshot(db, {
       String(parserVersion || "evidence-v1"),
       String(calendarState || "completed"),
       reconstructed ? 1 : 0,
+     String(catalogRevision || evidence.catalogRevision || "").trim() || null,
+     String(sourceIdentity || evidence.sourceIdentity || "").trim() || null,
+     String(payloadRevision || evidence.payloadRevision || "").trim() || null,
+     safeCutoffRound,
+     evidence.unresolved ? Object.values(evidence.unresolved).reduce((total, value) => total + Number(value || 0), 0) : 0,
       String(evidence?.coverage?.status || "incomplete"),
       payload,
       now
@@ -435,6 +498,7 @@ function listRaceDataSnapshots(db, season) {
     .prepare(
       `SELECT id, import_id, season, round_number, round_name, sync_id, fetched_at,
               source_type, source_note, parser_version, calendar_state, reconstructed,
+              catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
               coverage_status, payload_json, created_at
        FROM race_data_snapshots
        WHERE season = ?
@@ -463,6 +527,7 @@ function findRaceDataSnapshot(db, season, roundNumber) {
     .prepare(
       `SELECT id, import_id, season, round_number, round_name, sync_id, fetched_at,
               source_type, source_note, parser_version, calendar_state, reconstructed,
+              catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
               coverage_status, payload_json, created_at
        FROM race_data_snapshots
        WHERE season = ? AND round_number = ?
@@ -486,8 +551,9 @@ function findEvidenceForActualSnapshot(db, snapshotId) {
     .prepare(
       `SELECT rds.id, rds.import_id, rds.season, rds.round_number, rds.round_name, rds.sync_id,
               rds.fetched_at, rds.source_type, rds.source_note, rds.parser_version,
-              rds.calendar_state, rds.reconstructed,
-              rds.coverage_status, rds.payload_json, rds.created_at
+              rds.calendar_state, rds.reconstructed, rds.catalog_revision,
+              rds.source_identity, rds.payload_revision, rds.cutoff_round,
+              rds.unresolved_count, rds.coverage_status, rds.payload_json, rds.created_at
        FROM actual_snapshots AS snapshot
        LEFT JOIN race_data_snapshots AS rds
          ON rds.id = snapshot.source_data_snapshot_id

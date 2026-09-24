@@ -38,6 +38,21 @@ function ensureActualSnapshotColumns(db) {
   if (!names.has("source_data_snapshot_id")) {
     db.exec("ALTER TABLE actual_snapshots ADD COLUMN source_data_snapshot_id INTEGER;");
   }
+  if (!names.has("catalog_revision")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN catalog_revision TEXT;");
+  }
+  if (!names.has("evidence_revision")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN evidence_revision TEXT;");
+  }
+  if (!names.has("derivation_version")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN derivation_version TEXT;");
+  }
+  if (!names.has("published_at")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN published_at TEXT;");
+  }
+  if (!names.has("manual_correction_json")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN manual_correction_json TEXT;");
+  }
 
   db.exec(`
     UPDATE actual_snapshots
@@ -91,7 +106,12 @@ function mapSnapshotRow(row) {
     source_data_snapshot_id:
       row.source_data_snapshot_id == null || row.source_data_snapshot_id === ""
         ? null
-        : Number(row.source_data_snapshot_id)
+        : Number(row.source_data_snapshot_id),
+    catalog_revision: row.catalog_revision ? String(row.catalog_revision) : null,
+    evidence_revision: row.evidence_revision ? String(row.evidence_revision) : null,
+    derivation_version: row.derivation_version ? String(row.derivation_version) : null,
+    published_at: row.published_at ? String(row.published_at) : null,
+    manual_correction_json: row.manual_correction_json ? String(row.manual_correction_json) : null
   };
 }
 
@@ -147,7 +167,12 @@ function findLatestSnapshotForRound(db, season, roundNumber, options = {}) {
           reviewed_at,
           reviewed_by_user_id,
           source_data_import_id,
-          source_data_snapshot_id
+          source_data_snapshot_id,
+          catalog_revision,
+          evidence_revision,
+          derivation_version,
+          published_at,
+          manual_correction_json
         FROM actual_snapshots
         WHERE season = ?
           AND round_number = ?
@@ -186,7 +211,12 @@ function findLatestRoundSnapshotForSeason(db, season, options = {}) {
           reviewed_at,
           reviewed_by_user_id,
           source_data_import_id,
-          source_data_snapshot_id
+          source_data_snapshot_id,
+          catalog_revision,
+          evidence_revision,
+          derivation_version,
+          published_at,
+          manual_correction_json
         FROM actual_snapshots
         WHERE season = ?
           AND round_number IS NOT NULL
@@ -225,7 +255,12 @@ function listLatestSnapshotsForSeason(db, season, options = {}) {
         reviewed_at,
         reviewed_by_user_id,
         source_data_import_id,
-        source_data_snapshot_id
+        source_data_snapshot_id,
+        catalog_revision,
+        evidence_revision,
+        derivation_version,
+        published_at,
+        manual_correction_json
       FROM actual_snapshots
       WHERE season = ?
         AND round_number IS NOT NULL
@@ -265,7 +300,12 @@ function findSnapshotById(db, snapshotId, options = {}) {
           reviewed_at,
           reviewed_by_user_id,
           source_data_import_id,
-          source_data_snapshot_id
+          source_data_snapshot_id,
+          catalog_revision,
+          evidence_revision,
+          derivation_version,
+          published_at,
+          manual_correction_json
         FROM actual_snapshots
         WHERE id = ?
         LIMIT 1
@@ -301,7 +341,11 @@ function sanitizeSnapshotMeta({
   sourceType = "manual",
   sourceNote = "",
   createdByUserId = null,
-  label = ""
+  label = "",
+  catalogRevision = null,
+  evidenceRevision = null,
+  derivationVersion = null,
+  manualCorrection = null
 }) {
   const now = new Date().toISOString();
   const safeSeason = Number.isFinite(Number(season)) ? Number(season) : null;
@@ -327,7 +371,11 @@ function sanitizeSnapshotMeta({
     safeLabel,
     safeSourceType,
     safeSourceNote,
-    safeUserId
+    safeUserId,
+    safeCatalogRevision: String(catalogRevision || "").trim() || null,
+    safeEvidenceRevision: String(evidenceRevision || "").trim() || null,
+    safeDerivationVersion: String(derivationVersion || "").trim() || null,
+    safeManualCorrection: manualCorrection == null ? null : JSON.stringify(manualCorrection)
   };
 }
 
@@ -341,7 +389,12 @@ function upsertSnapshotForRound(db, {
   createdByUserId = null,
   label = "",
   reviewStatus = REVIEW_STATUS_REVIEWED,
-  preserveReviewIfUnchanged = false
+  preserveReviewIfUnchanged = false,
+  catalogRevision = null,
+  evidenceRevision = null,
+  derivationVersion = null,
+  manualCorrection = null,
+  publishedAt = null
 }) {
   const entries = filterNonEmptyValues(valuesByQuestion);
   if (entries.length === 0) return null;
@@ -353,7 +406,11 @@ function upsertSnapshotForRound(db, {
     sourceType,
     sourceNote,
     createdByUserId,
-    label
+    label,
+    catalogRevision,
+    evidenceRevision,
+    derivationVersion,
+    manualCorrection
   });
   const existing = meta.safeRoundNumber
     ? findLatestSnapshotForRound(db, meta.safeSeason, meta.safeRoundNumber)
@@ -361,13 +418,19 @@ function upsertSnapshotForRound(db, {
   const nextValues = Object.fromEntries(entries);
   const existingValues = existing ? fetchSnapshotValues(db, existing.id) : {};
   const valuesChanged = !existing || !snapshotValuesEqual(existingValues, nextValues);
+  const provenanceChanged = Boolean(existing && (
+    String(existing.catalog_revision || "") !== String(meta.safeCatalogRevision || "")
+      || String(existing.evidence_revision || "") !== String(meta.safeEvidenceRevision || "")
+      || String(existing.derivation_version || "") !== String(meta.safeDerivationVersion || "")
+      || String(existing.manual_correction_json || "") !== String(meta.safeManualCorrection || "")
+  ));
 
   let nextReviewStatus = normalizeReviewStatus(reviewStatus);
   let nextReviewedAt = nextReviewStatus === REVIEW_STATUS_REVIEWED ? meta.now : null;
   let nextReviewedByUserId =
     nextReviewStatus === REVIEW_STATUS_REVIEWED ? meta.safeUserId : null;
 
-  if (existing && preserveReviewIfUnchanged && !valuesChanged) {
+  if (existing && preserveReviewIfUnchanged && !valuesChanged && !provenanceChanged) {
     nextReviewStatus = normalizeReviewStatus(existing.review_status);
     nextReviewedAt = existing.reviewed_at || null;
     nextReviewedByUserId = existing.reviewed_by_user_id || null;
@@ -387,9 +450,14 @@ function upsertSnapshotForRound(db, {
       created_by_user_id,
       review_status,
       reviewed_at,
-      reviewed_by_user_id
+      reviewed_by_user_id,
+      catalog_revision,
+      evidence_revision,
+      derivation_version,
+      published_at,
+      manual_correction_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   );
   const insertValue = db.prepare(
@@ -405,6 +473,7 @@ function upsertSnapshotForRound(db, {
       Boolean(snapshotId)
       && preserveReviewIfUnchanged
       && !valuesChanged
+      && !provenanceChanged
       && normalizeReviewStatus(existing.review_status) === nextReviewStatus
       && String(existing.reviewed_at || "") === String(nextReviewedAt || "")
       && Number(existing.reviewed_by_user_id || 0) === Number(nextReviewedByUserId || 0);
@@ -413,6 +482,7 @@ function upsertSnapshotForRound(db, {
       return {
         snapshotId,
         valuesChanged,
+        provenanceChanged,
         reviewStatus: nextReviewStatus
       };
     }
@@ -429,7 +499,14 @@ function upsertSnapshotForRound(db, {
       meta.safeUserId,
       nextReviewStatus,
       nextReviewedAt,
-      nextReviewedByUserId
+      nextReviewedByUserId,
+      meta.safeCatalogRevision,
+      meta.safeEvidenceRevision,
+      meta.safeDerivationVersion,
+      nextReviewStatus === REVIEW_STATUS_REVIEWED
+        ? (publishedAt || meta.now)
+        : null,
+      meta.safeManualCorrection
     );
     snapshotId = Number(snapshotInfo.lastInsertRowid);
 
@@ -439,6 +516,7 @@ function upsertSnapshotForRound(db, {
     return {
       snapshotId,
       valuesChanged,
+      provenanceChanged,
       reviewStatus: nextReviewStatus
     };
   });
@@ -462,10 +540,11 @@ function markSnapshotReviewed(db, {
     SET review_status = ?,
         reviewed_at = ?,
         reviewed_by_user_id = ?,
+        published_at = COALESCE(published_at, ?),
         updated_at = COALESCE(updated_at, created_at)
     WHERE id = ?
     `
-  ).run(REVIEW_STATUS_REVIEWED, reviewedAt, safeUserId, safeSnapshotId);
+  ).run(REVIEW_STATUS_REVIEWED, reviewedAt, safeUserId, reviewedAt, safeSnapshotId);
   return Number(result.changes || 0);
 }
 

@@ -191,3 +191,44 @@ test("round-limited snapshot lookups ignore stale debug rounds", (t) => {
   assert.equal(findSnapshotById(db, debugSnapshot.snapshotId, options), null);
   assert.equal(findSnapshotById(db, debugSnapshot.snapshotId).round_number, 66);
 });
+
+test("actual snapshots keep catalog and evidence provenance in the review lifecycle", (t) => {
+  const { db, tempDir } = createTempDb();
+  t.after(() => {
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  ensureActualSnapshotColumns(db);
+  const first = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:1" },
+    sourceType: "derived",
+    catalogRevision: "catalog-a",
+    evidenceRevision: "evidence-a",
+    derivationVersion: "actuals-v1",
+    reviewStatus: REVIEW_STATUS_PENDING
+  });
+  const second = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:1" },
+    sourceType: "derived",
+    catalogRevision: "catalog-b",
+    evidenceRevision: "evidence-a",
+    derivationVersion: "actuals-v1",
+    reviewStatus: REVIEW_STATUS_PENDING,
+    preserveReviewIfUnchanged: true
+  });
+
+  assert.notEqual(second.snapshotId, first.snapshotId);
+  assert.equal(second.valuesChanged, false);
+  assert.equal(second.provenanceChanged, true);
+  const latest = findLatestSnapshotForRound(db, 2026, 6);
+  assert.equal(latest.catalog_revision, "catalog-b");
+  assert.equal(latest.evidence_revision, "evidence-a");
+  assert.equal(latest.published_at, null);
+});

@@ -99,6 +99,48 @@ test("buildEvidenceBundle normalizes race, qualifying, and standings evidence", 
   assert.equal(evidence.sourceUrls.race, "https://example.test/race");
 });
 
+test("evidence records the input revision and unresolved canonical rows", () => {
+  const evidence = buildEvidenceBundle({
+    data: {
+      season: 2026,
+      results: [{
+        round: 6,
+        raceName: "Monaco Grand Prix",
+        Results: [{
+          position: "1",
+          Driver: { givenName: "Known", familyName: "Driver" },
+          Constructor: { name: "Unknown Team" }
+        }]
+      }],
+      qualifying: [],
+      sprints: [],
+      driverStandingsByRound: new Map(),
+      constructorStandingsByRound: new Map(),
+      driverOfTheDayByRound: new Map()
+    },
+    roster: { drivers: ["Known Driver"], teams: ["Unknown Team"] },
+    canonicalCatalog: {
+      driver: [{ id: 1, value: "driver:1", label: "Known Driver" }],
+      team: [{ id: 10, value: "team:10", label: "Canonical Team" }]
+    },
+    catalogRevision: "catalog-123",
+    cutoffRound: 6,
+    sourceIdentity: "jolpica:2026:r6",
+    payloadRevision: "payload-456",
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix"
+  });
+
+  assert.equal(evidence.catalogRevision, "catalog-123");
+  assert.equal(evidence.cutoffRound, 6);
+  assert.equal(evidence.sourceIdentity, "jolpica:2026:r6");
+  assert.equal(evidence.payloadRevision, "payload-456");
+  assert.equal(evidence.race.rows[0].driver_id, 1);
+  assert.equal(evidence.race.rows[0].team_id, null);
+  assert.equal(evidence.unresolved.raceTeams, 1);
+  assert.equal(evidence.coverage.status, "incomplete");
+});
+
 test("summarizeEvidence reports source row counts", () => {
   const summary = summarizeEvidence({
     coverage: {
@@ -144,6 +186,10 @@ test("persisted evidence is reusable by round and idempotent for the same sync",
   });
   const evidence = {
     roundName: "Monaco Grand Prix",
+    catalogRevision: "catalog-123",
+    payloadRevision: "payload-456",
+    sourceIdentity: "jolpica:2026:r6",
+    cutoffRound: 6,
     coverage: { status: "complete", sources: { race: { count: 1 } } },
     race: { rows: [{ driver: "driver:1", constructor: "team:10", position: 1 }] }
   };
@@ -168,7 +214,12 @@ test("persisted evidence is reusable by round and idempotent for the same sync",
 
   assert.equal(secondId, firstId);
   assert.equal(listRaceDataSnapshots(db, 2026).length, 1);
-  assert.deepEqual(findRaceDataSnapshot(db, 2026, 6).payload.race.rows[0], evidence.race.rows[0]);
+  const persisted = findRaceDataSnapshot(db, 2026, 6);
+  assert.deepEqual(persisted.payload.race.rows[0], evidence.race.rows[0]);
+  assert.equal(persisted.catalog_revision, "catalog-123");
+  assert.equal(persisted.payload_revision, "payload-456");
+  assert.equal(persisted.source_identity, "jolpica:2026:r6");
+  assert.equal(persisted.cutoff_round, 6);
   assert.equal(completeRaceDataImport(db, importId, { completedRounds: 1 }), 1);
   assert.equal(db.prepare("SELECT status, completed_rounds FROM race_data_imports WHERE id = ?").get(importId).status, "completed");
 });

@@ -10,12 +10,13 @@ const {
   linkEvidenceToActualSnapshot,
   saveRaceDataSnapshot
 } = require("../src/race-data-evidence");
+const { ensureActualSnapshotColumns } = require("../src/actuals-snapshots");
 const roster = require("../data/roster.json");
 const races = require("../data/races.json").races;
 const { DRIVER_TEAM_ASSIGNMENTS, seedSeasonInputs } = require("./seed-season-inputs");
 const { seedPreviewSeasonFixtures } = require("./seed-preview-season-fixtures");
 const { listSeasonInputs, upsertDriver, upsertSeasonDriver } = require("../src/season-inputs");
-const { buildCanonicalCatalog } = require("../src/canonical-answers");
+const { buildSeasonCatalog } = require("../src/season-catalog");
 const { applySeasonLineup, buildLineupProjection } = require("../src/season-lineup");
 
 const PREVIEW_SOURCE = "preview_fixture";
@@ -54,7 +55,7 @@ function buildRows(round, now) {
   });
 }
 
-function buildEvidence(round, now, totals, canonicalCatalog = null) {
+function buildEvidence(round, now, totals, canonicalCatalog = null, provenance = {}) {
   const roundName = races[round - 1] || "Round " + round;
   const cancelled = round === 10;
   const raceRows = cancelled ? [] : buildRows(round, now);
@@ -119,6 +120,10 @@ function buildEvidence(round, now, totals, canonicalCatalog = null) {
       },
       roster,
       canonicalCatalog,
+      catalogRevision: provenance.catalogRevision || null,
+      cutoffRound: round,
+      sourceIdentity: provenance.sourceIdentity || null,
+      payloadRevision: provenance.payloadRevision || null,
       roundNumber: round,
       roundName,
       fetchedAt: now,
@@ -180,9 +185,11 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
   }
 
   ensureRaceDataSchema(database);
+  ensureActualSnapshotColumns(database);
   seedSeasonInputs(database, { season: 2026, now });
   const replacement = seedPreviewReplacement(database, now);
-  const canonicalCatalog = buildCanonicalCatalog(listSeasonInputs(database, 2026));
+  const seasonCatalog = buildSeasonCatalog(database, 2026);
+  const canonicalCatalog = seasonCatalog.canonical;
   const transaction = database.transaction(() => {
     database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
     database.prepare("DELETE FROM actual_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);
@@ -202,7 +209,11 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
     const totals = { drivers: {}, teams: {} };
     const snapshots = [];
     for (let round = 1; round <= 13; round += 1) {
-      const built = buildEvidence(round, now, totals, canonicalCatalog);
+      const built = buildEvidence(round, now, totals, canonicalCatalog, {
+        catalogRevision: seasonCatalog.catalogRevision,
+        sourceIdentity: PREVIEW_SYNC_ID + ":r" + round,
+        payloadRevision: PREVIEW_PARSER_VERSION + ":" + round
+      });
       const evidenceId = saveRaceDataSnapshot(database, {
         season: 2026,
         roundNumber: round,
@@ -215,13 +226,20 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
         parserVersion: PREVIEW_PARSER_VERSION,
         calendarState: built.calendarState,
         reconstructed: false,
+        catalogRevision: seasonCatalog.catalogRevision,
+        sourceIdentity: PREVIEW_SYNC_ID + ":r" + round,
+        payloadRevision: PREVIEW_PARSER_VERSION + ":" + round,
+        cutoffRound: round,
         evidence: built.evidence
       });
       const snapshotId = Number(database.prepare(
-        "INSERT INTO actual_snapshots (season, round_number, round_name, label, source_type, source_note, created_at, updated_at, created_by_user_id, review_status, reviewed_at, reviewed_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', NULL, NULL)"
+        "INSERT INTO actual_snapshots (season, round_number, round_name, label, source_type, source_note, created_at, updated_at, created_by_user_id, review_status, reviewed_at, reviewed_by_user_id, catalog_revision, evidence_revision, derivation_version, published_at, manual_correction_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pending', NULL, NULL, ?, ?, ?, NULL, NULL)"
       ).run(
         2026, round, built.roundName, "R" + round + " - " + built.roundName,
-        PREVIEW_SOURCE, SANITIZED_NOTE, now, now
+        PREVIEW_SOURCE, SANITIZED_NOTE, now, now,
+        seasonCatalog.catalogRevision,
+        PREVIEW_PARSER_VERSION + ":" + round,
+        "preview-fixture-v1"
       ).lastInsertRowid);
       linkEvidenceToActualSnapshot(database, snapshotId, evidenceId, importId);
       const value = built.calendarState === "cancelled" ? "no" : "yes";
