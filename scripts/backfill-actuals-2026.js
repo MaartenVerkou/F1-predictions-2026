@@ -860,7 +860,6 @@ function ensureActualsSchema(db) {
 function writeActualsAndSnapshots(db, {
   season,
   rounds,
-  latestValues,
   snapshots,
   importId,
   deriveContext
@@ -932,15 +931,9 @@ function writeActualsAndSnapshots(db, {
       completedAt: now
     });
 
-    db.prepare("DELETE FROM actuals").run();
-    const insertActual = db.prepare(
-      "INSERT INTO actuals (question_id, value, updated_at) VALUES (?, ?, ?)"
-    );
-    const latestDerived = derivedByRound.get(rounds[rounds.length - 1]);
-    const liveValues = { ...latestValues, ...(latestDerived?.values || {}) };
-    Object.entries(liveValues).forEach(([questionId, value]) => {
-      insertActual.run(questionId, value, now);
-    });
+    // Do not publish pending derived values into the legacy global projection.
+    // Admin review must explicitly promote a snapshot before public scoring can
+    // consume it; the selected pending snapshot remains available in Admin.
   });
   tx();
   return {
