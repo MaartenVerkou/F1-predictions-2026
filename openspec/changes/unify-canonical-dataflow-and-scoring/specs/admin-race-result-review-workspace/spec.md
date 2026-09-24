@@ -47,12 +47,13 @@ The constructor race-data matrix SHALL derive podium indicators from the same no
 - **AND** win, pole, and podium aggregates SHALL remain outside this table until a dedicated summary design is introduced
 
 ### Requirement: Race data switches driver and constructor order in one matrix
-The Race data workspace SHALL use one shared matrix with identical result cells for driver and constructor views. The constructor view SHALL always group the selected-round drivers under their constructor and merge the constructor label, championship position, and constructor total points across the team's two seat rows, without adding artificial Driver 1/Driver 2 data fields.
+The Race data workspace SHALL use one shared matrix with identical result cells for driver and constructor views. The constructor view SHALL always group the selected-round drivers under their constructor in one shared identity column, show the team and corresponding driver for each seat row, and merge the championship position and constructor total points across the team's two seat rows, without adding artificial Driver 1/Driver 2 data fields.
 
 #### Scenario: An administrator selects the constructor view
 - **WHEN** the administrator selects the Constructors control
 - **THEN** each constructor SHALL render one group containing its seat 1 and seat 2 drivers in canonical seat order
-- **AND** the constructor label, position, and total points SHALL remain one vertically merged group value
+- **AND** each seat row SHALL show its team and driver in the single constructor identity column
+- **AND** the position and total points SHALL remain one vertically merged group value
 - **AND** each driver row SHALL use the existing driver result cells, marker semantics, and responsive labels
 
 #### Scenario: The view control reorders the existing matrix in place
