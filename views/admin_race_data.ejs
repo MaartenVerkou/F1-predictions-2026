@@ -62,7 +62,7 @@
 
   <div class="admin-race-data-table-wrap">
     <% const rows = viewMode === 'constructors' ? view.constructors : view.drivers; %>
-    <table class="admin-race-data-matrix">
+    <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>">
       <thead>
         <tr>
           <th scope="col" class="admin-race-data-sticky admin-race-data-rank"><%= t('admin_race_data.position') %></th>
@@ -85,22 +85,15 @@
           <tr>
             <td class="admin-race-data-sticky admin-race-data-rank"><%= row.championshipPosition || index + 1 %></td>
             <th scope="row" class="admin-race-data-sticky admin-race-data-entity">
-              <span class="admin-race-data-full-label"><%= row.name %></span>
-              <span class="admin-race-data-compact-label"><%= row.code || row.name %></span>
+              <%- include('partials/admin_race_data_entity_label', { fullLabel: row.name, compactLabel: row.code || row.name }) %>
             </th>
             <% if (viewMode === 'drivers') { %>
               <td class="admin-race-data-sticky admin-race-data-team">
-                <span class="admin-race-data-full-label"><%= row.constructor || '—' %></span>
-                <span class="admin-race-data-compact-label"><%= row.constructorCode || row.constructor || '—' %></span>
+                <%- include('partials/admin_race_data_entity_label', { fullLabel: row.constructor || '—', compactLabel: row.constructorCode || row.constructor || '—' }) %>
               </td>
             <% } %>
             <% row.cells.forEach((cell, cellIndex) => { %>
-              <td class="admin-race-data-cell state-<%= cell.state %> <%= cell.label === '—' ? 'is-empty' : '' %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.podiumPosition ? 'is-podium-' + cell.podiumPosition : '' %>"
-                  title="<%= cell.title %>">
-                <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %>">
-                  <span class="admin-race-data-result"><%= cell.label %><% if (cell.markerGlyph) { %><sup class="admin-race-data-marker" title="<%= cell.markerTitle %>" aria-label="<%= cell.markerTitle %>"><%= cell.markerGlyph %></sup><% } %></span>
-                </a>
-              </td>
+              <%- include('partials/admin_race_data_matrix_cell', { season, viewMode, cell, cellIndex }) %>
             <% }) %>
             <td class="admin-race-data-summary admin-race-data-sticky-right"><%= row.points == null ? '—' : row.points %></td>
           </tr>

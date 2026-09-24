@@ -2789,6 +2789,9 @@ button:disabled {
 
 .admin-race-data-matrix {
   min-width: 980px;
+  --admin-race-rank-width: 44px;
+  --admin-race-entity-width: 150px;
+  --admin-race-team-width: 128px;
 }
 
 .admin-race-data-matrix th,
@@ -2849,19 +2852,21 @@ button:disabled {
 
 .admin-race-data-rank {
   left: 0;
-  width: 44px;
-  min-width: 44px;
+  width: var(--admin-race-rank-width);
+  min-width: var(--admin-race-rank-width);
 }
 
 .admin-race-data-entity {
-  left: 44px;
-  min-width: 150px;
+  left: var(--admin-race-rank-width);
+  width: var(--admin-race-entity-width);
+  min-width: var(--admin-race-entity-width);
   text-align: left !important;
 }
 
 .admin-race-data-team {
-  left: 194px;
-  min-width: 128px;
+  left: calc(var(--admin-race-rank-width) + var(--admin-race-entity-width));
+  width: var(--admin-race-team-width);
+  min-width: var(--admin-race-team-width);
   text-align: left !important;
 }
 
@@ -3010,15 +3015,14 @@ button:disabled {
 }
 
 @media (max-width: 860px) {
-  .admin-race-data-entity {
-    width: 110px;
-    min-width: 110px;
+  .admin-race-data-matrix {
+    --admin-race-entity-width: 110px;
+    --admin-race-team-width: 64px;
   }
 
-  .admin-race-data-team {
-    left: 154px;
-    width: 64px;
-    min-width: 64px;
+  .admin-race-data-entity {
+    width: var(--admin-race-entity-width);
+    min-width: var(--admin-race-entity-width);
   }
 
   .admin-race-data-team .admin-race-data-full-label {
@@ -3028,11 +3032,21 @@ button:disabled {
   .admin-race-data-team .admin-race-data-compact-label {
     display: inline;
   }
+
+  .admin-race-data-matrix--constructors .admin-race-data-entity .admin-race-data-full-label {
+    display: none;
+  }
+
+  .admin-race-data-matrix--constructors .admin-race-data-entity .admin-race-data-compact-label {
+    display: inline;
+  }
 }
 
 @media (max-width: 640px) {
   .admin-race-data-matrix {
     font-size: 12px;
+    --admin-race-entity-width: 96px;
+    --admin-race-team-width: 56px;
   }
 
   .admin-race-data-matrix th,
@@ -3041,14 +3055,8 @@ button:disabled {
   }
 
   .admin-race-data-entity {
-    width: 96px;
-    min-width: 96px;
-  }
-
-  .admin-race-data-team {
-    left: 140px;
-    width: 56px;
-    min-width: 56px;
+    width: var(--admin-race-entity-width);
+    min-width: var(--admin-race-entity-width);
   }
 
   .admin-race-data-entity .admin-race-data-full-label {

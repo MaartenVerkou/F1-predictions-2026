@@ -101,6 +101,51 @@ function sortAuditRows(rows) {
     .map(({ row }) => row);
 }
 
+function matchesAuditEntity(row, entity, { idField, nameField }) {
+  if (!row || !entity) return false;
+  if (entity.id != null && row[idField] != null) {
+    return Number(row[idField]) === Number(entity.id);
+  }
+  return row[nameField] === entity.name;
+}
+
+function buildAuditMarkerMeta({ pole = false, fastestLap = false } = {}) {
+  const markers = [];
+  if (pole) markers.push("P");
+  if (fastestLap) markers.push("FL");
+  return {
+    markers,
+    markerGlyph: markers.join(" "),
+    markerTitle: [pole ? "Pole position" : null, fastestLap ? "Fastest lap" : null]
+      .filter(Boolean)
+      .join(" · ")
+  };
+}
+
+function buildAuditMatrixCell({
+  round,
+  cutoffRoundNumber,
+  label,
+  title,
+  state = round.state,
+  podiumPosition = null,
+  markers = [],
+  markerGlyph = "",
+  markerTitle = ""
+}) {
+  const afterCutoff = round.roundNumber > cutoffRoundNumber;
+  return {
+    label: label == null ? "—" : String(label),
+    state: afterCutoff ? "future" : state,
+    afterCutoff,
+    podiumPosition,
+    markers,
+    markerGlyph,
+    markerTitle,
+    title: afterCutoff ? ["After selected cutoff", title].filter(Boolean).join(" · ") : title
+  };
+}
+
 function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
   if (evidence) return evidence.coverage_status || evidence.payload?.coverage?.status || "incomplete";
   return Number(roundNumber) > Number(latestEvidenceRound || 0) ? "future" : "not_synced";
@@ -260,16 +305,14 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     const cells = rounds.map((round) => {
       const raceRows = round.evidence?.payload?.race?.rows || [];
       const qualifyingRows = round.evidence?.payload?.qualifying?.rows || [];
-      const row = raceRows.find((item) =>
-        entity.id != null
-          ? Number(item.driver_id) === Number(entity.id)
-          : item.driver === driver
-      ) || null;
-      const qualifying = qualifyingRows.find((item) =>
-        entity.id != null
-          ? Number(item.driver_id) === Number(entity.id)
-          : item.driver === driver
-      ) || null;
+      const row = raceRows.find((item) => matchesAuditEntity(item, entity, {
+        idField: "driver_id",
+        nameField: "driver"
+      })) || null;
+      const qualifying = qualifyingRows.find((item) => matchesAuditEntity(item, entity, {
+        idField: "driver_id",
+        nameField: "driver"
+      })) || null;
       const afterCutoff = round.roundNumber > cutoffRoundNumber;
       const qualifyingOutcome = auditNonClassifiedLabel(qualifying);
       const pole = Boolean(qualifying?.pole || Number(qualifying?.position) === 1);
@@ -280,29 +323,23 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       const resultLabel = round.evidence
         ? (row ? auditResultLabel(row) : qualifyingOutcome || "—")
         : "—";
-      const markers = [];
-      if (pole) markers.push("P");
-      if (fastestLap) markers.push("FL");
-      const markerGlyph = markers.join(" ");
-      const markerTitle = [pole ? "Pole position" : null, fastestLap ? "Fastest lap" : null]
-        .filter(Boolean)
-        .join(" · ");
+      const markerMeta = buildAuditMarkerMeta({ pole, fastestLap });
       const resultTitle = row || qualifyingOutcome
-        ? [row?.status || qualifyingOutcome || resultLabel, row?.grid != null ? "grid " + row.grid : null, row?.points != null ? row.points + " pts" : null, markerTitle || null]
+        ? [row?.status || qualifyingOutcome || resultLabel, row?.grid != null ? "grid " + row.grid : null, row?.points != null ? row.points + " pts" : null, markerMeta.markerTitle || null]
           .filter(Boolean)
           .join(" · ")
         : round.evidence ? "No classified row" : "Evidence unavailable";
       return {
-        label: resultLabel,
+        ...buildAuditMatrixCell({
+          round,
+          cutoffRoundNumber,
+          label: resultLabel,
+          title: resultTitle,
+          podiumPosition,
+          ...markerMeta
+        }),
         pole,
         fastestLap,
-        markers,
-        markerGlyph,
-        markerTitle,
-        podiumPosition,
-        afterCutoff,
-        title: afterCutoff ? ["After selected cutoff", resultTitle].filter(Boolean).join(" · ") : resultTitle,
-        state: afterCutoff ? "future" : round.state,
         row
       };
     });
@@ -326,31 +363,32 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   const constructorRows = sortAuditRows(teamEntities.map((entity) => {
     const team = entity.name;
     const cells = rounds.map((round) => {
-      const afterCutoff = round.roundNumber > cutoffRoundNumber;
       if (!round.evidence) {
-        return {
+        return buildAuditMatrixCell({
+          round,
+          cutoffRoundNumber,
           label: "—",
-          state: afterCutoff ? "future" : round.state,
-          afterCutoff,
-          title: afterCutoff ? "After selected cutoff · Evidence unavailable" : "Evidence unavailable"
-        };
+          title: "Evidence unavailable"
+        });
       }
       const raceRows = round.evidence.payload?.race?.rows || [];
       const sprintRows = round.evidence.payload?.sprint?.rows || [];
       const points = raceRows
-        .filter((row) =>
-          entity.id != null
-            ? Number(row.team_id) === Number(entity.id)
-            : row.constructor === team
-        )
-        .concat(sprintRows.filter((row) => row.constructor === team))
+        .filter((row) => matchesAuditEntity(row, entity, {
+          idField: "team_id",
+          nameField: "constructor"
+        }))
+        .concat(sprintRows.filter((row) => matchesAuditEntity(row, entity, {
+          idField: "team_id",
+          nameField: "constructor"
+        })))
         .reduce((total, row) => total + Number(row.points || 0), 0);
-      return {
-        label: String(points),
-        state: afterCutoff ? "future" : round.state,
-        afterCutoff,
-        title: (afterCutoff ? "After selected cutoff · " : "") + points + " points from race and sprint"
-      };
+      return buildAuditMatrixCell({
+        round,
+        cutoffRoundNumber,
+        label: points,
+        title: points + " points from race and sprint"
+      });
     });
     const standing = (entity.id != null ? selectedConstructorIdMap.get(Number(entity.id)) : null)
       || selectedConstructorMap.get(team)

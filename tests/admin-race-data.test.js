@@ -140,6 +140,9 @@ test("buildRaceDataAuditView uses selected cutoff standings and mutes later roun
   assert.equal(view.drivers[0].cells[1].state, "future");
   assert.equal(view.constructors[0].cells[1].label, "25");
   assert.equal(view.constructors[0].cells[1].afterCutoff, true);
+  assert.equal(view.drivers[0].constructorCode, "MER");
+  assert.equal(view.constructors[0].code, "MER");
+  assert.deepEqual(view.constructors[0].cells[0].markers, []);
   assert.equal(view.cutoffRoundNumber, 1);
 });
 
