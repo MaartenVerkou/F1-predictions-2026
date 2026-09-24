@@ -290,21 +290,26 @@ function parseDriverOfTheDayByRound(html, completedRaces, rosterDrivers) {
   if (start < 0) return new Map();
   const section = text.slice(start + marker.length);
   const byRound = new Map();
+  let cursor = 0;
 
   for (let index = 0; index < completedRaces.length; index += 1) {
     const race = completedRaces[index];
     const label = shortRaceLabel(race.raceName);
-    const currentIndex = section.search(new RegExp(`\\b${escapeRegExp(label)}\\b`, "i"));
-    if (currentIndex < 0) continue;
+    const currentMatch = section
+      .slice(cursor)
+      .match(new RegExp(`\\b${escapeRegExp(label)}\\b`, "i"));
+    if (!currentMatch) continue;
+    const currentIndex = cursor + currentMatch.index;
 
     let nextIndex = section.length;
+    const nextSearchStart = currentIndex + label.length;
     for (let next = index + 1; next < completedRaces.length; next += 1) {
       const nextLabel = shortRaceLabel(completedRaces[next].raceName);
-      const offset = section
-        .slice(currentIndex + label.length)
-        .search(new RegExp(`\\b${escapeRegExp(nextLabel)}\\b`, "i"));
-      if (offset >= 0) {
-        nextIndex = currentIndex + label.length + offset;
+      const nextMatch = section
+        .slice(nextSearchStart)
+        .match(new RegExp(`\\b${escapeRegExp(nextLabel)}\\b`, "i"));
+      if (nextMatch) {
+        nextIndex = nextSearchStart + nextMatch.index;
         break;
       }
     }
@@ -314,6 +319,7 @@ function parseDriverOfTheDayByRound(html, completedRaces, rosterDrivers) {
       new RegExp(`\\b${escapeRegExp(driver)}\\b`, "i").test(chunk)
     );
     if (winner) byRound.set(Number(race.round), winner);
+    cursor = currentIndex + label.length;
   }
 
   return byRound;
@@ -1139,5 +1145,7 @@ if (require.main === module) {
 module.exports = {
   buildPersistedDataFromEvidence,
   compareSnapshotValues,
-  deriveSnapshotsFromPersistedEvidence
+  deriveSnapshotsFromPersistedEvidence,
+  parseDriverOfTheDayByRound,
+  shortRaceLabel
 };
