@@ -1210,6 +1210,7 @@ const initRaceDataViewToggle = () => {
   if (!tabs || !matrix) return;
   const toggles = Array.from(tabs.querySelectorAll('[data-race-data-view-toggle]'));
   const bodies = Array.from(matrix.querySelectorAll('[data-race-data-body]'));
+  const roundLinks = Array.from(matrix.querySelectorAll('[data-race-data-round-link]'));
   const legendItems = Array.from(document.querySelectorAll('[data-race-data-constructor-legend]'));
   const viewInputs = Array.from(document.querySelectorAll('.admin-race-data-page form input[name="view"]'));
   if (!toggles.length || !bodies.length) return;
@@ -1237,6 +1238,11 @@ const initRaceDataViewToggle = () => {
     matrix.classList.toggle('admin-race-data-matrix--constructors', view === 'constructors');
     matrix.classList.toggle('admin-race-data-matrix--drivers', view === 'drivers');
     matrix.dataset.raceDataActiveView = view;
+    roundLinks.forEach((link) => {
+      const url = new URL(link.href, window.location.href);
+      url.searchParams.set('view', view);
+      link.href = `${url.pathname}${url.search}${url.hash}`;
+    });
     viewInputs.forEach((input) => {
       input.value = view;
     });
