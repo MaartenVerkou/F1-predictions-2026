@@ -84,6 +84,8 @@ function normalizeResultRow(row, roster, kind, canonicalCatalog = null) {
     team_label: constructor,
     driver_id: canonicalId(canonicalCatalog, "driver", driver),
     team_id: canonicalId(canonicalCatalog, "team", constructor),
+    provider_driver_id: String(row?.Driver?.driverId || "").trim() || null,
+    provider_team_id: String(row?.Constructor?.constructorId || "").trim() || null,
     number: String(row?.number || "").trim() || null,
     grid: parseNum(row?.grid),
     position,
@@ -91,7 +93,15 @@ function normalizeResultRow(row, roster, kind, canonicalCatalog = null) {
     status: String(row?.status || "").trim() || null,
     points: parseNum(row?.points, 0),
     laps: parseNum(row?.laps),
+    raceTime: String(row?.Time?.time || "").trim() || null,
     fastestLap: String(row?.FastestLap?.rank || "").trim() === "1",
+    fastestLapTime: String(row?.FastestLap?.Time?.time || "").trim() || null,
+    fastestLapAverageSpeed: parseNum(row?.FastestLap?.AverageSpeed?.speed),
+    qualifyingTimes: kind === "qualifying" ? {
+      q1: String(row?.Q1 || "").trim() || null,
+      q2: String(row?.Q2 || "").trim() || null,
+      q3: String(row?.Q3 || "").trim() || null
+    } : null,
     pole: kind === "qualifying" && position === 1
   };
 }
@@ -106,6 +116,7 @@ function normalizeStandingsRow(row, roster, entityType, canonicalCatalog = null)
     entity,
     entity_label: entity,
     entity_id: canonicalId(canonicalCatalog, entityType === "driver" ? "driver" : "team", entity),
+    provider_entity_id: String((entityType === "driver" ? row?.Driver?.driverId : row?.Constructor?.constructorId) || "").trim() || null,
     position: parseNum(row?.position),
     points: parseNum(row?.points, 0)
   };
@@ -227,6 +238,15 @@ function buildEvidenceBundle({
     external: {
       driverOfTheDay: data?.driverOfTheDayByRound?.get(round) || null,
       driverOfTheDayId: canonicalId(canonicalCatalog, "driver", data?.driverOfTheDayByRound?.get(round))
+    },
+    raw: {
+      provider: "jolpica-ergast",
+      providerSchema: "ergast-v1",
+      race,
+      qualifying: qualifyingRace,
+      sprint: sprintRace,
+      driverStandings,
+      constructorStandings
     }
   };
 }

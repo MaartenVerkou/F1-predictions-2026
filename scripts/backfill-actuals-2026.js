@@ -32,41 +32,11 @@ const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json"
 const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
 const SEASON = Number(process.env.F1_SEASON || 2026);
 const API_BASE = "https://api.jolpi.ca/ergast/f1";
-const FORMULA1_DOTD_URL = `https://www.formula1.com/en/results/${SEASON}/awards/driver-of-the-day`;
+const FORMULA1_DOTD_PATH = "awards/driver-of-the-day";
 const USER_AGENT = "f1-predictions-actuals-backfill";
 const BACKFILL_SOURCE_NOTE =
-  "Backfilled from Jolpica/Ergast, Formula1.com results, and manual 2026-06-06 engine-supplier announcement review";
+  "Backfilled from Jolpica/Ergast with Formula1.com cross-check; normalized evidence retains the provider payload";
 const TEAM_ENGINE_SWITCH_2027_2028_ACTUAL = "no";
-const CANCELLED_RACES_2026 = [
-  "Bahrain Grand Prix",
-  "Saudi Arabian Grand Prix"
-];
-const ORIGINAL_DNF_RACE_ORDER_2026 = [
-  "Australian Grand Prix",
-  "Chinese Grand Prix",
-  "Japanese Grand Prix",
-  "Bahrain Grand Prix",
-  "Saudi Arabian Grand Prix",
-  "Miami Grand Prix",
-  "Canadian Grand Prix",
-  "Monaco Grand Prix",
-  "Barcelona-Catalunya Grand Prix",
-  "Austrian Grand Prix",
-  "British Grand Prix",
-  "Belgian Grand Prix",
-  "Hungarian Grand Prix",
-  "Dutch Grand Prix",
-  "Italian Grand Prix",
-  "Spanish Grand Prix",
-  "Azerbaijan Grand Prix",
-  "Singapore Grand Prix",
-  "United States Grand Prix",
-  "Mexico City Grand Prix",
-  "Sao Paulo Grand Prix",
-  "Las Vegas Grand Prix",
-  "Qatar Grand Prix",
-  "Abu Dhabi Grand Prix"
-];
 
 const DRIVER_NAME_ALIASES = {
   andreakimiantonelli: "Kimi Antonelli",
@@ -85,13 +55,6 @@ const TEAM_NAME_ALIASES = {
   alpinef1team: "Alpine",
   astonmartinf1team: "Aston Martin"
 };
-
-const MERCEDES_ENGINE_TEAMS_2026 = new Set([
-  "Mercedes",
-  "McLaren",
-  "Williams",
-  "Alpine"
-]);
 
 const MULTI_ACTUAL_SINGLE_CHOICE_IDS = new Set([
   "most_driver_of_the_day",
@@ -300,14 +263,24 @@ function escapeRegExp(value) {
 }
 
 function shortRaceLabel(raceName) {
-  return String(raceName || "")
+  const base = String(raceName || "")
     .replace(/^The\s+/i, "")
     .replace(/\s+Grand Prix$/i, "")
-    .replace("Canadian", "Canada")
-    .replace("Chinese", "China")
-    .replace("Japanese", "Japan")
-    .replace("Australian", "Australia")
     .trim();
+  const labels = {
+    Australian: "Australia",
+    Chinese: "China",
+    Japanese: "Japan",
+    Canadian: "Canada",
+    Austrian: "Austria",
+    British: "Great Britain",
+    Belgian: "Belgium",
+    Hungarian: "Hungary",
+    Dutch: "Netherlands",
+    Italian: "Italy",
+    Spanish: "Spain"
+  };
+  return labels[base] || base;
 }
 
 function parseDriverOfTheDayByRound(html, completedRaces, rosterDrivers) {
@@ -455,11 +428,8 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
   const podiumTeams = new Set();
   const dnfCountsByDriver = new Map();
   const dnfByRace = Object.fromEntries(
-    ORIGINAL_DNF_RACE_ORDER_2026.map((raceName) => [raceName, 0])
+    (Array.isArray(races) ? races : []).map((raceName) => [raceName, 0])
   );
-  CANCELLED_RACES_2026.forEach((raceName) => {
-    dnfByRace[raceName] = 0;
-  });
   const winnerGridRows = [];
   const qualStats = new Map();
   const sprintPointsByDriver = new Map();
@@ -545,6 +515,11 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     });
   });
 
+  const mercedesEngineTeams = new Set(
+    Object.entries(roster.team_profiles || {})
+      .filter(([, profile]) => String(profile?.power_unit || "").trim().toLowerCase() === "mercedes")
+      .map(([team]) => team)
+  );
   const dotdCounts = new Map();
   completedRoundNumbers.forEach((round) => {
     const winner = data.driverOfTheDayByRound.get(round);
@@ -692,7 +667,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
       constructorStandings
         .slice(0, 5)
         .map((row) => teamNameFromApi(row.Constructor, roster.teams || []))
-        .filter((team) => MERCEDES_ENGINE_TEAMS_2026.has(team)).length >= 4
+        .filter((team) => mercedesEngineTeams.has(team)).length >= 4
         ? "yes"
         : "no",
     mini_q3_ferrari_podium: ["Charles Leclerc", "Lewis Hamilton"].every((driver) =>
@@ -715,11 +690,12 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
 }
 
 async function fetchSeasonData({ season, roster }) {
+  const driverOfTheDayUrl = `https://www.formula1.com/en/results/${season}/${FORMULA1_DOTD_PATH}`;
   const [resultsJson, qualifyingJson, sprintJson, dotdHtml] = await Promise.all([
     fetchAllRaceTableRaces(`${API_BASE}/${season}/results.json`, "Results"),
     fetchAllRaceTableRaces(`${API_BASE}/${season}/qualifying.json`, "QualifyingResults"),
     fetchAllRaceTableRaces(`${API_BASE}/${season}/sprint.json`, "SprintResults"),
-    fetchText(FORMULA1_DOTD_URL).catch(() => "")
+    fetchText(driverOfTheDayUrl).catch(() => "")
   ]);
 
   const results = resultsJson || [];
@@ -755,6 +731,7 @@ async function fetchSeasonData({ season, roster }) {
     completedRounds,
     driverStandingsByRound,
     constructorStandingsByRound,
+    driverOfTheDayUrl,
     driverOfTheDayByRound: parseDriverOfTheDayByRound(dotdHtml, results, roster.drivers || [])
   };
 }
@@ -904,7 +881,7 @@ function writeActualsAndSnapshots(db, {
         sourceNote: BACKFILL_SOURCE_NOTE,
         parserVersion: "evidence-v1",
         calendarState: snapshot.calendarState || "completed",
-        reconstructed: true,
+        reconstructed: false,
         evidence: snapshot.evidence
       });
       snapshot.evidenceId = evidenceId;
@@ -933,7 +910,7 @@ function writeActualsAndSnapshots(db, {
         roundNumber: snapshot.roundNumber,
         roundName: snapshot.roundName,
         valuesByQuestion: snapshot.values,
-        sourceType: "autofill_backfill",
+        sourceType: SOURCE_TYPES.JOLPICA,
         sourceNote: BACKFILL_SOURCE_NOTE,
         label: `R${snapshot.roundNumber} - ${snapshot.roundName}`,
         reviewStatus: REVIEW_STATUS_PENDING,
@@ -1020,7 +997,7 @@ async function main() {
           sprint: API_BASE + "/" + args.season + "/" + roundNumber + "/sprint.json",
           driverStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/driverStandings.json",
           constructorStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/constructorStandings.json",
-          driverOfTheDay: FORMULA1_DOTD_URL
+          driverOfTheDay: data.driverOfTheDayUrl
         }
       })
     };
@@ -1067,7 +1044,7 @@ async function main() {
         sourceType: SOURCE_TYPES.JOLPICA,
         parserVersion: "evidence-v1",
         requestedRounds: completedRounds.length,
-        reconstructed: true,
+        reconstructed: false,
         sourceNote: BACKFILL_SOURCE_NOTE
       });
       snapshots.forEach((snapshot) => {
@@ -1138,7 +1115,6 @@ async function main() {
         database: args.databaseUrl ? "postgres" : "sqlite",
         dbPath: args.dbPath,
         completedRounds,
-        cancelledRacesHandledAsZeroDnf: CANCELLED_RACES_2026,
         snapshots: snapshots.map((snapshot) => ({
           roundNumber: snapshot.roundNumber,
           roundName: snapshot.roundName,

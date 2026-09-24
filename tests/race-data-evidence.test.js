@@ -99,6 +99,51 @@ test("buildEvidenceBundle normalizes race, qualifying, and standings evidence", 
   assert.equal(evidence.sourceUrls.race, "https://example.test/race");
 });
 
+test("evidence keeps provider identity and raw session details for future derivations", () => {
+  const evidence = buildEvidenceBundle({
+    data: {
+      season: 2026,
+      results: [{
+        round: 1,
+        raceName: "Australian Grand Prix",
+        Results: [{
+          number: "63",
+          position: "1",
+          points: "25",
+          Time: { time: "1:30:00.000" },
+          FastestLap: { rank: "1", Time: { time: "1:20.000" }, AverageSpeed: { speed: "190.5" } },
+          Driver: { driverId: "russell", givenName: "George", familyName: "Russell" },
+          Constructor: { constructorId: "mercedes", name: "Mercedes" }
+        }]
+      }],
+      qualifying: [{
+        round: 1,
+        QualifyingResults: [{
+          position: "1", Q1: "1:20.000", Q2: "1:19.000", Q3: "1:18.000",
+          Driver: { driverId: "russell", givenName: "George", familyName: "Russell" },
+          Constructor: { constructorId: "mercedes", name: "Mercedes" }
+        }]
+      }],
+      sprints: [],
+      driverStandingsByRound: new Map(),
+      constructorStandingsByRound: new Map(),
+      driverOfTheDayByRound: new Map()
+    },
+    roster: { drivers: ["George Russell"], teams: ["Mercedes"] },
+    roundNumber: 1,
+    roundName: "Australian Grand Prix"
+  });
+
+  assert.equal(evidence.race.rows[0].provider_driver_id, "russell");
+  assert.equal(evidence.race.rows[0].fastestLapTime, "1:20.000");
+  assert.equal(evidence.race.rows[0].fastestLapAverageSpeed, 190.5);
+  assert.deepEqual(evidence.qualifying.rows[0].qualifyingTimes, {
+    q1: "1:20.000", q2: "1:19.000", q3: "1:18.000"
+  });
+  assert.equal(evidence.raw.provider, "jolpica-ergast");
+  assert.equal(evidence.raw.race.Results[0].Driver.driverId, "russell");
+});
+
 test("evidence records the input revision and unresolved canonical rows", () => {
   const evidence = buildEvidenceBundle({
     data: {

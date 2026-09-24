@@ -49,10 +49,10 @@ test("sanitized preview seeds all seasons while keeping evidence scoped to 2026"
       db.prepare("SELECT year FROM seasons ORDER BY year").all().map((row) => row.year),
       [2025, 2026, 2027],
     );
-    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM races").get().count, 66);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM races").get().count, 69);
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM race_data_snapshots").get().count, 13);
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM actual_snapshots").get().count, 13);
-    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM driver_team_assignments").get().count, 70);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM driver_team_assignments").get().count, 76);
   } finally {
     if (previous === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previous;

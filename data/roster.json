@@ -21,7 +21,8 @@
     "Oscar Piastri",
     "Pierre Gasly",
     "Sergio Perez",
-    "Valtteri Bottas"
+    "Valtteri Bottas",
+    "Yuki Tsunoda"
   ],
   "driver_numbers": {
     "Alexander Albon": 23,
@@ -45,7 +46,8 @@
     "Oscar Piastri": 81,
     "Pierre Gasly": 10,
     "Sergio Perez": 11,
-    "Valtteri Bottas": 77
+    "Valtteri Bottas": 77,
+    "Yuki Tsunoda": 22
   },
   "driver_profiles": {
     "Alexander Albon": {"driver_code": "ALB", "nationality_code": "THA", "date_of_birth": "1996-03-23"},
@@ -69,7 +71,8 @@
     "Oscar Piastri": {"driver_code": "PIA", "nationality_code": "AUS", "date_of_birth": "2001-04-06"},
     "Pierre Gasly": {"driver_code": "GAS", "nationality_code": "FRA", "date_of_birth": "1996-02-07"},
     "Sergio Perez": {"driver_code": "PER", "nationality_code": "MEX", "date_of_birth": "1990-01-26"},
-    "Valtteri Bottas": {"driver_code": "BOT", "nationality_code": "FIN", "date_of_birth": "1989-08-28"}
+    "Valtteri Bottas": {"driver_code": "BOT", "nationality_code": "FIN", "date_of_birth": "1989-08-28"},
+    "Yuki Tsunoda": {"driver_code": "TSU", "nationality_code": "JPN", "date_of_birth": "2000-05-11"}
   },
   "teams": [
     "Alpine",

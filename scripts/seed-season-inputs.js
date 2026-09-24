@@ -46,11 +46,25 @@ const DRIVER_TEAM_ASSIGNMENTS = {
   "Oscar Piastri": "McLaren",
   "Pierre Gasly": "Alpine",
   "Sergio Perez": "Cadillac",
-  "Valtteri Bottas": "Cadillac"
+  "Valtteri Bottas": "Cadillac",
+  "Yuki Tsunoda": "Racing Bulls"
 };
 
 // Stable presentation order for the season. IDs remain opaque database keys;
 // this list can be replaced for a future season without renumbering entities.
+const DRIVER_TEAM_ASSIGNMENT_PERIODS_2026 = {
+  "Liam Lawson": [
+    { team: "Racing Bulls", seat: 1, fromRound: 1, toRound: 11 },
+    { team: "Red Bull Racing", seat: 2, fromRound: 12, toRound: null }
+  ],
+  "Isack Hadjar": [
+    { team: "Red Bull Racing", seat: 2, fromRound: 1, toRound: 11 }
+  ],
+  "Yuki Tsunoda": [
+    { team: "Racing Bulls", seat: 1, fromRound: 12, toRound: null }
+  ]
+};
+
 const TEAM_DISPLAY_ORDER = [
   "Mercedes", "Ferrari", "McLaren", "Red Bull Racing", "Racing Bulls",
   "Alpine", "Haas F1 Team", "Audi", "Williams", "Aston Martin", "Cadillac"
@@ -123,6 +137,25 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       const driverNumber = roster.driver_numbers?.[driverName];
       if (driverNumber == null) throw new Error(`Missing canonical driver number for ${driverName}.`);
       upsertSeasonDriver(db, { seasonId: seasonRow.id, driverId: id, driverNumber, now });
+      const periods = season === 2026 ? DRIVER_TEAM_ASSIGNMENT_PERIODS_2026[driverName] : null;
+      if (periods) {
+        db.prepare("DELETE FROM driver_team_assignments WHERE season_id = ? AND driver_id = ?").run(seasonRow.id, id);
+        periods.forEach((period) => {
+          const teamId = teamIds.get(period.team);
+          if (!teamId) throw new Error(`Missing canonical team assignment for ${driverName}.`);
+          upsertDriverTeamAssignment(db, {
+            seasonId: seasonRow.id,
+            driverId: id,
+            teamId,
+            seatNumber: period.seat,
+            fromRound: period.fromRound,
+            toRound: period.toRound,
+            source: "official-f1-2026-refresh",
+            now
+          });
+        });
+        continue;
+      }
       const teamName = DRIVER_TEAM_ASSIGNMENTS[driverName];
       if (!teamName || !teamIds.has(teamName)) throw new Error(`Missing canonical team assignment for ${driverName}.`);
       const seatNumber = (TEAM_DRIVER_ORDER[teamName] || []).indexOf(driverName) + 1 || 1;
