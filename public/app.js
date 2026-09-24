@@ -1210,6 +1210,7 @@ const initRaceDataViewToggle = () => {
   if (!tabs || !matrix) return;
   const toggles = Array.from(tabs.querySelectorAll('[data-race-data-view-toggle]'));
   const bodies = Array.from(matrix.querySelectorAll('[data-race-data-body]'));
+  const identityHeaders = Array.from(matrix.querySelectorAll('[data-race-data-identity-header]'));
   const roundLinks = Array.from(matrix.querySelectorAll('[data-race-data-round-link]'));
   const legendItems = Array.from(document.querySelectorAll('[data-race-data-constructor-legend]'));
   const viewInputs = Array.from(document.querySelectorAll('.admin-race-data-page form input[name="view"]'));
@@ -1231,6 +1232,9 @@ const initRaceDataViewToggle = () => {
     });
     bodies.forEach((body) => {
       body.hidden = body.dataset.raceDataBody !== view;
+    });
+    identityHeaders.forEach((header) => {
+      header.hidden = header.dataset.raceDataIdentityHeader !== view;
     });
     legendItems.forEach((item) => {
       item.hidden = view !== 'constructors';

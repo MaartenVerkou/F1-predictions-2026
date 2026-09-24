@@ -65,8 +65,8 @@
       <thead>
         <tr>
           <th scope="col" class="admin-race-data-sticky admin-race-data-rank"><%= t('admin_race_data.position') %></th>
-          <th scope="col" class="admin-race-data-sticky admin-race-data-entity"><%= t('admin_race_data.driver') %></th>
-          <th scope="col" class="admin-race-data-sticky admin-race-data-team"><%= t('admin_race_data.team') %></th>
+          <th scope="col" class="admin-race-data-sticky admin-race-data-entity" data-race-data-identity-header="drivers"<%= viewMode === 'drivers' ? '' : ' hidden' %>><%= t('admin_race_data.driver') %></th>
+          <th scope="col" class="admin-race-data-sticky admin-race-data-entity" data-race-data-identity-header="constructors"<%= viewMode === 'constructors' ? '' : ' hidden' %>><%= t('admin_race_data.team') %></th>
           <% view.rounds.forEach((round) => { %>
             <th scope="col" class="admin-race-data-round-head <%= round.afterCutoff ? 'is-after-cutoff' : '' %>">
               <a data-race-data-round-link href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>">R<%= round.roundNumber %></a>

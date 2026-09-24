@@ -76,6 +76,19 @@ test("all input tables use explicit responsive table variants", () => {
   assert.match(styles, /overflow-wrap:\s*anywhere/);
 });
 
+test("race data views share one identity column and a common row rhythm", () => {
+  const view = readView("admin_race_data.ejs");
+  const row = readView("partials/admin_race_data_matrix_row.ejs");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(view, /data-race-data-identity-header="drivers"/);
+  assert.match(view, /data-race-data-identity-header="constructors"/);
+  assert.match(row, /admin-race-data-constructor-detail/);
+  assert.doesNotMatch(row, /admin-race-data-team-detail/);
+  assert.doesNotMatch(row, /admin-race-data-driver-detail/);
+  assert.match(styles, /\.admin-race-data-matrix th,[\s\S]*?line-height:\s*1\.25/);
+  assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);
+});
+
 test("inputs exposes shared historical confirmation and advanced data states", () => {
   const view = readView("admin_inputs.ejs");
   assert.match(view, /data-admin-season-policy/);
