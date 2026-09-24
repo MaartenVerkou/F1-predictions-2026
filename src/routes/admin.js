@@ -283,7 +283,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       const markers = [];
       if (pole) markers.push("P");
       if (fastestLap) markers.push("FL");
-      const markerGlyph = markers.map(() => "*").join("");
+      const markerGlyph = markers.join(" ");
       const markerTitle = [pole ? "Pole position" : null, fastestLap ? "Fastest lap" : null]
         .filter(Boolean)
         .join(" · ");

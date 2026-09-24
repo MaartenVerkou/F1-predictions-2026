@@ -186,7 +186,7 @@ test("race data rows follow selected points and expose pole, fastest lap, and cu
   assert.equal(view.drivers[0].cells[0].pole, true);
   assert.equal(view.drivers[0].cells[0].fastestLap, true);
   assert.deepEqual(view.drivers[0].cells[0].markers, ["P", "FL"]);
-  assert.equal(view.drivers[0].cells[0].markerGlyph, "**");
+  assert.equal(view.drivers[0].cells[0].markerGlyph, "P FL");
   assert.equal(view.drivers[0].cells[1].afterCutoff, true);
   assert.equal(view.drivers[0].cells[1].state, "future");
   assert.equal(view.drivers.find((row) => row.name === "Driver DNQ").cells[0].label, "DNQ");
