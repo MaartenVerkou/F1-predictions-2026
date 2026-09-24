@@ -45,3 +45,23 @@ The constructor race-data matrix SHALL derive podium indicators from the same no
 - **WHEN** an administrator selects an earlier round cutoff
 - **THEN** the constructor summary SHALL show wins and podiums counted only through that cutoff
 - **AND** later rounds SHALL not contribute to those totals
+
+### Requirement: Constructor detail uses grouped canonical driver rows
+The constructor Race data view SHALL provide an explicit detail toggle that reuses the same matrix columns and cell semantics while grouping the selected-round drivers under their constructor. The grouped view SHALL merge the constructor label, championship position, and constructor total points across the team's two seat rows, without adding artificial Driver 1/Driver 2 data fields.
+
+#### Scenario: An administrator enables constructor detail
+- **WHEN** the constructor detail toggle is enabled
+- **THEN** each constructor SHALL render one group containing its seat 1 and seat 2 drivers in canonical seat order
+- **AND** the constructor label, position, and total points SHALL remain one vertically merged group value
+- **AND** each driver row SHALL use the existing driver result cells, marker semantics, and responsive labels
+
+#### Scenario: Constructor detail follows the selected round lineup
+- **WHEN** a historical or current round is selected
+- **THEN** driver rows SHALL be resolved from the season's canonical assignment projection at that round
+- **AND** a mid-season replacement SHALL appear only from its assignment start round onward
+- **AND** an empty seat SHALL remain visibly unavailable without borrowing a driver from another round
+
+#### Scenario: Constructor detail is shareable and reversible
+- **WHEN** an administrator switches between constructor totals and grouped detail
+- **THEN** the selected mode SHALL be represented in the URL and preserve the season, view, and cutoff
+- **AND** disabling detail SHALL restore the compact constructor totals without changing evidence or derived values
