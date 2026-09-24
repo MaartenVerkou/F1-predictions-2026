@@ -25,3 +25,23 @@ The workspace SHALL distinguish immutable observed evidence from derived actual 
 - **WHEN** the admin saves a correction
 - **THEN** the correction SHALL be stored as an explicit override with audit metadata
 - **AND** the original derived value SHALL remain recoverable
+
+### Requirement: Constructor race cells expose canonical podium facts
+The constructor race-data matrix SHALL derive podium indicators from the same normalized Grand Prix driver results used by actuals derivation. A constructor SHALL be marked with its best classified driver finish of 1, 2, or 3 for a round when applicable; sprint-only results SHALL not create a Grand Prix podium indicator.
+
+#### Scenario: A constructor has a podium driver
+- **GIVEN** persisted race evidence contains a driver finish in positions 1 through 3 for a constructor
+- **WHEN** the constructor matrix is rendered for a cutoff that includes that round
+- **THEN** the points cell SHALL retain the constructor's race and sprint points
+- **AND** it SHALL show a compact, position-specific podium indicator with an accessible explanation of the driver finish
+
+#### Scenario: A constructor has no Grand Prix podium
+- **GIVEN** all of a constructor's driver results are outside positions 1 through 3, or evidence is unavailable
+- **WHEN** the constructor matrix is rendered
+- **THEN** the cell SHALL not show a podium indicator
+- **AND** future or unavailable cells SHALL remain visually muted and semantically distinguishable
+
+#### Scenario: Constructor podium totals follow the selected cutoff
+- **WHEN** an administrator selects an earlier round cutoff
+- **THEN** the constructor summary SHALL show wins and podiums counted only through that cutoff
+- **AND** later rounds SHALL not contribute to those totals

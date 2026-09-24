@@ -43,6 +43,7 @@
 
 - [ ] 6.1 Update Questions to resolve options from the selected catalog revision and show unresolved options as a data-quality state.
 - [ ] 6.2 Update Race data to display normalized evidence/provenance and the same selected cutoff used by Actuals.
+- [ ] 6.2a Add shared constructor podium metadata to the Race data matrix, including cutoff-aware position badges, accessible legend text, and constructor win/podium summaries.
 - [ ] 6.3 Update Actuals, leaderboard, and analysis to consume shared services and remove duplicated semantic transformations.
 - [ ] 6.4 Keep loading, empty, error, permission, responsive, and accessibility states coherent across the four admin/public workflows.
 
