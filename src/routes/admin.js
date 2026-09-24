@@ -122,6 +122,44 @@ function buildAuditMarkerMeta({ pole = false, fastestLap = false } = {}) {
   };
 }
 
+function buildConstructorPodiumMeta(raceRows, entity) {
+  const podiumRows = (raceRows || [])
+    .filter((row) => matchesAuditEntity(row, entity, {
+      idField: "team_id",
+      nameField: "constructor"
+    }))
+    .map((row) => ({ row, position: Number(row.position) }))
+    .filter(({ position }) => Number.isInteger(position) && position >= 1 && position <= 3)
+    .sort((left, right) => left.position - right.position);
+  const best = podiumRows[0] || null;
+  if (!best) {
+    return {
+      podiumPosition: null,
+      podiumDrivers: [],
+      podiumMarkerGlyph: "",
+      podiumMarkerTitle: ""
+    };
+  }
+  const podiumDrivers = podiumRows
+    .map(({ row }) => row.driver)
+    .filter(Boolean);
+  const bestLabel = best.position === 1 ? "Grand Prix winner" : "Grand Prix podium";
+  return {
+    podiumPosition: best.position,
+    podiumDrivers,
+    podiumMarkerGlyph: String(best.position),
+    podiumMarkerTitle: `${bestLabel}: P${best.position} — ${podiumDrivers.join(", ")}`
+  };
+}
+
+function buildAuditPodiumSummary(cells) {
+  const podiumCells = (cells || []).filter((cell) => !cell.afterCutoff && cell.podiumPosition);
+  return {
+    wins: podiumCells.filter((cell) => cell.podiumPosition === 1).length,
+    podiums: podiumCells.length
+  };
+}
+
 function buildAuditMatrixCell({
   round,
   cutoffRoundNumber,
@@ -129,6 +167,8 @@ function buildAuditMatrixCell({
   title,
   state = round.state,
   podiumPosition = null,
+  podiumMarkerGlyph = "",
+  podiumMarkerTitle = "",
   markers = [],
   markerGlyph = "",
   markerTitle = ""
@@ -138,7 +178,9 @@ function buildAuditMatrixCell({
     label: label == null ? "—" : String(label),
     state: afterCutoff ? "future" : state,
     afterCutoff,
-    podiumPosition,
+    podiumPosition: afterCutoff ? null : podiumPosition,
+    podiumMarkerGlyph: afterCutoff ? "" : podiumMarkerGlyph,
+    podiumMarkerTitle: afterCutoff ? "" : podiumMarkerTitle,
     markers,
     markerGlyph,
     markerTitle,
@@ -383,11 +425,18 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
           nameField: "constructor"
         })))
         .reduce((total, row) => total + Number(row.points || 0), 0);
+      const podiumMeta = buildConstructorPodiumMeta(raceRows, entity);
       return buildAuditMatrixCell({
         round,
         cutoffRoundNumber,
         label: points,
-        title: points + " points from race and sprint"
+        title: [
+          points + " points from race and sprint",
+          podiumMeta.podiumMarkerTitle || null
+        ].filter(Boolean).join(" · "),
+        podiumPosition: podiumMeta.podiumPosition,
+        podiumMarkerGlyph: podiumMeta.podiumMarkerGlyph,
+        podiumMarkerTitle: podiumMeta.podiumMarkerTitle
       });
     });
     const standing = (entity.id != null ? selectedConstructorIdMap.get(Number(entity.id)) : null)
@@ -399,7 +448,8 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       id: entity.id,
       cells,
       points: standing?.points ?? null,
-      championshipPosition: standing?.position ?? null
+      championshipPosition: standing?.position ?? null,
+      podiumSummary: buildAuditPodiumSummary(cells)
     };
   }));
 

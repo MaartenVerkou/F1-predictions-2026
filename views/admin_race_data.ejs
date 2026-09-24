@@ -95,7 +95,15 @@
             <% row.cells.forEach((cell, cellIndex) => { %>
               <%- include('partials/admin_race_data_matrix_cell', { season, viewMode, cell, cellIndex }) %>
             <% }) %>
-            <td class="admin-race-data-summary admin-race-data-sticky-right"><%= row.points == null ? '—' : row.points %></td>
+            <td class="admin-race-data-summary admin-race-data-sticky-right"<% if (viewMode === 'constructors' && row.podiumSummary) { %> title="<%= t('admin_race_data.constructor_summary_title', row.podiumSummary) %>"<% } %>>
+              <span class="admin-race-data-summary-points"><%= row.points == null ? '—' : row.points %></span>
+              <% if (viewMode === 'constructors' && row.podiumSummary) { %>
+                <span class="admin-race-data-summary-meta" aria-label="<%= t('admin_race_data.constructor_summary_title', row.podiumSummary) %>">
+                  <span class="admin-race-data-summary-win">W <%= row.podiumSummary.wins %></span>
+                  <span class="admin-race-data-summary-podium">P <%= row.podiumSummary.podiums %></span>
+                </span>
+              <% } %>
+            </td>
           </tr>
         <% }) %>
       </tbody>
@@ -113,6 +121,10 @@
     <span><%= t('admin_race_data.legend_wd') %></span>
     <span><%= t('admin_race_data.legend_pole') %></span>
     <span><%= t('admin_race_data.legend_fastest_lap') %></span>
+    <% if (viewMode === 'constructors') { %>
+      <span><%= t('admin_race_data.legend_constructor_podium') %></span>
+      <span><%= t('admin_race_data.legend_constructor_summary') %></span>
+    <% } %>
     <span><%= t('admin_race_data.legend_unavailable') %></span>
   </div>
 

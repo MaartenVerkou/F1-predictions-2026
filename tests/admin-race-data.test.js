@@ -143,7 +143,58 @@ test("buildRaceDataAuditView uses selected cutoff standings and mutes later roun
   assert.equal(view.drivers[0].constructorCode, "MER");
   assert.equal(view.constructors[0].code, "MER");
   assert.deepEqual(view.constructors[0].cells[0].markers, []);
+  assert.equal(view.constructors[0].cells[0].podiumPosition, 1);
+  assert.equal(view.constructors[0].cells[0].podiumMarkerGlyph, "1");
+  assert.deepEqual(view.constructors[0].podiumSummary, { wins: 1, podiums: 1 });
   assert.equal(view.cutoffRoundNumber, 1);
+});
+
+test("constructor podiums use Grand Prix finishes, not sprint-only results, and respect cutoff", () => {
+  const evidence = (round, racePosition, sprintPosition) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: {
+        rows: [{
+          driver: "Driver Alpha",
+          constructor: "Team A",
+          position: racePosition,
+          points: racePosition === 2 ? 18 : 8,
+          status: "Finished"
+        }]
+      },
+      qualifying: { rows: [] },
+      sprint: {
+        rows: [{
+          driver: "Driver Alpha",
+          constructor: "Team A",
+          position: sprintPosition,
+          points: 8,
+          status: "Finished"
+        }]
+      },
+      standings: {
+        drivers: [{ entity: "Driver Alpha", position: round, points: round === 1 ? 16 : 42 }],
+        constructors: [{ entity: "Team A", position: 1, points: round === 1 ? 16 : 42 }]
+      }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster: { drivers: ["Driver Alpha"], teams: ["Team A"] },
+    evidenceRows: [evidence(1, 4, 1), evidence(2, 2, 1)],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+
+  const constructor = view.constructors[0];
+  assert.equal(constructor.cells[0].podiumPosition, null);
+  assert.equal(constructor.cells[0].podiumMarkerGlyph, "");
+  assert.deepEqual(constructor.podiumSummary, { wins: 0, podiums: 0 });
+  assert.equal(constructor.cells[1].afterCutoff, true);
+  assert.equal(constructor.cells[1].podiumPosition, null);
 });
 
 test("race data rows follow selected points and expose pole, fastest lap, and cutoff state", () => {
