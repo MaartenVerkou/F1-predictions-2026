@@ -23,9 +23,6 @@
       </select>
       <input type="hidden" name="view" value="<%= viewMode %>" />
       <input type="hidden" name="round" value="<%= view.selectedRoundNumber || 1 %>" />
-      <% if (viewMode === 'constructors' && constructorDetail) { %>
-        <input type="hidden" name="detail" value="drivers" />
-      <% } %>
     </form>
   </div>
 
@@ -36,38 +33,21 @@
   <% } %>
 
   <div class="admin-race-data-toolbar">
-    <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>">
+    <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
       <a class="admin-race-data-tab <%= viewMode === 'drivers' ? 'is-active' : '' %>"
          href="/admin/race-data?season=<%= season %>&view=drivers&round=<%= view.selectedRoundNumber %>"
-         role="tab" aria-selected="<%= viewMode === 'drivers' ? 'true' : 'false' %>">
+         role="tab" aria-selected="<%= viewMode === 'drivers' ? 'true' : 'false' %>" data-race-data-view-toggle="drivers">
         <%= t('admin_race_data.drivers_view') %>
       </a>
       <a class="admin-race-data-tab <%= viewMode === 'constructors' ? 'is-active' : '' %>"
-         href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %><%= constructorDetail ? '&detail=drivers' : '' %>"
-         role="tab" aria-selected="<%= viewMode === 'constructors' ? 'true' : 'false' %>">
+         href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>"
+         role="tab" aria-selected="<%= viewMode === 'constructors' ? 'true' : 'false' %>" data-race-data-view-toggle="constructors">
         <%= t('admin_race_data.constructors_view') %>
       </a>
     </div>
-    <% if (viewMode === 'constructors') { %>
-      <div class="admin-race-data-detail-toggle" role="group" aria-label="<%= t('admin_race_data.constructor_detail_label') %>">
-        <a class="admin-race-data-detail-toggle-option <%= constructorDetail ? '' : 'is-active' %>"
-           href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>&detail=totals"
-           aria-pressed="<%= constructorDetail ? 'false' : 'true' %>">
-          <%= t('admin_race_data.constructor_totals_view') %>
-        </a>
-        <a class="admin-race-data-detail-toggle-option <%= constructorDetail ? 'is-active' : '' %>"
-           href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>&detail=drivers"
-           aria-pressed="<%= constructorDetail ? 'true' : 'false' %>">
-          <%= t('admin_race_data.constructor_drivers_view') %>
-        </a>
-      </div>
-    <% } %>
     <form method="get" action="/admin/race-data" class="admin-race-data-round-form">
       <input type="hidden" name="view" value="<%= viewMode %>" />
       <input type="hidden" name="season" value="<%= season %>" />
-      <% if (viewMode === 'constructors' && constructorDetail) { %>
-        <input type="hidden" name="detail" value="drivers" />
-      <% } %>
       <label for="admin-race-data-round"><%= t('admin_race_data.round_label') %></label>
       <select id="admin-race-data-round" name="round" onchange="this.form.submit()">
         <% view.rounds.forEach((round) => { %>
@@ -81,37 +61,31 @@
   </div>
 
   <div class="admin-race-data-table-wrap">
-    <% const rows = viewMode === 'constructors' ? view.constructors : view.drivers; %>
-    <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %> <%= constructorDetail ? 'admin-race-data-matrix--constructor-detail' : '' %>">
+    <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
       <thead>
         <tr>
           <th scope="col" class="admin-race-data-sticky admin-race-data-rank"><%= t('admin_race_data.position') %></th>
-          <th scope="col" class="admin-race-data-sticky admin-race-data-entity">
-            <%= constructorDetail || viewMode === 'drivers' ? t('admin_race_data.driver') : t('admin_race_data.constructor') %>
-          </th>
-          <% if (viewMode === 'drivers' || constructorDetail) { %>
-            <th scope="col" class="admin-race-data-sticky admin-race-data-team"><%= t('admin_race_data.team') %></th>
-          <% } %>
+          <th scope="col" class="admin-race-data-sticky admin-race-data-entity"><%= t('admin_race_data.driver') %></th>
+          <th scope="col" class="admin-race-data-sticky admin-race-data-team"><%= t('admin_race_data.team') %></th>
           <% view.rounds.forEach((round) => { %>
             <th scope="col" class="admin-race-data-round-head <%= round.afterCutoff ? 'is-after-cutoff' : '' %>">
-              <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %><%= constructorDetail ? '&detail=drivers' : '' %>">R<%= round.roundNumber %></a>
+              <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>">R<%= round.roundNumber %></a>
             </th>
           <% }) %>
           <th scope="col" class="admin-race-data-summary admin-race-data-sticky-right"><%= t('admin_race_data.points') %></th>
         </tr>
       </thead>
-      <tbody>
-        <% if (constructorDetail) { %>
-          <% view.constructorGroups.forEach((group) => { %>
-            <% group.drivers.forEach((row, groupIndex) => { %>
-              <%- include('partials/admin_race_data_matrix_row', { season, viewMode, detailMode: true, rowKind: 'constructor-driver', row, group, groupIndex, groupSize: group.drivers.length, index: groupIndex }) %>
-            <% }) %>
+      <tbody data-race-data-body="drivers"<%= viewMode === 'drivers' ? '' : ' hidden' %>>
+        <% view.drivers.forEach((row, index) => { %>
+          <%- include('partials/admin_race_data_matrix_row', { season, viewMode: 'drivers', detailMode: false, rowKind: 'drivers', row, group: null, groupIndex: 0, groupSize: 1, index }) %>
+        <% }) %>
+      </tbody>
+      <tbody data-race-data-body="constructors"<%= viewMode === 'constructors' ? '' : ' hidden' %>>
+        <% view.constructorGroups.forEach((group) => { %>
+          <% group.drivers.forEach((row, groupIndex) => { %>
+            <%- include('partials/admin_race_data_matrix_row', { season, viewMode: 'constructors', detailMode: true, rowKind: 'constructor-driver', row, group, groupIndex, groupSize: group.drivers.length, index: groupIndex }) %>
           <% }) %>
-        <% } else { %>
-          <% rows.forEach((row, index) => { %>
-            <%- include('partials/admin_race_data_matrix_row', { season, viewMode, detailMode: false, rowKind: viewMode, row, group: null, groupIndex: 0, groupSize: 1, index }) %>
-          <% }) %>
-        <% } %>
+        <% }) %>
       </tbody>
     </table>
   </div>
@@ -127,10 +101,8 @@
     <span><%= t('admin_race_data.legend_wd') %></span>
     <span><%= t('admin_race_data.legend_pole') %></span>
     <span><%= t('admin_race_data.legend_fastest_lap') %></span>
-    <% if (viewMode === 'constructors') { %>
-      <span><%= t('admin_race_data.legend_constructor_podium') %></span>
-      <span><%= t('admin_race_data.legend_constructor_summary') %></span>
-    <% } %>
+    <span data-race-data-constructor-legend<%= viewMode === 'constructors' ? '' : ' hidden' %>><%= t('admin_race_data.legend_constructor_podium') %></span>
+    <span data-race-data-constructor-legend<%= viewMode === 'constructors' ? '' : ' hidden' %>><%= t('admin_race_data.legend_constructor_summary') %></span>
     <span><%= t('admin_race_data.legend_unavailable') %></span>
   </div>
 

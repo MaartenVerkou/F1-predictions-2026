@@ -3543,8 +3543,6 @@ function registerAdminRoutes(app, deps) {
       String(req.query.view || "").trim().toLowerCase() === "constructors"
         ? "constructors"
         : "drivers";
-    const constructorDetail = viewMode === "constructors"
-      && String(req.query.detail || "").trim().toLowerCase() === "drivers";
     const requestedRound = Number(req.query.round || 0);
     const defaultRound =
       requestedRound > 0
@@ -3578,7 +3576,6 @@ function registerAdminRoutes(app, deps) {
       locale,
       view,
       viewMode,
-      constructorDetail,
       derivedActuals,
       selectedSnapshot,
       importRows,

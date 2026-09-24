@@ -34,7 +34,7 @@
   <% } %>
 
   <% row.cells.forEach((cell, cellIndex) => { %>
-    <%- include('admin_race_data_matrix_cell', { season, viewMode, constructorDetail: isGroupedDriver, cell, cellIndex }) %>
+    <%- include('admin_race_data_matrix_cell', { season, viewMode, cell, cellIndex }) %>
   <% }) %>
 
   <% if (isGroupedDriver) { %>

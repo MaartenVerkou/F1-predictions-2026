@@ -1204,6 +1204,65 @@ const initAdminLineupHistoryEditors = () => {
   });
 };
 
+const initRaceDataViewToggle = () => {
+  const tabs = document.querySelector('[data-race-data-view-tabs]');
+  const matrix = document.querySelector('[data-race-data-matrix]');
+  if (!tabs || !matrix) return;
+  const toggles = Array.from(tabs.querySelectorAll('[data-race-data-view-toggle]'));
+  const bodies = Array.from(matrix.querySelectorAll('[data-race-data-body]'));
+  const legendItems = Array.from(document.querySelectorAll('[data-race-data-constructor-legend]'));
+  const viewInputs = Array.from(document.querySelectorAll('.admin-race-data-page form input[name="view"]'));
+  if (!toggles.length || !bodies.length) return;
+
+  const normalizeView = (value) => value === 'constructors' ? 'constructors' : 'drivers';
+
+  const syncView = (value) => {
+    const view = normalizeView(value);
+    toggles.forEach((toggle) => {
+      const isActive = toggle.dataset.raceDataViewToggle === view;
+      toggle.classList.toggle('is-active', isActive);
+      toggle.setAttribute('aria-selected', String(isActive));
+      if (isActive) {
+        toggle.setAttribute('aria-current', 'page');
+      } else {
+        toggle.removeAttribute('aria-current');
+      }
+    });
+    bodies.forEach((body) => {
+      body.hidden = body.dataset.raceDataBody !== view;
+    });
+    legendItems.forEach((item) => {
+      item.hidden = view !== 'constructors';
+    });
+    matrix.classList.toggle('admin-race-data-matrix--constructors', view === 'constructors');
+    matrix.classList.toggle('admin-race-data-matrix--drivers', view === 'drivers');
+    matrix.dataset.raceDataActiveView = view;
+    viewInputs.forEach((input) => {
+      input.value = view;
+    });
+  };
+
+  const currentView = () => new URL(window.location.href).searchParams.get('view') || matrix.dataset.raceDataActiveView;
+
+  toggles.forEach((toggle) => {
+    toggle.addEventListener('click', (event) => {
+      const view = normalizeView(toggle.dataset.raceDataViewToggle);
+      if (view === normalizeView(currentView())) {
+        event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      const url = new URL(toggle.href, window.location.href);
+      url.searchParams.set('view', view);
+      window.history.pushState({ raceDataView: view }, '', url);
+      syncView(view);
+    });
+  });
+
+  window.addEventListener('popstate', () => syncView(currentView()));
+  syncView(currentView());
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
   initHeaderOffsets();
@@ -1228,6 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAdminSeasonMutationConfirmation();
   initAdminInputTables();
   initAdminLineupHistoryEditors();
+  initRaceDataViewToggle();
   initSignupPasswordMatch();
   initScrollToEndButton();
 });
