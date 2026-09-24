@@ -82,7 +82,8 @@ test("race data views share one identity column and a common row rhythm", () => 
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
   assert.match(view, /data-race-data-identity-header="drivers"/);
   assert.match(view, /data-race-data-identity-header="constructors"/);
-  assert.match(row, /admin-race-data-constructor-detail/);
+  assert.match(row, /rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail"/);
+  assert.doesNotMatch(row, /admin-race-data-constructor-driver/);
   assert.doesNotMatch(row, /admin-race-data-team-detail/);
   assert.doesNotMatch(row, /admin-race-data-driver-detail/);
   assert.match(styles, /\.admin-race-data-matrix th,[\s\S]*?line-height:\s*1\.25/);

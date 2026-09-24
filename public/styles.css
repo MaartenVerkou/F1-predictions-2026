@@ -2793,10 +2793,6 @@ button:disabled {
   --admin-race-entity-width: 150px;
 }
 
-.admin-race-data-matrix--constructors {
-  --admin-race-entity-width: 220px;
-}
-
 .admin-race-data-matrix th,
 .admin-race-data-matrix td,
 .admin-race-data-detail-table th,
@@ -2981,20 +2977,7 @@ button:disabled {
 .admin-race-data-constructor-detail {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-weight: 650;
-}
-
-.admin-race-data-constructor-team {
   font-weight: 750;
-}
-
-.admin-race-data-constructor-separator {
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.admin-race-data-constructor-driver {
-  font-weight: 650;
 }
 
 .admin-race-data-group-driver.is-empty .admin-race-data-constructor-detail {
@@ -3074,10 +3057,6 @@ button:disabled {
     --admin-race-entity-width: 110px;
   }
 
-  .admin-race-data-matrix--constructors {
-    --admin-race-entity-width: 150px;
-  }
-
   .admin-race-data-entity {
     width: var(--admin-race-entity-width);
     min-width: var(--admin-race-entity-width);
@@ -3096,10 +3075,6 @@ button:disabled {
   .admin-race-data-matrix {
     font-size: 12px;
     --admin-race-entity-width: 96px;
-  }
-
-  .admin-race-data-matrix--constructors {
-    --admin-race-entity-width: 128px;
   }
 
   .admin-race-data-matrix th,

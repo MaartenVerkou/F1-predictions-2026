@@ -13,15 +13,11 @@
         <%= group.summary.championshipPosition || '—' %>
       </td>
     <% } %>
-    <th scope="row" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail" data-race-data-identity-cell="constructors" aria-label="<%= group.summary.name %>, <%= row.name === '—' ? 'Empty seat' : row.name %><% if (row.seatNumber) { %>, seat <%= row.seatNumber %><% } %>">
-      <span class="admin-race-data-constructor-team">
+    <% if (groupIsFirst) { %>
+      <th scope="row" rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail" data-race-data-identity-cell="constructors" aria-label="<%= group.summary.name %>">
         <%- include('admin_race_data_entity_label', { fullLabel: group.summary.name, compactLabel: group.summary.code || group.summary.name }) %>
-      </span>
-      <span class="admin-race-data-constructor-separator" aria-hidden="true"> · </span>
-      <span class="admin-race-data-constructor-driver">
-        <%- include('admin_race_data_entity_label', { fullLabel: row.name, compactLabel: row.code || row.name }) %>
-      </span>
-    </th>
+      </th>
+    <% } %>
   <% } else { %>
     <td class="admin-race-data-sticky admin-race-data-rank"><%= row.championshipPosition || index + 1 %></td>
     <th scope="row" class="admin-race-data-sticky admin-race-data-entity" data-race-data-identity-cell="drivers">
