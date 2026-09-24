@@ -168,21 +168,55 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
     }
 
     const raceIds = [];
+    const existingRacesBySlug = new Map(
+      db.prepare("SELECT id, slug FROM races WHERE season_id = ?").all(seasonRow.id)
+        .map((row) => [String(row.slug), Number(row.id)])
+    );
+    // A corrected calendar can insert a round in the middle of an existing
+    // season. Move existing rows out of the unique round range first, then
+    // update them by stable slug so race identity and evidence references stay
+    // intact while aliases are rebuilt for the new schedule.
+    db.prepare("UPDATE races SET round_number = round_number + 1000 WHERE season_id = ?").run(seasonRow.id);
+    db.prepare("DELETE FROM entity_aliases WHERE entity_type = ? AND season_id = ?").run(ENTITY_TYPES.RACE, seasonRow.id);
+    for (const raceId of existingRacesBySlug.values()) {
+      db.prepare("DELETE FROM entity_provider_refs WHERE entity_type = ? AND entity_id = ?").run(ENTITY_TYPES.RACE, raceId);
+    }
     raceNames.forEach((raceName, index) => {
       const roundNumber = index + 1;
-      const raceId = upsertRace(db, {
-        seasonId: seasonRow.id,
+      const slug = slugify(raceName);
+      const existingRaceId = existingRacesBySlug.get(slug);
+      let raceId;
+      const values = [
         roundNumber,
-        slug: slugify(raceName),
-        displayName: raceName,
-        scheduledDate: calendar[raceName]?.start || null,
-        scheduledTimezone: calendar[raceName]?.timezone || null,
-        raceCode: calendar[raceName]?.code,
-        countryCode: calendar[raceName]?.country_code,
-        circuitName: calendar[raceName]?.circuit,
-        calendarState: "scheduled",
+        slug,
+        raceName,
+        calendar[raceName]?.start || null,
+        calendar[raceName]?.timezone || null,
+        calendar[raceName]?.code || null,
+        calendar[raceName]?.country_code || null,
+        calendar[raceName]?.circuit || null,
+        "scheduled",
         now
-      });
+      ];
+      if (existingRaceId) {
+        db.prepare("UPDATE races SET round_number = ?, slug = ?, display_name = ?, scheduled_date = ?, scheduled_timezone = ?, race_code = ?, country_code = ?, circuit_name = ?, calendar_state = ?, updated_at = ? WHERE id = ?")
+          .run(...values, existingRaceId);
+        raceId = existingRaceId;
+      } else {
+        raceId = upsertRace(db, {
+          seasonId: seasonRow.id,
+          roundNumber,
+          slug,
+          displayName: raceName,
+          scheduledDate: calendar[raceName]?.start || null,
+          scheduledTimezone: calendar[raceName]?.timezone || null,
+          raceCode: calendar[raceName]?.code,
+          countryCode: calendar[raceName]?.country_code,
+          circuitName: calendar[raceName]?.circuit,
+          calendarState: "scheduled",
+          now
+        });
+      }
       addEntityAlias(db, { entityType: ENTITY_TYPES.RACE, entityId: raceId, seasonId: seasonRow.id, alias: raceName, source: "seed", now });
       addProviderReference(db, { entityType: ENTITY_TYPES.RACE, entityId: raceId, provider: "jolpica", providerKey: `${season}-round-${roundNumber}`, providerLabel: raceName, now });
       raceIds.push(raceId);
