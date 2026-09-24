@@ -1,0 +1,9 @@
+<td class="admin-race-data-summary admin-race-data-sticky-right"<% if (rowspan) { %> rowspan="<%= rowspan %>"<% } %><% if (viewMode === 'constructors' && row.podiumSummary) { %> title="<%= t('admin_race_data.constructor_summary_title', row.podiumSummary) %>"<% } %>>
+  <span class="admin-race-data-summary-points"><%= row.points == null ? '—' : row.points %></span>
+  <% if (viewMode === 'constructors' && row.podiumSummary) { %>
+    <span class="admin-race-data-summary-meta" aria-label="<%= t('admin_race_data.constructor_summary_title', row.podiumSummary) %>">
+      <span class="admin-race-data-summary-win">W <%= row.podiumSummary.wins %></span>
+      <span class="admin-race-data-summary-podium">P <%= row.podiumSummary.podiums %></span>
+    </span>
+  <% } %>
+</td>

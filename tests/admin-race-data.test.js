@@ -246,6 +246,76 @@ test("race data rows follow selected points and expose pole, fastest lap, and cu
   assert.equal(view.drivers.find((row) => row.name === "Driver DNQ").cells[0].label, "DNQ");
 });
 
+test("constructor detail groups the canonical two-seat lineup and merges team summary data", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster: {
+      drivers: ["Driver Alpha", "Driver Beta"],
+      teams: ["Team A"],
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", code: "ALP", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", code: "BET", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        race: {
+          rows: [
+            { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, points: 25, status: "Finished" },
+            { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 2, points: 18, status: "Finished" }
+          ]
+        },
+        qualifying: { rows: [] },
+        sprint: { rows: [] },
+        standings: {
+          drivers: [
+            { entity_id: 101, entity: "Driver Alpha", position: 1, points: 25 },
+            { entity_id: 102, entity: "Driver Beta", position: 2, points: 18 }
+          ],
+          constructors: [{ entity_id: 201, entity: "Team A", position: 1, points: 43 }]
+        }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+
+  assert.equal(view.constructorGroups.length, 1);
+  assert.equal(view.constructorGroups[0].summary.name, "Team A");
+  assert.equal(view.constructorGroups[0].summary.points, 43);
+  assert.deepEqual(
+    view.constructorGroups[0].drivers.map((driver) => [driver.name, driver.seatNumber]),
+    [["Driver Alpha", 1], ["Driver Beta", 2]]
+  );
+  assert.equal(view.constructorGroups[0].drivers[0].cells[0].label, "1");
+  assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "2");
+});
+
+test("constructor detail fills an unassigned seat without inventing a driver result", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster: {
+      driver_entities: [{ id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 }],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+
+  const drivers = view.constructorGroups[0].drivers;
+  assert.equal(drivers.length, 2);
+  assert.equal(drivers[0].name, "Driver Alpha");
+  assert.equal(drivers[1].isEmpty, true);
+  assert.equal(drivers[1].name, "—");
+  assert.equal(drivers[1].seatNumber, 2);
+});
+
 test("race data is exposed as a read-only admin workspace", () => {
   const routes = {};
   const app = {

@@ -241,7 +241,8 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
         name: String(seat.driverName),
         code: driverCatalogById.get(Number(seat.driverId))?.driver_code || null,
         teamId: Number(team.teamId),
-        teamName: String(team.teamName)
+        teamName: String(team.teamName),
+        seatNumber: Number(seat.seatNumber)
       }])
   ).values());
   const teamEntities = projection
@@ -249,7 +250,12 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
     .map((team) => ({
       id: Number(team.teamId),
       name: String(team.teamName),
-      code: teamCatalogById.get(Number(team.teamId))?.team_code || null
+      code: teamCatalogById.get(Number(team.teamId))?.team_code || null,
+      seats: team.seats.map((seat) => ({
+        seatNumber: Number(seat.seatNumber),
+        driverId: seat.driverId == null ? null : Number(seat.driverId),
+        driverName: seat.driverName || null
+      }))
     }));
   return {
     ...base,
@@ -394,6 +400,8 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       name: driver,
       code: entity.code || fallbackEntityCode(driver, "driver"),
       id: entity.id,
+      teamId: entity.teamId ?? null,
+      seatNumber: entity.seatNumber == null ? null : Number(entity.seatNumber),
       constructor,
       constructorCode: constructorEntity?.code || (constructor ? fallbackEntityCode(constructor, "team") : null),
       cells,
@@ -453,6 +461,60 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     };
   }));
 
+  const buildUnavailableDriverRow = (team, seatNumber) => ({
+    name: "—",
+    code: "—",
+    id: null,
+    teamId: team.id ?? null,
+    seatNumber,
+    constructor: team.name,
+    constructorCode: team.code || fallbackEntityCode(team.name, "team"),
+    isEmpty: true,
+    cells: rounds.map((round) => buildAuditMatrixCell({
+      round,
+      cutoffRoundNumber,
+      label: "—",
+      title: `Seat ${seatNumber} unavailable`
+    })),
+    points: null,
+    championshipPosition: null
+  });
+
+  const constructorGroups = constructorRows.map((summary) => {
+    const team = teamEntities.find((entity) => (
+      summary.id != null && entity.id != null
+        ? Number(entity.id) === Number(summary.id)
+        : entity.name === summary.name
+    )) || summary;
+    const teamDrivers = driverRows
+      .filter((row) => (
+        summary.id != null && row.teamId != null
+          ? Number(row.teamId) === Number(summary.id)
+          : row.constructor === summary.name
+      ))
+      .sort((left, right) => (
+        (Number(left.seatNumber) || 999) - (Number(right.seatNumber) || 999)
+          || left.name.localeCompare(right.name)
+      ));
+    const driversBySeat = [1, 2].map((seatNumber) => (
+      teamDrivers.find((row) => Number(row.seatNumber) === seatNumber)
+        || (teamDrivers.every((row) => row.seatNumber == null)
+          ? teamDrivers[seatNumber - 1]
+          : null)
+        || buildUnavailableDriverRow({
+          id: team.id,
+          name: team.name,
+          code: team.code
+        }, seatNumber)
+    ));
+    return {
+      id: summary.id,
+      name: summary.name,
+      summary,
+      drivers: driversBySeat
+    };
+  });
+
   const payload = selected?.evidence?.payload || null;
   const raceRows = payload?.race?.rows || [];
   const qualifyingRows = payload?.qualifying?.rows || [];
@@ -492,6 +554,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     rounds,
     drivers: driverRows,
     constructors: constructorRows,
+    constructorGroups,
     selectedRound: selected,
     selectedRoundNumber: selected?.roundNumber || cutoffRoundNumber,
     cutoffRoundNumber,
@@ -3480,6 +3543,8 @@ function registerAdminRoutes(app, deps) {
       String(req.query.view || "").trim().toLowerCase() === "constructors"
         ? "constructors"
         : "drivers";
+    const constructorDetail = viewMode === "constructors"
+      && String(req.query.detail || "").trim().toLowerCase() === "drivers";
     const requestedRound = Number(req.query.round || 0);
     const defaultRound =
       requestedRound > 0
@@ -3513,6 +3578,7 @@ function registerAdminRoutes(app, deps) {
       locale,
       view,
       viewMode,
+      constructorDetail,
       derivedActuals,
       selectedSnapshot,
       importRows,

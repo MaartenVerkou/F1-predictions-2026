@@ -1,0 +1,47 @@
+<% const isGroupedDriver = detailMode && rowKind === 'constructor-driver'; %>
+<% const groupIsFirst = isGroupedDriver && groupIndex === 0; %>
+<% const rowClass = [
+  isGroupedDriver ? 'admin-race-data-group-driver' : '',
+  isGroupedDriver && groupIsFirst ? 'is-group-start' : '',
+  isGroupedDriver && groupIndex === groupSize - 1 ? 'is-group-end' : '',
+  row.isEmpty ? 'is-empty' : ''
+].filter(Boolean).join(' '); %>
+<tr class="<%= rowClass %>">
+  <% if (isGroupedDriver) { %>
+    <% if (groupIsFirst) { %>
+      <td rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-rank">
+        <%= group.summary.championshipPosition || '—' %>
+      </td>
+    <% } %>
+    <th scope="row" class="admin-race-data-sticky admin-race-data-entity admin-race-data-driver-detail"<% if (row.seatNumber) { %> aria-label="<%= row.name === '—' ? 'Empty seat' : row.name %>, seat <%= row.seatNumber %>"<% } %>>
+      <%- include('admin_race_data_entity_label', { fullLabel: row.name, compactLabel: row.code || row.name }) %>
+    </th>
+    <% if (groupIsFirst) { %>
+      <td rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-team admin-race-data-team-detail">
+        <%- include('admin_race_data_entity_label', { fullLabel: group.summary.name, compactLabel: group.summary.code || group.summary.name }) %>
+      </td>
+    <% } %>
+  <% } else { %>
+    <td class="admin-race-data-sticky admin-race-data-rank"><%= row.championshipPosition || index + 1 %></td>
+    <th scope="row" class="admin-race-data-sticky admin-race-data-entity">
+      <%- include('admin_race_data_entity_label', { fullLabel: row.name, compactLabel: row.code || row.name }) %>
+    </th>
+    <% if (viewMode === 'drivers') { %>
+      <td class="admin-race-data-sticky admin-race-data-team">
+        <%- include('admin_race_data_entity_label', { fullLabel: row.constructor || '—', compactLabel: row.constructorCode || row.constructor || '—' }) %>
+      </td>
+    <% } %>
+  <% } %>
+
+  <% row.cells.forEach((cell, cellIndex) => { %>
+    <%- include('admin_race_data_matrix_cell', { season, viewMode, constructorDetail: isGroupedDriver, cell, cellIndex }) %>
+  <% }) %>
+
+  <% if (isGroupedDriver) { %>
+    <% if (groupIsFirst) { %>
+      <%- include('admin_race_data_summary_cell', { row: group.summary, viewMode: 'constructors', rowspan: groupSize }) %>
+    <% } %>
+  <% } else { %>
+    <%- include('admin_race_data_summary_cell', { row, viewMode, rowspan: null }) %>
+  <% } %>
+</tr>

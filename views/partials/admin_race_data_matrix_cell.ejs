@@ -1,6 +1,6 @@
 <td class="admin-race-data-cell state-<%= cell.state %> <%= cell.label === '—' ? 'is-empty' : '' %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.podiumPosition ? 'is-podium-' + cell.podiumPosition : '' %>"
     title="<%= cell.title %>">
-  <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %>">
+  <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %><%= constructorDetail ? '&detail=drivers' : '' %>">
     <span class="admin-race-data-result"><%= cell.label %><% if (cell.markerGlyph) { %><sup class="admin-race-data-marker" title="<%= cell.markerTitle %>" aria-label="<%= cell.markerTitle %>"><%= cell.markerGlyph %></sup><% } %><% if (cell.podiumMarkerGlyph) { %><span class="admin-race-data-podium-marker is-position-<%= cell.podiumPosition %>" role="img" title="<%= cell.podiumMarkerTitle %>" aria-label="<%= cell.podiumMarkerTitle %>"><%= cell.podiumMarkerGlyph %></span><% } %></span>
   </a>
 </td>

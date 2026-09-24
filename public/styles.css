@@ -2770,6 +2770,41 @@ button:disabled {
   font-size: 12px;
 }
 
+.admin-race-data-detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rules-bg) 72%, var(--card));
+}
+
+.admin-race-data-detail-toggle-option {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-race-data-detail-toggle-option:hover,
+.admin-race-data-detail-toggle-option:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 84%, var(--border));
+}
+
+.admin-race-data-detail-toggle-option.is-active {
+  color: var(--text);
+  background: var(--card);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
+}
+
 .admin-race-data-table-wrap,
 .admin-race-data-detail-table-wrap {
   width: 100%;
@@ -2995,6 +3030,25 @@ button:disabled {
 
 .admin-race-data-summary-win {
   color: var(--accent);
+}
+
+.admin-race-data-group-driver.is-group-start > th,
+.admin-race-data-group-driver.is-group-start > td {
+  border-top: 2px solid color-mix(in srgb, var(--border) 78%, var(--accent));
+}
+
+.admin-race-data-group-driver .admin-race-data-driver-detail {
+  padding-left: 18px;
+  font-weight: 650;
+}
+
+.admin-race-data-group-driver .admin-race-data-team-detail {
+  font-weight: 750;
+}
+
+.admin-race-data-group-driver.is-empty .admin-race-data-driver-detail {
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .admin-race-data-full-label {
