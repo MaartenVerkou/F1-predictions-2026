@@ -2980,23 +2980,6 @@ button:disabled {
   display: block;
 }
 
-.admin-race-data-summary-meta {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.admin-race-data-summary-win {
-  color: var(--accent);
-}
-
 .admin-race-data-group-driver.is-group-start > th,
 .admin-race-data-group-driver.is-group-start > td {
   border-top: 2px solid color-mix(in srgb, var(--border) 78%, var(--accent));

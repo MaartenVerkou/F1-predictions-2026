@@ -41,10 +41,10 @@ The constructor race-data matrix SHALL derive podium indicators from the same no
 - **THEN** the cell SHALL not show a podium indicator
 - **AND** future or unavailable cells SHALL remain visually muted and semantically distinguishable
 
-#### Scenario: Constructor podium totals follow the selected cutoff
-- **WHEN** an administrator selects an earlier round cutoff
-- **THEN** the constructor summary SHALL show wins and podiums counted only through that cutoff
-- **AND** later rounds SHALL not contribute to those totals
+#### Scenario: Constructor totals remain points-only
+- **WHEN** the constructor matrix is rendered
+- **THEN** the merged constructor total SHALL use the same plain points presentation as the driver matrix
+- **AND** win, pole, and podium aggregates SHALL remain outside this table until a dedicated summary design is introduced
 
 ### Requirement: Race data switches driver and constructor order in one matrix
 The Race data workspace SHALL use one shared matrix with identical result cells for driver and constructor views. The constructor view SHALL always group the selected-round drivers under their constructor and merge the constructor label, championship position, and constructor total points across the team's two seat rows, without adding artificial Driver 1/Driver 2 data fields.
