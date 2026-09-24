@@ -13,6 +13,8 @@ test("auditResultLabel preserves classified and non-classified outcomes", () => 
   assert.equal(auditResultLabel({ position: 2, status: "Finished" }), "2");
   assert.equal(auditResultLabel({ position: null, status: "Retired" }), "Ret");
   assert.equal(auditResultLabel({ position: null, status: "Did not start" }), "DNS");
+  assert.equal(auditResultLabel({ position: 18, status: "Retired" }), "Ret");
+  assert.equal(auditResultLabel({ position: 20, status: "Did not qualify" }), "DNQ");
   assert.equal(auditResultLabel(null), "—");
 });
 
@@ -136,7 +138,58 @@ test("buildRaceDataAuditView uses selected cutoff standings and mutes later roun
   assert.equal(view.drivers[0].points, 25);
   assert.equal(view.drivers[0].championshipPosition, 1);
   assert.equal(view.drivers[0].cells[1].state, "future");
+  assert.equal(view.constructors[0].cells[1].label, "25");
+  assert.equal(view.constructors[0].cells[1].afterCutoff, true);
   assert.equal(view.cutoffRoundNumber, 1);
+});
+
+test("race data rows follow selected points and expose pole, fastest lap, and cutoff state", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster: {
+      drivers: ["Driver Alpha", "Driver Beta", "Driver DNQ"],
+      teams: ["Team A"]
+    },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        race: {
+          rows: [
+            { driver: "Driver Alpha", constructor: "Team A", position: 2, points: 18, status: "Finished" },
+            { driver: "Driver Beta", constructor: "Team A", position: 1, points: 25, status: "Finished", fastestLap: true }
+          ]
+        },
+        qualifying: {
+          rows: [
+            { driver: "Driver Beta", position: 1, pole: true },
+            { driver: "Driver DNQ", status: "Did not qualify", position: null }
+          ]
+        },
+        sprint: { rows: [] },
+        standings: {
+          drivers: [
+            { entity: "Driver Beta", position: 1, points: 25 },
+            { entity: "Driver Alpha", position: 2, points: 18 }
+          ],
+          constructors: [{ entity: "Team A", position: 1, points: 43 }]
+        }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+
+  assert.equal(view.drivers[0].name, "Driver Beta");
+  assert.equal(view.drivers[0].cells[0].pole, true);
+  assert.equal(view.drivers[0].cells[0].fastestLap, true);
+  assert.deepEqual(view.drivers[0].cells[0].markers, ["P", "FL"]);
+  assert.equal(view.drivers[0].cells[0].markerGlyph, "**");
+  assert.equal(view.drivers[0].cells[1].afterCutoff, true);
+  assert.equal(view.drivers[0].cells[1].state, "future");
+  assert.equal(view.drivers.find((row) => row.name === "Driver DNQ").cells[0].label, "DNQ");
 });
 
 test("race data is exposed as a read-only admin workspace", () => {

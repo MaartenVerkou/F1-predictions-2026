@@ -51,8 +51,6 @@ const {
 
 function auditResultLabel(row) {
   if (!row) return "—";
-  const position = Number(row.position);
-  if (Number.isFinite(position) && position > 0) return String(position);
   const raw = String(row.status || row.positionText || "").trim();
   const key = raw.toLowerCase();
   if (key.includes("retir") || key === "dnf") return "Ret";
@@ -61,7 +59,46 @@ function auditResultLabel(row) {
   if (key.includes("disqual") || key === "dsq") return "DSQ";
   if (key.includes("not classified") || key === "nc") return "NC";
   if (key.includes("withdrew") || key === "wd") return "WD";
+  const position = Number(row.position);
+  if (Number.isFinite(position) && position > 0) return String(position);
   return raw || "—";
+}
+
+function auditNonClassifiedLabel(row) {
+  const label = auditResultLabel(row);
+  return ["Ret", "DNS", "DNQ", "DSQ", "NC", "WD"].includes(label) ? label : null;
+}
+
+function fallbackEntityCode(value, kind = "driver") {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "—";
+  if (kind === "team" && parts.length > 1) {
+    const initials = parts.map((part) => part.replace(/[^A-Za-z0-9]/g, "")[0] || "").join("");
+    if (initials.length >= 2) return initials.slice(0, 3).toUpperCase();
+  }
+  const lastPart = parts.at(-1).replace(/[^A-Za-z0-9]/g, "");
+  return (lastPart || parts.join("")).slice(0, 3).toUpperCase() || "—";
+}
+
+function sortAuditRows(rows) {
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      const leftPoints = Number(left.row.points);
+      const rightPoints = Number(right.row.points);
+      const leftHasPoints = Number.isFinite(leftPoints);
+      const rightHasPoints = Number.isFinite(rightPoints);
+      if (leftHasPoints !== rightHasPoints) return leftHasPoints ? -1 : 1;
+      if (leftHasPoints && leftPoints !== rightPoints) return rightPoints - leftPoints;
+      const leftPosition = Number(left.row.championshipPosition);
+      const rightPosition = Number(right.row.championshipPosition);
+      const leftHasPosition = Number.isFinite(leftPosition);
+      const rightHasPosition = Number.isFinite(rightPosition);
+      if (leftHasPosition !== rightHasPosition) return leftHasPosition ? -1 : 1;
+      if (leftHasPosition && leftPosition !== rightPosition) return leftPosition - rightPosition;
+      return left.index - right.index;
+    })
+    .map(({ row }) => row);
 }
 
 function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
@@ -97,6 +134,12 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
     assignments: catalog.assignments,
     roundNumber: Number(roundNumber)
   });
+  const driverCatalogById = new Map(
+    (catalog.drivers || []).map((driver) => [Number(driver.id), driver])
+  );
+  const teamCatalogById = new Map(
+    (catalog.teams || []).map((team) => [Number(team.id), team])
+  );
   const drivers = Array.from(new Map(
     projection.flatMap((team) => team.seats)
       .filter((seat) => seat.driverId != null && seat.driverName)
@@ -104,16 +147,23 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
   ).values());
   const teams = projection.map((team) => team.teamName);
   const driverEntities = Array.from(new Map(
-    projection.flatMap((team) => team.seats)
-      .filter((seat) => seat.driverId != null && seat.driverName)
-      .map((seat) => [Number(seat.driverId), {
+    projection.flatMap((team) => team.seats.map((seat) => ({ seat, team })))
+      .filter(({ seat }) => seat.driverId != null && seat.driverName)
+      .map(({ seat, team }) => [Number(seat.driverId), {
         id: Number(seat.driverId),
-        name: String(seat.driverName)
+        name: String(seat.driverName),
+        code: driverCatalogById.get(Number(seat.driverId))?.driver_code || null,
+        teamId: Number(team.teamId),
+        teamName: String(team.teamName)
       }])
   ).values());
   const teamEntities = projection
     .filter((team) => team.teamId != null && team.teamName)
-    .map((team) => ({ id: Number(team.teamId), name: String(team.teamName) }));
+    .map((team) => ({
+      id: Number(team.teamId),
+      name: String(team.teamName),
+      code: teamCatalogById.get(Number(team.teamId))?.team_code || null
+    }));
   return {
     ...base,
     drivers: drivers.length ? drivers : base.drivers || [],
@@ -205,51 +255,85 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   const teamEntities = Array.isArray(roster?.team_entities)
     ? roster.team_entities
     : teams.map((name) => ({ id: null, name }));
-  const driverRows = driverEntities.map((entity) => {
+  const driverRows = sortAuditRows(driverEntities.map((entity) => {
     const driver = entity.name;
     const cells = rounds.map((round) => {
       const raceRows = round.evidence?.payload?.race?.rows || [];
+      const qualifyingRows = round.evidence?.payload?.qualifying?.rows || [];
       const row = raceRows.find((item) =>
         entity.id != null
           ? Number(item.driver_id) === Number(entity.id)
           : item.driver === driver
       ) || null;
+      const qualifying = qualifyingRows.find((item) =>
+        entity.id != null
+          ? Number(item.driver_id) === Number(entity.id)
+          : item.driver === driver
+      ) || null;
       const afterCutoff = round.roundNumber > cutoffRoundNumber;
+      const qualifyingOutcome = auditNonClassifiedLabel(qualifying);
+      const pole = Boolean(qualifying?.pole || Number(qualifying?.position) === 1);
+      const fastestLap = Boolean(row?.fastestLap);
+      const podiumPosition = !afterCutoff && [1, 2, 3].includes(Number(row?.position))
+        ? Number(row.position)
+        : null;
+      const resultLabel = round.evidence
+        ? (row ? auditResultLabel(row) : qualifyingOutcome || "—")
+        : "—";
+      const markers = [];
+      if (pole) markers.push("P");
+      if (fastestLap) markers.push("FL");
+      const markerGlyph = markers.map(() => "*").join("");
+      const markerTitle = [pole ? "Pole position" : null, fastestLap ? "Fastest lap" : null]
+        .filter(Boolean)
+        .join(" · ");
+      const resultTitle = row || qualifyingOutcome
+        ? [row?.status || qualifyingOutcome || resultLabel, row?.grid != null ? "grid " + row.grid : null, row?.points != null ? row.points + " pts" : null, markerTitle || null]
+          .filter(Boolean)
+          .join(" · ")
+        : round.evidence ? "No classified row" : "Evidence unavailable";
       return {
-        label: afterCutoff ? "—" : round.evidence ? auditResultLabel(row) : "—",
-        title: afterCutoff
-          ? "After selected cutoff"
-          : row
-            ? [row.status, row.grid != null ? "grid " + row.grid : null, row.points != null ? row.points + " pts" : null]
-                .filter(Boolean)
-                .join(" · ")
-            : round.evidence ? "No classified row" : "Evidence unavailable",
-        state: round.afterCutoff ? "future" : round.state,
+        label: resultLabel,
+        pole,
+        fastestLap,
+        markers,
+        markerGlyph,
+        markerTitle,
+        podiumPosition,
+        afterCutoff,
+        title: afterCutoff ? ["After selected cutoff", resultTitle].filter(Boolean).join(" · ") : resultTitle,
+        state: afterCutoff ? "future" : round.state,
         row
       };
     });
     const standing = (entity.id != null ? selectedDriverIdMap.get(Number(entity.id)) : null)
       || selectedDriverMap.get(driver)
       || null;
-    const constructor = cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
+    const constructor = entity.teamName || cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
+    const constructorEntity = teamEntities.find((item) => item.name === constructor);
     return {
       name: driver,
+      code: entity.code || fallbackEntityCode(driver, "driver"),
       id: entity.id,
       constructor,
+      constructorCode: constructorEntity?.code || (constructor ? fallbackEntityCode(constructor, "team") : null),
       cells,
       points: standing?.points ?? null,
       championshipPosition: standing?.position ?? null
     };
-  });
+  }));
 
-  const constructorRows = teamEntities.map((entity) => {
+  const constructorRows = sortAuditRows(teamEntities.map((entity) => {
     const team = entity.name;
     const cells = rounds.map((round) => {
-      if (round.roundNumber > cutoffRoundNumber) {
-        return { label: "—", state: "future", title: "After selected cutoff" };
-      }
+      const afterCutoff = round.roundNumber > cutoffRoundNumber;
       if (!round.evidence) {
-        return { label: "—", state: round.state, title: "Evidence unavailable" };
+        return {
+          label: "—",
+          state: afterCutoff ? "future" : round.state,
+          afterCutoff,
+          title: afterCutoff ? "After selected cutoff · Evidence unavailable" : "Evidence unavailable"
+        };
       }
       const raceRows = round.evidence.payload?.race?.rows || [];
       const sprintRows = round.evidence.payload?.sprint?.rows || [];
@@ -263,8 +347,9 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
         .reduce((total, row) => total + Number(row.points || 0), 0);
       return {
         label: String(points),
-        state: round.state,
-        title: points + " points from race and sprint"
+        state: afterCutoff ? "future" : round.state,
+        afterCutoff,
+        title: (afterCutoff ? "After selected cutoff · " : "") + points + " points from race and sprint"
       };
     });
     const standing = (entity.id != null ? selectedConstructorIdMap.get(Number(entity.id)) : null)
@@ -272,12 +357,13 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       || null;
     return {
       name: team,
+      code: entity.code || fallbackEntityCode(team, "team"),
       id: entity.id,
       cells,
       points: standing?.points ?? null,
       championshipPosition: standing?.position ?? null
     };
-  });
+  }));
 
   const payload = selected?.evidence?.payload || null;
   const raceRows = payload?.race?.rows || [];

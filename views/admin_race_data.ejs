@@ -60,16 +60,6 @@
     </form>
   </div>
 
-  <div class="admin-race-data-legend muted">
-    <span><strong><%= t('admin_race_data.legend') %>:</strong></span>
-    <span><%= t('admin_race_data.legend_finish') %></span>
-    <span><%= t('admin_race_data.legend_retired') %></span>
-    <span><%= t('admin_race_data.legend_dns') %></span>
-    <span><%= t('admin_race_data.legend_dnq') %></span>
-    <span><%= t('admin_race_data.legend_nc') %></span>
-    <span><%= t('admin_race_data.legend_unavailable') %></span>
-  </div>
-
   <div class="admin-race-data-table-wrap">
     <% const rows = viewMode === 'constructors' ? view.constructors : view.drivers; %>
     <table class="admin-race-data-matrix">
@@ -83,32 +73,54 @@
             <th scope="col" class="admin-race-data-sticky admin-race-data-team"><%= t('admin_race_data.team') %></th>
           <% } %>
           <% view.rounds.forEach((round) => { %>
-            <th scope="col" class="admin-race-data-round-head">
+            <th scope="col" class="admin-race-data-round-head <%= round.afterCutoff ? 'is-after-cutoff' : '' %>">
               <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>">R<%= round.roundNumber %></a>
             </th>
           <% }) %>
-          <th scope="col" class="admin-race-data-summary"><%= t('admin_race_data.points') %></th>
+          <th scope="col" class="admin-race-data-summary admin-race-data-sticky-right"><%= t('admin_race_data.points') %></th>
         </tr>
       </thead>
       <tbody>
         <% rows.forEach((row, index) => { %>
           <tr>
             <td class="admin-race-data-sticky admin-race-data-rank"><%= row.championshipPosition || index + 1 %></td>
-            <th scope="row" class="admin-race-data-sticky admin-race-data-entity"><%= row.name %></th>
+            <th scope="row" class="admin-race-data-sticky admin-race-data-entity">
+              <span class="admin-race-data-full-label"><%= row.name %></span>
+              <span class="admin-race-data-compact-label"><%= row.code || row.name %></span>
+            </th>
             <% if (viewMode === 'drivers') { %>
-              <td class="admin-race-data-sticky admin-race-data-team"><%= row.constructor || '—' %></td>
+              <td class="admin-race-data-sticky admin-race-data-team">
+                <span class="admin-race-data-full-label"><%= row.constructor || '—' %></span>
+                <span class="admin-race-data-compact-label"><%= row.constructorCode || row.constructor || '—' %></span>
+              </td>
             <% } %>
             <% row.cells.forEach((cell, cellIndex) => { %>
-              <td class="admin-race-data-cell state-<%= cell.state %> <%= cell.label === '—' ? 'is-empty' : '' %>"
+              <td class="admin-race-data-cell state-<%= cell.state %> <%= cell.label === '—' ? 'is-empty' : '' %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.podiumPosition ? 'is-podium-' + cell.podiumPosition : '' %>"
                   title="<%= cell.title %>">
-                <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %>"><%= cell.label %></a>
+                <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %>">
+                  <span class="admin-race-data-result"><%= cell.label %><% if (cell.markerGlyph) { %><sup class="admin-race-data-marker" title="<%= cell.markerTitle %>" aria-label="<%= cell.markerTitle %>"><%= cell.markerGlyph %></sup><% } %></span>
+                </a>
               </td>
             <% }) %>
-            <td class="admin-race-data-summary"><%= row.points == null ? '—' : row.points %></td>
+            <td class="admin-race-data-summary admin-race-data-sticky-right"><%= row.points == null ? '—' : row.points %></td>
           </tr>
         <% }) %>
       </tbody>
     </table>
+  </div>
+
+  <div class="admin-race-data-legend muted" aria-label="<%= t('admin_race_data.legend') %>">
+    <span><strong><%= t('admin_race_data.legend') %>:</strong></span>
+    <span><%= t('admin_race_data.legend_finish') %></span>
+    <span><%= t('admin_race_data.legend_retired') %></span>
+    <span><%= t('admin_race_data.legend_dns') %></span>
+    <span><%= t('admin_race_data.legend_dnq') %></span>
+    <span><%= t('admin_race_data.legend_nc') %></span>
+    <span><%= t('admin_race_data.legend_dsq') %></span>
+    <span><%= t('admin_race_data.legend_wd') %></span>
+    <span><%= t('admin_race_data.legend_pole') %></span>
+    <span><%= t('admin_race_data.legend_fastest_lap') %></span>
+    <span><%= t('admin_race_data.legend_unavailable') %></span>
   </div>
 
   <section class="admin-race-data-detail" aria-labelledby="admin-race-data-detail-heading">
