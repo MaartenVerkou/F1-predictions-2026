@@ -2019,6 +2019,16 @@ button:disabled {
   gap: 0;
 }
 
+/* Let the page controls shrink to the card; the matrix owns horizontal scroll. */
+.admin-race-data-round-region,
+.admin-race-data-controls,
+.admin-race-data-table-section,
+.admin-race-data-table-toolbar,
+.admin-race-data-focus-form,
+.admin-race-data-round-form {
+  min-width: 0;
+}
+
 .admin-race-data-round-region[aria-busy="true"] {
   opacity: 0.55;
   pointer-events: none;
