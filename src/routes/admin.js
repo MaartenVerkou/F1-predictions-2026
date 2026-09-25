@@ -494,6 +494,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
 
   const constructorRows = sortAuditRows(teamEntities.map((entity) => {
     const team = entity.name;
+    let highestRaceFinish = null;
     const cells = rounds.map((round) => {
       if (!round.evidence) {
         return buildAuditMatrixCell({
@@ -505,11 +506,19 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       }
       const raceRows = round.evidence.payload?.race?.rows || [];
       const sprintRows = round.evidence.payload?.sprint?.rows || [];
-      const points = raceRows
-        .filter((row) => matchesAuditEntity(row, entity, {
-          idField: "team_id",
-          nameField: "constructor"
-        }))
+      const teamRaceRows = raceRows.filter((row) => matchesAuditEntity(row, entity, {
+        idField: "team_id",
+        nameField: "constructor"
+      }));
+      if (!round.afterCutoff) {
+        teamRaceRows.forEach((row) => {
+          const finish = Number(row.position);
+          if (Number.isFinite(finish) && finish > 0) {
+            highestRaceFinish = highestRaceFinish == null ? finish : Math.max(highestRaceFinish, finish);
+          }
+        });
+      }
+      const points = teamRaceRows
         .concat(sprintRows.filter((row) => matchesAuditEntity(row, entity, {
           idField: "team_id",
           nameField: "constructor"
@@ -541,6 +550,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       points: standing?.points ?? null,
       summaryValue: standing?.points ?? null,
       championshipPosition: standing?.position ?? null,
+      highestRaceFinish,
       podiumSummary: buildAuditPodiumSummary(cells)
     };
   }));
