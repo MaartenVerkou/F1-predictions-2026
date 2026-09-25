@@ -114,7 +114,8 @@
         "metric": "grid_wins",
         "kind": "matrix",
         "scope": "season",
-        "requiredEvidence": ["race"]
+        "requiredEvidence": ["race"],
+        "matrixMetric": "grid_wins"
       }
     },
     {
@@ -168,7 +169,8 @@
         "metric": "driver_of_day",
         "kind": "matrix",
         "scope": "season",
-        "requiredEvidence": ["external.driverOfTheDay"]
+        "requiredEvidence": ["external.driverOfTheDay"],
+        "matrixMetric": "driver_of_day"
       }
     },
     {
@@ -183,7 +185,8 @@
         "metric": "dnfs",
         "kind": "matrix",
         "scope": "season",
-        "requiredEvidence": ["race"]
+        "requiredEvidence": ["race"],
+        "matrixMetric": "dnfs"
       }
     },
     {
@@ -271,7 +274,8 @@
         "kind": "matrix",
         "scope": "season",
         "sort": "asc",
-        "requiredEvidence": ["qualifying"]
+        "requiredEvidence": ["qualifying"],
+        "matrixMetric": "qualifying_h2h"
       }
     },
     {

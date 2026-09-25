@@ -40,6 +40,11 @@ function focusCell(cell, { label, title, hit = false, state = null } = {}) {
     label: label == null ? "—" : String(label),
     title: title || cell.title,
     focusHit: Boolean(hit),
+    markerGlyph: "",
+    markerTitle: "",
+    podiumPosition: null,
+    podiumMarkerGlyph: "",
+    podiumMarkerTitle: "",
     ...(state ? { state } : {})
   };
 }
@@ -65,7 +70,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
   let worstWinningGrid = null;
   const cells = row.cells.map((cell, index) => {
     const round = rounds[index];
-    if (cell.afterCutoff) return cell;
+    const inCutoff = !cell.afterCutoff;
     if (!round?.evidence) {
       return focusCell(cell, { label: "—", title: "Evidence unavailable", hit: false });
     }
@@ -73,10 +78,10 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
     if (metric === "dnfs") {
       if (!race) return focusCell(cell, { label: "—", title: "No race row", hit: false });
       const dnf = isDnfStatus(race.status);
-      if (dnf) count += 1;
+      if (dnf && inCutoff) count += 1;
       return focusCell(cell, {
         label: dnf ? "1" : "0",
-        hit: dnf,
+        hit: inCutoff && dnf,
         title: `${race.status || "Unclassified status"} · ${dnf ? "DNF" : "Classified / excluded from DNF"}`
       });
     }
@@ -85,14 +90,14 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       if (position !== 1) return focusCell(cell, { label: "—", title: "Not a race win", hit: false });
       const grid = numeric(race?.grid);
       const gridLabel = grid === 0 ? "PL" : grid == null ? "—" : String(grid);
-      if (grid != null) {
+      if (grid != null && inCutoff) {
         const comparableGrid = grid === 0 ? 23 : grid;
         worstWinningGrid = worstWinningGrid == null ? comparableGrid : Math.max(worstWinningGrid, comparableGrid);
       }
-      count += 1;
+      if (inCutoff) count += 1;
       return focusCell(cell, {
         label: gridLabel,
-        hit: true,
+        hit: inCutoff,
         title: `${row.name} won from grid ${gridLabel}`
       });
     }
@@ -100,20 +105,20 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       const award = round.evidence.payload?.external?.driverOfTheDay;
       if (!award) return focusCell(cell, { label: "—", title: "Driver of the Day evidence unavailable", hit: false, state: "incomplete" });
       const hit = String(award) === String(row.name);
-      if (hit) count += 1;
+      if (hit && inCutoff) count += 1;
       return focusCell(cell, {
         label: hit ? "1" : "0",
-        hit,
+        hit: inCutoff && hit,
         title: hit ? "Driver of the Day" : `Driver of the Day: ${award}`
       });
     }
     const sprintRows = roundRows(round, "sprint");
     const hasSprintEvidence = sprintRows.length > 0;
     const points = sprintPointsForDriver(round, { id: row.id, name: row.name });
-    sprintTotal += points;
+    if (inCutoff) sprintTotal += points;
     return focusCell(cell, {
       label: hasSprintEvidence ? points : "—",
-      hit: hasSprintEvidence && points > 0,
+      hit: inCutoff && hasSprintEvidence && points > 0,
       title: hasSprintEvidence ? `${points} sprint points` : "No sprint result in this round"
     });
   });
@@ -139,7 +144,7 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
   let racesCompared = 0;
   row.cells = row.cells.map((cell, index) => {
     const round = rounds[index];
-    if (cell.afterCutoff) return cell;
+    const inCutoff = !cell.afterCutoff;
     if (!round?.evidence || !left || !right) {
       return focusCell(cell, { label: "—", title: "Two qualifying rows required", hit: false });
     }
@@ -151,9 +156,11 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     if (leftPosition == null || rightPosition == null) {
       return focusCell(cell, { label: "—", title: "Incomplete qualifying comparison", hit: false, state: "incomplete" });
     }
-    racesCompared += 1;
-    if (leftPosition < rightPosition) leftWins += 1;
-    if (rightPosition < leftPosition) rightWins += 1;
+    if (inCutoff) {
+      racesCompared += 1;
+      if (leftPosition < rightPosition) leftWins += 1;
+      if (rightPosition < leftPosition) rightWins += 1;
+    }
     const winner = leftPosition === rightPosition
       ? "Tie"
       : leftPosition < rightPosition ? left.name : right.name;

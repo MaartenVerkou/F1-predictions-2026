@@ -39,7 +39,8 @@
       <input type="hidden" name="season" value="<%= season %>" />
       <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
       <label for="admin-race-data-focus"><%= t('admin_race_data.focus_label') %></label>
-      <% const focusGroups = (view.focusOptions || []).reduce((groups, option) => {
+      <% const visibleFocusOptions = (view.focusOptions || []).filter((option) => option.view === 'all' || option.view === viewMode); %>
+      <% const focusGroups = visibleFocusOptions.reduce((groups, option) => {
         const group = option.group || 'other';
         (groups[group] ||= []).push(option);
         return groups;

@@ -3626,7 +3626,9 @@ function registerAdminRoutes(app, deps) {
       currentSeason: CURRENT_SEASON
     });
     const season = Number(seasonContext.year || CURRENT_SEASON);
-    const sourceQuestions = getQuestions(locale);
+    const sourceQuestions = getQuestions(locale, {
+      includeMeta: true
+    });
     const pointsLabel = t("admin_race_data.focus_points");
     const focusOptions = buildRaceDataFocusOptions(sourceQuestions, { pointsLabel });
     const requestedFocusId = String(req.query.focus || "points").trim() || "points";
