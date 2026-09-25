@@ -146,7 +146,6 @@ test("buildRaceDataAuditView uses selected cutoff standings and mutes later roun
   assert.equal(view.constructors[0].code, "MER");
   assert.deepEqual(view.constructors[0].cells[0].markers, []);
   assert.equal(view.constructors[0].cells[0].podiumPosition, 1);
-  assert.equal(view.constructors[0].cells[0].podiumMarkerGlyph, "1");
   assert.deepEqual(view.constructors[0].podiumSummary, { wins: 1, podiums: 1 });
   assert.equal(view.cutoffRoundNumber, 1);
 });
@@ -193,7 +192,6 @@ test("constructor podiums use Grand Prix finishes, not sprint-only results, and 
 
   const constructor = view.constructors[0];
   assert.equal(constructor.cells[0].podiumPosition, null);
-  assert.equal(constructor.cells[0].podiumMarkerGlyph, "");
   assert.deepEqual(constructor.podiumSummary, { wins: 0, podiums: 0 });
   assert.equal(constructor.cells[1].afterCutoff, true);
   assert.equal(constructor.cells[1].podiumPosition, null);
@@ -296,6 +294,50 @@ test("constructor detail groups the canonical two-seat lineup and merges team su
   );
   assert.equal(view.constructorGroups[0].drivers[0].cells[0].label, "1");
   assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "2");
+});
+
+test("constructor points focus keeps both seat values separate from the team total", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        race: {
+          rows: [
+            { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, points: 25, status: "Finished" },
+            { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 2, points: 18, status: "Finished" }
+          ]
+        },
+        qualifying: { rows: [] },
+        sprint: { rows: [] },
+        standings: {
+          drivers: [
+            { entity_id: 101, entity: "Driver Alpha", position: 1, points: 25 },
+            { entity_id: 102, entity: "Driver Beta", position: 2, points: 18 }
+          ],
+          constructors: [{ entity_id: 201, entity: "Team A", position: 1, points: 43 }]
+        }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: { id: "constructors_championship_top_3", view: "constructors", metric: "points", matrixMetric: "points" }
+  });
+
+  const group = view.constructorGroups[0];
+  assert.deepEqual(group.drivers.map((driver) => driver.cells[0].label), ["25", "18"]);
+  assert.equal(group.summary.cells[0].label, "43");
+  assert.equal(group.summary.summaryValue, 43);
 });
 
 test("constructor detail fills an unassigned seat without inventing a driver result", () => {
@@ -565,7 +607,6 @@ test("qualifying focus compares constructor teammates in the shared matrix", () 
   assert.equal(view.constructors[0].cells[0].label, "5–8");
   assert.equal(view.constructorGroups[0].drivers[0].cells[0].label, "5");
   assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "8");
-  assert.equal(view.constructorGroups[0].drivers[1].cells[0].podiumMarkerGlyph, "");
   assert.equal(view.focusSummary.value, "Team A · 1");
 });
 

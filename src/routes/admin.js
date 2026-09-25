@@ -47,7 +47,10 @@ const {
   readSeasonMutationFlags,
   resolveAdminSeasonContext
 } = require("../admin-season-context");
-const { applyRaceDataFocus } = require("../race-data-audit");
+const {
+  applyDriverPointsMetric,
+  applyRaceDataFocus
+} = require("../race-data-audit");
 
 
 function auditResultLabel(row) {
@@ -123,34 +126,16 @@ function buildAuditMarkerMeta({ pole = false, fastestLap = false } = {}) {
   };
 }
 
-function buildConstructorPodiumMeta(raceRows, entity) {
-  const podiumRows = (raceRows || [])
+function buildConstructorPodiumPosition(raceRows, entity) {
+  const bestPosition = (raceRows || [])
     .filter((row) => matchesAuditEntity(row, entity, {
       idField: "team_id",
       nameField: "constructor"
     }))
-    .map((row) => ({ row, position: Number(row.position) }))
-    .filter(({ position }) => Number.isInteger(position) && position >= 1 && position <= 3)
-    .sort((left, right) => left.position - right.position);
-  const best = podiumRows[0] || null;
-  if (!best) {
-    return {
-      podiumPosition: null,
-      podiumDrivers: [],
-      podiumMarkerGlyph: "",
-      podiumMarkerTitle: ""
-    };
-  }
-  const podiumDrivers = podiumRows
-    .map(({ row }) => row.driver)
-    .filter(Boolean);
-  const bestLabel = best.position === 1 ? "Grand Prix winner" : "Grand Prix podium";
-  return {
-    podiumPosition: best.position,
-    podiumDrivers,
-    podiumMarkerGlyph: String(best.position),
-    podiumMarkerTitle: `${bestLabel}: P${best.position} — ${podiumDrivers.join(", ")}`
-  };
+    .map((row) => Number(row.position))
+    .filter((position) => Number.isInteger(position) && position >= 1 && position <= 3)
+    .sort((left, right) => left - right)[0];
+  return bestPosition || null;
 }
 
 function buildAuditPodiumSummary(cells) {
@@ -168,8 +153,6 @@ function buildAuditMatrixCell({
   title,
   state = round.state,
   podiumPosition = null,
-  podiumMarkerGlyph = "",
-  podiumMarkerTitle = "",
   markers = [],
   markerGlyph = "",
   markerTitle = "",
@@ -181,8 +164,6 @@ function buildAuditMatrixCell({
     state: afterCutoff ? "future" : state,
     afterCutoff,
     podiumPosition: afterCutoff ? null : podiumPosition,
-    podiumMarkerGlyph: afterCutoff ? "" : podiumMarkerGlyph,
-    podiumMarkerTitle: afterCutoff ? "" : podiumMarkerTitle,
     markers,
     markerGlyph,
     markerTitle,
@@ -523,18 +504,13 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
           nameField: "constructor"
         })))
         .reduce((total, row) => total + Number(row.points || 0), 0);
-      const podiumMeta = buildConstructorPodiumMeta(raceRows, entity);
+      const podiumPosition = buildConstructorPodiumPosition(raceRows, entity);
       return buildAuditMatrixCell({
         round,
         cutoffRoundNumber,
         label: points,
-        title: [
-          points + " points from race and sprint",
-          podiumMeta.podiumMarkerTitle || null
-        ].filter(Boolean).join(" · "),
-        podiumPosition: podiumMeta.podiumPosition,
-        podiumMarkerGlyph: podiumMeta.podiumMarkerGlyph,
-        podiumMarkerTitle: podiumMeta.podiumMarkerTitle
+        title: points + " points from race and sprint",
+        podiumPosition
       });
     });
     const standing = (entity.id != null ? selectedConstructorIdMap.get(Number(entity.id)) : null)
@@ -583,6 +559,9 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     championshipPosition: null
   });
 
+  const constructorPointsMode = activeFocus.view === "constructors"
+    && String(activeFocus.matrixMetric || activeFocus.metric || "points") === "points";
+
   const constructorGroups = constructorRows.map((summary) => {
     const team = teamEntities.find((entity) => (
       summary.id != null && entity.id != null
@@ -599,10 +578,16 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
         (Number(left.seatNumber) || 999) - (Number(right.seatNumber) || 999)
           || left.name.localeCompare(right.name)
       ));
+    const displayTeamDrivers = constructorPointsMode
+      ? teamDrivers.map((driver) => applyDriverPointsMetric({
+        ...driver,
+        cells: (driver.cells || []).map((cell) => ({ ...cell }))
+      }, rounds))
+      : teamDrivers;
     const driversBySeat = [1, 2].map((seatNumber) => (
-      teamDrivers.find((row) => Number(row.seatNumber) === seatNumber)
-        || (teamDrivers.every((row) => row.seatNumber == null)
-          ? teamDrivers[seatNumber - 1]
+      displayTeamDrivers.find((row) => Number(row.seatNumber) === seatNumber)
+        || (displayTeamDrivers.every((row) => row.seatNumber == null)
+          ? displayTeamDrivers[seatNumber - 1]
           : null)
         || buildUnavailableDriverRow({
           id: team.id,
@@ -617,31 +602,6 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       drivers: driversBySeat
     };
   });
-
-  const constructorFocusMode = activeFocus.cellMode
-    || (activeFocus.matrixMetric === "qualifying_h2h" || activeFocus.metric === "qualifying_h2h" ? "qualifying" : null);
-  if (activeFocus.view === "constructors" && constructorFocusMode === "points") {
-    constructorGroups.forEach((group) => {
-      const focusCells = group.summary.cells || [];
-      group.drivers = group.drivers.map((driver, groupIndex) => ({
-        ...driver,
-        cells: groupIndex === 0
-          ? focusCells.map((cell) => ({ ...cell }))
-          : focusCells.map((cell) => ({
-            ...cell,
-            label: "—",
-            podiumPosition: null,
-            podiumMarkerGlyph: "",
-            podiumMarkerTitle: "",
-            markers: [],
-            markerGlyph: "",
-            markerTitle: "",
-            focusHit: false,
-            title: "Focus value shown on the team row"
-          }))
-      }));
-    });
-  }
 
   const payload = selected?.evidence?.payload || null;
   const raceRows = payload?.race?.rows || [];

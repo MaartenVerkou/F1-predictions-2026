@@ -43,8 +43,6 @@ function focusCell(cell, { label, title, hit = false, state = null } = {}) {
     markerGlyph: "",
     markerTitle: "",
     podiumPosition: null,
-    podiumMarkerGlyph: "",
-    podiumMarkerTitle: "",
     ...(state ? { state } : {})
   };
 }
@@ -245,6 +243,44 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
     row.focusSortValue = row.summaryValue;
   }
   row.focusMeta = { count, sprintTotal, worstWinningGrid, worstWinningGridLabel };
+  return row;
+}
+
+function applyDriverPointsMetric(row, rounds) {
+  row.cells = (row.cells || []).map((cell, index) => {
+    const round = rounds[index];
+    if (!round?.evidence) {
+      return focusCell(cell, {
+        label: "—",
+        title: "Evidence unavailable",
+        hit: false
+      });
+    }
+
+    const entity = { id: row.id, name: row.name };
+    const raceRows = roundRows(round, "race")
+      .filter((candidate) => entityMatches(candidate, entity, { idField: "driver_id", nameField: "driver" }));
+    const sprintRows = roundRows(round, "sprint")
+      .filter((candidate) => entityMatches(candidate, entity, { idField: "driver_id", nameField: "driver" }));
+    const hasEvidence = raceRows.length > 0 || sprintRows.length > 0;
+    if (!hasEvidence) {
+      return focusCell(cell, {
+        label: "—",
+        title: "No driver row in this round",
+        hit: false
+      });
+    }
+
+    const points = [...raceRows, ...sprintRows]
+      .reduce((total, candidate) => total + Number(candidate.points || 0), 0);
+    return focusCell(cell, {
+      label: points,
+      title: row.name + ": " + points + " championship points",
+      hit: false
+    });
+  });
+  row.summaryValue = row.points ?? null;
+  row.focusSortValue = row.points ?? null;
   return row;
 }
 
@@ -594,6 +630,7 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
 
 module.exports = {
   applyRaceDataFocus,
+  applyDriverPointsMetric,
   buildFocusSummary,
   isDnfStatus,
   sortFocusRows

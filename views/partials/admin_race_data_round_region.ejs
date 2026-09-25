@@ -126,7 +126,6 @@
     <% } else if (view.focus?.metric === 'qualifying_h2h') { %>
       <span><%= t('admin_race_data.legend_qualifying_focus') %></span>
     <% } else { %>
-      <span><%= t('admin_race_data.legend_finish') %></span>
       <span><%= t('admin_race_data.legend_retired') %></span>
       <span><%= t('admin_race_data.legend_dns') %></span>
       <span><%= t('admin_race_data.legend_dnq') %></span>
@@ -135,8 +134,6 @@
       <span><%= t('admin_race_data.legend_wd') %></span>
       <span><%= t('admin_race_data.legend_pole') %></span>
       <span><%= t('admin_race_data.legend_fastest_lap') %></span>
-      <span data-race-data-constructor-legend<%= viewMode === 'constructors' ? '' : ' hidden' %>><%= t('admin_race_data.legend_constructor_podium') %></span>
-      <span><%= t('admin_race_data.legend_unavailable') %></span>
     <% } %>
   </div>
 
