@@ -1,30 +1,28 @@
 <div class="admin-race-data-round-region" data-race-data-round-region>
-  <p class="muted admin-race-data-cutoff" data-race-data-cutoff>
-    <%= t('admin_race_data.cutoff') %>: <strong><%= view.selectedRound?.label || '—' %></strong>
-    <% if (selectedImport) { %>
-      · <%= selectedImport.reconstructed ? t('admin_race_data.reconstructed') : t('admin_race_data.import_status') %>:
-      <strong><%= selectedImport.status %></strong>
-    <% } %>
-  </p>
-
-  <div class="admin-race-data-toolbar">
-    <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
-      <a class="admin-race-data-tab <%= viewMode === 'drivers' ? 'is-active' : '' %>"
-         href="/admin/race-data?season=<%= season %>&view=drivers&round=<%= view.selectedRoundNumber %>&focus=points"
-         role="tab" aria-selected="<%= viewMode === 'drivers' ? 'true' : 'false' %>" data-race-data-view-toggle="drivers">
-        <%= t('admin_race_data.drivers_view') %>
-      </a>
-      <a class="admin-race-data-tab <%= viewMode === 'constructors' ? 'is-active' : '' %>"
-         href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>&focus=points"
-         role="tab" aria-selected="<%= viewMode === 'constructors' ? 'true' : 'false' %>" data-race-data-view-toggle="constructors">
-        <%= t('admin_race_data.constructors_view') %>
-      </a>
-    </div>
+  <div class="admin-race-data-controls">
+    <form method="get" action="/admin/race-data" class="admin-race-data-focus-form" data-race-data-focus-form>
+      <input type="hidden" name="view" value="<%= viewMode %>" />
+      <input type="hidden" name="season" value="<%= season %>" />
+      <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+      <label for="admin-race-data-focus"><%= t('admin_race_data.questions_label') %></label>
+      <select id="admin-race-data-focus" name="focus">
+        <% (view.focusOptions || []).forEach((option) => {
+          const tableLabel = option.view === 'constructors'
+            ? t('admin_race_data.constructors_view')
+            : option.view === 'drivers'
+              ? t('admin_race_data.drivers_view')
+              : t('admin_race_data.question_base_both');
+        %>
+          <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %> · <%= t('admin_race_data.question_table_label') %>: <%= tableLabel %></option>
+        <% }) %>
+      </select>
+      <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_focus') %></button></noscript>
+    </form>
     <form method="get" action="/admin/race-data" class="admin-race-data-round-form" data-race-data-round-form>
       <input type="hidden" name="view" value="<%= viewMode %>" />
       <input type="hidden" name="season" value="<%= season %>" />
       <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
-      <label for="admin-race-data-round"><%= t('admin_race_data.round_label') %></label>
+      <label for="admin-race-data-round"><%= t('admin_race_data.round_short_label') %></label>
       <select id="admin-race-data-round" name="round">
         <% view.rounds.forEach((round) => { %>
           <option value="<%= round.roundNumber %>" <%= round.roundNumber === view.selectedRoundNumber ? 'selected' : '' %>>
@@ -34,45 +32,26 @@
       </select>
       <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_round') %></button></noscript>
     </form>
-    <form method="get" action="/admin/race-data" class="admin-race-data-focus-form" data-race-data-focus-form>
-      <input type="hidden" name="view" value="<%= viewMode %>" />
-      <input type="hidden" name="season" value="<%= season %>" />
-      <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
-      <label for="admin-race-data-focus"><%= t('admin_race_data.focus_label') %></label>
-      <% const visibleFocusOptions = (view.focusOptions || []).filter((option) => option.view === 'all' || option.view === viewMode); %>
-      <% const focusGroups = visibleFocusOptions.reduce((groups, option) => {
-        const group = option.group || 'other';
-        (groups[group] ||= []).push(option);
-        return groups;
-      }, {}); %>
-      <select id="admin-race-data-focus" name="focus">
-        <% Object.entries(focusGroups).forEach(([group, options]) => { %>
-          <optgroup label="<%= t(`admin_race_data.focus_group_${group}`) %>">
-            <% options.forEach((option) => { %>
-              <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %></option>
-            <% }) %>
-          </optgroup>
-        <% }) %>
-      </select>
-      <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_focus') %></button></noscript>
-    </form>
   </div>
 
-  <% if (view.focusSummary) { %>
-    <% const focusSummaryStatusKey = view.focusSummary.status === 'ready'
-      ? 'focus_ready'
-      : view.focusSummary.status === 'partial'
-        ? 'focus_partial'
-        : 'focus_unavailable'; %>
-    <section class="admin-race-data-focus-summary is-<%= view.focusSummary.status %>" data-race-data-focus-summary aria-label="<%= t('admin_race_data.focus_audit') %>">
-      <span class="admin-race-data-focus-summary-label"><%= t('admin_race_data.focus_audit') %></span>
-      <strong class="admin-race-data-focus-summary-value" title="<%= view.focusSummary.tooltip || '' %>"><%= view.focusSummary.value %></strong>
-      <span class="admin-race-data-focus-summary-detail" title="<%= view.focusSummary.tooltip || '' %>"><%= view.focusSummary.detail %></span>
-      <span class="admin-race-data-focus-summary-status"><%= t(`admin_race_data.${focusSummaryStatusKey}`) %></span>
-    </section>
-  <% } %>
+  <section class="admin-race-data-table-section" aria-labelledby="admin-race-data-table-heading">
+    <div class="admin-race-data-table-toolbar">
+      <h2 id="admin-race-data-table-heading"><%= t('admin_race_data.table_heading') %></h2>
+      <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
+        <a class="admin-race-data-tab <%= viewMode === 'drivers' ? 'is-active' : '' %>"
+           href="/admin/race-data?season=<%= season %>&view=drivers&round=<%= view.selectedRoundNumber %>&focus=points"
+           role="tab" aria-selected="<%= viewMode === 'drivers' ? 'true' : 'false' %>" data-race-data-view-toggle="drivers">
+          <%= t('admin_race_data.drivers_view') %>
+        </a>
+        <a class="admin-race-data-tab <%= viewMode === 'constructors' ? 'is-active' : '' %>"
+           href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>&focus=points"
+           role="tab" aria-selected="<%= viewMode === 'constructors' ? 'true' : 'false' %>" data-race-data-view-toggle="constructors">
+          <%= t('admin_race_data.constructors_view') %>
+        </a>
+      </div>
+    </div>
+    <div class="admin-race-data-table-wrap">
 
-  <div class="admin-race-data-table-wrap">
     <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
       <thead>
         <tr>
@@ -106,6 +85,21 @@
       <%- include('admin_race_data_matrix_footer', { season, viewMode, view }) %>
     </table>
   </div>
+  </section>
+
+  <% if (view.focusSummary) { %>
+    <% const focusSummaryStatusKey = view.focusSummary.status === 'ready'
+      ? 'focus_ready'
+      : view.focusSummary.status === 'partial'
+        ? 'focus_partial'
+        : 'focus_unavailable'; %>
+    <section class="admin-race-data-focus-summary is-<%= view.focusSummary.status %>" data-race-data-focus-summary aria-label="<%= t('admin_race_data.focus_audit') %>">
+      <span class="admin-race-data-focus-summary-label"><%= t('admin_race_data.focus_audit') %></span>
+      <strong class="admin-race-data-focus-summary-value" title="<%= view.focusSummary.tooltip || '' %>"><%= view.focusSummary.value %></strong>
+      <span class="admin-race-data-focus-summary-detail" title="<%= view.focusSummary.tooltip || '' %>"><%= view.focusSummary.detail %></span>
+      <span class="admin-race-data-focus-summary-status"><%= t(`admin_race_data.${focusSummaryStatusKey}`) %></span>
+    </section>
+  <% } %>
 
   <div class="admin-race-data-legend muted" aria-label="<%= t('admin_race_data.legend') %>">
     <span><strong><%= t('admin_race_data.legend') %>:</strong></span>
@@ -166,11 +160,6 @@
           </p>
         <% } %>
       </div>
-      <% if (selectedSnapshot) { %>
-        <a class="secondary button" href="/admin/actuals?season=<%= season %>&target=round:<%= view.selectedRoundNumber %>">
-          <%= t('admin_race_data.open_actuals') %>
-        </a>
-      <% } %>
     </div>
 
     <% if (view.selectedEvidence) { %>
@@ -218,16 +207,6 @@
           </tbody>
         </table>
       </div>
-      <% if (Object.keys(derivedActuals || {}).length > 0) { %>
-        <details class="admin-race-data-derived">
-          <summary><%= t('admin_race_data.derived_actuals') %> (<%= Object.keys(derivedActuals).length %>)</summary>
-          <dl>
-            <% Object.entries(derivedActuals).forEach(([questionId, value]) => { %>
-              <div><dt><%= questionId %></dt><dd><%= value %></dd></div>
-            <% }) %>
-          </dl>
-        </details>
-      <% } %>
     <% } else { %>
       <div class="alert"><%= t('admin_race_data.no_evidence_detail') %></div>
     <% } %>

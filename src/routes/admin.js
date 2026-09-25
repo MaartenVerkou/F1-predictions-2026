@@ -3724,10 +3724,6 @@ function registerAdminRoutes(app, deps) {
       focus
     });
     view.focusOptions = focusOptions;
-    const selectedSnapshot = view.selectedRound?.snapshot || null;
-    const derivedActuals = selectedSnapshot
-      ? loadSnapshotValues(db, selectedSnapshot.id)
-      : {};
     const model = {
       user,
       season,
@@ -3736,8 +3732,6 @@ function registerAdminRoutes(app, deps) {
       locale,
       view,
       viewMode,
-      derivedActuals,
-      selectedSnapshot,
       importRows,
       selectedImport: view.selectedImportId
         ? importRows.find((item) => item.id === view.selectedImportId) || null

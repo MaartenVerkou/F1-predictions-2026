@@ -37,15 +37,15 @@ For historical backfills where the original source capture is absent, the import
 
 ### 3. Cutoff-aware audit model
 
-The Race data page selects a round cutoff. Matrix cells for rounds after the cutoff are muted as future; cells through the cutoff use persisted evidence. Driver and constructor summary columns use standings from the selected cutoff bundle, not the latest available bundle. The selected detail panel shows calendar/import/coverage state, source timestamp, the round evidence, and a link to Actuals.
+The Race data page selects a round cutoff. Matrix cells for rounds after the cutoff are muted as future; cells through the cutoff use persisted evidence. Driver and constructor summary columns use standings from the selected cutoff bundle, not the latest available bundle. The selected detail panel shows calendar/import/coverage state, source timestamp, and the round evidence.
 
-### 4. Two matrix tabs plus one detail table
+### 4. Question-led matrix workspace
 
-The Drivers tab shows drivers by race with classified result/status cells. The Constructors tab shows constructor race points. The selected-round detail table combines grid, qualifying, sprint, race, status, and points so the admin can validate all actual-relevant inputs without separate dense tables.
+The workspace starts with a Questions selector that lists every supported question and identifies whether its evidence is based on drivers, constructors, or both. Selecting a question chooses the compatible matrix view; selecting a round keeps the same question context while changing the cutoff. The matrix section then presents the Drivers/Constructors toggle directly above one shared table structure. Question-specific projections may change cell values, totals, and ordering, but do not create separate duplicate tables.
 
 ### 5. Read-only audit route
 
-`GET /admin/race-data` is admin-only and has no mutation form. It accepts only view/cutoff selection and links to the existing Actuals review target. CSRF/mutation protection remains unchanged because the page does not write.
+`GET /admin/race-data` is admin-only and has no mutation form. It accepts only question, view, and cutoff selection. Scoring review remains a separate workflow; the audit page does not expose an Actuals action or derived-value panel. CSRF/mutation protection remains unchanged because the page does not write.
 
 ### 6. Sanitized preview fixture
 

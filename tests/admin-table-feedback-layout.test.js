@@ -84,13 +84,23 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(page, /partials\/admin_race_data_round_region/);
   assert.match(region, /<tbody data-race-data-body="<%= viewMode %>">/);
   assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
+  assert.match(region, /class="admin-race-data-controls"/);
+  assert.match(region, /questions_label/);
+  assert.match(region, /question_table_label/);
   assert.match(region, /data-race-data-round-form/);
   assert.match(region, /data-race-data-round-link/);
+  assert.match(region, /class="admin-race-data-table-section"/);
+  assert.match(region, /class="admin-race-data-table-toolbar"/);
+  assert.doesNotMatch(region, /admin-race-data-toolbar/);
+  assert.doesNotMatch(region, /open_actuals|derived_actuals|selectedSnapshot|derivedActuals/);
   assert.match(row, /rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail"/);
   assert.doesNotMatch(row, /admin-race-data-constructor-driver/);
   assert.doesNotMatch(row, /admin-race-data-team-detail/);
   assert.doesNotMatch(row, /admin-race-data-driver-detail/);
   assert.match(styles, /\.admin-race-data-matrix th,[\s\S]*?line-height:\s*1\.25/);
+  assert.match(styles, /\.admin-race-data-controls\s*\{/);
+  assert.match(styles, /\.admin-race-data-table-section\s*\{/);
+  assert.match(styles, /\.admin-race-data-table-toolbar\s*\{/);
   assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);
 });
 
