@@ -40,6 +40,7 @@ function focusCell(cell, { label, title, hit = false, state = null } = {}) {
     label: label == null ? "—" : String(label),
     title: title || cell.title,
     focusHit: Boolean(hit),
+    focusColumn: Boolean(cell.focusColumn),
     markerGlyph: "",
     markerTitle: "",
     podiumPosition: null,
@@ -70,9 +71,21 @@ function championshipPointsForDriver(round, entity) {
 }
 
 function defaultRaceDataHighlightMode(metric) {
-  return ["podiums", "teammate_points"].includes(String(metric || "").trim().toLowerCase())
-    ? "rows"
-    : "cells";
+  const normalized = String(metric || "").trim().toLowerCase();
+  if (normalized === "dnf_by_race") return "columns";
+  if ([
+    "championship_top3",
+    "last_standing",
+    "podiums",
+    "dnfs",
+    "grid_wins",
+    "driver_of_day",
+    "sprint_points",
+    "sprint_champion_same",
+    "teammate_points",
+    "ferrari_podium"
+  ].includes(normalized)) return "rows";
+  return "cells";
 }
 
 function inferFocusFooterMode(focus, metric) {
@@ -97,6 +110,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
         value: null,
         state: "future",
         afterCutoff: true,
+        focusColumn: false,
         title: "After selected cutoff"
       };
     }
@@ -106,6 +120,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
         value: null,
         state: round.state || "not_synced",
         afterCutoff: false,
+        focusColumn: Boolean(round.focusColumn),
         title: round.evidence ? "No contribution for this round" : "Evidence unavailable"
       };
     }
@@ -122,6 +137,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
       value: observed ? total : null,
       state: round.state,
       afterCutoff: false,
+      focusColumn: Boolean(round.focusColumn),
       title: observed
         ? (mode === "count" ? "Observed count through this round" : "Observed points through this round")
         : "No matching values in this round"
@@ -143,7 +159,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
 function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
   const metric = String(focus.matrixMetric || focus.metric || "points");
   const teammatePointsFocus = String(focus.metric || "").toLowerCase() === "teammate_points";
-  const highlightCells = focus.highlightMode !== "rows";
+  const highlightCells = focus.highlightMode === "cells";
   if (!["podiums", "dnfs", "grid_wins", "driver_of_day", "sprint_points"].includes(metric) && !teammatePointsFocus) return row;
 
   let count = 0;
@@ -244,6 +260,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
     row.focusRow = count > 0;
     row.focusSortValue = row.points ?? null;
   } else if (metric === "grid_wins") {
+    if (focus.highlightMode === "rows") row.focusRow = count > 0;
     row.summaryValue = worstWinningGrid;
     row.summaryLabel = worstWinningGridLabel || "—";
     row.focusSortValue = worstWinningGrid == null ? -1 : worstWinningGrid;
@@ -345,8 +362,8 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
       ? "Tie"
       : leftPosition < rightPosition ? left.name : right.name;
     const comparisonTitle = `${left.name} ${leftPosition} · ${right.name} ${rightPosition} · ${winner}`;
-    const leftIsBest = focus.highlightMode !== "rows" && inCutoff && leftPosition < rightPosition;
-    const rightIsBest = focus.highlightMode !== "rows" && inCutoff && rightPosition < leftPosition;
+    const leftIsBest = focus.highlightMode === "cells" && inCutoff && leftPosition < rightPosition;
+    const rightIsBest = focus.highlightMode === "cells" && inCutoff && rightPosition < leftPosition;
     applySeatCell(left, index, leftPosition, comparisonTitle, leftIsBest);
     applySeatCell(right, index, rightPosition, comparisonTitle, rightIsBest);
     return focusCell(cell, {
@@ -404,6 +421,66 @@ function sortFocusRows(rows, direction = "desc") {
       return left.index - right.index;
     })
     .map(({ row }) => row);
+}
+
+function markFocusRows({ focus, drivers, constructors }) {
+  if (focus.highlightMode !== "rows") return;
+  const metric = String(focus.metric || "").trim().toLowerCase();
+  const matrixMetric = String(focus.matrixMetric || "").trim().toLowerCase();
+  const rows = focus.view === "constructors" ? constructors : drivers;
+
+  if (metric === "championship_top3") {
+    rows.slice(0, 3).forEach((row) => { row.focusRow = true; });
+    return;
+  }
+  if (metric === "last_standing") {
+    rows.slice(0, 1).forEach((row) => { row.focusRow = true; });
+    return;
+  }
+  if (["dnfs", "driver_of_day", "sprint_points"].includes(matrixMetric)) {
+    const values = rows
+      .map((row) => numeric(row.summaryValue))
+      .filter((value) => value != null);
+    const topValue = values.length ? Math.max(...values) : null;
+    if (topValue == null || topValue <= 0) return;
+    rows.forEach((row) => {
+      row.focusRow = numeric(row.summaryValue) === topValue;
+    });
+    return;
+  }
+  if (metric === "ferrari_podium") {
+    rows.forEach((row) => {
+      row.focusRow = String(row.constructor || "") === "Ferrari";
+    });
+  }
+}
+
+function markFocusColumns({ focus, rounds, drivers, constructors }) {
+  if (focus.highlightMode !== "columns" || String(focus.metric || "").toLowerCase() !== "dnf_by_race") {
+    return [];
+  }
+  const rows = focus.view === "constructors" ? constructors : drivers;
+  const candidates = (rounds || []).map((round, index) => {
+    if (round.afterCutoff || !round.evidence || round.state === "cancelled") return null;
+    const count = rows.reduce((total, row) => (
+      total + (row.cells?.[index]?.label === "1" ? 1 : 0)
+    ), 0);
+    return { round, index, count };
+  }).filter(Boolean);
+  const selected = candidates
+    .filter(({ count }) => count > 0)
+    .sort((left, right) => right.count - left.count || left.round.roundNumber - right.round.roundNumber)
+    .slice(0, 3);
+  selected.forEach(({ round, index }, rank) => {
+    round.focusColumn = true;
+    round.focusColumnRank = rank + 1;
+    rows.forEach((row) => {
+      const cell = row.cells?.[index];
+      if (!cell) return;
+      row.cells[index] = { ...cell, focusColumn: true, focusHit: false };
+    });
+  });
+  return selected.map(({ round, count }) => ({ roundNumber: round.roundNumber, count }));
 }
 
 function completedRounds(rounds) {
@@ -552,7 +629,8 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
       count: roundRows(round, "race").filter((row) => isDnfStatus(row.status)).length
     })).sort((left, right) => right.count - left.count);
     if (!counts.length) return unavailable("No race evidence yet.");
-    const top = counts.slice(0, 3);
+    const top = counts.filter((item) => item.count > 0).slice(0, 3);
+    if (!top.length) return unavailable("No DNFs recorded yet.");
     return { ...base, value: top.map((item) => `R${item.round.roundNumber}: ${item.count}`).join(" · "), detail: "DNFs by race", tooltip: top.map((item) => `${item.round.label}: ${item.count} DNFs`).join(" · ") };
   }
 
@@ -623,6 +701,17 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
   const sortedConstructors = lastStandingFocus
     ? sortLastStandingRows(nextConstructors)
     : sortFocusRows(nextConstructors, direction);
+  const focusColumns = markFocusColumns({
+    focus: resolvedFocus,
+    rounds,
+    drivers: sortedDrivers,
+    constructors: sortedConstructors
+  });
+  markFocusRows({
+    focus: resolvedFocus,
+    drivers: sortedDrivers,
+    constructors: sortedConstructors
+  });
   const rowsForFooter = resolvedFocus.view === "constructors" ? sortedConstructors : sortedDrivers;
   return {
     drivers: sortedDrivers,
@@ -634,6 +723,7 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
       rows: rowsForFooter,
       metric
     }),
+    focusColumns,
     metric
   };
 }

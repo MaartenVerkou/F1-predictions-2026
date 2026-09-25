@@ -72,7 +72,7 @@
             <th scope="col" class="admin-race-data-sticky admin-race-data-entity"><%= t('admin_race_data.team') %></th>
           <% } %>
           <% view.rounds.forEach((round) => { %>
-            <th scope="col" class="admin-race-data-round-head <%= round.afterCutoff ? 'is-after-cutoff' : '' %>">
+            <th scope="col" class="admin-race-data-round-head <%= round.afterCutoff ? 'is-after-cutoff' : '' %> <%= round.focusColumn ? 'is-focus-column' : '' %>" data-race-data-focus-column="<%= round.focusColumn ? 'true' : 'false' %>" title="<%= round.focusColumn ? 'Selected focus race' : '' %>">
               <a data-race-data-round-link href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>&focus=<%= view.focusId || 'points' %>">R<%= round.roundNumber %></a>
             </th>
           <% }) %>

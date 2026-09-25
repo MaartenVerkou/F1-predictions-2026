@@ -3304,6 +3304,27 @@ button:disabled {
 
 /* Focus states use one neutral treatment so the evidence stays scannable in
    both themes and does not depend on hue or a strong cell outline. */
+/* Focus columns use the same quiet neutral treatment as focus rows. The
+   column edge makes a selected race scannable without outlining every value. */
+.admin-race-data-matrix thead .admin-race-data-round-head.is-focus-column {
+  background: color-mix(in srgb, var(--text) 7%, var(--card));
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 28%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--text) 28%, transparent);
+  font-weight: 750;
+}
+
+.admin-race-data-matrix tbody td.is-focus-column {
+  background: color-mix(in srgb, var(--text) 4%, var(--card));
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 22%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.admin-race-data-matrix-footer td.is-focus-column {
+  background: color-mix(in srgb, var(--text) 7%, var(--card));
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 28%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--text) 28%, transparent);
+}
+
 .admin-race-data-matrix tbody tr.is-focus-row > th,
 .admin-race-data-matrix tbody tr.is-focus-row > td {
   background: color-mix(in srgb, var(--text) 4%, var(--card));

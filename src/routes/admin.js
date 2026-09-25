@@ -599,6 +599,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       id: summary.id,
       name: summary.name,
       summary,
+      focusRow: Boolean(summary.focusRow),
       drivers: driversBySeat
     };
   });

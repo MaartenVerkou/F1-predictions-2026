@@ -558,7 +558,10 @@ test("question focus projections expose DNF and grid-winner facts without changi
     focus: { id: "most_dnfs_driver", view: "drivers", metric: "dnfs", matrixMetric: "dnfs", sort: "desc" }
   });
   assert.equal(dnfView.drivers.find((row) => row.name === "Driver Beta").cells[0].label, "1");
-  assert.equal(dnfView.drivers.find((row) => row.name === "Driver Beta").summaryValue, 1);
+  const dnfDriver = dnfView.drivers.find((row) => row.name === "Driver Beta");
+  assert.equal(dnfDriver.summaryValue, 1);
+  assert.equal(dnfDriver.focusRow, true);
+  assert.equal(dnfDriver.cells[0].focusHit, false);
   assert.equal(dnfView.drivers.find((row) => row.name === "Driver Alpha").cells[0].label, "0");
   assert.match(dnfView.focusSummary.value, /Driver Beta/);
 
@@ -574,6 +577,75 @@ test("question focus projections expose DNF and grid-winner facts without changi
   assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").summaryValue, 12);
   assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").summaryLabel, "12");
   assert.equal(gridView.focusSummary.value, "12 · Driver Alpha");
+});
+
+test("DNF-by-race focus highlights the three highest-DNF race columns", () => {
+  const roster = {
+    driver_entities: [
+      { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+      { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 },
+      { id: 103, name: "Driver Gamma", teamId: 202, teamName: "Team B", seatNumber: 1 },
+      { id: 104, name: "Driver Delta", teamId: 202, teamName: "Team B", seatNumber: 2 }
+    ],
+    team_entities: [
+      { id: 201, name: "Team A", code: "TMA" },
+      { id: 202, name: "Team B", code: "TMB" }
+    ]
+  };
+  const evidence = (round, statuses) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: { rows: statuses.map((status, index) => ({
+        driver_id: 101 + index,
+        driver: ["Driver Alpha", "Driver Beta", "Driver Gamma", "Driver Delta"][index],
+        constructor: index < 2 ? "Team A" : "Team B",
+        position: status === "Retired" ? null : index + 1,
+        points: status === "Retired" ? 0 : Math.max(0, 25 - index * 5),
+        status
+      })) },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: { drivers: [], constructors: [] }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Round One", "Round Two", "Round Three", "Round Four"],
+    roster,
+    evidenceRows: [
+      evidence(1, ["Retired", "Retired", "Finished", "Retired"]),
+      evidence(2, ["Retired", "Finished", "Retired", "Finished"]),
+      evidence(3, ["Retired", "Retired", "Retired", "Retired"]),
+      evidence(4, ["Finished", "Finished", "Finished", "Finished"])
+    ],
+    snapshotRows: [],
+    selectedRound: 4,
+    focus: {
+      id: "select_three_races_dnfs",
+      view: "drivers",
+      metric: "dnf_by_race",
+      matrixMetric: "dnfs",
+      footerMode: "count"
+    }
+  });
+
+  assert.deepEqual(
+    view.rounds.filter((round) => round.focusColumn).map((round) => round.roundNumber),
+    [1, 2, 3]
+  );
+  assert.deepEqual(
+    view.focusFooter.cells.map((cell) => cell.focusColumn),
+    [true, true, true, false]
+  );
+  view.drivers.forEach((row) => {
+    assert.deepEqual(
+      row.cells.map((cell) => cell.focusColumn),
+      [true, true, true, false]
+    );
+    assert.equal(row.cells.some((cell) => cell.focusHit), false);
+  });
 });
 
 test("qualifying focus compares constructor teammates in the shared matrix", () => {

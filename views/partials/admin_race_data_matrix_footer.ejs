@@ -5,7 +5,7 @@
         <span><%= view.focusFooter.label %></span>
       </th>
       <% view.focusFooter.cells.forEach((cell, cellIndex) => { %>
-        <td class="admin-race-data-footer-cell state-<%= cell.state %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.label === '—' ? 'is-empty' : '' %>"
+        <td class="admin-race-data-footer-cell state-<%= cell.state %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.label === '—' ? 'is-empty' : '' %> <%= cell.focusColumn ? 'is-focus-column' : '' %>"
             title="<%= cell.title %>">
           <span><%= cell.label %></span>
         </td>
