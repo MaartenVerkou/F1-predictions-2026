@@ -89,6 +89,7 @@
   --header-logo-bg: rgba(255, 255, 255, 0.95);
   --header-popover-bg: #ffffff;
   --shadow-soft: 0 16px 36px rgba(8, 17, 39, 0.08);
+  color-scheme: light;
   --shadow-strong: 0 18px 34px rgba(214, 11, 34, 0.24);
   --glow-a: rgba(214, 11, 34, 0.12);
   --glow-b: rgba(29, 62, 129, 0.16);
@@ -127,6 +128,7 @@
   --header-logo-bg: rgba(5, 9, 17, 0.68);
   --header-popover-bg: rgba(11, 18, 38, 0.98);
   --shadow-soft: 0 22px 46px rgba(0, 0, 0, 0.42);
+  color-scheme: dark;
   --shadow-strong: 0 20px 36px rgba(255, 45, 69, 0.28);
   --glow-a: rgba(255, 45, 69, 0.18);
   --glow-b: rgba(56, 93, 171, 0.24);
@@ -2858,8 +2860,27 @@ button:disabled {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) color-mix(in srgb, var(--card) 86%, var(--border));
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.admin-race-data-table-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.admin-race-data-table-wrap::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--card) 86%, var(--border));
+  border-radius: 999px;
+}
+
+.admin-race-data-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 2px solid color-mix(in srgb, var(--card) 86%, var(--border));
+  border-radius: 999px;
 }
 
 .admin-race-data-matrix,
@@ -2871,7 +2892,9 @@ button:disabled {
 }
 
 .admin-race-data-matrix {
-  min-width: 980px;
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
   --admin-race-rank-width: 44px;
   --admin-race-entity-width: 150px;
   /* Keep audit meaning hue-independent: a neutral, high-contrast matrix. */
@@ -2954,12 +2977,14 @@ button:disabled {
   left: 0;
   width: var(--admin-race-rank-width);
   min-width: var(--admin-race-rank-width);
+  border-right: 0 !important;
 }
 
 .admin-race-data-entity {
   left: var(--admin-race-rank-width);
   width: var(--admin-race-entity-width);
   min-width: var(--admin-race-entity-width);
+  border-left: 0 !important;
   text-align: left !important;
 }
 
