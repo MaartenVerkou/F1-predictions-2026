@@ -354,6 +354,7 @@ test("race data focus options are driven by question metadata", () => {
     ["all_podium_finishers", "drivers", "podiums"],
     ["constructors_championship_top_3", "constructors", "points"]
   ]);
+  assert.deepEqual(options.map((option) => option.questionNumber), [null, 1, 2]);
   assert.equal(resolveRaceDataFocus({
     questions,
     focusId: "all_podium_finishers",

@@ -12,8 +12,11 @@
             : option.view === 'drivers'
               ? t('admin_race_data.drivers_view')
               : t('admin_race_data.question_base_both');
+          const questionPrefix = option.questionNumber == null
+            ? ''
+            : `${String(option.questionNumber).padStart(2, '0')}. `;
         %>
-          <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %> · <%= t('admin_race_data.question_table_label') %>: <%= tableLabel %></option>
+          <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= questionPrefix %><%= option.label %> · <%= tableLabel %></option>
         <% }) %>
       </select>
       <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_focus') %></button></noscript>

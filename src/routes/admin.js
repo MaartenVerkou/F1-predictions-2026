@@ -197,10 +197,12 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
     view: "all",
     metric: "points",
     questionId: null,
+    questionNumber: null,
     group: "standings",
     label: pointsLabel
   }];
   const seen = new Set(["points"]);
+  let questionNumber = 0;
   for (const question of questions || []) {
     const projection = question?.race_data_focus;
     const id = String(question?.id || "").trim();
@@ -217,6 +219,7 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
             ? "external"
             : "other";
     const group = String(projection?.group || inferredGroup).trim().toLowerCase();
+    questionNumber += 1;
     options.push({
       id,
       view,
@@ -237,6 +240,7 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       compareTeams: Array.isArray(projection?.compareTeams) ? projection.compareTeams.slice() : [],
       requiredEvidence: Array.isArray(projection?.requiredEvidence) ? projection.requiredEvidence.slice() : [],
       questionId: id,
+      questionNumber,
       label: String(question.prompt || id)
     });
     seen.add(id);

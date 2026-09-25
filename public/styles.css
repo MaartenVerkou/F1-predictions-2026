@@ -2760,11 +2760,6 @@ button:disabled {
   gap: 12px;
 }
 
-.admin-race-data-table-toolbar h2 {
-  margin: 0;
-  font-size: 1rem;
-}
-
 .admin-race-data-focus-summary {
   display: flex;
   align-items: baseline;
@@ -7616,4 +7611,30 @@ button.lang-option.is-active {
   border-color: var(--accent);
   color: var(--card);
   background: var(--accent);
+}
+
+
+/* Keep each control readable as a label-plus-selector pair, even when the
+   controls wrap as a group on a narrow viewport. */
+.admin-race-data-controls .admin-race-data-focus-form,
+.admin-race-data-controls .admin-race-data-round-form {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.admin-race-data-controls .admin-race-data-focus-form label,
+.admin-race-data-controls .admin-race-data-round-form label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.admin-race-data-controls .admin-race-data-focus-form select,
+.admin-race-data-controls .admin-race-data-round-form select {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.admin-race-data-table-section {
+  margin-top: 10px;
 }
