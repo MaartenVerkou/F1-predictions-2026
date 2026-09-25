@@ -284,6 +284,30 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
   return row;
 }
 
+function sortLastStandingRows(rows) {
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      const leftPoints = numeric(left.row.points);
+      const rightPoints = numeric(right.row.points);
+      if (leftPoints == null && rightPoints != null) return 1;
+      if (leftPoints != null && rightPoints == null) return -1;
+      if (leftPoints != null && rightPoints != null && leftPoints !== rightPoints) {
+        return leftPoints - rightPoints;
+      }
+
+      const leftPosition = numeric(left.row.championshipPosition);
+      const rightPosition = numeric(right.row.championshipPosition);
+      if (leftPosition == null && rightPosition != null) return 1;
+      if (leftPosition != null && rightPosition == null) return -1;
+      if (leftPosition != null && rightPosition != null && leftPosition !== rightPosition) {
+        return rightPosition - leftPosition;
+      }
+      return left.index - right.index;
+    })
+    .map(({ row }) => row);
+}
+
 function sortFocusRows(rows, direction = "desc") {
   return rows
     .map((row, index) => ({ row, index }))
@@ -348,9 +372,8 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
   }
   if (metric === "last_standing") {
     const rows = [...(focus.view === "constructors" ? constructors : drivers)]
-      .filter((row) => Number.isFinite(Number(row.championshipPosition)))
-      .sort((left, right) => Number(right.championshipPosition) - Number(left.championshipPosition));
-    const last = rows[0];
+      .filter((row) => Number.isFinite(Number(row.championshipPosition)));
+    const last = sortLastStandingRows(rows)[0];
     if (!last) return unavailable("Standings are not available for this cutoff.");
     return {
       ...base,
@@ -508,12 +531,17 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
 
 function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoffRoundNumber }) {
   const metric = String(focus?.matrixMetric || focus?.metric || "points");
+  const lastStandingFocus = String(focus?.metric || "").toLowerCase() === "last_standing";
   const resolvedFocus = { ...focus, matrixMetric: metric };
   const nextDrivers = driverRows.map((row) => applyDriverMetric(row, rounds, resolvedFocus, cutoffRoundNumber));
   const nextConstructors = constructorRows.map((row) => applyConstructorMetric(row, rounds, resolvedFocus, cutoffRoundNumber, nextDrivers));
   const direction = focus?.sort === "asc" ? "asc" : "desc";
-  const sortedDrivers = sortFocusRows(nextDrivers, direction);
-  const sortedConstructors = sortFocusRows(nextConstructors, direction);
+  const sortedDrivers = lastStandingFocus
+    ? sortLastStandingRows(nextDrivers)
+    : sortFocusRows(nextDrivers, direction);
+  const sortedConstructors = lastStandingFocus
+    ? sortLastStandingRows(nextConstructors)
+    : sortFocusRows(nextConstructors, direction);
   const rowsForFooter = resolvedFocus.view === "constructors" ? sortedConstructors : sortedDrivers;
   return {
     drivers: sortedDrivers,

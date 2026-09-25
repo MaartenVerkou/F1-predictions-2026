@@ -366,6 +366,65 @@ test("race data focus options are driven by question metadata", () => {
   }).id, "points");
 });
 
+test("last championship focus inverts the championship order", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Spanish Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 1, name: "Lance Stroll", teamId: 10, teamName: "Aston Martin", seatNumber: 1 },
+        { id: 2, name: "Valtteri Bottas", teamId: 11, teamName: "Cadillac", seatNumber: 1 },
+        { id: 3, name: "Sergio Perez", teamId: 12, teamName: "Cadillac", seatNumber: 2 }
+      ],
+      team_entities: [
+        { id: 10, name: "Aston Martin", code: "AMR" },
+        { id: 11, name: "Cadillac", code: "CAD" },
+        { id: 12, name: "Cadillac", code: "CAD" }
+      ]
+    },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        race: {
+          rows: [
+            { driver_id: 1, driver: "Lance Stroll", constructor: "Aston Martin", position: 21, points: 0, status: "Retired" },
+            { driver_id: 2, driver: "Valtteri Bottas", constructor: "Cadillac", position: 18, points: 0, status: "Lapped" },
+            { driver_id: 3, driver: "Sergio Perez", constructor: "Cadillac", position: 20, points: 0, status: "Retired" }
+          ]
+        },
+        qualifying: { rows: [] },
+        sprint: { rows: [] },
+        standings: {
+          drivers: [
+            { entity_id: 1, entity: "Lance Stroll", position: 21, points: 0 },
+            { entity_id: 2, entity: "Valtteri Bottas", position: 22, points: 0 },
+            { entity_id: 3, entity: "Sergio Perez", position: 23, points: 0 }
+          ],
+          constructors: []
+        }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: {
+      id: "drivers_championship_last",
+      view: "drivers",
+      metric: "last_standing",
+      matrixMetric: "points",
+      sort: "asc"
+    }
+  });
+
+  assert.equal(view.focusSummary.value, "Sergio Perez · P23");
+  assert.deepEqual(view.drivers.map((row) => row.name), [
+    "Sergio Perez",
+    "Valtteri Bottas",
+    "Lance Stroll"
+  ]);
+});
+
 test("podium focus projects binary results, counts podiums, and preserves cutoff", () => {
   const evidence = (round, rows) => ({
     id: round,
