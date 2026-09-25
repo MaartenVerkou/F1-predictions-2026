@@ -227,10 +227,12 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
       .map((round) => [round, buildPreviewLineupEntries(seasonCatalog, round)])
   );
   const transaction = database.transaction(() => {
-    database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
-    database.prepare("DELETE FROM actual_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);
-    database.prepare("DELETE FROM race_data_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);
-    database.prepare("DELETE FROM race_data_imports WHERE source_type = ?").run(PREVIEW_SOURCE);
+    // A sanitized preview is its own dataset. Remove stale provider evidence first
+    // so the audit route cannot select an older non-sanitized snapshot for a round.
+    database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE season = ?)").run(2026);
+    database.prepare("DELETE FROM actual_snapshots WHERE season = ?").run(2026);
+    database.prepare("DELETE FROM race_data_snapshots WHERE season = ?").run(2026);
+    database.prepare("DELETE FROM race_data_imports WHERE season = ?").run(2026);
 
     const importId = createRaceDataImport(database, {
       season: 2026,
