@@ -526,6 +526,8 @@ test("question focus projections expose DNF and grid-winner facts without changi
     focus: { id: "lowest_grid_win_position", view: "drivers", metric: "grid_wins", matrixMetric: "grid_wins" }
   });
   assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").cells[0].label, "12");
+  assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").summaryValue, 12);
+  assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").summaryLabel, "12");
   assert.equal(gridView.focusSummary.value, "12 · Driver Alpha");
 });
 
@@ -560,8 +562,8 @@ test("qualifying focus compares constructor teammates in the shared matrix", () 
   });
   assert.equal(view.constructors[0].summaryValue, 1);
   assert.equal(view.constructors[0].cells[0].label, "5–8");
-  assert.equal(view.constructorGroups[0].drivers[0].cells[0].label, "5–8");
-  assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "—");
+  assert.equal(view.constructorGroups[0].drivers[0].cells[0].label, "5");
+  assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "8");
   assert.equal(view.constructorGroups[0].drivers[1].cells[0].podiumMarkerGlyph, "");
   assert.equal(view.focusSummary.value, "Team A · 1");
 });

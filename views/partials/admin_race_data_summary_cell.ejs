@@ -1,3 +1,3 @@
 <td class="admin-race-data-summary admin-race-data-sticky-right"<% if (rowspan) { %> rowspan="<%= rowspan %>"<% } %>>
-  <span class="admin-race-data-summary-points"><%= row.summaryValue == null ? (row.points == null ? '—' : row.points) : row.summaryValue %></span>
+  <span class="admin-race-data-summary-points"><%= row.summaryLabel != null ? row.summaryLabel : (row.summaryValue == null ? (row.points == null ? '—' : row.points) : row.summaryValue) %></span>
 </td>

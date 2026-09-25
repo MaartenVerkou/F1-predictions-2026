@@ -144,6 +144,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
   let count = 0;
   let sprintTotal = 0;
   let worstWinningGrid = null;
+  let worstWinningGridLabel = null;
   const cells = row.cells.map((cell, index) => {
     const round = rounds[index];
     const inCutoff = !cell.afterCutoff;
@@ -195,7 +196,10 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       const gridLabel = grid === 0 ? "PL" : grid == null ? "—" : String(grid);
       if (grid != null && inCutoff) {
         const comparableGrid = grid === 0 ? 23 : grid;
-        worstWinningGrid = worstWinningGrid == null ? comparableGrid : Math.max(worstWinningGrid, comparableGrid);
+        if (worstWinningGrid == null || comparableGrid > worstWinningGrid) {
+          worstWinningGrid = comparableGrid;
+          worstWinningGridLabel = gridLabel;
+        }
       }
       if (inCutoff) count += 1;
       return focusCell(cell, {
@@ -230,11 +234,15 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
   if (teammatePointsFocus) {
     row.summaryValue = row.points ?? null;
     row.focusSortValue = row.points ?? null;
+  } else if (metric === "grid_wins") {
+    row.summaryValue = worstWinningGrid;
+    row.summaryLabel = worstWinningGridLabel || "—";
+    row.focusSortValue = worstWinningGrid == null ? -1 : worstWinningGrid;
   } else {
     row.summaryValue = metric === "sprint_points" ? sprintTotal : count;
-    row.focusSortValue = metric === "grid_wins" ? (worstWinningGrid == null ? -1 : worstWinningGrid) : row.summaryValue;
+    row.focusSortValue = row.summaryValue;
   }
-  row.focusMeta = { count, sprintTotal, worstWinningGrid };
+  row.focusMeta = { count, sprintTotal, worstWinningGrid, worstWinningGridLabel };
   return row;
 }
 
@@ -250,10 +258,21 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
   let leftWins = 0;
   let rightWins = 0;
   let racesCompared = 0;
+  const applySeatCell = (driver, index, label, title, state) => {
+    if (!driver?.cells?.[index]) return;
+    driver.cells[index] = focusCell(driver.cells[index], {
+      label,
+      title,
+      hit: false,
+      ...(state ? { state } : {})
+    });
+  };
   row.cells = row.cells.map((cell, index) => {
     const round = rounds[index];
     const inCutoff = !cell.afterCutoff;
     if (!round?.evidence || !left || !right) {
+      applySeatCell(left, index, "—", "Two qualifying rows required");
+      applySeatCell(right, index, "—", "Two qualifying rows required");
       return focusCell(cell, { label: "—", title: "Two qualifying rows required", hit: false });
     }
     const qualifying = roundRows(round, "qualifying");
@@ -262,6 +281,8 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     const leftPosition = numeric(leftRow?.position);
     const rightPosition = numeric(rightRow?.position);
     if (leftPosition == null || rightPosition == null) {
+      applySeatCell(left, index, "—", "Incomplete qualifying comparison", "incomplete");
+      applySeatCell(right, index, "—", "Incomplete qualifying comparison", "incomplete");
       return focusCell(cell, { label: "—", title: "Incomplete qualifying comparison", hit: false, state: "incomplete" });
     }
     if (inCutoff) {
@@ -272,10 +293,13 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     const winner = leftPosition === rightPosition
       ? "Tie"
       : leftPosition < rightPosition ? left.name : right.name;
+    const comparisonTitle = `${left.name} ${leftPosition} · ${right.name} ${rightPosition} · ${winner}`;
+    applySeatCell(left, index, leftPosition, comparisonTitle);
+    applySeatCell(right, index, rightPosition, comparisonTitle);
     return focusCell(cell, {
       label: `${leftPosition}–${rightPosition}`,
       hit: false,
-      title: `${left.name} ${leftPosition} · ${right.name} ${rightPosition} · ${winner}`
+      title: comparisonTitle
     });
   });
   row.summaryValue = Math.abs(leftWins - rightWins);

@@ -612,7 +612,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
 
   const constructorFocusMode = activeFocus.cellMode
     || (activeFocus.matrixMetric === "qualifying_h2h" || activeFocus.metric === "qualifying_h2h" ? "qualifying" : null);
-  if (activeFocus.view === "constructors" && ["points", "qualifying"].includes(constructorFocusMode)) {
+  if (activeFocus.view === "constructors" && constructorFocusMode === "points") {
     constructorGroups.forEach((group) => {
       const focusCells = group.summary.cells || [];
       group.drivers = group.drivers.map((driver, groupIndex) => ({
