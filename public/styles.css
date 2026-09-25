@@ -3242,6 +3242,11 @@ button:disabled {
     --admin-race-entity-width: 110px;
   }
 
+  /* Constructors already show three-letter team codes at this breakpoint. */
+  .admin-race-data-matrix--constructors {
+    --admin-race-entity-width: 72px;
+  }
+
   .admin-race-data-entity {
     width: var(--admin-race-entity-width);
     min-width: var(--admin-race-entity-width);
@@ -3259,7 +3264,7 @@ button:disabled {
 @media (max-width: 640px) {
   .admin-race-data-matrix {
     font-size: 12px;
-    --admin-race-entity-width: 96px;
+    --admin-race-entity-width: 72px;
   }
 
   .admin-race-data-matrix th,
