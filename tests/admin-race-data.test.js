@@ -509,9 +509,11 @@ test("podium focus projects binary results, counts podiums, and preserves cutoff
   assert.equal(view.drivers[0].name, "Driver Alpha");
   assert.equal(view.drivers[0].summaryValue, 2);
   assert.deepEqual(view.drivers[0].cells.map((cell) => cell.label), ["1", "1", "—"]);
-  assert.equal(view.drivers[0].cells[0].focusHit, true);
+  assert.equal(view.drivers[0].cells[0].focusHit, false);
+  assert.equal(view.drivers[0].focusRow, true);
   assert.deepEqual(view.drivers[1].cells.map((cell) => cell.label), ["0", "1", "—"]);
   assert.equal(view.drivers[1].summaryValue, 1);
+  assert.equal(view.drivers[1].focusRow, true);
   assert.equal(view.drivers[1].cells[0].markerGlyph, "");
   assert.equal(view.drivers[1].cells[2].afterCutoff, true);
 });
@@ -607,6 +609,8 @@ test("qualifying focus compares constructor teammates in the shared matrix", () 
   assert.equal(view.constructors[0].cells[0].label, "5–8");
   assert.equal(view.constructorGroups[0].drivers[0].cells[0].label, "5");
   assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "8");
+  assert.equal(view.constructorGroups[0].drivers[0].cells[0].focusHit, true);
+  assert.equal(view.constructorGroups[0].drivers[1].cells[0].focusHit, false);
   assert.equal(view.focusSummary.value, "Team A · 1");
 });
 

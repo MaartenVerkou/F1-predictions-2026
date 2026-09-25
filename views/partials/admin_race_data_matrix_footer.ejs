@@ -7,9 +7,7 @@
       <% view.focusFooter.cells.forEach((cell, cellIndex) => { %>
         <td class="admin-race-data-footer-cell state-<%= cell.state %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.label === '—' ? 'is-empty' : '' %>"
             title="<%= cell.title %>">
-          <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %>&focus=<%= view.focusId || 'points' %>">
-            <span><%= cell.label %></span>
-          </a>
+          <span><%= cell.label %></span>
         </td>
       <% }) %>
       <th scope="col" class="admin-race-data-footer-total admin-race-data-sticky-right">

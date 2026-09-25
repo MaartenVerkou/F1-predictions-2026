@@ -69,6 +69,12 @@ function championshipPointsForDriver(round, entity) {
   return racePointsForDriver(round, entity) + sprintPointsForDriver(round, entity);
 }
 
+function defaultRaceDataHighlightMode(metric) {
+  return ["podiums", "teammate_points"].includes(String(metric || "").trim().toLowerCase())
+    ? "rows"
+    : "cells";
+}
+
 function inferFocusFooterMode(focus, metric) {
   const declared = String(focus?.footerMode || "").trim().toLowerCase();
   if (["count", "sum", "none"].includes(declared)) return declared === "none" ? null : declared;
@@ -137,6 +143,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
 function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
   const metric = String(focus.matrixMetric || focus.metric || "points");
   const teammatePointsFocus = String(focus.metric || "").toLowerCase() === "teammate_points";
+  const highlightCells = focus.highlightMode !== "rows";
   if (!["podiums", "dnfs", "grid_wins", "driver_of_day", "sprint_points"].includes(metric) && !teammatePointsFocus) return row;
 
   let count = 0;
@@ -173,7 +180,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       if (podium && inCutoff) count += 1;
       return focusCell(cell, {
         label: podium ? "1" : "0",
-        hit: inCutoff && podium,
+        hit: highlightCells && inCutoff && podium,
         title: podium ? "Podium finish" : "No podium finish"
       });
     }
@@ -183,7 +190,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       if (dnf && inCutoff) count += 1;
       return focusCell(cell, {
         label: dnf ? "1" : "0",
-        hit: inCutoff && dnf,
+        hit: highlightCells && inCutoff && dnf,
         title: `${race.status || "Unclassified status"} · ${dnf ? "DNF" : "Classified / excluded from DNF"}`
       });
     }
@@ -202,7 +209,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       if (inCutoff) count += 1;
       return focusCell(cell, {
         label: gridLabel,
-        hit: inCutoff,
+        hit: highlightCells && inCutoff,
         title: `${row.name} won from grid ${gridLabel}`
       });
     }
@@ -213,7 +220,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       if (hit && inCutoff) count += 1;
       return focusCell(cell, {
         label: hit ? "1" : "0",
-        hit: inCutoff && hit,
+        hit: highlightCells && inCutoff && hit,
         title: hit ? "Driver of the Day" : `Driver of the Day: ${award}`
       });
     }
@@ -223,7 +230,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
     if (inCutoff) sprintTotal += points;
     return focusCell(cell, {
       label: hasSprintEvidence ? points : "—",
-      hit: inCutoff && hasSprintEvidence && points > 0,
+      hit: highlightCells && inCutoff && hasSprintEvidence && points > 0,
       title: hasSprintEvidence ? `${points} sprint points` : "No sprint result in this round"
     });
   });
@@ -233,6 +240,8 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
     const comparedDrivers = (focus.compareDrivers || focus.options || []).map((value) => String(value));
     row.focusRow = focus.highlightMode === "rows" && comparedDrivers.includes(String(row.name));
     row.summaryValue = row.points ?? null;
+  } else if (metric === "podiums" && focus.highlightMode === "rows") {
+    row.focusRow = count > 0;
     row.focusSortValue = row.points ?? null;
   } else if (metric === "grid_wins") {
     row.summaryValue = worstWinningGrid;
@@ -300,12 +309,12 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
   let leftWins = 0;
   let rightWins = 0;
   let racesCompared = 0;
-  const applySeatCell = (driver, index, label, title, state) => {
+  const applySeatCell = (driver, index, label, title, hit = false, state) => {
     if (!driver?.cells?.[index]) return;
     driver.cells[index] = focusCell(driver.cells[index], {
       label,
       title,
-      hit: false,
+      hit,
       ...(state ? { state } : {})
     });
   };
@@ -323,8 +332,8 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     const leftPosition = numeric(leftRow?.position);
     const rightPosition = numeric(rightRow?.position);
     if (leftPosition == null || rightPosition == null) {
-      applySeatCell(left, index, "—", "Incomplete qualifying comparison", "incomplete");
-      applySeatCell(right, index, "—", "Incomplete qualifying comparison", "incomplete");
+      applySeatCell(left, index, "—", "Incomplete qualifying comparison", false, "incomplete");
+      applySeatCell(right, index, "—", "Incomplete qualifying comparison", false, "incomplete");
       return focusCell(cell, { label: "—", title: "Incomplete qualifying comparison", hit: false, state: "incomplete" });
     }
     if (inCutoff) {
@@ -336,8 +345,10 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
       ? "Tie"
       : leftPosition < rightPosition ? left.name : right.name;
     const comparisonTitle = `${left.name} ${leftPosition} · ${right.name} ${rightPosition} · ${winner}`;
-    applySeatCell(left, index, leftPosition, comparisonTitle);
-    applySeatCell(right, index, rightPosition, comparisonTitle);
+    const leftIsBest = focus.highlightMode !== "rows" && inCutoff && leftPosition < rightPosition;
+    const rightIsBest = focus.highlightMode !== "rows" && inCutoff && rightPosition < leftPosition;
+    applySeatCell(left, index, leftPosition, comparisonTitle, leftIsBest);
+    applySeatCell(right, index, rightPosition, comparisonTitle, rightIsBest);
     return focusCell(cell, {
       label: `${leftPosition}–${rightPosition}`,
       hit: false,
@@ -600,8 +611,7 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
   const lastStandingFocus = String(focus?.metric || "").toLowerCase() === "last_standing";
   const focusMetric = String(focus?.metric || "").toLowerCase();
   const highlightMode = String(
-    focus?.highlightMode
-      || (focusMetric === "teammate_points" ? "rows" : "cells")
+    focus?.highlightMode || defaultRaceDataHighlightMode(focusMetric)
   ).trim().toLowerCase();
   const resolvedFocus = { ...focus, matrixMetric: metric, highlightMode };
   const nextDrivers = driverRows.map((row) => applyDriverMetric(row, rounds, resolvedFocus, cutoffRoundNumber));
@@ -631,6 +641,7 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
 module.exports = {
   applyRaceDataFocus,
   applyDriverPointsMetric,
+  defaultRaceDataHighlightMode,
   buildFocusSummary,
   isDnfStatus,
   sortFocusRows

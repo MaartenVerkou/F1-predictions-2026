@@ -3074,13 +3074,6 @@ button:disabled {
   background: linear-gradient(135deg, rgba(181, 116, 63, 0.16) 0%, rgba(232, 199, 170, 0.24) 100%);
 }
 
-.admin-race-data-cell.is-focus-hit {
-  border-color: color-mix(in srgb, var(--border) 42%, var(--accent));
-  background: color-mix(in srgb, var(--accent) 15%, var(--card));
-  color: var(--text);
-  font-weight: 800;
-}
-
 .admin-race-data-cell.state-incomplete {
   color: #9a5b00;
 }
@@ -3131,6 +3124,7 @@ button:disabled {
   min-width: 52px;
   color: var(--text);
   font-variant-numeric: tabular-nums;
+  cursor: default;
 }
 .admin-race-data-footer-cell.is-after-cutoff {
   color: var(--muted);
@@ -3301,26 +3295,27 @@ button:disabled {
 }
 
 .admin-race-data-matrix .admin-race-data-cell.is-focus-hit {
-  border-color: var(--text);
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--text);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--text) 6%, var(--card));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--text) 34%, transparent);
   color: var(--text);
+  font-weight: 750;
 }
 
-/* Comparison questions identify the participants once at row level. Keep the
-   matrix cells identical to the normal table so the values stay scannable. */
+/* Focus states use one neutral treatment so the evidence stays scannable in
+   both themes and does not depend on hue or a strong cell outline. */
 .admin-race-data-matrix tbody tr.is-focus-row > th,
 .admin-race-data-matrix tbody tr.is-focus-row > td {
-  background: color-mix(in srgb, var(--text) 6%, var(--card));
+  background: color-mix(in srgb, var(--text) 4%, var(--card));
 }
 
 .admin-race-data-matrix tbody tr.is-focus-row > .admin-race-data-entity {
-  box-shadow: inset 2px 0 0 var(--text);
-  font-weight: 800;
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 54%, transparent);
+  font-weight: 750;
 }
 
 .admin-race-data-matrix tbody tr.is-focus-row > .admin-race-data-sticky-right {
-  background: color-mix(in srgb, var(--text) 8%, var(--card));
+  background: color-mix(in srgb, var(--text) 6%, var(--card));
 }
 
 .admin-race-data-matrix .admin-race-data-cell.state-incomplete {
