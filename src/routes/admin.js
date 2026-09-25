@@ -610,6 +610,25 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     };
   });
 
+  const constructorFocusMode = activeFocus.cellMode
+    || (activeFocus.matrixMetric === "qualifying_h2h" || activeFocus.metric === "qualifying_h2h" ? "qualifying" : null);
+  if (activeFocus.view === "constructors" && ["points", "qualifying"].includes(constructorFocusMode)) {
+    constructorGroups.forEach((group) => {
+      const focusCells = group.summary.cells || [];
+      group.drivers = group.drivers.map((driver, groupIndex) => ({
+        ...driver,
+        cells: groupIndex === 0
+          ? focusCells.map((cell) => ({ ...cell }))
+          : focusCells.map((cell) => ({
+            ...cell,
+            label: "—",
+            focusHit: false,
+            title: "Focus value shown on the team row"
+          }))
+      }));
+    });
+  }
+
   const payload = selected?.evidence?.payload || null;
   const raceRows = payload?.race?.rows || [];
   const qualifyingRows = payload?.qualifying?.rows || [];

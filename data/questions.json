@@ -158,7 +158,9 @@
         "matrixMetric": "points",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["race", "constructorStandings"]
+        "requiredEvidence": ["race", "constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none"
       }
     },
     {
@@ -362,7 +364,9 @@
         "matrixMetric": "points",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["constructorStandings"]
+        "requiredEvidence": ["constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none"
       }
     },
     {
@@ -392,7 +396,9 @@
         "matrixMetric": "points",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["constructorStandings"]
+        "requiredEvidence": ["constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none"
       }
     },
     {

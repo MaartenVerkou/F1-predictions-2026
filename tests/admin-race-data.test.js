@@ -501,6 +501,8 @@ test("qualifying focus compares constructor teammates in the shared matrix", () 
   });
   assert.equal(view.constructors[0].summaryValue, 1);
   assert.equal(view.constructors[0].cells[0].label, "5–8");
+  assert.equal(view.constructorGroups[0].drivers[0].cells[0].label, "5–8");
+  assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "—");
   assert.equal(view.focusSummary.value, "Team A · 1");
 });
 
