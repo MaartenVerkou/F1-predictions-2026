@@ -3281,6 +3281,22 @@ button:disabled {
   color: var(--text);
 }
 
+/* Comparison questions identify the participants once at row level. Keep the
+   matrix cells identical to the normal table so the values stay scannable. */
+.admin-race-data-matrix tbody tr.is-focus-row > th,
+.admin-race-data-matrix tbody tr.is-focus-row > td {
+  background: color-mix(in srgb, var(--text) 6%, var(--card));
+}
+
+.admin-race-data-matrix tbody tr.is-focus-row > .admin-race-data-entity {
+  box-shadow: inset 2px 0 0 var(--text);
+  font-weight: 800;
+}
+
+.admin-race-data-matrix tbody tr.is-focus-row > .admin-race-data-sticky-right {
+  background: color-mix(in srgb, var(--text) 8%, var(--card));
+}
+
 .admin-race-data-matrix .admin-race-data-cell.state-incomplete {
   color: var(--muted);
 }

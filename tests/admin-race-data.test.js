@@ -670,7 +670,10 @@ test("teammate points focus renders per-round championship points without a foot
     }
   });
   const alpha = view.drivers.find((row) => row.name === "Driver Alpha");
+  const beta = view.drivers.find((row) => row.name === "Driver Beta");
   assert.deepEqual(alpha.cells.map((cell) => cell.label), ["13", "9"]);
-  assert.equal(alpha.cells[0].focusHit, true);
+  assert.equal(alpha.cells[0].focusHit, false);
+  assert.equal(alpha.focusRow, true);
+  assert.equal(beta.focusRow, true);
   assert.equal(view.focusFooter, null);
 });

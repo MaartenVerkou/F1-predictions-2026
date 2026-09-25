@@ -223,6 +223,10 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       metric,
       matrixMetric: String(projection?.matrixMetric || (metric === "points" || metric === "podiums" ? metric : "points")).trim().toLowerCase(),
       cellMode: String(projection?.cellMode || "").trim().toLowerCase() || null,
+      highlightMode: String(
+        projection?.highlightMode
+          || (["teammate_points", "qualifying_h2h"].includes(metric) ? "rows" : "cells")
+      ).trim().toLowerCase(),
       footerMode: String(projection?.footerMode || "").trim().toLowerCase() || null,
       sort: String(projection?.sort || "desc").trim().toLowerCase(),
       kind: String(projection?.kind || "matrix").trim().toLowerCase(),

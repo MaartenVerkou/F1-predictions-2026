@@ -165,7 +165,7 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
       const hit = comparedDrivers.includes(String(row.name));
       return focusCell(cell, {
         label: points,
-        hit: inCutoff && hit,
+        hit: focus.highlightMode === "rows" ? false : inCutoff && hit,
         title: row.name + ": " + points + " championship points"
       });
     }
@@ -232,6 +232,8 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
 
   row.cells = cells;
   if (teammatePointsFocus) {
+    const comparedDrivers = (focus.compareDrivers || focus.options || []).map((value) => String(value));
+    row.focusRow = focus.highlightMode === "rows" && comparedDrivers.includes(String(row.name));
     row.summaryValue = row.points ?? null;
     row.focusSortValue = row.points ?? null;
   } else if (metric === "grid_wins") {
@@ -255,6 +257,10 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     .sort((left, right) => (Number(left.seatNumber) || 999) - (Number(right.seatNumber) || 999));
   const left = teamDrivers[0] || null;
   const right = teamDrivers[1] || null;
+  if (focus.highlightMode === "rows") {
+    if (left) left.focusRow = true;
+    if (right) right.focusRow = true;
+  }
   let leftWins = 0;
   let rightWins = 0;
   let racesCompared = 0;
@@ -556,7 +562,12 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
 function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoffRoundNumber }) {
   const metric = String(focus?.matrixMetric || focus?.metric || "points");
   const lastStandingFocus = String(focus?.metric || "").toLowerCase() === "last_standing";
-  const resolvedFocus = { ...focus, matrixMetric: metric };
+  const focusMetric = String(focus?.metric || "").toLowerCase();
+  const highlightMode = String(
+    focus?.highlightMode
+      || (["teammate_points", "qualifying_h2h"].includes(focusMetric) ? "rows" : "cells")
+  ).trim().toLowerCase();
+  const resolvedFocus = { ...focus, matrixMetric: metric, highlightMode };
   const nextDrivers = driverRows.map((row) => applyDriverMetric(row, rounds, resolvedFocus, cutoffRoundNumber));
   const nextConstructors = constructorRows.map((row) => applyConstructorMetric(row, rounds, resolvedFocus, cutoffRoundNumber, nextDrivers));
   const direction = focus?.sort === "asc" ? "asc" : "desc";

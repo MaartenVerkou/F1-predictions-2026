@@ -4,6 +4,7 @@
   isGroupedDriver ? 'admin-race-data-group-driver' : '',
   isGroupedDriver && groupIsFirst ? 'is-group-start' : '',
   isGroupedDriver && groupIndex === groupSize - 1 ? 'is-group-end' : '',
+  row.focusRow ? 'is-focus-row' : '',
   row.isEmpty ? 'is-empty' : ''
 ].filter(Boolean).join(' '); %>
 <tr class="<%= rowClass %>">
