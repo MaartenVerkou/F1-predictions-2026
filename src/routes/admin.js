@@ -222,11 +222,14 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       view,
       metric,
       matrixMetric: String(projection?.matrixMetric || (metric === "points" || metric === "podiums" ? metric : "points")).trim().toLowerCase(),
+      cellMode: String(projection?.cellMode || "").trim().toLowerCase() || null,
+      footerMode: String(projection?.footerMode || "").trim().toLowerCase() || null,
       sort: String(projection?.sort || "desc").trim().toLowerCase(),
       kind: String(projection?.kind || "matrix").trim().toLowerCase(),
       scope: String(projection?.scope || "through_cutoff").trim().toLowerCase(),
       group,
       options: Array.isArray(question.options) ? question.options.slice() : [],
+      compareDrivers: Array.isArray(projection?.compareDrivers) ? projection.compareDrivers.slice() : [],
       compareTeams: Array.isArray(projection?.compareTeams) ? projection.compareTeams.slice() : [],
       requiredEvidence: Array.isArray(projection?.requiredEvidence) ? projection.requiredEvidence.slice() : [],
       questionId: id,
@@ -414,7 +417,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   const teamEntities = Array.isArray(roster?.team_entities)
     ? roster.team_entities
     : teams.map((name) => ({ id: null, name }));
-  const podiumFocus = activeFocus.metric === "podiums";
+  const podiumFocus = activeFocus.matrixMetric === "podiums" || ["podiums", "ferrari_podium"].includes(activeFocus.metric);
   const driverRows = sortAuditRows(driverEntities.map((entity) => {
     const driver = entity.name;
     const cells = rounds.map((round) => {
@@ -660,7 +663,8 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     catalogRevision,
     focus: activeFocus,
     focusId: activeFocus.id,
-    focusSummary: focusProjection.summary
+    focusSummary: focusProjection.summary,
+    focusFooter: focusProjection.footer
   };
 }
 
@@ -3661,6 +3665,8 @@ function registerAdminRoutes(app, deps) {
       engine_switch: t("admin_race_data.focus_external")
     };
     focus.metricLabel = focusMetricLabels[focus.matrixMetric || focus.metric] || t("admin_race_data.points");
+    focus.footerRoundLabel = t("admin_race_data.focus_round_total");
+    focus.footerTotalLabel = t("admin_race_data.focus_through_cutoff");
     const catalog = seasonContext.selected
       ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
       : null;

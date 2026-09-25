@@ -503,3 +503,110 @@ test("qualifying focus compares constructor teammates in the shared matrix", () 
   assert.equal(view.constructors[0].cells[0].label, "5–8");
   assert.equal(view.focusSummary.value, "Team A · 1");
 });
+
+test("count and sprint focus projections expose cutoff-aware additive footers", () => {
+  const evidence = (round, raceRows, sprintRows = []) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: { rows: raceRows },
+      qualifying: { rows: [] },
+      sprint: { rows: sprintRows },
+      standings: { drivers: [], constructors: [] }
+    }
+  });
+  const roster = {
+    driver_entities: [
+      { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+      { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+    ],
+    team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+  };
+  const rows = [
+    { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, points: 25, status: "Finished" },
+    { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: null, points: 0, status: "Retired" }
+  ];
+  const dnfView = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster,
+    evidenceRows: [
+      evidence(1, rows),
+      evidence(2, rows)
+    ],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: { id: "most_dnfs_driver", view: "drivers", metric: "dnfs", matrixMetric: "dnfs", footerMode: "count" }
+  });
+  assert.equal(dnfView.focusFooter.mode, "count");
+  assert.deepEqual(dnfView.focusFooter.cells.map((cell) => cell.label), ["1", "—"]);
+  assert.equal(dnfView.focusFooter.total, 1);
+  assert.equal(dnfView.focusFooter.totalLabel, "Through cutoff");
+
+  const sprintView = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster,
+    evidenceRows: [
+      evidence(1, rows, [{ driver_id: 101, driver: "Driver Alpha", points: 3 }]),
+      evidence(2, rows, [{ driver_id: 101, driver: "Driver Alpha", points: 4 }])
+    ],
+    snapshotRows: [],
+    selectedRound: 2,
+    focus: { id: "mini_q4_sprint_champion_same", view: "drivers", metric: "sprint_points", matrixMetric: "sprint_points", footerMode: "sum" }
+  });
+  assert.deepEqual(sprintView.focusFooter.cells.map((cell) => cell.label), ["3", "4"]);
+  assert.equal(sprintView.focusFooter.total, 7);
+});
+
+test("teammate points focus renders per-round championship points without a footer", () => {
+  const evidence = (round, points, sprintPoints) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: {
+        rows: [
+          { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, points, status: "Finished" },
+          { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 2, points: 18, status: "Finished" }
+        ]
+      },
+      qualifying: { rows: [] },
+      sprint: { rows: sprintPoints == null ? [] : [{ driver_id: 101, driver: "Driver Alpha", points: sprintPoints }] },
+      standings: {
+        drivers: [
+          { entity_id: 101, entity: "Driver Alpha", position: 1, points: points + (sprintPoints || 0) + (round === 2 ? 20 : 0) },
+          { entity_id: 102, entity: "Driver Beta", position: 2, points: 36 }
+        ],
+        constructors: [{ entity_id: 201, entity: "Team A", position: 1, points: 61 }]
+      }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [evidence(1, 10, 3), evidence(2, 5, 4)],
+    snapshotRows: [],
+    selectedRound: 2,
+    focus: {
+      id: "teammate_battle",
+      view: "drivers",
+      metric: "teammate_points",
+      matrixMetric: "points",
+      cellMode: "points",
+      footerMode: "none",
+      compareDrivers: ["Driver Alpha", "Driver Beta"]
+    }
+  });
+  const alpha = view.drivers.find((row) => row.name === "Driver Alpha");
+  assert.deepEqual(alpha.cells.map((cell) => cell.label), ["13", "9"]);
+  assert.equal(alpha.cells[0].focusHit, true);
+  assert.equal(view.focusFooter, null);
+});

@@ -809,6 +809,8 @@
     "focus_group_external": "Externe Daten",
     "focus_group_other": "Sonstiges",
     "focus_audit": "Fragenprüfung",
+    "focus_round_total": "Rundensumme",
+    "focus_through_cutoff": "Bis zum Stichtag",
     "focus_ready": "Prüfbereit",
     "focus_partial": "Weitere Daten erforderlich",
     "focus_unavailable": "Nicht verfügbar",

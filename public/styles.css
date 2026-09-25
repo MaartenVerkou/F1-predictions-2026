@@ -3045,6 +3045,56 @@ button:disabled {
   display: block;
 }
 
+.admin-race-data-matrix-footer th,
+.admin-race-data-matrix-footer td {
+  border-top: 2px solid var(--border);
+  background: color-mix(in srgb, var(--card) 86%, var(--border));
+  font-weight: 750;
+}
+.admin-race-data-matrix-footer th {
+  text-align: left;
+}
+.admin-race-data-footer-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: calc(var(--admin-race-rank-width) + var(--admin-race-entity-width));
+  text-align: left !important;
+}
+.admin-race-data-footer-label span,
+.admin-race-data-footer-label small {
+  display: block;
+}
+.admin-race-data-footer-label small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.admin-race-data-footer-cell {
+  width: 52px;
+  min-width: 52px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.admin-race-data-footer-cell.is-after-cutoff {
+  color: var(--muted);
+  opacity: 0.42;
+}
+.admin-race-data-footer-cell.state-not_synced,
+.admin-race-data-footer-cell.state-cancelled,
+.admin-race-data-footer-cell.is-empty {
+  color: var(--muted);
+  font-weight: 500;
+}
+.admin-race-data-footer-total {
+  min-width: 68px;
+  font-variant-numeric: tabular-nums;
+  text-align: center !important;
+}
+
 .admin-race-data-constructor-detail {
   overflow: hidden;
   text-overflow: ellipsis;

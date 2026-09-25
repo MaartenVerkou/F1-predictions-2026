@@ -818,6 +818,8 @@
     "focus_group_external": "External evidence",
     "focus_group_other": "Other",
     "focus_audit": "Question audit",
+    "focus_round_total": "Round total",
+    "focus_through_cutoff": "Through cutoff",
     "focus_ready": "Ready to review",
     "focus_partial": "Needs more evidence",
     "focus_unavailable": "Not available",

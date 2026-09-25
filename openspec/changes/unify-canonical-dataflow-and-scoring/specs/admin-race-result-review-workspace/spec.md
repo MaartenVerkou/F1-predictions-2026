@@ -120,3 +120,10 @@ The Race data workspace SHALL resolve each question's audit profile from questio
 - **WHEN** the administrator changes the selected round while a question focus is active
 - **THEN** all cells, totals, summary values, and readiness state SHALL use the same cutoff
 - **AND** future rounds SHALL remain muted and excluded from the candidate result
+
+#### Scenario: Additive audit focuses expose round contributions without a second table
+- **GIVEN** a question declares a count or points-per-round projection
+- **WHEN** the administrator selects that focus
+- **THEN** the shared matrix SHALL render the declared per-round value and an additive Round total footer
+- **AND** the footer SHALL include only evidence through the selected cutoff, label its total as through-cutoff, and mute later rounds
+- **AND** comparison or ordinal projections SHALL omit the footer and keep their own compact cell representation

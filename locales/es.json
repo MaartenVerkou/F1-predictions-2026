@@ -809,6 +809,8 @@
     "focus_group_external": "Datos externos",
     "focus_group_other": "Otros",
     "focus_audit": "Auditoría de pregunta",
+    "focus_round_total": "Total de ronda",
+    "focus_through_cutoff": "Hasta el corte",
     "focus_ready": "Lista para revisar",
     "focus_partial": "Faltan datos",
     "focus_unavailable": "No disponible",

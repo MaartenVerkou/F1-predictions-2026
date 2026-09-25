@@ -809,6 +809,8 @@
     "focus_group_external": "Externe evidence",
     "focus_group_other": "Overig",
     "focus_audit": "Vraagcontrole",
+    "focus_round_total": "Rondetotaal",
+    "focus_through_cutoff": "T/m cutoff",
     "focus_ready": "Gereed voor controle",
     "focus_partial": "Meer evidence nodig",
     "focus_unavailable": "Niet beschikbaar",

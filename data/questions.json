@@ -115,7 +115,9 @@
         "kind": "matrix",
         "scope": "season",
         "requiredEvidence": ["race"],
-        "matrixMetric": "grid_wins"
+        "matrixMetric": "grid_wins",
+        "cellMode": "ordinal",
+        "footerMode": "none"
       }
     },
     {
@@ -132,7 +134,9 @@
         "metric": "podiums",
         "kind": "matrix",
         "scope": "through_cutoff",
-        "requiredEvidence": ["race"]
+        "requiredEvidence": ["race"],
+        "cellMode": "count",
+        "footerMode": "count"
       }
     },
     {
@@ -170,7 +174,9 @@
         "kind": "matrix",
         "scope": "season",
         "requiredEvidence": ["external.driverOfTheDay"],
-        "matrixMetric": "driver_of_day"
+        "matrixMetric": "driver_of_day",
+        "cellMode": "count",
+        "footerMode": "count"
       }
     },
     {
@@ -186,7 +192,9 @@
         "kind": "matrix",
         "scope": "season",
         "requiredEvidence": ["race"],
-        "matrixMetric": "dnfs"
+        "matrixMetric": "dnfs",
+        "cellMode": "count",
+        "footerMode": "count"
       }
     },
     {
@@ -238,7 +246,10 @@
         "matrixMetric": "points",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["driverStandings"]
+        "requiredEvidence": ["driverStandings"],
+        "cellMode": "points",
+        "footerMode": "none",
+        "compareDrivers": ["Kimi Antonelli", "George Russell"]
       }
     },
     {
@@ -258,7 +269,10 @@
         "matrixMetric": "points",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["driverStandings"]
+        "requiredEvidence": ["driverStandings"],
+        "cellMode": "points",
+        "footerMode": "none",
+        "compareDrivers": ["Lando Norris", "Oscar Piastri"]
       }
     },
     {
@@ -275,7 +289,9 @@
         "scope": "season",
         "sort": "asc",
         "requiredEvidence": ["qualifying"],
-        "matrixMetric": "qualifying_h2h"
+        "matrixMetric": "qualifying_h2h",
+        "cellMode": "qualifying",
+        "footerMode": "none"
       }
     },
     {
@@ -294,7 +310,10 @@
         "matrixMetric": "points",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["constructorStandings"]
+        "requiredEvidence": ["constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none",
+        "compareTeams": ["Alpine", "Cadillac", "Audi", "Aston Martin"]
       }
     },
     {
@@ -311,7 +330,9 @@
         "matrixMetric": "dnfs",
         "kind": "summary",
         "scope": "through_cutoff",
-        "requiredEvidence": ["race"]
+        "requiredEvidence": ["race"],
+        "cellMode": "count",
+        "footerMode": "count"
       }
     },
     {
@@ -386,7 +407,9 @@
         "matrixMetric": "podiums",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["race"]
+        "requiredEvidence": ["race"],
+        "cellMode": "count",
+        "footerMode": "count"
       }
     },
     {
@@ -401,7 +424,9 @@
         "matrixMetric": "sprint_points",
         "kind": "summary",
         "scope": "season",
-        "requiredEvidence": ["sprint", "driverStandings"]
+        "requiredEvidence": ["sprint", "driverStandings"],
+        "cellMode": "points",
+        "footerMode": "sum"
       }
     },
     {
