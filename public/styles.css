@@ -2915,6 +2915,22 @@ button:disabled {
   --accent: #f1f5ff;
 }
 
+.admin-race-data-matrix .admin-race-data-col-rank {
+  width: var(--admin-race-rank-width);
+}
+
+.admin-race-data-matrix .admin-race-data-col-entity {
+  width: var(--admin-race-entity-width);
+}
+
+.admin-race-data-matrix .admin-race-data-col-round {
+  width: 52px;
+}
+
+.admin-race-data-matrix .admin-race-data-col-summary {
+  width: 68px;
+}
+
 .admin-race-data-matrix th,
 .admin-race-data-matrix td,
 .admin-race-data-detail-table th,

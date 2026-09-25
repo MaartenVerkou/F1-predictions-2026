@@ -55,6 +55,14 @@
     <div class="admin-race-data-table-wrap">
 
     <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
+      <colgroup>
+        <col class="admin-race-data-col admin-race-data-col-rank">
+        <col class="admin-race-data-col admin-race-data-col-entity">
+        <% view.rounds.forEach(() => { %>
+          <col class="admin-race-data-col admin-race-data-col-round">
+        <% }) %>
+        <col class="admin-race-data-col admin-race-data-col-summary">
+      </colgroup>
       <thead>
         <tr>
           <th scope="col" class="admin-race-data-sticky admin-race-data-rank"><%= t('admin_race_data.position') %></th>
