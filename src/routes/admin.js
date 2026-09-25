@@ -225,7 +225,7 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       cellMode: String(projection?.cellMode || "").trim().toLowerCase() || null,
       highlightMode: String(
         projection?.highlightMode
-          || (["teammate_points", "qualifying_h2h"].includes(metric) ? "rows" : "cells")
+          || (metric === "teammate_points" ? "rows" : "cells")
       ).trim().toLowerCase(),
       footerMode: String(projection?.footerMode || "").trim().toLowerCase() || null,
       sort: String(projection?.sort || "desc").trim().toLowerCase(),

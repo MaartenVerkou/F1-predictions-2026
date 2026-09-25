@@ -565,7 +565,7 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
   const focusMetric = String(focus?.metric || "").toLowerCase();
   const highlightMode = String(
     focus?.highlightMode
-      || (["teammate_points", "qualifying_h2h"].includes(focusMetric) ? "rows" : "cells")
+      || (focusMetric === "teammate_points" ? "rows" : "cells")
   ).trim().toLowerCase();
   const resolvedFocus = { ...focus, matrixMetric: metric, highlightMode };
   const nextDrivers = driverRows.map((row) => applyDriverMetric(row, rounds, resolvedFocus, cutoffRoundNumber));
