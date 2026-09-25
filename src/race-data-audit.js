@@ -284,14 +284,6 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
   return row;
 }
 
-function highestRaceFinish(row) {
-  const positions = (row?.cells || [])
-    .filter((cell) => !cell.afterCutoff)
-    .map((cell) => numeric(cell.row?.position))
-    .filter((position) => position != null && position > 0);
-  return positions.length ? Math.max(...positions) : null;
-}
-
 function sortFocusRows(rows, direction = "desc") {
   return rows
     .map((row, index) => ({ row, index }))
@@ -303,19 +295,6 @@ function sortFocusRows(rows, direction = "desc") {
       if (leftValue != null && rightValue != null && leftValue !== rightValue) {
         return direction === "asc" ? leftValue - rightValue : rightValue - leftValue;
       }
-
-      // The last-standing focus ranks equal-point candidates by their worst
-      // recorded race result, so the highest numeric finish is reviewed first.
-      const leftRaceFinish = numeric(left.row.lastStandingRaceFinish);
-      const rightRaceFinish = numeric(right.row.lastStandingRaceFinish);
-      if (leftRaceFinish != null || rightRaceFinish != null) {
-        if (leftRaceFinish == null && rightRaceFinish != null) return 1;
-        if (leftRaceFinish != null && rightRaceFinish == null) return -1;
-        if (leftRaceFinish != null && rightRaceFinish != null && leftRaceFinish !== rightRaceFinish) {
-          return rightRaceFinish - leftRaceFinish;
-        }
-      }
-
       const leftPosition = numeric(left.row.championshipPosition);
       const rightPosition = numeric(right.row.championshipPosition);
       if (leftPosition != null && rightPosition != null && leftPosition !== rightPosition) {
@@ -369,17 +348,15 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
   }
   if (metric === "last_standing") {
     const rows = [...(focus.view === "constructors" ? constructors : drivers)]
-      .filter((row) => Number.isFinite(Number(row.championshipPosition)));
-    const ordered = focus.sort === "asc"
-      ? sortFocusRows(rows, "asc")
-      : rows.sort((left, right) => Number(right.championshipPosition) - Number(left.championshipPosition));
-    const last = ordered[0];
+      .filter((row) => Number.isFinite(Number(row.championshipPosition)))
+      .sort((left, right) => Number(right.championshipPosition) - Number(left.championshipPosition));
+    const last = rows[0];
     if (!last) return unavailable("Standings are not available for this cutoff.");
     return {
       ...base,
-      value: String(last.name) + " · P" + last.championshipPosition,
-      detail: "Last classified standing through R" + cutoffRoundNumber,
-      tooltip: String(last.name) + ": " + (last.points ?? "—") + " points"
+      value: `${last.name} · P${last.championshipPosition}`,
+      detail: `Last classified standing through R${cutoffRoundNumber}`,
+      tooltip: `${last.name}: ${last.points ?? "—"} points`
     };
   }
   if (["damage", "engine_switch"].includes(metric)) {
@@ -534,18 +511,6 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
   const resolvedFocus = { ...focus, matrixMetric: metric };
   const nextDrivers = driverRows.map((row) => applyDriverMetric(row, rounds, resolvedFocus, cutoffRoundNumber));
   const nextConstructors = constructorRows.map((row) => applyConstructorMetric(row, rounds, resolvedFocus, cutoffRoundNumber, nextDrivers));
-  if (metric === "last_standing") {
-    nextDrivers.forEach((row) => {
-      row.lastStandingRaceFinish = highestRaceFinish(row);
-      row.focusSortValue = row.points ?? null;
-      row.summaryValue = row.points ?? null;
-    });
-    nextConstructors.forEach((row) => {
-      row.lastStandingRaceFinish = row.highestRaceFinish ?? null;
-      row.focusSortValue = row.points ?? null;
-      row.summaryValue = row.points ?? null;
-    });
-  }
   const direction = focus?.sort === "asc" ? "asc" : "desc";
   const sortedDrivers = sortFocusRows(nextDrivers, direction);
   const sortedConstructors = sortFocusRows(nextConstructors, direction);
