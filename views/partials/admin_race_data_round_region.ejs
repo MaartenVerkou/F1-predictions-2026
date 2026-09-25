@@ -34,10 +34,9 @@
     </form>
   </div>
 
-  <section class="admin-race-data-table-section" aria-labelledby="admin-race-data-table-heading">
+  <section class="admin-race-data-table-section" aria-label="<%= t('admin_race_data.table_heading') %>">
     <div class="admin-race-data-table-toolbar">
-      <h2 id="admin-race-data-table-heading"><%= t('admin_race_data.table_heading') %></h2>
-      <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
+      <div class="admin-race-data-tabs admin-race-data-view-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
         <a class="admin-race-data-tab <%= viewMode === 'drivers' ? 'is-active' : '' %>"
            href="/admin/race-data?season=<%= season %>&view=drivers&round=<%= view.selectedRoundNumber %>&focus=points"
            role="tab" aria-selected="<%= viewMode === 'drivers' ? 'true' : 'false' %>" data-race-data-view-toggle="drivers">

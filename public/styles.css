@@ -2736,8 +2736,7 @@ button:disabled {
 
 .admin-race-data-controls {
   align-items: flex-end;
-  padding: 0 0 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 0 0 8px;
 }
 
 .admin-race-data-controls .admin-race-data-focus-form {
@@ -2757,7 +2756,7 @@ button:disabled {
 .admin-race-data-table-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
 }
 
@@ -7576,4 +7575,45 @@ button.lang-option.is-active {
   .group-page > .card {
     padding: 18px;
   }
+}
+
+
+/* The data view is a two-state switch, not a second navigation row. */
+.admin-race-data-view-tabs {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 92%, var(--border));
+}
+
+.admin-race-data-view-tabs .admin-race-data-tab {
+  min-height: 32px;
+  padding: 6px 13px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--muted);
+  background: transparent;
+  line-height: 1.2;
+}
+
+.admin-race-data-view-tabs .admin-race-data-tab:last-child {
+  border-right: 0;
+}
+
+.admin-race-data-view-tabs .admin-race-data-tab:hover,
+.admin-race-data-view-tabs .admin-race-data-tab:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 80%, var(--border));
+}
+
+.admin-race-data-view-tabs .admin-race-data-tab.is-active {
+  border-color: var(--accent);
+  color: var(--card);
+  background: var(--accent);
 }
