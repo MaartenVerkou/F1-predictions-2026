@@ -2855,6 +2855,14 @@ button:disabled {
   min-width: 980px;
   --admin-race-rank-width: 44px;
   --admin-race-entity-width: 150px;
+  /* Keep audit meaning hue-independent: a neutral, high-contrast matrix. */
+  --card: #ffffff;
+  --border: #cbd5e1;
+  --text: #111827;
+  --muted: #6b7280;
+  --accent: #111827;
+  background: var(--card);
+  color: var(--text);
 }
 
 .admin-race-data-matrix th,
@@ -3061,17 +3069,8 @@ button:disabled {
   min-width: calc(var(--admin-race-rank-width) + var(--admin-race-entity-width));
   text-align: left !important;
 }
-.admin-race-data-footer-label span,
-.admin-race-data-footer-label small {
-  display: block;
-}
-.admin-race-data-footer-label small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+.admin-race-data-footer-label {
+  white-space: nowrap;
 }
 .admin-race-data-footer-cell {
   width: 52px;
@@ -3244,6 +3243,47 @@ button:disabled {
 :root[data-theme="dark"] .admin-race-data-cell.is-podium-3 {
   border-color: rgba(177, 118, 74, 0.44);
   background: linear-gradient(135deg, rgba(94, 49, 23, 0.74) 0%, rgba(31, 18, 13, 0.94) 100%);
+}
+
+/* Neutral audit states remain legible without relying on colour differences. */
+.admin-race-data-matrix tbody td {
+  background: var(--card);
+  color: var(--text);
+}
+
+.admin-race-data-matrix .admin-race-data-cell.is-podium-1,
+.admin-race-data-matrix .admin-race-data-cell.is-podium-2,
+.admin-race-data-matrix .admin-race-data-cell.is-podium-3 {
+  border-color: var(--border);
+  background: var(--card);
+  color: var(--text);
+}
+
+.admin-race-data-matrix .admin-race-data-cell.is-focus-hit {
+  border-color: var(--text);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--text);
+  color: var(--text);
+}
+
+.admin-race-data-matrix .admin-race-data-cell.state-incomplete {
+  color: var(--muted);
+}
+
+.admin-race-data-matrix .admin-race-data-podium-marker,
+.admin-race-data-matrix .admin-race-data-podium-marker.is-position-1,
+.admin-race-data-matrix .admin-race-data-podium-marker.is-position-2,
+.admin-race-data-matrix .admin-race-data-podium-marker.is-position-3 {
+  background: var(--text);
+  box-shadow: none;
+  color: var(--card);
+}
+
+.admin-race-data-matrix-footer th,
+.admin-race-data-matrix-footer td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  line-height: 1.15;
 }
 \n@media (max-width: 720px) {
   .account-page,
