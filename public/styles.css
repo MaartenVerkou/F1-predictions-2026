@@ -2012,6 +2012,17 @@ button:disabled {
   gap: 18px;
 }
 
+.admin-race-data-round-region {
+  display: grid;
+  gap: 0;
+}
+
+.admin-race-data-round-region[aria-busy="true"] {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
 .admin-race-data-heading,
 .admin-race-data-detail-heading {
   display: flex;

@@ -47,7 +47,7 @@ The constructor race-data matrix SHALL derive podium indicators from the same no
 - **AND** win, pole, and podium aggregates SHALL remain outside this table until a dedicated summary design is introduced
 
 ### Requirement: Race data switches driver and constructor order in one matrix
-The Race data workspace SHALL use one shared matrix with identical result cells for driver and constructor views. The constructor view SHALL always group the selected-round seat rows under their constructor, show the team once in a vertically merged identity cell, and merge the championship position and constructor total points across the team's two seat rows. Seat order remains the canonical driver 1/driver 2 order without adding artificial Driver 1/Driver 2 data fields or displaying driver names in this view.
+The Race data workspace SHALL use one shared matrix and reusable row/cell partials with identical result cells for driver and constructor views. The server SHALL render only the selected view's identity header and rows at a time; it SHALL not duplicate the full alternative matrix in the page DOM. The constructor view SHALL always group the selected-round seat rows under their constructor, show the team once in a vertically merged identity cell, and merge the championship position and constructor total points across the team's two seat rows. Seat order remains the canonical driver 1/driver 2 order without adding artificial Driver 1/Driver 2 data fields or displaying driver names in this view.
 
 #### Scenario: An administrator selects the constructor view
 - **WHEN** the administrator selects the Constructors control
@@ -58,9 +58,16 @@ The Race data workspace SHALL use one shared matrix with identical result cells 
 
 #### Scenario: The view control reorders the existing matrix in place
 - **WHEN** the administrator switches between Drivers and Constructors
-- **THEN** the workspace SHALL keep the same page and result-cell components
-- **AND** it SHALL only switch the visible row ordering/grouping without a full-page navigation
+- **THEN** the workspace SHALL keep the page shell and replace only the server-rendered race-data region
+- **AND** the selected region SHALL use the same row and result-cell partials without duplicating the inactive view in the DOM
+- **AND** the switch SHALL complete without a full-page navigation when client-side enhancement is available
 - **AND** the selected view SHALL remain represented in the URL for refresh and sharing
+
+#### Scenario: The round selector refreshes the same region
+- **WHEN** the administrator selects another race round or follows a round header link
+- **THEN** the page SHALL replace only the race-data region with the selected round's server-rendered cutoff, matrix, legend, and detail state
+- **AND** the selected round and view SHALL remain represented in the URL for refresh and sharing
+- **AND** a normal GET navigation SHALL remain available when client-side enhancement is unavailable
 
 #### Scenario: Constructor grouping follows the selected round lineup
 - **WHEN** a historical or current round is selected

@@ -77,11 +77,15 @@ test("all input tables use explicit responsive table variants", () => {
 });
 
 test("race data views share one identity column and a common row rhythm", () => {
-  const view = readView("admin_race_data.ejs");
+  const page = readView("admin_race_data.ejs");
+  const region = readView("partials/admin_race_data_round_region.ejs");
   const row = readView("partials/admin_race_data_matrix_row.ejs");
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  assert.match(view, /data-race-data-identity-header="drivers"/);
-  assert.match(view, /data-race-data-identity-header="constructors"/);
+  assert.match(page, /partials\/admin_race_data_round_region/);
+  assert.match(region, /<tbody data-race-data-body="<%= viewMode %>">/);
+  assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
+  assert.match(region, /data-race-data-round-form/);
+  assert.match(region, /data-race-data-round-link/);
   assert.match(row, /rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail"/);
   assert.doesNotMatch(row, /admin-race-data-constructor-driver/);
   assert.doesNotMatch(row, /admin-race-data-team-detail/);

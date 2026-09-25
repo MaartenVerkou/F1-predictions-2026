@@ -3568,7 +3568,7 @@ function registerAdminRoutes(app, deps) {
     const derivedActuals = selectedSnapshot
       ? loadSnapshotValues(db, selectedSnapshot.id)
       : {};
-    return res.render("admin_race_data", {
+    const model = {
       user,
       season,
       seasonContext,
@@ -3584,7 +3584,11 @@ function registerAdminRoutes(app, deps) {
         : null,
       catalogRevision: catalog?.catalogRevision || null,
       catalogReadiness: catalog?.readiness || null
-    });
+    };
+    if (String(req.query.fragment || "").trim().toLowerCase() === "round") {
+      return res.render("partials/admin_race_data_round_region", model);
+    }
+    return res.render("admin_race_data", model);
   });
 
   app.get("/admin/actuals", requireAdmin, (req, res) => {

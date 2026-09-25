@@ -1204,73 +1204,101 @@ const initAdminLineupHistoryEditors = () => {
   });
 };
 
-const initRaceDataViewToggle = () => {
-  const tabs = document.querySelector('[data-race-data-view-tabs]');
+let raceDataRegionController = null;
+let raceDataHistoryBound = false;
+
+const syncRaceDataSeasonForm = (url) => {
+  const form = document.querySelector('.admin-race-data-page .admin-inputs-season-form');
+  if (!form) return;
   const matrix = document.querySelector('[data-race-data-matrix]');
-  if (!tabs || !matrix) return;
-  const toggles = Array.from(tabs.querySelectorAll('[data-race-data-view-toggle]'));
-  const bodies = Array.from(matrix.querySelectorAll('[data-race-data-body]'));
-  const identityHeaders = Array.from(matrix.querySelectorAll('[data-race-data-identity-header]'));
-  const roundLinks = Array.from(matrix.querySelectorAll('[data-race-data-round-link]'));
-  const legendItems = Array.from(document.querySelectorAll('[data-race-data-constructor-legend]'));
-  const viewInputs = Array.from(document.querySelectorAll('.admin-race-data-page form input[name="view"]'));
-  if (!toggles.length || !bodies.length) return;
+  const view = url.searchParams.get('view') || matrix?.dataset.raceDataActiveView || 'drivers';
+  const round = url.searchParams.get('round');
+  const viewInput = form.querySelector('input[name="view"]');
+  const roundInput = form.querySelector('input[name="round"]');
+  if (viewInput) viewInput.value = view;
+  if (roundInput && round) roundInput.value = round;
+};
 
-  const normalizeView = (value) => value === 'constructors' ? 'constructors' : 'drivers';
+const requestRaceDataRegion = async (targetUrl, { pushHistory = false } = {}) => {
+  const region = document.querySelector('[data-race-data-round-region]');
+  if (!region) return;
+  const cleanUrl = new URL(targetUrl, window.location.href);
+  cleanUrl.searchParams.delete('fragment');
+  const requestUrl = new URL(cleanUrl.href);
+  requestUrl.searchParams.set('fragment', 'round');
+  const controller = new AbortController();
+  raceDataRegionController?.abort();
+  raceDataRegionController = controller;
+  region.setAttribute('aria-busy', 'true');
 
-  const syncView = (value) => {
-    const view = normalizeView(value);
-    toggles.forEach((toggle) => {
-      const isActive = toggle.dataset.raceDataViewToggle === view;
-      toggle.classList.toggle('is-active', isActive);
-      toggle.setAttribute('aria-selected', String(isActive));
-      if (isActive) {
-        toggle.setAttribute('aria-current', 'page');
-      } else {
-        toggle.removeAttribute('aria-current');
-      }
+  try {
+    const response = await fetch(requestUrl.href, {
+      headers: { Accept: 'text/html' },
+      credentials: 'same-origin',
+      signal: controller.signal
     });
-    bodies.forEach((body) => {
-      body.hidden = body.dataset.raceDataBody !== view;
-    });
-    identityHeaders.forEach((header) => {
-      header.hidden = header.dataset.raceDataIdentityHeader !== view;
-    });
-    legendItems.forEach((item) => {
-      item.hidden = view !== 'constructors';
-    });
-    matrix.classList.toggle('admin-race-data-matrix--constructors', view === 'constructors');
-    matrix.classList.toggle('admin-race-data-matrix--drivers', view === 'drivers');
-    matrix.dataset.raceDataActiveView = view;
-    roundLinks.forEach((link) => {
-      const url = new URL(link.href, window.location.href);
-      url.searchParams.set('view', view);
-      link.href = `${url.pathname}${url.search}${url.hash}`;
-    });
-    viewInputs.forEach((input) => {
-      input.value = view;
-    });
-  };
+    if (!response.ok) throw new Error(`Race data update failed (${response.status})`);
+    const html = await response.text();
+    const template = document.createElement('template');
+    template.innerHTML = html.trim();
+    const nextRegion = template.content.querySelector('[data-race-data-round-region]');
+    if (!nextRegion) throw new Error('Race data update returned no workspace');
+    if (pushHistory) window.history.pushState({ raceData: true }, '', cleanUrl.href);
+    region.replaceWith(nextRegion);
+    syncRaceDataSeasonForm(cleanUrl);
+    initRaceDataViewToggle();
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    region.removeAttribute('aria-busy');
+    window.location.assign(cleanUrl.href);
+  } finally {
+    if (raceDataRegionController === controller) raceDataRegionController = null;
+  }
+};
 
-  const currentView = () => new URL(window.location.href).searchParams.get('view') || matrix.dataset.raceDataActiveView;
+const initRaceDataViewToggle = () => {
+  const region = document.querySelector('[data-race-data-round-region]');
+  if (!region || region.dataset.raceDataNavigationBound === 'true') return;
+  region.dataset.raceDataNavigationBound = 'true';
 
-  toggles.forEach((toggle) => {
-    toggle.addEventListener('click', (event) => {
-      const view = normalizeView(toggle.dataset.raceDataViewToggle);
-      if (view === normalizeView(currentView())) {
-        event.preventDefault();
-        return;
-      }
+  region.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-race-data-view-toggle]');
+    const roundLink = event.target.closest('[data-race-data-round-link]');
+    const link = toggle || roundLink;
+    if (!link || !region.contains(link) || event.defaultPrevented) return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    const current = new URL(window.location.href);
+    url.searchParams.delete('fragment');
+    if (url.href === current.href) {
       event.preventDefault();
-      const url = new URL(toggle.href, window.location.href);
-      url.searchParams.set('view', view);
-      window.history.pushState({ raceDataView: view }, '', url);
-      syncView(view);
-    });
+      return;
+    }
+    event.preventDefault();
+    void requestRaceDataRegion(url, { pushHistory: true });
   });
 
-  window.addEventListener('popstate', () => syncView(currentView()));
-  syncView(currentView());
+  region.addEventListener('change', (event) => {
+    const select = event.target.closest('[data-race-data-round-form] select[name="round"]');
+    if (!select || !region.contains(select)) return;
+    const form = select.form;
+    const url = new URL(form?.action || window.location.href, window.location.href);
+    url.searchParams.set('season', form?.elements.season?.value || new URL(window.location.href).searchParams.get('season') || '');
+    url.searchParams.set('view', form?.elements.view?.value || document.querySelector('[data-race-data-matrix]')?.dataset.raceDataActiveView || 'drivers');
+    url.searchParams.set('round', select.value);
+    event.preventDefault();
+    void requestRaceDataRegion(url, { pushHistory: true });
+  });
+
+  if (!raceDataHistoryBound) {
+    window.addEventListener('popstate', () => {
+      if (document.querySelector('[data-race-data-round-region]')) {
+        void requestRaceDataRegion(window.location.href);
+      }
+    });
+    raceDataHistoryBound = true;
+  }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
