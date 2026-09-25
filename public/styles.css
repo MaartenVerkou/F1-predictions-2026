@@ -2865,6 +2865,14 @@ button:disabled {
   color: var(--text);
 }
 
+:root[data-theme="dark"] .admin-race-data-matrix {
+  --card: #0f1730;
+  --border: #27385d;
+  --text: #f1f5ff;
+  --muted: #9ba9c9;
+  --accent: #f1f5ff;
+}
+
 .admin-race-data-matrix th,
 .admin-race-data-matrix td,
 .admin-race-data-detail-table th,

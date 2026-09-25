@@ -153,3 +153,13 @@ test("inputs toolbar actions use the same compact rhythm as the tabs", () => {
   assert.match(styles, /min-height:\s*34px/);
   assert.match(styles, /border-radius:\s*999px/);
 });
+
+test("race data matrix palette follows the active theme", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const lightMatrixRule = styles.match(/\.admin-race-data-matrix\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(lightMatrixRule, /--card:\s*#ffffff/);
+  assert.match(
+    styles,
+    /:root\[data-theme="dark"\]\s+\.admin-race-data-matrix\s*\{[\s\S]*?--card:\s*#0f1730/
+  );
+});
