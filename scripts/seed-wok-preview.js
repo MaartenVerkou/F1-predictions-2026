@@ -32,12 +32,16 @@ function splitDriverName(name) {
   };
 }
 
-function buildRows(round, now) {
+function buildRows(round, now, lineup = null) {
   const pointsByPosition = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
-  return roster.drivers.map((name, index) => {
-    const teamName = DRIVER_TEAM_ASSIGNMENTS[name];
+  const entries = Array.isArray(lineup) && lineup.length
+    ? lineup
+    : roster.drivers.map((name) => ({ name, teamName: DRIVER_TEAM_ASSIGNMENTS[name] }));
+  return entries.map((entry, index) => {
+    const name = String(entry.name || "").trim();
+    const teamName = String(entry.teamName || "").trim();
     if (!teamName) throw new Error(`Missing canonical preview team assignment for ${name}.`);
-    const position = ((index + round * 2) % roster.drivers.length) + 1;
+    const position = ((index + round * 2) % entries.length) + 1;
     const retired = round === 8 && index === 4;
     const dns = round === 13 && index === 17;
     const status = retired ? "Retired" : dns ? "Did not start" : "Finished";
@@ -55,10 +59,10 @@ function buildRows(round, now) {
   });
 }
 
-function buildEvidence(round, now, totals, canonicalCatalog = null, provenance = {}) {
+function buildEvidence(round, now, totals, canonicalCatalog = null, provenance = {}, lineup = null) {
   const roundName = races[round - 1] || "Round " + round;
   const cancelled = round === 10;
-  const raceRows = cancelled ? [] : buildRows(round, now);
+  const raceRows = cancelled ? [] : buildRows(round, now, lineup);
   const qualifyingRows = cancelled || round === 8
     ? []
     : raceRows.map((row) => ({ ...row, position: row.position || "20" }));
@@ -82,7 +86,11 @@ function buildEvidence(round, now, totals, canonicalCatalog = null, provenance =
     });
   }
 
-  const driverStandings = roster.drivers
+  const standingDriverNames = Array.from(new Set([
+    ...roster.drivers,
+    ...Object.keys(totals.drivers)
+  ]));
+  const driverStandings = standingDriverNames
     .map((name) => ({ name, points: totals.drivers[name] || 0 }))
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
     .map((item, index) => ({
@@ -190,6 +198,20 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
   const replacement = seedPreviewReplacement(database, now);
   const seasonCatalog = buildSeasonCatalog(database, 2026);
   const canonicalCatalog = seasonCatalog.canonical;
+  const lineupByRound = new Map(
+    Array.from({ length: 13 }, (_, index) => index + 1).map((round) => {
+      const projection = buildLineupProjection({
+        teams: seasonCatalog.teams,
+        drivers: seasonCatalog.drivers,
+        assignments: seasonCatalog.assignments,
+        roundNumber: round
+      });
+      const lineup = projection.flatMap((team) => team.seats
+        .filter((seat) => seat.driverId != null && seat.driverName)
+        .map((seat) => ({ name: seat.driverName, teamName: team.teamName })));
+      return [round, lineup];
+    })
+  );
   const transaction = database.transaction(() => {
     database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
     database.prepare("DELETE FROM actual_snapshots WHERE source_type = ?").run(PREVIEW_SOURCE);
@@ -213,7 +235,7 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
         catalogRevision: seasonCatalog.catalogRevision,
         sourceIdentity: PREVIEW_SYNC_ID + ":r" + round,
         payloadRevision: PREVIEW_PARSER_VERSION + ":" + round
-      });
+      }, lineupByRound.get(round));
       const evidenceId = saveRaceDataSnapshot(database, {
         season: 2026,
         roundNumber: round,

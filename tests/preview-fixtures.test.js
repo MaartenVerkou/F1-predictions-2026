@@ -53,6 +53,14 @@ test("sanitized preview seeds all seasons while keeping evidence scoped to 2026"
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM race_data_snapshots").get().count, 13);
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM actual_snapshots").get().count, 13);
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM driver_team_assignments").get().count, 76);
+    const r8Payload = JSON.parse(
+      db.prepare("SELECT payload_json FROM race_data_snapshots WHERE round_number = 8").get().payload_json
+    );
+    const r8Drivers = r8Payload.race.rows.map((row) => row.driver);
+    assert.ok(r8Drivers.includes("Preview Replacement"));
+    assert.equal(r8Drivers.includes("Kimi Antonelli"), false);
+    const r8StandingNames = r8Payload.standings.drivers.map((row) => row.entity);
+    assert.ok(r8StandingNames.includes("Preview Replacement"));
   } finally {
     if (previous === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previous;
