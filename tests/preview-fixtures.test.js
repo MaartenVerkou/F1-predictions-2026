@@ -50,8 +50,10 @@ test("sanitized preview seeds all seasons while keeping evidence scoped to 2026"
       [2025, 2026, 2027],
     );
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM races").get().count, 69);
-    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM race_data_snapshots").get().count, 13);
-    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM actual_snapshots").get().count, 13);
+    assert.equal(result.snapshotCount, 14);
+    assert.deepEqual(result.rounds, Array.from({ length: 14 }, (_, index) => index + 1));
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM race_data_snapshots").get().count, 14);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM actual_snapshots").get().count, 14);
     assert.equal(db.prepare("SELECT COUNT(*) AS count FROM driver_team_assignments").get().count, 76);
     const r8Payload = JSON.parse(
       db.prepare("SELECT payload_json FROM race_data_snapshots WHERE round_number = 8").get().payload_json
@@ -61,6 +63,11 @@ test("sanitized preview seeds all seasons while keeping evidence scoped to 2026"
     assert.equal(r8Drivers.includes("Kimi Antonelli"), false);
     const r8StandingNames = r8Payload.standings.drivers.map((row) => row.entity);
     assert.ok(r8StandingNames.includes("Preview Replacement"));
+    const r14Payload = JSON.parse(
+      db.prepare("SELECT payload_json FROM race_data_snapshots WHERE round_number = 14").get().payload_json
+    );
+    assert.ok(r14Payload.race.rows.length > 0);
+    assert.ok(r14Payload.race.rows.some((row) => row.driver === "Preview Replacement"));
   } finally {
     if (previous === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previous;

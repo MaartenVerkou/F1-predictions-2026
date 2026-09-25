@@ -184,6 +184,30 @@ function seedPreviewReplacement(database, now) {
   return { driverId: replacementId, teamId: targetTeam.teamId, fromRound: 8 };
 }
 
+function buildPreviewLineupEntries(seasonCatalog, round) {
+  const projection = buildLineupProjection({
+    teams: seasonCatalog.teams,
+    drivers: seasonCatalog.drivers,
+    assignments: seasonCatalog.assignments,
+    roundNumber: round
+  });
+  const active = projection.flatMap((team) => team.seats
+    .filter((seat) => seat.driverId != null && seat.driverName)
+    .map((seat) => ({ name: seat.driverName, teamName: team.teamName })));
+  const activeByName = new Map(active.map((entry) => [entry.name, entry]));
+  const rosterNames = new Set(roster.drivers);
+  const replacements = active.filter((entry) => !rosterNames.has(entry.name));
+  let replacementIndex = 0;
+  const entries = roster.drivers.flatMap((name) => {
+    const entry = activeByName.get(name);
+    if (entry) return [entry];
+    const replacement = replacements[replacementIndex];
+    replacementIndex += 1;
+    return replacement ? [replacement] : [];
+  });
+  return entries.concat(replacements.slice(replacementIndex));
+}
+
 function seedSanitizedPreview(database, now = new Date().toISOString()) {
   if (String(process.env.WOK_PREVIEW_DATA_MODE || "").trim().toLowerCase() !== "sanitized") {
     throw new Error("Preview fixture seeding requires WOK_PREVIEW_DATA_MODE=sanitized");
@@ -199,18 +223,8 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
   const seasonCatalog = buildSeasonCatalog(database, 2026);
   const canonicalCatalog = seasonCatalog.canonical;
   const lineupByRound = new Map(
-    Array.from({ length: 13 }, (_, index) => index + 1).map((round) => {
-      const projection = buildLineupProjection({
-        teams: seasonCatalog.teams,
-        drivers: seasonCatalog.drivers,
-        assignments: seasonCatalog.assignments,
-        roundNumber: round
-      });
-      const lineup = projection.flatMap((team) => team.seats
-        .filter((seat) => seat.driverId != null && seat.driverName)
-        .map((seat) => ({ name: seat.driverName, teamName: team.teamName })));
-      return [round, lineup];
-    })
+    Array.from({ length: 14 }, (_, index) => index + 1)
+      .map((round) => [round, buildPreviewLineupEntries(seasonCatalog, round)])
   );
   const transaction = database.transaction(() => {
     database.prepare("DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE source_type = ?)").run(PREVIEW_SOURCE);
@@ -223,14 +237,14 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
       syncId: PREVIEW_SYNC_ID,
       sourceType: PREVIEW_SOURCE,
       parserVersion: PREVIEW_PARSER_VERSION,
-      requestedRounds: 13,
+      requestedRounds: 14,
       reconstructed: false,
       sourceNote: SANITIZED_NOTE,
       startedAt: now
     });
     const totals = { drivers: {}, teams: {} };
     const snapshots = [];
-    for (let round = 1; round <= 13; round += 1) {
+    for (let round = 1; round <= 14; round += 1) {
       const built = buildEvidence(round, now, totals, canonicalCatalog, {
         catalogRevision: seasonCatalog.catalogRevision,
         sourceIdentity: PREVIEW_SYNC_ID + ":r" + round,
