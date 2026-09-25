@@ -789,6 +789,11 @@
     "legend_unavailable": "— = nicht verfügbar / nicht gemeldet",
     "future_round": "Zukünftiges Rennen; Quelldaten werden noch nicht erwartet.",
     "cancelled_round": "Abgesagtes Rennen; es werden keine Quelldaten erwartet.",
-    "partial_round": "Unvollständige Quellenabdeckung; fehlende Felder bleiben nicht verfügbar."
+    "partial_round": "Unvollständige Quellenabdeckung; fehlende Felder bleiben nicht verfügbar.",
+    "focus_label": "Fokus",
+    "open_focus": "Fokus öffnen",
+    "focus_points": "Meisterschaftspunkte",
+    "focus_podiums": "Podien",
+    "legend_podium_focus": "1 = Podium · 0 = kein Podium · — = nicht verfügbar"
   }
 }

@@ -10,12 +10,12 @@
   <div class="admin-race-data-toolbar">
     <div class="admin-race-data-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
       <a class="admin-race-data-tab <%= viewMode === 'drivers' ? 'is-active' : '' %>"
-         href="/admin/race-data?season=<%= season %>&view=drivers&round=<%= view.selectedRoundNumber %>"
+         href="/admin/race-data?season=<%= season %>&view=drivers&round=<%= view.selectedRoundNumber %>&focus=points"
          role="tab" aria-selected="<%= viewMode === 'drivers' ? 'true' : 'false' %>" data-race-data-view-toggle="drivers">
         <%= t('admin_race_data.drivers_view') %>
       </a>
       <a class="admin-race-data-tab <%= viewMode === 'constructors' ? 'is-active' : '' %>"
-         href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>"
+         href="/admin/race-data?season=<%= season %>&view=constructors&round=<%= view.selectedRoundNumber %>&focus=points"
          role="tab" aria-selected="<%= viewMode === 'constructors' ? 'true' : 'false' %>" data-race-data-view-toggle="constructors">
         <%= t('admin_race_data.constructors_view') %>
       </a>
@@ -23,6 +23,7 @@
     <form method="get" action="/admin/race-data" class="admin-race-data-round-form" data-race-data-round-form>
       <input type="hidden" name="view" value="<%= viewMode %>" />
       <input type="hidden" name="season" value="<%= season %>" />
+      <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
       <label for="admin-race-data-round"><%= t('admin_race_data.round_label') %></label>
       <select id="admin-race-data-round" name="round">
         <% view.rounds.forEach((round) => { %>
@@ -32,6 +33,18 @@
         <% }) %>
       </select>
       <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_round') %></button></noscript>
+    </form>
+    <form method="get" action="/admin/race-data" class="admin-race-data-focus-form" data-race-data-focus-form>
+      <input type="hidden" name="view" value="<%= viewMode %>" />
+      <input type="hidden" name="season" value="<%= season %>" />
+      <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+      <label for="admin-race-data-focus"><%= t('admin_race_data.focus_label') %></label>
+      <select id="admin-race-data-focus" name="focus">
+        <% (view.focusOptions || []).forEach((option) => { %>
+          <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %></option>
+        <% }) %>
+      </select>
+      <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_focus') %></button></noscript>
     </form>
   </div>
 
@@ -47,21 +60,21 @@
           <% } %>
           <% view.rounds.forEach((round) => { %>
             <th scope="col" class="admin-race-data-round-head <%= round.afterCutoff ? 'is-after-cutoff' : '' %>">
-              <a data-race-data-round-link href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>">R<%= round.roundNumber %></a>
+              <a data-race-data-round-link href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>&focus=<%= view.focusId || 'points' %>">R<%= round.roundNumber %></a>
             </th>
           <% }) %>
-          <th scope="col" class="admin-race-data-summary admin-race-data-sticky-right"><%= t('admin_race_data.points') %></th>
+          <th scope="col" class="admin-race-data-summary admin-race-data-sticky-right"><%= view.focus?.metricLabel || t('admin_race_data.points') %></th>
         </tr>
       </thead>
       <tbody data-race-data-body="<%= viewMode %>">
         <% if (viewMode === 'drivers') { %>
           <% view.drivers.forEach((row, index) => { %>
-            <%- include('admin_race_data_matrix_row', { season, viewMode: 'drivers', detailMode: false, rowKind: 'drivers', row, group: null, groupIndex: 0, groupSize: 1, index }) %>
+            <%- include('admin_race_data_matrix_row', { season, viewMode: 'drivers', detailMode: false, rowKind: 'drivers', row, group: null, groupIndex: 0, groupSize: 1, index, focusId: view.focusId || 'points' }) %>
           <% }) %>
         <% } else { %>
           <% view.constructorGroups.forEach((group) => { %>
             <% group.drivers.forEach((row, groupIndex) => { %>
-              <%- include('admin_race_data_matrix_row', { season, viewMode: 'constructors', detailMode: true, rowKind: 'constructor-driver', row, group, groupIndex, groupSize: group.drivers.length, index: groupIndex }) %>
+              <%- include('admin_race_data_matrix_row', { season, viewMode: 'constructors', detailMode: true, rowKind: 'constructor-driver', row, group, groupIndex, groupSize: group.drivers.length, index: groupIndex, focusId: view.focusId || 'points' }) %>
             <% }) %>
           <% }) %>
         <% } %>
@@ -71,17 +84,21 @@
 
   <div class="admin-race-data-legend muted" aria-label="<%= t('admin_race_data.legend') %>">
     <span><strong><%= t('admin_race_data.legend') %>:</strong></span>
-    <span><%= t('admin_race_data.legend_finish') %></span>
-    <span><%= t('admin_race_data.legend_retired') %></span>
-    <span><%= t('admin_race_data.legend_dns') %></span>
-    <span><%= t('admin_race_data.legend_dnq') %></span>
-    <span><%= t('admin_race_data.legend_nc') %></span>
-    <span><%= t('admin_race_data.legend_dsq') %></span>
-    <span><%= t('admin_race_data.legend_wd') %></span>
-    <span><%= t('admin_race_data.legend_pole') %></span>
-    <span><%= t('admin_race_data.legend_fastest_lap') %></span>
-    <span data-race-data-constructor-legend<%= viewMode === 'constructors' ? '' : ' hidden' %>><%= t('admin_race_data.legend_constructor_podium') %></span>
-    <span><%= t('admin_race_data.legend_unavailable') %></span>
+    <% if (view.focus?.metric === 'podiums') { %>
+      <span><%= t('admin_race_data.legend_podium_focus') %></span>
+    <% } else { %>
+      <span><%= t('admin_race_data.legend_finish') %></span>
+      <span><%= t('admin_race_data.legend_retired') %></span>
+      <span><%= t('admin_race_data.legend_dns') %></span>
+      <span><%= t('admin_race_data.legend_dnq') %></span>
+      <span><%= t('admin_race_data.legend_nc') %></span>
+      <span><%= t('admin_race_data.legend_dsq') %></span>
+      <span><%= t('admin_race_data.legend_wd') %></span>
+      <span><%= t('admin_race_data.legend_pole') %></span>
+      <span><%= t('admin_race_data.legend_fastest_lap') %></span>
+      <span data-race-data-constructor-legend<%= viewMode === 'constructors' ? '' : ' hidden' %>><%= t('admin_race_data.legend_constructor_podium') %></span>
+      <span><%= t('admin_race_data.legend_unavailable') %></span>
+    <% } %>
   </div>
 
   <section class="admin-race-data-detail" aria-labelledby="admin-race-data-detail-heading">

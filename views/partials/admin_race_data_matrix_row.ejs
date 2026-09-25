@@ -26,7 +26,7 @@
   <% } %>
 
   <% row.cells.forEach((cell, cellIndex) => { %>
-    <%- include('admin_race_data_matrix_cell', { season, viewMode, cell, cellIndex }) %>
+    <%- include('admin_race_data_matrix_cell', { season, viewMode, cell, cellIndex, focusId }) %>
   <% }) %>
 
   <% if (isGroupedDriver) { %>

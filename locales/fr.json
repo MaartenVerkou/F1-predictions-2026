@@ -789,6 +789,11 @@
     "legend_unavailable": "— = indisponible / non inscrit",
     "future_round": "Course future ; les données sources ne sont pas encore attendues.",
     "cancelled_round": "Course annulée ; aucune donnée source n’est attendue.",
-    "partial_round": "Couverture partielle; les champs manquants restent indisponibles."
+    "partial_round": "Couverture partielle; les champs manquants restent indisponibles.",
+    "focus_label": "Focus",
+    "open_focus": "Ouvrir le focus",
+    "focus_points": "Points du championnat",
+    "focus_podiums": "Podiums",
+    "legend_podium_focus": "1 = podium · 0 = pas de podium · — = indisponible"
   }
 }

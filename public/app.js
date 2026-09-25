@@ -1213,10 +1213,13 @@ const syncRaceDataSeasonForm = (url) => {
   const matrix = document.querySelector('[data-race-data-matrix]');
   const view = url.searchParams.get('view') || matrix?.dataset.raceDataActiveView || 'drivers';
   const round = url.searchParams.get('round');
+  const focus = url.searchParams.get('focus') || document.querySelector('[data-race-data-focus-form] select[name="focus"]')?.value || 'points';
   const viewInput = form.querySelector('input[name="view"]');
   const roundInput = form.querySelector('input[name="round"]');
+  const focusInput = form.querySelector('input[name="focus"]');
   if (viewInput) viewInput.value = view;
   if (roundInput && round) roundInput.value = round;
+  if (focusInput) focusInput.value = focus;
 };
 
 const requestRaceDataRegion = async (targetUrl, { pushHistory = false } = {}) => {
@@ -1280,13 +1283,32 @@ const initRaceDataViewToggle = () => {
   });
 
   region.addEventListener('change', (event) => {
+    const focusSelect = event.target.closest('[data-race-data-focus-form] select[name="focus"]');
+    if (focusSelect && region.contains(focusSelect)) {
+      const form = focusSelect.form;
+      const url = new URL(form?.action || window.location.href, window.location.href);
+      const current = new URL(window.location.href);
+      const option = focusSelect.options[focusSelect.selectedIndex];
+      const focusView = option?.dataset.raceDataFocusView;
+      url.searchParams.set('season', form?.elements.season?.value || current.searchParams.get('season') || '');
+      url.searchParams.set('round', form?.elements.round?.value || current.searchParams.get('round') || '');
+      url.searchParams.set('focus', focusSelect.value || 'points');
+      url.searchParams.set('view', focusView && focusView !== 'all'
+        ? focusView
+        : document.querySelector('[data-race-data-matrix]')?.dataset.raceDataActiveView || 'drivers');
+      event.preventDefault();
+      void requestRaceDataRegion(url, { pushHistory: true });
+      return;
+    }
     const select = event.target.closest('[data-race-data-round-form] select[name="round"]');
     if (!select || !region.contains(select)) return;
     const form = select.form;
     const url = new URL(form?.action || window.location.href, window.location.href);
-    url.searchParams.set('season', form?.elements.season?.value || new URL(window.location.href).searchParams.get('season') || '');
+    const current = new URL(window.location.href);
+    url.searchParams.set('season', form?.elements.season?.value || current.searchParams.get('season') || '');
     url.searchParams.set('view', form?.elements.view?.value || document.querySelector('[data-race-data-matrix]')?.dataset.raceDataActiveView || 'drivers');
     url.searchParams.set('round', select.value);
+    url.searchParams.set('focus', form?.elements.focus?.value || current.searchParams.get('focus') || 'points');
     event.preventDefault();
     void requestRaceDataRegion(url, { pushHistory: true });
   });

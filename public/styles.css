@@ -2725,6 +2725,7 @@ button:disabled {
 .admin-race-data-toolbar,
 .admin-race-data-tabs,
 .admin-race-data-round-form,
+.admin-race-data-focus-form,
 .admin-race-data-legend,
 .admin-race-data-coverage {
   display: flex;
@@ -2763,13 +2764,19 @@ button:disabled {
   margin: 0;
 }
 
-.admin-race-data-round-form label {
+.admin-race-data-focus-form {
+  margin: 0;
+}
+
+.admin-race-data-round-form label,
+.admin-race-data-focus-form label {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
 }
 
-.admin-race-data-round-form select {
+.admin-race-data-round-form select,
+.admin-race-data-focus-form select {
   min-width: 220px;
 }
 
@@ -2959,6 +2966,13 @@ button:disabled {
   background: linear-gradient(135deg, rgba(181, 116, 63, 0.16) 0%, rgba(232, 199, 170, 0.24) 100%);
 }
 
+.admin-race-data-cell.is-focus-hit {
+  border-color: color-mix(in srgb, var(--border) 42%, var(--accent));
+  background: color-mix(in srgb, var(--accent) 15%, var(--card));
+  color: var(--text);
+  font-weight: 800;
+}
+
 .admin-race-data-cell.state-incomplete {
   color: #9a5b00;
 }
@@ -3054,11 +3068,17 @@ button:disabled {
 
   .admin-race-data-round-form,
   .admin-race-data-round-form select,
+  .admin-race-data-focus-form,
+  .admin-race-data-focus-form select,
   .admin-race-data-detail-heading .button {
     width: 100%;
   }
 
   .admin-race-data-round-form {
+    align-items: stretch;
+  }
+
+  .admin-race-data-focus-form {
     align-items: stretch;
   }
 }

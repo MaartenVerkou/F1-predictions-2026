@@ -5,6 +5,8 @@ const assert = require("node:assert/strict");
 const {
   auditResultLabel,
   auditSourceState,
+  buildRaceDataFocusOptions,
+  resolveRaceDataFocus,
   buildRaceDataAuditView,
   registerAdminRoutes
 } = require("../src/routes/admin");
@@ -331,4 +333,83 @@ test("race data is exposed as a read-only admin workspace", () => {
 
   assert.equal(typeof routes["GET /admin/race-data"], "function");
   assert.equal(routes["POST /admin/race-data"], undefined);
+});
+
+test("race data focus options are driven by question metadata", () => {
+  const questions = [
+    {
+      id: "all_podium_finishers",
+      prompt: "Select all podium finishers",
+      race_data_focus: { view: "drivers", metric: "podiums" }
+    },
+    {
+      id: "constructors_championship_top_3",
+      prompt: "Constructors' Championship: pick your Top 3",
+      race_data_focus: { view: "constructors", metric: "points" }
+    }
+  ];
+  const options = buildRaceDataFocusOptions(questions, { pointsLabel: "Championship points" });
+  assert.deepEqual(options.map((option) => [option.id, option.view, option.metric]), [
+    ["points", "all", "points"],
+    ["all_podium_finishers", "drivers", "podiums"],
+    ["constructors_championship_top_3", "constructors", "points"]
+  ]);
+  assert.equal(resolveRaceDataFocus({
+    questions,
+    focusId: "all_podium_finishers",
+    viewMode: "drivers"
+  }).metric, "podiums");
+  assert.equal(resolveRaceDataFocus({
+    questions,
+    focusId: "all_podium_finishers",
+    viewMode: "constructors"
+  }).id, "points");
+});
+
+test("podium focus projects binary results, counts podiums, and preserves cutoff", () => {
+  const evidence = (round, rows) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: { rows },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: { drivers: [], constructors: [] }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", code: "ALP", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", code: "BET", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [
+      evidence(1, [
+        { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, points: 25, status: "Finished" },
+        { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 4, points: 12, status: "Finished" }
+      ]),
+      evidence(2, [
+        { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 2, points: 18, status: "Finished" },
+        { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 3, points: 15, status: "Finished" }
+      ])
+    ],
+    snapshotRows: [],
+    selectedRound: 2,
+    focus: { id: "all_podium_finishers", view: "drivers", metric: "podiums", label: "Podiums" }
+  });
+
+  assert.equal(view.focusId, "all_podium_finishers");
+  assert.equal(view.drivers[0].name, "Driver Alpha");
+  assert.equal(view.drivers[0].summaryValue, 2);
+  assert.deepEqual(view.drivers[0].cells.map((cell) => cell.label), ["1", "1", "—"]);
+  assert.equal(view.drivers[0].cells[0].focusHit, true);
+  assert.deepEqual(view.drivers[1].cells.map((cell) => cell.label), ["0", "1", "—"]);
+  assert.equal(view.drivers[1].summaryValue, 1);
+  assert.equal(view.drivers[1].cells[0].markerGlyph, "");
+  assert.equal(view.drivers[1].cells[2].afterCutoff, true);
 });

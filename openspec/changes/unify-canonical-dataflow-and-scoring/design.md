@@ -51,7 +51,7 @@ Make `leaderboard-model` (or a single adjacent score service) the only scoring i
 
 - Inputs: canonical identities, memberships, assignments, calendar, mappings, and readiness.
 - Questions: question definitions with options resolved from the selected catalog revision.
-- Race data: immutable evidence, coverage, cutoff totals, and source links.
+- Race data: immutable evidence, coverage, cutoff totals, source links, and read-only question-linked audit projections. Projection metadata selects a reusable metric/view over the same evidence; it is not a second source-of-truth table and never mutates Actuals.
 - Actuals: derived values, provenance, review/correction state, and publishability.
 - Leaderboard/analysis: scoring output for the selected published snapshot.
 

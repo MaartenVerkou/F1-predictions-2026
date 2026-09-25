@@ -74,3 +74,30 @@ The Race data workspace SHALL use one shared matrix and reusable row/cell partia
 - **THEN** driver rows SHALL be resolved from the season's canonical assignment projection at that round
 - **AND** a mid-season replacement SHALL appear only from its assignment start round onward
 - **AND** an empty seat SHALL remain visibly unavailable without borrowing a driver from another round
+
+### Requirement: Race data exposes question-linked audit projections
+The Race data workspace SHALL offer a neutral championship-points projection and question-linked read-only projections declared by question metadata. Every projection SHALL use the same normalized evidence, selected cutoff, catalog revision, and reusable matrix rows/cells; selecting a projection SHALL never write evidence or Actuals.
+
+#### Scenario: Default points focus
+- **GIVEN** no question focus is selected
+- **WHEN** the administrator opens Race data for a cutoff
+- **THEN** the active matrix SHALL show the existing cumulative championship points view
+- **AND** rows SHALL remain ordered by the selected standings totals
+
+#### Scenario: Podium question focus
+- **GIVEN** a question declares a driver podium projection
+- **WHEN** the administrator selects that question in the Race data focus control
+- **THEN** the driver matrix cells SHALL show `1` for a podium finish, `0` for a reported non-podium result, and `—` for unavailable or post-cutoff rounds
+- **AND** the total column SHALL count podiums through the selected cutoff and order rows by that count
+- **AND** the projection SHALL not show unrelated pole, fastest-lap, or constructor markers
+
+#### Scenario: Question focus selects its relevant table
+- **GIVEN** a question declares a constructor points projection
+- **WHEN** the administrator selects that question
+- **THEN** the workspace SHALL switch to the constructor grouping while retaining the same round, evidence, and matrix structure
+- **AND** the selected focus, view, and cutoff SHALL remain represented in the URL for refresh and sharing
+
+#### Scenario: Projection leaves source evidence unchanged
+- **WHEN** an administrator changes focus or cutoff
+- **THEN** the source detail and persisted evidence identity SHALL remain unchanged
+- **AND** no Actuals snapshot or review state SHALL be created, updated, or published
