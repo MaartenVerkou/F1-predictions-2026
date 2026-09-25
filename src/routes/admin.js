@@ -47,6 +47,7 @@ const {
   readSeasonMutationFlags,
   resolveAdminSeasonContext
 } = require("../admin-season-context");
+const { applyRaceDataFocus } = require("../race-data-audit");
 
 
 function auditResultLabel(row) {
@@ -196,6 +197,7 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
     view: "all",
     metric: "points",
     questionId: null,
+    group: "standings",
     label: pointsLabel
   }];
   const seen = new Set(["points"]);
@@ -205,11 +207,28 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
     const view = String(projection?.view || "").trim().toLowerCase();
     const metric = String(projection?.metric || "").trim().toLowerCase();
     if (!id || seen.has(id) || !["drivers", "constructors"].includes(view)) continue;
-    if (!["points", "podiums"].includes(metric)) continue;
+    const inferredGroup = ["championship_top3", "last_standing", "all_teams_points"].includes(metric)
+      ? "standings"
+      : ["podiums", "dnfs", "grid_wins", "driver_of_day", "sprint_points", "dnf_by_race"].includes(metric)
+        ? "race"
+        : ["teammate_points", "qualifying_h2h", "alpine_comparison"].includes(metric)
+          ? "comparisons"
+          : ["damage", "engine_switch"].includes(metric)
+            ? "external"
+            : "other";
+    const group = String(projection?.group || inferredGroup).trim().toLowerCase();
     options.push({
       id,
       view,
       metric,
+      matrixMetric: String(projection?.matrixMetric || (metric === "points" || metric === "podiums" ? metric : "points")).trim().toLowerCase(),
+      sort: String(projection?.sort || "desc").trim().toLowerCase(),
+      kind: String(projection?.kind || "matrix").trim().toLowerCase(),
+      scope: String(projection?.scope || "through_cutoff").trim().toLowerCase(),
+      group,
+      options: Array.isArray(question.options) ? question.options.slice() : [],
+      compareTeams: Array.isArray(projection?.compareTeams) ? projection.compareTeams.slice() : [],
+      requiredEvidence: Array.isArray(projection?.requiredEvidence) ? projection.requiredEvidence.slice() : [],
       questionId: id,
       label: String(question.prompt || id)
     });
@@ -290,6 +309,7 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
       id: Number(team.teamId),
       name: String(team.teamName),
       code: teamCatalogById.get(Number(team.teamId))?.team_code || null,
+      powerUnit: teamCatalogById.get(Number(team.teamId))?.power_unit || null,
       seats: team.seats.map((seat) => ({
         seatNumber: Number(seat.seatNumber),
         driverId: seat.driverId == null ? null : Number(seat.driverId),
@@ -513,6 +533,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       name: team,
       code: entity.code || fallbackEntityCode(team, "team"),
       id: entity.id,
+      powerUnit: entity.powerUnit || null,
       cells,
       points: standing?.points ?? null,
       summaryValue: standing?.points ?? null,
@@ -520,6 +541,16 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       podiumSummary: buildAuditPodiumSummary(cells)
     };
   }));
+
+  const focusProjection = applyRaceDataFocus({
+    focus: activeFocus,
+    rounds,
+    driverRows,
+    constructorRows,
+    cutoffRoundNumber
+  });
+  driverRows.splice(0, driverRows.length, ...focusProjection.drivers);
+  constructorRows.splice(0, constructorRows.length, ...focusProjection.constructors);
 
   const buildUnavailableDriverRow = (team, seatNumber) => ({
     name: "—",
@@ -628,7 +659,8 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     snapshotRows,
     catalogRevision,
     focus: activeFocus,
-    focusId: activeFocus.id
+    focusId: activeFocus.id,
+    focusSummary: focusProjection.summary
   };
 }
 
@@ -3613,9 +3645,20 @@ function registerAdminRoutes(app, deps) {
       viewMode,
       pointsLabel
     });
-    focus.metricLabel = focus.metric === "podiums"
-      ? t("admin_race_data.focus_podiums")
-      : t("admin_race_data.points");
+    const focusMetricLabels = {
+      points: t("admin_race_data.points"),
+      podiums: t("admin_race_data.focus_podiums"),
+      dnfs: t("admin_race_data.focus_dnfs"),
+      grid_wins: t("admin_race_data.focus_grid_wins"),
+      driver_of_day: t("admin_race_data.focus_driver_of_day"),
+      sprint_points: t("admin_race_data.focus_sprint_points"),
+      qualifying_h2h: t("admin_race_data.focus_qualifying_h2h"),
+      no_podium_points: t("admin_race_data.focus_no_podium_points"),
+      all_teams_points: t("admin_race_data.focus_team_coverage"),
+      damage: t("admin_race_data.focus_damage"),
+      engine_switch: t("admin_race_data.focus_external")
+    };
+    focus.metricLabel = focusMetricLabels[focus.matrixMetric || focus.metric] || t("admin_race_data.points");
     const catalog = seasonContext.selected
       ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
       : null;

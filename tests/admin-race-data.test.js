@@ -413,3 +413,93 @@ test("podium focus projects binary results, counts podiums, and preserves cutoff
   assert.equal(view.drivers[1].cells[0].markerGlyph, "");
   assert.equal(view.drivers[1].cells[2].afterCutoff, true);
 });
+
+test("question focus projections expose DNF and grid-winner facts without changing evidence", () => {
+  const evidence = {
+    id: 1,
+    round_number: 1,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: {
+        rows: [
+          { driver_id: 101, driver: "Driver Alpha", constructor: "Team A", position: 1, grid: 12, points: 25, status: "Finished" },
+          { driver_id: 102, driver: "Driver Beta", constructor: "Team A", position: null, grid: 4, points: 0, status: "Retired" }
+        ]
+      },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: {
+        drivers: [
+          { entity_id: 101, entity: "Driver Alpha", position: 1, points: 25 },
+          { entity_id: 102, entity: "Driver Beta", position: 2, points: 0 }
+        ],
+        constructors: [{ entity_id: 201, entity: "Team A", position: 1, points: 25 }]
+      }
+    }
+  };
+  const roster = {
+    driver_entities: [
+      { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+      { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+    ],
+    team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+  };
+  const dnfView = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster,
+    evidenceRows: [evidence],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: { id: "most_dnfs_driver", view: "drivers", metric: "dnfs", matrixMetric: "dnfs", sort: "desc" }
+  });
+  assert.equal(dnfView.drivers.find((row) => row.name === "Driver Beta").cells[0].label, "1");
+  assert.equal(dnfView.drivers.find((row) => row.name === "Driver Beta").summaryValue, 1);
+  assert.equal(dnfView.drivers.find((row) => row.name === "Driver Alpha").cells[0].label, "0");
+  assert.match(dnfView.focusSummary.value, /Driver Beta/);
+
+  const gridView = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster,
+    evidenceRows: [evidence],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: { id: "lowest_grid_win_position", view: "drivers", metric: "grid_wins", matrixMetric: "grid_wins" }
+  });
+  assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").cells[0].label, "12");
+  assert.equal(gridView.focusSummary.value, "12 · Driver Alpha");
+});
+
+test("qualifying focus compares constructor teammates in the shared matrix", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        race: { rows: [] },
+        qualifying: { rows: [
+          { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 5 },
+          { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 8 }
+        ] },
+        sprint: { rows: [] },
+        standings: { drivers: [], constructors: [{ entity_id: 201, entity: "Team A", position: 1, points: 0 }] }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: { id: "closest_qualifying_teammates", view: "constructors", metric: "qualifying_h2h", matrixMetric: "qualifying_h2h", sort: "asc" }
+  });
+  assert.equal(view.constructors[0].summaryValue, 1);
+  assert.equal(view.constructors[0].cells[0].label, "5–8");
+  assert.equal(view.focusSummary.value, "Team A · 1");
+});

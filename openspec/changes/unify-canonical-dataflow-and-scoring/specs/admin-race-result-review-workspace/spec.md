@@ -101,3 +101,22 @@ The Race data workspace SHALL offer a neutral championship-points projection and
 - **WHEN** an administrator changes focus or cutoff
 - **THEN** the source detail and persisted evidence identity SHALL remain unchanged
 - **AND** no Actuals snapshot or review state SHALL be created, updated, or published
+
+### Requirement: Question audit focuses expose the smallest useful fact projection
+The Race data workspace SHALL resolve each question's audit profile from question metadata and SHALL use a shared matrix or compact summary projection rather than rendering a separate question-specific table. A projection SHALL expose the observed facts needed to verify the candidate actual, its cutoff, and its evidence readiness without duplicating the source detail.
+
+#### Scenario: An administrator opens a question focus
+- **WHEN** a question declares a points, podium, DNF, grid-winner, sprint, qualifying, or comparison projection
+- **THEN** the focus control SHALL place it in the relevant group
+- **AND** the workspace SHALL reuse the existing driver or constructor matrix with the declared cell metric, total, and sort order
+- **AND** any additional interpretation SHALL appear as one compact summary with hover details
+
+#### Scenario: A question requires evidence that is not normalized
+- **WHEN** a question declares damage or external-announcement evidence that is not available in the selected evidence bundle
+- **THEN** the workspace SHALL show an explicit unavailable state and reason
+- **AND** it SHALL not infer the value from a related metric such as DNF or championship points
+
+#### Scenario: A question focus is reviewed at an earlier cutoff
+- **WHEN** the administrator changes the selected round while a question focus is active
+- **THEN** all cells, totals, summary values, and readiness state SHALL use the same cutoff
+- **AND** future rounds SHALL remain muted and excluded from the candidate result

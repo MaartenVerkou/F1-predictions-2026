@@ -39,14 +39,37 @@
       <input type="hidden" name="season" value="<%= season %>" />
       <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
       <label for="admin-race-data-focus"><%= t('admin_race_data.focus_label') %></label>
+      <% const focusGroups = (view.focusOptions || []).reduce((groups, option) => {
+        const group = option.group || 'other';
+        (groups[group] ||= []).push(option);
+        return groups;
+      }, {}); %>
       <select id="admin-race-data-focus" name="focus">
-        <% (view.focusOptions || []).forEach((option) => { %>
-          <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %></option>
+        <% Object.entries(focusGroups).forEach(([group, options]) => { %>
+          <optgroup label="<%= t(`admin_race_data.focus_group_${group}`) %>">
+            <% options.forEach((option) => { %>
+              <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %></option>
+            <% }) %>
+          </optgroup>
         <% }) %>
       </select>
       <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_focus') %></button></noscript>
     </form>
   </div>
+
+  <% if (view.focusSummary) { %>
+    <% const focusSummaryStatusKey = view.focusSummary.status === 'ready'
+      ? 'focus_ready'
+      : view.focusSummary.status === 'partial'
+        ? 'focus_partial'
+        : 'focus_unavailable'; %>
+    <section class="admin-race-data-focus-summary is-<%= view.focusSummary.status %>" data-race-data-focus-summary aria-label="<%= t('admin_race_data.focus_audit') %>">
+      <span class="admin-race-data-focus-summary-label"><%= t('admin_race_data.focus_audit') %></span>
+      <strong class="admin-race-data-focus-summary-value" title="<%= view.focusSummary.tooltip || '' %>"><%= view.focusSummary.value %></strong>
+      <span class="admin-race-data-focus-summary-detail" title="<%= view.focusSummary.tooltip || '' %>"><%= view.focusSummary.detail %></span>
+      <span class="admin-race-data-focus-summary-status"><%= t(`admin_race_data.${focusSummaryStatusKey}`) %></span>
+    </section>
+  <% } %>
 
   <div class="admin-race-data-table-wrap">
     <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
@@ -84,8 +107,18 @@
 
   <div class="admin-race-data-legend muted" aria-label="<%= t('admin_race_data.legend') %>">
     <span><strong><%= t('admin_race_data.legend') %>:</strong></span>
-    <% if (view.focus?.metric === 'podiums') { %>
+    <% if (view.focus?.metric === 'podiums' || view.focus?.metric === 'ferrari_podium') { %>
       <span><%= t('admin_race_data.legend_podium_focus') %></span>
+    <% } else if (view.focus?.metric === 'dnfs' || view.focus?.metric === 'dnf_by_race') { %>
+      <span><%= t('admin_race_data.legend_dnf_focus') %></span>
+    <% } else if (view.focus?.metric === 'grid_wins') { %>
+      <span><%= t('admin_race_data.legend_grid_wins_focus') %></span>
+    <% } else if (view.focus?.metric === 'driver_of_day') { %>
+      <span><%= t('admin_race_data.legend_driver_of_day_focus') %></span>
+    <% } else if (view.focus?.metric === 'sprint_points' || view.focus?.metric === 'sprint_champion_same') { %>
+      <span><%= t('admin_race_data.legend_sprint_focus') %></span>
+    <% } else if (view.focus?.metric === 'qualifying_h2h') { %>
+      <span><%= t('admin_race_data.legend_qualifying_focus') %></span>
     <% } else { %>
       <span><%= t('admin_race_data.legend_finish') %></span>
       <span><%= t('admin_race_data.legend_retired') %></span>
