@@ -2996,6 +2996,11 @@ button:disabled {
   border-right: 0 !important;
 }
 
+.admin-race-data-rank {
+  padding-right: 8px !important;
+  padding-left: 8px !important;
+}
+
 .admin-race-data-entity {
   left: var(--admin-race-rank-width);
   width: var(--admin-race-entity-width);
