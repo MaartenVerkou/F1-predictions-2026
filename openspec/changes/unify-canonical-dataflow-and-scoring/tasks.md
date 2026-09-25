@@ -47,7 +47,7 @@
 - [x] 6.2b Add the in-place Drivers/Constructors view switch with grouped constructor seat rows, merged constructor totals, canonical round lineup ordering, and shared matrix row/cell partials.
 - [x] 6.2c Add question-linked Race data audit projections over the shared matrix, including points and podium focus, cutoff-aware totals, metadata-driven table selection, URL state, and read-only semantics.
 - [x] 6.2d Extend question-linked Race data audit projections with metadata-driven focus groups, reusable DNF/grid/sprint/qualifying metrics, compact cross-question summaries, and explicit unavailable states for unsupported evidence.
-- [ ] 6.2e Add shared metric render modes for per-round count/points/comparison cells and a cutoff-aware additive footer, with metadata-driven focus profiles and tests for future-round exclusion.
+- [x] 6.2e Add shared metric render modes for per-round count/points/comparison cells and a cutoff-aware additive footer, with metadata-driven focus profiles and tests for future-round exclusion.
 - [ ] 6.3 Update Actuals, leaderboard, and analysis to consume shared services and remove duplicated semantic transformations.
 - [ ] 6.4 Keep loading, empty, error, permission, responsive, and accessibility states coherent across the four admin/public workflows.
 
