@@ -622,6 +622,12 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
           : focusCells.map((cell) => ({
             ...cell,
             label: "—",
+            podiumPosition: null,
+            podiumMarkerGlyph: "",
+            podiumMarkerTitle: "",
+            markers: [],
+            markerGlyph: "",
+            markerTitle: "",
             focusHit: false,
             title: "Focus value shown on the team row"
           }))
