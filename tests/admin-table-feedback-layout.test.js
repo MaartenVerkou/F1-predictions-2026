@@ -86,7 +86,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
   assert.match(region, /class="admin-race-data-controls"/);
   assert.match(region, /questions_label/);
-  assert.match(region, /question_table_label/);
+  assert.match(region, /table_heading/);
   assert.match(region, /data-race-data-round-form/);
   assert.match(region, /data-race-data-round-link/);
   assert.match(region, /class="admin-race-data-table-section"/);
