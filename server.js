@@ -5373,6 +5373,7 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
   const races = getRaces();
   const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
   const currentActuals = publishedActuals.values || {};
+  const publishedRound = Number(publishedActuals.snapshot?.round_number);
   const snapshotRows = db
     .prepare(
       `
@@ -5391,6 +5392,13 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
     if (!Number.isFinite(roundNumber) || roundNumber <= 0) return;
     if (roundNumber > races.length) return;
     if (!Number.isFinite(season) || season <= 0) return;
+    if (String(row.review_status || "").trim().toLowerCase() !== "reviewed") return;
+    if (season === CURRENT_SEASON) {
+      if (!publishedActuals.available) return;
+      if (Number.isFinite(publishedRound) && publishedRound > 0 && roundNumber > publishedRound) {
+        return;
+      }
+    }
     const key = `${season}:${roundNumber}`;
     if (snapshotByRound.has(key)) return;
     snapshotByRound.add(key);
