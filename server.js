@@ -5368,10 +5368,18 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
   if (!excludeHiddenAdmins && !adminAccess && !isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
+  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
+  if (!publishedActuals.available) {
+    return sendError(
+      req,
+      res,
+      404,
+      "Leaderboard is not available until an actual snapshot is reviewed and published."
+    );
+  }
   const canViewQuestionBreakdown = Boolean(user);
   const questions = getQuestions(locale);
   const races = getRaces();
-  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
   const currentActuals = publishedActuals.values || {};
   const publishedRound = Number(publishedActuals.snapshot?.round_number);
   const snapshotRows = db
