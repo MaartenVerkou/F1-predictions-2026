@@ -232,6 +232,9 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
     if (Number(error?.statusCode) === 429) {
       return { status: "rate_limited", discovered: 0, imported: 0, skipped: 0, pending: 0, error: error.message };
     }
+    if ([401, 403].includes(Number(error?.statusCode))) {
+      return { status: "blocked", discovered: 0, imported: 0, skipped: 0, pending: 0, error: error.message };
+    }
     throw error;
   }
   if (feed.status === "not_modified") return { status: "unchanged", discovered: 0, imported: 0, skipped: 0, pending: 0 };

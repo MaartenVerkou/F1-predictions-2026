@@ -57,3 +57,20 @@ test("Reddit import is idempotent and keeps evidence/actuals pending", async (t)
   assert.equal(evidenceCount, 1);
   assert.equal(pending.review_status, "pending");
 });
+
+test("blocked or rate-limited Reddit discovery never opens a database mutation", async () => {
+  const result = await run({
+    apply: true,
+    dryRun: false,
+    season: 2026,
+    round: null,
+    feedUrl: "https://reddit.test/feed",
+    author: "Dense-Strategy-867",
+    dbPath: "/path/that/is/not/opened",
+    databaseUrl: ""
+  }, {
+    fetchImpl: async () => ({ ok: false, status: 403, headers: { get: () => null } }),
+    sleep: async () => {}
+  });
+  assert.equal(result.status, "blocked");
+});
