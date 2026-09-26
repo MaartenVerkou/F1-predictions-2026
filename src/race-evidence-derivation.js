@@ -27,6 +27,8 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
   const driverStandingsByRound = new Map();
   const constructorStandingsByRound = new Map();
   const driverOfTheDayByRound = new Map();
+  const destructorsByRound = new Map();
+  const destructorsErrorsByRound = new Map();
 
   for (const row of evidenceRows || []) {
     const payload = row.payload || {};
@@ -63,6 +65,28 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
     if (payload.external?.driverOfTheDay) {
       driverOfTheDayByRound.set(round, payload.external.driverOfTheDay);
     }
+    const damage = payload.external?.damage;
+    const damageRows = Array.isArray(damage?.rows) ? damage.rows.map((item) => ({
+      round: item.round == null ? round : Number(item.round),
+      driverName: item.driver || item.driver_label || null,
+      constructorName: item.constructor || item.team_label || null,
+      driverId: item.driver_id == null ? null : item.driver_id,
+      constructorId: item.team_id == null ? null : item.team_id,
+      driverCode: item.driver_code || null,
+      components: Array.isArray(item.components) ? item.components.map((component) => ({
+        componentId: component.component_id || component.componentId || null,
+        name: component.name || "Unknown component",
+        price: component.price,
+        quantity: component.quantity,
+        totalCost: component.total_cost == null ? component.totalCost : component.total_cost
+      })) : [],
+      totalCost: item.totalCost == null ? item.total_cost : item.totalCost,
+      costStatus: item.cost_status || null,
+      sourceText: item.source_text || item.sourceText || null,
+      resolution: item.resolution || null
+    })) : [];
+    destructorsByRound.set(round, damageRows);
+    if (damage?.error) destructorsErrorsByRound.set(round, String(damage.error));
   }
 
   return {
@@ -73,7 +97,9 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
     completedRounds: results.map((row) => row.round),
     driverStandingsByRound,
     constructorStandingsByRound,
-    driverOfTheDayByRound
+    driverOfTheDayByRound,
+    destructorsByRound,
+    destructorsErrorsByRound
   };
 }
 

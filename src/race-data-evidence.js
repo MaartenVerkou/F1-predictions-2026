@@ -21,7 +21,8 @@ const TEAM_NAME_ALIASES = {
 const SOURCE_TYPES = {
   JOLPICA: "jolpica_ergast",
   FORMULA1: "formula1",
-  FORMULA1_DASHBOARD: "formula1_dashboard"
+  FORMULA1_DASHBOARD: "formula1_dashboard",
+  REDDIT_DESTRUCTORS: "reddit_destructors"
 };
 
 function parseNum(value, fallback = null) {
@@ -135,18 +136,24 @@ function normalizeDamageRow(row, roster, canonicalCatalog = null) {
   const driver = resolveCanonicalName(rawDriver, roster?.drivers || [], DRIVER_NAME_ALIASES) || rawDriver || null;
   const constructor = resolveCanonicalName(rawTeam, roster?.teams || [], TEAM_NAME_ALIASES) || rawTeam || null;
   const components = (Array.isArray(row?.components) ? row.components : []).map((component) => {
-    const price = Math.max(0, parseNum(component?.price, 0));
-    const quantity = Math.max(0, parseNum(component?.quantity, 0));
+    const parsedPrice = parseNum(component?.price);
+    const price = parsedPrice == null ? null : Math.max(0, parsedPrice);
+    const quantity = Math.max(0, parseNum(component?.quantity, 1));
     return {
       component_id: component?.componentId == null ? null : String(component.componentId),
       name: String(component?.name || "Unknown component").trim(),
       price,
       quantity,
-      total_cost: price * quantity
+      total_cost: price == null ? null : price * quantity
     };
   });
-  const componentTotal = components.reduce((sum, component) => sum + component.total_cost, 0);
-  const totalCost = Math.max(0, parseNum(row?.totalCost, componentTotal));
+  const parsedTotal = parseNum(row?.totalCost);
+  const componentTotal = components.every((component) => component.total_cost != null)
+    ? components.reduce((sum, component) => sum + component.total_cost, 0)
+    : null;
+  const totalCost = parsedTotal != null
+    ? Math.max(0, parsedTotal)
+    : componentTotal == null ? null : Math.max(0, componentTotal);
   return {
     round: parseNum(row?.round),
     driver,
@@ -158,10 +165,14 @@ function normalizeDamageRow(row, roster, canonicalCatalog = null) {
     provider_driver_id: row?.driverId == null ? null : String(row.driverId),
     provider_team_id: row?.constructorId == null ? null : String(row.constructorId),
     driver_number: row?.driverNumber == null ? null : String(row.driverNumber),
+    driver_code: row?.driverCode == null ? null : String(row.driverCode).trim().toUpperCase() || null,
     grand_prix_id: row?.grandPrixId == null ? null : String(row.grandPrixId),
     grand_prix_country: row?.grandPrixCountry || null,
     components,
-    totalCost
+    totalCost,
+    cost_status: totalCost == null ? "unresolved" : "resolved",
+    source_text: row?.sourceText == null ? null : String(row.sourceText),
+    resolution: row?.resolution || null
   };
 }
 
@@ -217,11 +228,15 @@ function buildEvidenceBundle({
     "qualifying", canonicalCatalog
   );
   const sprintRows = normalizeSourceRows(sprintRace.SprintResults, roster, "sprint", canonicalCatalog);
-  const damageSourceRows = data?.destructorsByRound?.get(round) || data?.damageByRound?.get(round) || [];
+  const damageMap = data?.destructorsByRound instanceof Map
+    ? data.destructorsByRound
+    : data?.damageByRound instanceof Map ? data.damageByRound : null;
+  const damageSourceRows = damageMap?.get(round) || [];
   const damageRows = damageSourceRows
     .map((row) => normalizeDamageRow(row, roster, canonicalCatalog))
-    .filter((row) => row.round != null && row.driver && row.constructor);
-  const damageSourceAvailable = data?.destructorsByRound instanceof Map && !data?.destructorsError;
+    .filter((row) => row.round != null && row.driver);
+  const destructorsError = data?.destructorsErrorsByRound?.get(round) || data?.destructorsError || null;
+  const damageSourceAvailable = damageMap instanceof Map && damageRows.length > 0 && !destructorsError;
   const normalizedDriverStandings = driverStandings
     .map((row) => normalizeStandingsRow(row, roster, "driver", canonicalCatalog))
     .filter(Boolean);
@@ -247,6 +262,7 @@ function buildEvidenceBundle({
         sprintTeams: sprintRows.filter((row) => row.constructor && row.team_id == null).length,
         damageDrivers: damageRows.filter((row) => row.driver && row.driver_id == null).length,
         damageTeams: damageRows.filter((row) => row.constructor && row.team_id == null).length,
+        damageCosts: damageRows.filter((row) => row.cost_status !== "resolved").length,
         standingsDrivers: normalizedDriverStandings.filter((row) => row.entity && row.entity_id == null).length,
         standingsTeams: normalizedConstructorStandings.filter((row) => row.entity && row.entity_id == null).length
       }
@@ -293,7 +309,7 @@ function buildEvidenceBundle({
       damage: {
         available: damageSourceAvailable,
         rows: damageRows,
-        error: data?.destructorsError || null
+        error: destructorsError
       }
     },
     raw: {
@@ -364,7 +380,19 @@ function ensureRaceDataSchema(db) {
     "CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_season_round " +
       "ON race_data_snapshots(season, round_number, created_at); " +
     "CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_import " +
-      "ON race_data_snapshots(import_id, round_number);"
+      "ON race_data_snapshots(import_id, round_number);" +
+    " CREATE TABLE IF NOT EXISTS destructors_source_posts (" + identity + ", " +
+      "provider TEXT NOT NULL, post_id TEXT NOT NULL, season INTEGER NOT NULL, " +
+      "round_number INTEGER, round_name TEXT, post_url TEXT, author TEXT, title TEXT, " +
+      "published_at TEXT, source_updated_at TEXT, fetched_at TEXT NOT NULL, content_hash TEXT NOT NULL, " +
+      "body_text TEXT, body_html TEXT, image_urls_json TEXT, parser_version TEXT NOT NULL, " +
+      "status TEXT NOT NULL, warnings_json TEXT, normalized_json TEXT, headers_json TEXT, " +
+      "last_error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, " +
+      "UNIQUE(provider, post_id)); " +
+    "CREATE INDEX IF NOT EXISTS idx_destructors_source_posts_season_round " +
+      "ON destructors_source_posts(season, round_number, updated_at); " +
+    "CREATE INDEX IF NOT EXISTS idx_destructors_source_posts_hash " +
+      "ON destructors_source_posts(provider, content_hash);"
   );
 
   const snapshotColumns = listColumnNames(db, "race_data_snapshots");
@@ -391,6 +419,96 @@ function ensureRaceDataSchema(db) {
       "WHERE parser_version IS NULL OR parser_version = '' OR calendar_state IS NULL OR " +
       "calendar_state = '' OR reconstructed IS NULL;"
   );
+}
+
+function parseJsonColumn(value, fallback) {
+  if (value == null || value === "") return fallback;
+  try { return JSON.parse(String(value)); } catch (error) { return fallback; }
+}
+
+function mapDestructorsSourcePost(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    id: Number(row.id),
+    season: Number(row.season),
+    round_number: row.round_number == null ? null : Number(row.round_number),
+    image_urls: parseJsonColumn(row.image_urls_json, []),
+    warnings: parseJsonColumn(row.warnings_json, []),
+    normalized: parseJsonColumn(row.normalized_json, null),
+    headers: parseJsonColumn(row.headers_json, {})
+  };
+}
+
+function findDestructorsSourcePost(db, provider, postId) {
+  const row = db.prepare(
+    "SELECT id, provider, post_id, season, round_number, round_name, post_url, author, title, " +
+      "published_at, source_updated_at, fetched_at, content_hash, body_text, body_html, image_urls_json, " +
+      "parser_version, status, warnings_json, normalized_json, headers_json, last_error, created_at, updated_at " +
+      "FROM destructors_source_posts WHERE provider = ? AND post_id = ? LIMIT 1"
+  ).get(String(provider), String(postId));
+  return mapDestructorsSourcePost(row);
+}
+
+function saveDestructorsSourcePost(db, {
+  provider = SOURCE_TYPES.REDDIT_DESTRUCTORS,
+  postId,
+  season,
+  roundNumber = null,
+  roundName = null,
+  postUrl = null,
+  author = null,
+  title = null,
+  publishedAt = null,
+  updatedAt = null,
+  fetchedAt = new Date().toISOString(),
+  contentHash,
+  bodyText = null,
+  bodyHtml = null,
+  imageUrls = [],
+  parserVersion = "reddit-destructors-rss-v1",
+  status = "pending_review",
+  warnings = [],
+  normalized = null,
+  headers = {},
+  lastError = null
+}) {
+  if (!postId || !Number.isFinite(Number(season)) || !contentHash) {
+    throw new Error("Destructors source post requires post id, season, and content hash.");
+  }
+  const now = new Date().toISOString();
+  const existing = findDestructorsSourcePost(db, provider, postId);
+  const values = [
+    Number(season), roundNumber == null ? null : Number(roundNumber), String(roundName || "").trim() || null,
+    String(postUrl || "").trim() || null, String(author || "").trim() || null, String(title || "").trim() || null,
+    publishedAt || null, updatedAt || null, fetchedAt || now, String(contentHash),
+    bodyText == null ? null : String(bodyText), bodyHtml == null ? null : String(bodyHtml), JSON.stringify(imageUrls || []),
+    String(parserVersion), String(status), JSON.stringify(warnings || []), normalized == null ? null : JSON.stringify(normalized),
+    JSON.stringify(headers || {}), lastError == null ? null : String(lastError), now
+  ];
+  if (existing) {
+    db.prepare(
+      "UPDATE destructors_source_posts SET season = ?, round_number = ?, round_name = ?, post_url = ?, " +
+        "author = ?, title = ?, published_at = ?, source_updated_at = ?, fetched_at = ?, content_hash = ?, body_text = ?, " +
+        "body_html = ?, image_urls_json = ?, parser_version = ?, status = ?, warnings_json = ?, normalized_json = ?, " +
+        "headers_json = ?, last_error = ?, updated_at = ? WHERE id = ?"
+    ).run(...values, Number(existing.id));
+    return Number(existing.id);
+  }
+  const result = db.prepare(
+    "INSERT INTO destructors_source_posts (provider, post_id, season, round_number, round_name, post_url, author, title, " +
+      "published_at, source_updated_at, fetched_at, content_hash, body_text, body_html, image_urls_json, parser_version, status, " +
+      "warnings_json, normalized_json, headers_json, last_error, created_at, updated_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(String(provider), String(postId), ...values, now);
+  return Number(result.lastInsertRowid);
+}
+
+function listDestructorsSourcePosts(db, season, { roundNumber = null } = {}) {
+  const rows = roundNumber == null
+    ? db.prepare("SELECT * FROM destructors_source_posts WHERE season = ? ORDER BY published_at ASC, id ASC").all(Number(season))
+    : db.prepare("SELECT * FROM destructors_source_posts WHERE season = ? AND round_number = ? ORDER BY published_at ASC, id ASC").all(Number(season), Number(roundNumber));
+  return rows.map(mapDestructorsSourcePost);
 }
 
 function createRaceDataImport(db, {
@@ -673,15 +791,18 @@ module.exports = {
   createRaceDataImport,
   ensureRaceDataSchema,
   findEvidenceForActualSnapshot,
+  findDestructorsSourcePost,
   findRaceDataSnapshot,
   findRaceDataImport,
   linkEvidenceToActualSnapshot,
   listRaceDataImports,
+  listDestructorsSourcePosts,
   listRaceDataSnapshots,
   normalizeCoverage,
   normalizeDamageRow,
   normalizeLookupKey,
   parseEvidencePayload,
+  saveDestructorsSourcePost,
   saveRaceDataSnapshot,
   summarizeEvidence,
   teamNameFromApi,
