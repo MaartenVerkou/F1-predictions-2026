@@ -18,6 +18,10 @@
 - [ ] 2.2 Make import persistence idempotent for equivalent bundles and create a new evidence revision only when normalized facts or parser behavior changes.
 - [ ] 2.3 Add pure and integration tests for complete, partial, cancelled, future, reconstructed, duplicate, and changed imports.
 - [ ] 2.4 Route Race data and Actuals to the same persisted evidence/cutoff read model and verify that future data cannot leak into earlier rounds.
+- [ ] 2.5 Add a validated Formula 1 Dashboard provider adapter for calendar, race, starting-grid, qualifying, sprint, driver-standings, and constructor-standings endpoints with timeout/retry and immutable provenance.
+- [ ] 2.6 Normalize Formula 1 Dashboard rows to the provider-neutral evidence contract, resolve stable catalog IDs where unique, and preserve provider IDs/labels plus explicit unresolved/conflict reasons.
+- [ ] 2.7 Make the backfill/admin sync provider-selectable through server configuration, keeping Actuals and Race data on persisted evidence and preventing live API calls during rendering or scoring.
+- [ ] 2.8 Add provider fixtures/tests for successful constructor mapping, sentinel statuses, partial/future rounds, malformed responses, idempotent revisions, and Formula 1 Dashboard versus existing-provider comparison output.
 
 ## 3. Shared derivation engine
 
@@ -53,7 +57,7 @@
 
 ## 7. Preview, release, and cleanup
 
-- [ ] 7.1 Keep coherent synthetic fixtures test-only, and bootstrap the public isolated preview from validated provider evidence without a random-data fallback.
+- [ ] 7.1 Keep coherent synthetic fixtures test-only, and bootstrap the public isolated preview from validated Formula 1 Dashboard/provider evidence without a random-data fallback.
 - [ ] 7.2 Run syntax, focused tests, full tests, build, strict OpenSpec validation, and critical Playwright flows on the preview branch.
 - [ ] 7.3 Verify `/healthz` reports PostgreSQL, production remains unchanged, and the preview shows reproducible Inputs → Questions → Race data → Actuals → scoring behavior.
 - [ ] 7.4 Remove superseded route/script implementations and archive this change only after explicit preview approval and a clean final diff review.

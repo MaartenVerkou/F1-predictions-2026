@@ -83,3 +83,13 @@ Add columns/tables and dual-read compatibility first. Backfill or report resolva
 ### 8. Use provider-backed evidence for the public preview
 
 The public sanitized preview SHALL use the same normalized provider-import path as an admin sync, backed by an isolated preview PostgreSQL database. Preview creation SHALL seed canonical Inputs, fetch the completed public rounds from the approved provider, persist evidence and pending actual snapshots, and expose source/provenance metadata. It SHALL fail if the provider import fails; it SHALL not fall back to generated positions, synthetic points, or a production database clone. Deterministic fixture seeding remains available only through an explicitly test-only helper.
+
+### 9. Add Formula 1 Dashboard as a versioned evidence adapter
+
+Formula 1 Dashboard is an external, unofficial read-only provider. Its API is accessed only by the import boundary through a configurable base URL (`FORMULA1_DASHBOARD_API_BASE_URL`, defaulting to the documented public host) and a provider selector (`F1_DATA_PROVIDER`). The application never calls it while rendering Race data, Actuals, or scoring.
+
+The adapter fetches the season calendar, race classifications, starting grids, qualifying, sprint results, driver-standings evolution, and constructor-standings evolution. It converts the provider response into the existing provider-neutral source shape before `buildEvidenceBundle` persists it. Provider IDs and labels are retained, while canonical IDs are resolved through the season catalog; a missing or ambiguous match stays unresolved.
+
+Each imported round carries `source_type = formula1_dashboard`, the exact endpoint URLs, provider schema revision, fetch timestamp, normalized payload revision, and a compact provenance record. Formula 1 Dashboard data may be compared with another provider, but neither provider silently overwrites the other. A conflicting fact is recorded as an unresolved/conflict state and blocks affected derivations until an administrator reviews it. A provider outage, malformed response, or partial session does not become zeroes and does not trigger a synthetic fallback.
+
+The adapter is used by the preview and by explicit admin sync configuration first. Production keeps its existing provider until a separately approved comparison and deployment; both environments still derive actuals and scoring solely from persisted reviewed evidence.
