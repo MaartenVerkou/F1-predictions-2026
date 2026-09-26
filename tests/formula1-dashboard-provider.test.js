@@ -5,6 +5,7 @@ const test = require("node:test");
 const {
   buildMeetingResults,
   fetchFormula1DashboardSeasonData,
+  normalizedDamageRow,
   normalizedResultRow,
   statusFor
 } = require("../src/formula1-dashboard-provider");
@@ -53,6 +54,20 @@ test("Formula 1 Dashboard adapter normalizes race sessions and merges starting g
     round: 1, constructor_id: 4, position: 1, points: 43,
     constructor: { name: "Mercedes" }
   }];
+  const destructors = [{
+    round: 1,
+    driver_id: 168,
+    driver_season: {
+      id: 168,
+      constructor_id: 4,
+      driver: { name: "George Russell" },
+      constructor: { name: "Mercedes" }
+    },
+    components: [
+      { component_id: 1, name: "Front wing", price: 125000, quantity: 1 },
+      { component_id: 2, name: "Floor", price: 50000, quantity: 2 }
+    ]
+  }];
 
   const fetchImpl = async (url) => {
     const parsed = new URL(url);
@@ -60,6 +75,7 @@ test("Formula 1 Dashboard adapter normalizes race sessions and merges starting g
     if (path.endsWith("/grand-prix")) return response([meeting]);
     if (path.endsWith("/driver-standings-evolution")) return response(driverEvolution);
     if (path.endsWith("/constructor-standings-evolution")) return response(constructorEvolution);
+    if (path.endsWith("/destructors-championship")) return response(destructors);
     if (path.endsWith("/results")) return response(rows);
     throw new Error(`Unexpected URL: ${url}`);
   };
@@ -81,6 +97,8 @@ test("Formula 1 Dashboard adapter normalizes race sessions and merges starting g
   assert.equal(data.sprints[0].SprintResults[0].points, 8);
   assert.equal(data.driverStandingsByRound.get(1)[0].Driver.familyName, "Russell");
   assert.equal(data.constructorStandingsByRound.get(1)[0].Constructor.name, "Mercedes");
+  assert.equal(data.destructorsByRound.get(1)[0].totalCost, 225000);
+  assert.equal(data.destructorsByRound.get(1)[0].driverName, "George Russell");
   assert.match(data.payloadRevisionByRound.get(1), /^[a-f0-9]{24}$/);
 });
 
@@ -96,6 +114,23 @@ test("Formula 1 Dashboard sentinel statuses never become finishing positions", (
   assert.equal(row.positionText, "DNF");
   assert.equal(statusFor({ completion_status_code: "DNS" }), "Did not start");
   assert.equal(statusFor({ completion_status_code: "DSQ" }), "Disqualified");
+});
+
+test("Formula 1 Dashboard destructors rows calculate component totals", () => {
+  const row = normalizedDamageRow({
+    round: 3,
+    driver_id: 42,
+    driver_season: {
+      id: 42,
+      constructor_id: 9,
+      driver: { name: "Test Driver" },
+      constructor: { name: "Test Team" }
+    },
+    components: [{ name: "Wing", price: 100, quantity: 3 }]
+  });
+  assert.equal(row.totalCost, 300);
+  assert.equal(row.components[0].totalCost, 300);
+  assert.equal(row.constructorName, "Test Team");
 });
 
 test("Formula 1 Dashboard does not publish a calendar round before race evidence exists", async () => {
@@ -149,6 +184,15 @@ test("Formula 1 Dashboard rows become canonical persisted evidence", () => {
       sprints: [],
       driverStandingsByRound: new Map(),
       constructorStandingsByRound: new Map(),
+      destructorsByRound: new Map([[1, [{
+        round: 1,
+        driverId: "168",
+        driverName: "George Russell",
+        constructorId: "4",
+        constructorName: "Mercedes",
+        components: [{ name: "Front wing", price: 125000, quantity: 1 }],
+        totalCost: 125000
+      }]]]),
       driverOfTheDayByRound: new Map()
     },
     roster: { drivers: ["George Russell"], teams: ["Mercedes"] },
@@ -168,4 +212,6 @@ test("Formula 1 Dashboard rows become canonical persisted evidence", () => {
   assert.equal(evidence.raw.provider, "formula1_dashboard");
   assert.equal(evidence.raw.providerSchema, "formula1dashboard-api-v1");
   assert.equal(evidence.raw.provenance.sourceIdentity, "formula1_dashboard:2026:meeting-1279");
+  assert.equal(evidence.external.damage.available, true);
+  assert.equal(evidence.external.damage.rows[0].totalCost, 125000);
 });

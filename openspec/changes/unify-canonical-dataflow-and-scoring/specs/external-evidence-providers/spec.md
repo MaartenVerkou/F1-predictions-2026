@@ -36,6 +36,20 @@ The adapter SHALL resolve provider driver, team, and race labels/IDs through the
 - **WHEN** the provider constructor ID or label matches one canonical team in the selected season
 - **THEN** evidence SHALL store the canonical team ID plus provider ID and label
 
+### Requirement: Destructors component costs are normalized as race evidence
+The provider adapter SHALL normalize Formula 1 Dashboard destructors rows into per-round driver and constructor evidence, preserving component names, unit prices, quantities, provider IDs, and a calculated non-negative total cost.
+
+#### Scenario: A destructors row contains component costs
+- **WHEN** an imported row contains one or more damaged components
+- **THEN** the normalized evidence SHALL calculate `price × quantity` for each component and the row total
+- **AND** Race data SHALL project the same rows as per-round driver and constructor costs with a cumulative cutoff total
+- **AND** Actuals derivation SHALL use those persisted rows rather than recomputing from a live API response
+
+#### Scenario: Destructors data is absent or outside the configured calendar
+- **WHEN** the provider returns no destructors row for a configured round, or returns a non-calendar sentinel round
+- **THEN** the round projection SHALL show evidence unavailable or zero only when the provider response itself was successfully imported
+- **AND** the sentinel row SHALL not be assigned to a configured race round
+
 #### Scenario: Formula 1 Dashboard and another source disagree
 - **WHEN** two imported sources provide conflicting normalized facts for the same season, round, entity, or session
 - **THEN** the evidence comparison SHALL report the conflict with both provenance references

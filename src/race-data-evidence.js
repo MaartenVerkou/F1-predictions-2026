@@ -129,11 +129,48 @@ function normalizeSourceRows(rows, roster, kind, canonicalCatalog = null) {
     .filter(Boolean);
 }
 
-function normalizeCoverage({ race, qualifying, sprint, driverStandings, constructorStandings }) {
+function normalizeDamageRow(row, roster, canonicalCatalog = null) {
+  const rawDriver = String(row?.driverName || row?.driver || "").trim();
+  const rawTeam = String(row?.constructorName || row?.constructor || row?.team || "").trim();
+  const driver = resolveCanonicalName(rawDriver, roster?.drivers || [], DRIVER_NAME_ALIASES) || rawDriver || null;
+  const constructor = resolveCanonicalName(rawTeam, roster?.teams || [], TEAM_NAME_ALIASES) || rawTeam || null;
+  const components = (Array.isArray(row?.components) ? row.components : []).map((component) => {
+    const price = Math.max(0, parseNum(component?.price, 0));
+    const quantity = Math.max(0, parseNum(component?.quantity, 0));
+    return {
+      component_id: component?.componentId == null ? null : String(component.componentId),
+      name: String(component?.name || "Unknown component").trim(),
+      price,
+      quantity,
+      total_cost: price * quantity
+    };
+  });
+  const componentTotal = components.reduce((sum, component) => sum + component.total_cost, 0);
+  const totalCost = Math.max(0, parseNum(row?.totalCost, componentTotal));
+  return {
+    round: parseNum(row?.round),
+    driver,
+    constructor,
+    driver_label: driver,
+    team_label: constructor,
+    driver_id: canonicalId(canonicalCatalog, "driver", driver),
+    team_id: canonicalId(canonicalCatalog, "team", constructor),
+    provider_driver_id: row?.driverId == null ? null : String(row.driverId),
+    provider_team_id: row?.constructorId == null ? null : String(row.constructorId),
+    driver_number: row?.driverNumber == null ? null : String(row.driverNumber),
+    grand_prix_id: row?.grandPrixId == null ? null : String(row.grandPrixId),
+    grand_prix_country: row?.grandPrixCountry || null,
+    components,
+    totalCost
+  };
+}
+
+function normalizeCoverage({ race = [], qualifying = [], sprint = [], damage = [], damageAvailable = null, driverStandings = [], constructorStandings = [] }) {
   const coverage = {
     race: { available: race.length > 0, count: race.length },
     qualifying: { available: qualifying.length > 0, count: qualifying.length },
     sprint: { available: sprint.length > 0, count: sprint.length },
+    damage: { available: damageAvailable == null ? damage.length > 0 : Boolean(damageAvailable), count: damage.length },
     driverStandings: { available: driverStandings.length > 0, count: driverStandings.length },
     constructorStandings: {
       available: constructorStandings.length > 0,
@@ -180,6 +217,11 @@ function buildEvidenceBundle({
     "qualifying", canonicalCatalog
   );
   const sprintRows = normalizeSourceRows(sprintRace.SprintResults, roster, "sprint", canonicalCatalog);
+  const damageSourceRows = data?.destructorsByRound?.get(round) || data?.damageByRound?.get(round) || [];
+  const damageRows = damageSourceRows
+    .map((row) => normalizeDamageRow(row, roster, canonicalCatalog))
+    .filter((row) => row.round != null && row.driver && row.constructor);
+  const damageSourceAvailable = data?.destructorsByRound instanceof Map && !data?.destructorsError;
   const normalizedDriverStandings = driverStandings
     .map((row) => normalizeStandingsRow(row, roster, "driver", canonicalCatalog))
     .filter(Boolean);
@@ -190,6 +232,8 @@ function buildEvidenceBundle({
     race: raceRows,
     qualifying: qualifyingRows,
     sprint: sprintRows,
+    damage: damageRows,
+    damageAvailable: damageSourceAvailable,
     driverStandings: normalizedDriverStandings,
     constructorStandings: normalizedConstructorStandings
   });
@@ -201,6 +245,8 @@ function buildEvidenceBundle({
         qualifyingTeams: qualifyingRows.filter((row) => row.constructor && row.team_id == null).length,
         sprintDrivers: sprintRows.filter((row) => row.driver && row.driver_id == null).length,
         sprintTeams: sprintRows.filter((row) => row.constructor && row.team_id == null).length,
+        damageDrivers: damageRows.filter((row) => row.driver && row.driver_id == null).length,
+        damageTeams: damageRows.filter((row) => row.constructor && row.team_id == null).length,
         standingsDrivers: normalizedDriverStandings.filter((row) => row.entity && row.entity_id == null).length,
         standingsTeams: normalizedConstructorStandings.filter((row) => row.entity && row.entity_id == null).length
       }
@@ -224,6 +270,7 @@ function buildEvidenceBundle({
       qualifying: sourceUrls.qualifying || null,
       sprint: sourceUrls.sprint || null,
       startingGrid: sourceUrls.startingGrid || null,
+      damage: sourceUrls.damage || null,
       driverStandings: sourceUrls.driverStandings || null,
       constructorStandings: sourceUrls.constructorStandings || null,
       driverOfTheDay: sourceUrls.driverOfTheDay || null
@@ -242,7 +289,12 @@ function buildEvidenceBundle({
     },
     external: {
       driverOfTheDay: data?.driverOfTheDayByRound?.get(round) || null,
-      driverOfTheDayId: canonicalId(canonicalCatalog, "driver", data?.driverOfTheDayByRound?.get(round))
+      driverOfTheDayId: canonicalId(canonicalCatalog, "driver", data?.driverOfTheDayByRound?.get(round)),
+      damage: {
+        available: damageSourceAvailable,
+        rows: damageRows,
+        error: data?.destructorsError || null
+      }
     },
     raw: {
       provider: String(provider || data?.provider || "jolpica-ergast"),
@@ -251,6 +303,7 @@ function buildEvidenceBundle({
       race,
       qualifying: qualifyingRace,
       sprint: sprintRace,
+      destructors: damageSourceRows,
       driverStandings,
       constructorStandings
     }
@@ -607,6 +660,7 @@ function summarizeEvidence(payload) {
     raceCount: Number(sources.race?.count || 0),
     qualifyingCount: Number(sources.qualifying?.count || 0),
     sprintCount: Number(sources.sprint?.count || 0),
+    damageCount: Number(sources.damage?.count || 0),
     driverStandingsCount: Number(sources.driverStandings?.count || 0),
     constructorStandingsCount: Number(sources.constructorStandings?.count || 0)
   };
@@ -625,6 +679,7 @@ module.exports = {
   listRaceDataImports,
   listRaceDataSnapshots,
   normalizeCoverage,
+  normalizeDamageRow,
   normalizeLookupKey,
   parseEvidencePayload,
   saveRaceDataSnapshot,

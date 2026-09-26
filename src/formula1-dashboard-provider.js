@@ -101,6 +101,42 @@ function normalizedResultRow(row, kind) {
   return result;
 }
 
+function normalizedDamageComponent(component) {
+  const price = Math.max(0, parseFinite(component?.price, 0));
+  const quantity = Math.max(0, parseFinite(component?.quantity, 0));
+  return {
+    componentId: component?.component_id == null ? null : String(component.component_id),
+    name: String(component?.name || "").trim() || "Unknown component",
+    price,
+    quantity,
+    totalCost: price * quantity
+  };
+}
+
+function normalizedDamageRow(row, driverNameOverride = null) {
+  const driverId = row?.driver_id ?? row?.driver_season?.id;
+  const constructorId = row?.constructor_id ?? row?.driver_season?.constructor_id;
+  const driverName = String(
+    driverNameOverride || row?.driver_name || row?.driver_season?.driver?.full_name || row?.driver_season?.driver?.name || ""
+  ).trim();
+  const constructorName = String(
+    row?.constructor_name || row?.driver_season?.constructor?.name || ""
+  ).trim();
+  const components = (Array.isArray(row?.components) ? row.components : []).map(normalizedDamageComponent);
+  return {
+    round: parseFinite(row?.round, null),
+    driverId: driverId == null ? null : String(driverId),
+    driverName,
+    constructorId: constructorId == null ? null : String(constructorId),
+    constructorName,
+    driverNumber: row?.driver_number == null ? null : String(row.driver_number),
+    grandPrixId: row?.grand_prix_id == null ? null : String(row.grand_prix_id),
+    grandPrixCountry: String(row?.grand_prix?.country || "").trim() || null,
+    components,
+    totalCost: components.reduce((total, component) => total + component.totalCost, 0)
+  };
+}
+
 function normalizedStandingsRow(row, kind) {
   const driver = driverRef({
     ...row,
@@ -255,6 +291,21 @@ async function fetchFormula1DashboardSeasonData({
   const constructorStandingsByRound = new Map();
   const completedRounds = [];
   const driverNamesById = new Map();
+  const driverNamesByNumber = new Map();
+  let destructorsSourceUrl = buildSourceUrl(normalizedBase, "destructors-championship", { year: safeSeason });
+  let destructorsPayload = [];
+  let destructorsError = null;
+  try {
+    const destructorsResponse = await request("destructors-championship", { year: safeSeason });
+    destructorsSourceUrl = destructorsResponse.url;
+    destructorsPayload = unwrapArray(destructorsResponse.payload, "destructors championship");
+  } catch (error) {
+    destructorsError = {
+      message: String(error?.message || error),
+      provider: PROVIDER,
+      sourceUrl: destructorsSourceUrl
+    };
+  }
 
   for (const meeting of selectedMeetings) {
     const round = Number(meeting.round);
@@ -270,6 +321,16 @@ async function fetchFormula1DashboardSeasonData({
       }
     });
     const built = buildMeetingResults(rows, round, meeting);
+    [...built.race.Results, ...(built.qualifying?.QualifyingResults || []), ...(built.sprint?.SprintResults || [])]
+      .forEach((result) => {
+        const driverId = result?.Driver?.driverId;
+        const fullName = [result?.Driver?.givenName, result?.Driver?.familyName]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
+        if (driverId != null && fullName) driverNamesById.set(String(driverId), fullName);
+        if (result?.number != null && fullName) driverNamesByNumber.set(String(result.number), fullName);
+      });
     const hasRace = built.race.Results.length > 0;
     // A calendar state is not enough to publish evidence: some providers mark
     // a meeting completed before the result session is available. Only a
@@ -298,6 +359,7 @@ async function fetchFormula1DashboardSeasonData({
       qualifying: response.url,
       sprint: response.url,
       startingGrid: response.url,
+      damage: destructorsSourceUrl,
       driverStandings: buildSourceUrl(normalizedBase, "driver-standings-evolution", { year: safeSeason }),
       constructorStandings: buildSourceUrl(normalizedBase, "constructor-standings-evolution", { year: safeSeason })
     });
@@ -313,6 +375,32 @@ async function fetchFormula1DashboardSeasonData({
     }));
   }
 
+  const destructors = destructorsPayload
+    .map((row) => normalizedDamageRow(
+      row,
+      driverNamesByNumber.get(String(row?.driver_number))
+        || driverNamesById.get(String(row?.driver_id ?? row?.driver_season?.id))
+        || null
+    ))
+    .filter((row) => row.round != null && row.driverName && row.constructorName);
+  const destructorsByRound = new Map();
+  destructors.forEach((row) => {
+    if (!destructorsByRound.has(row.round)) destructorsByRound.set(row.round, []);
+    destructorsByRound.get(row.round).push(row);
+  });
+  payloadRevisionByRound.forEach((_, round) => {
+    const meeting = selectedMeetings.find((item) => Number(item.round) === Number(round));
+    const race = results.find((item) => Number(item.round) === Number(round));
+    payloadRevisionByRound.set(round, stableHash({
+      round,
+      meeting,
+      race,
+      damage: destructorsByRound.get(round) || [],
+      driverStandings: driverStandingsByRound.get(round) || [],
+      constructorStandings: constructorStandingsByRound.get(round) || []
+    }));
+  });
+
   return {
     season: safeSeason,
     provider: PROVIDER,
@@ -322,6 +410,10 @@ async function fetchFormula1DashboardSeasonData({
     results,
     qualifying,
     sprints,
+    destructors,
+    destructorsByRound,
+    destructorsError,
+    destructorsSourceUrl,
     completedRounds: Array.from(new Set(completedRounds)).sort((a, b) => a - b),
     driverStandingsByRound,
     constructorStandingsByRound,
@@ -345,6 +437,8 @@ module.exports = {
   normalizeGrid,
   normalizePosition,
   normalizedResultRow,
+  normalizedDamageComponent,
+  normalizedDamageRow,
   normalizedStandingsRow,
   statusFor,
   stableHash

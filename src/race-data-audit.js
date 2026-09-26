@@ -1,5 +1,12 @@
 "use strict";
 
+const {
+  damageRowCost,
+  damageRowEntity,
+  formatDamageCost,
+  formatDamageCostExact
+} = require("./destructors-damage");
+
 const CLASSIFIED_STATUS_RE = /^(finished|lapped|lap\s+down|\+\d+\s+lap|\+\d+\.\d+s?)$/i;
 const NON_DNF_STATUS_RE = /^(dns|dnq|did not start|did not qualify|dsq|disqualified|nc|not classified|wd|withdrew)$/i;
 
@@ -24,7 +31,16 @@ function isDnfStatus(status) {
 }
 
 function roundRows(round, section) {
+  if (section === "damage") return round?.evidence?.payload?.external?.damage?.rows || [];
   return round?.evidence?.payload?.[section]?.rows || [];
+}
+
+function damageEntityMatches(candidate, row, entityType) {
+  const idField = entityType === "team" ? "team_id" : "driver_id";
+  if (row?.id != null && candidate?.[idField] != null) {
+    return Number(row.id) === Number(candidate[idField]);
+  }
+  return damageRowEntity(candidate, entityType) === String(row?.name || "");
 }
 
 function findRoundRow(round, entity, section = "race") {
@@ -34,7 +50,7 @@ function findRoundRow(round, entity, section = "race") {
   })) || null;
 }
 
-function focusCell(cell, { label, title, hit = false, state = null } = {}) {
+function focusCell(cell, { label, title, hit = false, state = null, value } = {}) {
   return {
     ...cell,
     label: label == null ? "—" : String(label),
@@ -44,6 +60,7 @@ function focusCell(cell, { label, title, hit = false, state = null } = {}) {
     markerGlyph: "",
     markerTitle: "",
     podiumPosition: null,
+    ...(value !== undefined ? { value } : {}),
     ...(state ? { state } : {})
   };
 }
@@ -81,6 +98,7 @@ function defaultRaceDataHighlightMode(metric) {
     "grid_wins",
     "driver_of_day",
     "sprint_points",
+    "damage",
     "sprint_champion_same",
     "teammate_points",
     "ferrari_podium"
@@ -92,6 +110,7 @@ function inferFocusFooterMode(focus, metric) {
   const declared = String(focus?.footerMode || "").trim().toLowerCase();
   if (["count", "sum", "none"].includes(declared)) return declared === "none" ? null : declared;
   if (["podiums", "dnfs", "driver_of_day", "dnf_by_race", "ferrari_podium"].includes(String(focus?.metric || "").toLowerCase())) return "count";
+  if (String(focus?.metric || "").toLowerCase() === "damage") return "sum";
   if (["podiums", "dnfs", "driver_of_day", "sprint_points"].includes(metric)) {
     return metric === "sprint_points" ? "sum" : "count";
   }
@@ -127,19 +146,23 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
     let total = 0;
     let observed = false;
     (rows || []).forEach((row) => {
-      const value = numeric(row.cells?.[index]?.label);
+      const value = numeric(row.cells?.[index]?.value ?? row.cells?.[index]?.label);
       if (value == null) return;
       total += value;
       observed = true;
     });
     return {
-      label: observed ? String(total) : "—",
+      label: observed
+        ? (metric === "damage" ? formatDamageCost(total) : String(total))
+        : "—",
       value: observed ? total : null,
       state: round.state,
       afterCutoff: false,
       focusColumn: Boolean(round.focusColumn),
       title: observed
-        ? (mode === "count" ? "Observed count through this round" : "Observed points through this round")
+        ? (metric === "damage"
+          ? `Recorded damage through this round · ${formatDamageCostExact(total)}`
+          : mode === "count" ? "Observed count through this round" : "Observed points through this round")
         : "No matching values in this round"
     };
   });
@@ -156,10 +179,51 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
   };
 }
 
+function applyDamageMetric(row, rounds, focus, entityType) {
+  let total = 0;
+  let observed = false;
+  const cells = row.cells.map((cell, index) => {
+    const round = rounds[index];
+    if (cell.afterCutoff) {
+      return focusCell(cell, { label: "—", title: "After selected cutoff", hit: false, state: "future" });
+    }
+    if (!round?.evidence) {
+      return focusCell(cell, { label: "—", title: "Damage evidence unavailable", hit: false, state: "incomplete" });
+    }
+    const damage = roundRows(round, "damage");
+    const damageAvailable = round.evidence.payload?.external?.damage?.available === true;
+    if (!damage.length && !damageAvailable) {
+      return focusCell(cell, {
+        label: "—",
+        title: "Damage evidence unavailable",
+        hit: false,
+        state: "incomplete"
+      });
+    }
+    const matching = damage.filter((candidate) => damageEntityMatches(candidate, row, entityType));
+    const cost = matching.reduce((sum, candidate) => sum + damageRowCost(candidate), 0);
+    total += cost;
+    observed = true;
+    return focusCell(cell, {
+      label: formatDamageCost(cost),
+      value: cost,
+      hit: false,
+      title: cost > 0 ? formatDamageCostExact(cost) : "No recorded damage"
+    });
+  });
+  row.cells = cells;
+  row.summaryValue = observed ? total : null;
+  row.summaryLabel = observed ? formatDamageCost(total) : "—";
+  row.focusSortValue = row.summaryValue;
+  row.focusMeta = { totalCost: observed ? total : null };
+  return row;
+}
+
 function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
   const metric = String(focus.matrixMetric || focus.metric || "points");
   const teammatePointsFocus = String(focus.metric || "").toLowerCase() === "teammate_points";
   const highlightCells = focus.highlightMode === "cells";
+  if (metric === "damage") return applyDamageMetric(row, rounds, focus, "driver");
   if (!["podiums", "dnfs", "grid_wins", "driver_of_day", "sprint_points"].includes(metric) && !teammatePointsFocus) return row;
 
   let count = 0;
@@ -312,6 +376,7 @@ function applyDriverPointsMetric(row, rounds) {
 
 function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRows = []) {
   const metric = String(focus.matrixMetric || focus.metric || "points");
+  if (metric === "damage") return applyDamageMetric(row, rounds, focus, "team");
   if (metric !== "qualifying_h2h") return row;
 
   const teamDrivers = driverRows
@@ -437,7 +502,7 @@ function markFocusRows({ focus, drivers, constructors }) {
     rows.slice(0, 1).forEach((row) => { row.focusRow = true; });
     return;
   }
-  if (["dnfs", "driver_of_day", "sprint_points"].includes(matrixMetric)) {
+  if (["dnfs", "driver_of_day", "sprint_points", "damage"].includes(matrixMetric)) {
     const values = rows
       .map((row) => numeric(row.summaryValue))
       .filter((value) => value != null);
@@ -536,10 +601,26 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
       tooltip: `${last.name}: ${last.points ?? "—"} points`
     };
   }
-  if (["damage", "engine_switch"].includes(metric)) {
-    return unavailable(metric === "damage"
-      ? "Damage evidence is not part of the normalized race bundle yet."
-      : "This question requires an external announcement source.");
+  if (metric === "damage") {
+    const rows = (focus.view === "constructors" ? constructors : drivers)
+      .filter((row) => Number.isFinite(Number(row.summaryValue)));
+    if (!rows.length) return unavailable("Damage evidence is unavailable for this cutoff.");
+    const topValue = Math.max(...rows.map((row) => Number(row.summaryValue)));
+    const leaders = rows.filter((row) => Number(row.summaryValue) === topValue);
+    const partial = completed.some((round) => {
+      const damage = round.evidence?.payload?.external?.damage;
+      return damage && damage.available === false;
+    });
+    return {
+      ...base,
+      status: partial ? "partial" : "ready",
+      value: `${formatNames(leaders.map((row) => row.name))} · ${formatDamageCost(topValue)}`,
+      detail: `Damage costs through R${cutoffRoundNumber}`,
+      tooltip: leaders.map((row) => `${row.name}: ${formatDamageCostExact(row.summaryValue)}`).join(" · ")
+    };
+  }
+  if (metric === "engine_switch") {
+    return unavailable("This question requires an external announcement source.");
   }
 
   if (metric === "podiums" || metric === "dnfs" || metric === "driver_of_day" || metric === "sprint_points") {

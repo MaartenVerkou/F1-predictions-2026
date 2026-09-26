@@ -821,6 +821,7 @@
     "legend_grid_wins_focus": "La parrilla solo aparece para ganadores",
     "legend_driver_of_day_focus": "1 = piloto del día · 0 = otro piloto · — = falta la fuente",
     "legend_sprint_focus": "Solo puntos de sprint; — = sin sprint o no disponible",
-    "legend_qualifying_focus": "La celda muestra posiciones; el total es la diferencia de victorias"
+    "legend_qualifying_focus": "La celda muestra posiciones; el total es la diferencia de victorias",
+    "legend_damage_focus": "Coste de daños por carrera; total acumulado hasta el corte · — = evidencia no disponible"
   }
 }

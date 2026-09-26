@@ -125,6 +125,8 @@
       <span><%= t('admin_race_data.legend_sprint_focus') %></span>
     <% } else if (view.focus?.metric === 'qualifying_h2h') { %>
       <span><%= t('admin_race_data.legend_qualifying_focus') %></span>
+    <% } else if (view.focus?.metric === 'damage') { %>
+      <span><%= t('admin_race_data.legend_damage_focus') %></span>
     <% } else { %>
       <span><%= t('admin_race_data.legend_retired') %></span>
       <span><%= t('admin_race_data.legend_dns') %></span>

@@ -821,6 +821,7 @@
     "legend_grid_wins_focus": "La grille est affichée uniquement pour les vainqueurs",
     "legend_driver_of_day_focus": "1 = pilote du jour · 0 = autre pilote · — = source manquante",
     "legend_sprint_focus": "Points de sprint uniquement ; — = pas de sprint ou indisponible",
-    "legend_qualifying_focus": "La cellule affiche les positions ; le total est l’écart de victoires"
+    "legend_qualifying_focus": "La cellule affiche les positions ; le total est l’écart de victoires",
+    "legend_damage_focus": "Coût des dommages par course ; total cumulé jusqu’à la limite · — = preuve indisponible"
   }
 }

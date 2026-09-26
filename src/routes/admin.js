@@ -58,6 +58,7 @@ const {
   applyRaceDataFocus,
   defaultRaceDataHighlightMode
 } = require("../race-data-audit");
+const { topDamageEntities } = require("../destructors-damage");
 
 
 function auditResultLabel(row) {
@@ -1382,6 +1383,13 @@ function registerAdminRoutes(app, deps) {
       }));
 
     const currentLeader = driverNameFromApi(driverStandings[0]?.Driver, roster.drivers || []);
+    const damageCutoffRound = completedRounds.length ? Math.max(...completedRounds) : 0;
+    const damageDriverLeaders = providerData?.destructorsByRound
+      ? topDamageEntities(providerData.destructorsByRound, { maxRound: damageCutoffRound, entityType: "driver" })
+      : [];
+    const damageTeamLeaders = providerData?.destructorsByRound
+      ? topDamageEntities(providerData.destructorsByRound, { maxRound: damageCutoffRound, entityType: "team" })
+      : [];
     const topSprintRows = Array.from(sprintPointsByDriver.entries())
       .map(([name, points]) => ({ name, points }))
       .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
@@ -1457,6 +1465,12 @@ function registerAdminRoutes(app, deps) {
           ? collapseTiedActuals("most_points_no_podium", topNoPodiumTeams)
           : String(questionsById.most_points_no_podium?.bonus_value || "All teams scored a podium"),
       most_dnfs_driver: collapseTiedActuals("most_dnfs_driver", mostDnfDrivers),
+      destructors_driver: damageDriverLeaders.length
+        ? collapseTiedActuals("destructors_driver", damageDriverLeaders)
+        : null,
+      destructors_team: damageTeamLeaders.length
+        ? collapseTiedActuals("destructors_team", damageTeamLeaders)
+        : null,
       teammate_battle_antonelli_russell: (() => {
         const question = questionsById.teammate_battle_antonelli_russell;
         const pair = Array.isArray(question?.options) ? question.options.slice(0, 2) : [];

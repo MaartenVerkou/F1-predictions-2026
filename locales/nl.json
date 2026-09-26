@@ -821,6 +821,7 @@
     "legend_grid_wins_focus": "Gridnummer wordt alleen bij racewinnaars getoond",
     "legend_driver_of_day_focus": "1 = Driver of the Day · 0 = andere coureur · — = bron ontbreekt",
     "legend_sprint_focus": "Alleen sprintpunten; — = geen sprintresultaat of niet beschikbaar",
-    "legend_qualifying_focus": "Cel toont kwalificatieposities; totaal is het winverschil"
+    "legend_qualifying_focus": "Cel toont kwalificatieposities; totaal is het winverschil",
+    "legend_damage_focus": "Schadekosten per ronde; totaal is cumulatief t/m cutoff · — = bewijs ontbreekt"
   }
 }

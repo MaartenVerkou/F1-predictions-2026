@@ -204,6 +204,7 @@ test("summarizeEvidence reports source row counts", () => {
     raceCount: 20,
     qualifyingCount: 20,
     sprintCount: 0,
+    damageCount: 0,
     driverStandingsCount: 20,
     constructorStandingsCount: 10
   });

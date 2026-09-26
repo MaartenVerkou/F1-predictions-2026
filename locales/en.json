@@ -830,6 +830,7 @@
     "legend_grid_wins_focus": "Grid number is shown only for race winners",
     "legend_driver_of_day_focus": "1 = Driver of the Day · 0 = another driver · — = source missing",
     "legend_sprint_focus": "Sprint points only; — = no sprint result or unavailable",
-    "legend_qualifying_focus": "Cell shows qualifying positions; total is the win-gap"
+    "legend_qualifying_focus": "Cell shows qualifying positions; total is the win-gap",
+    "legend_damage_focus": "Damage cost per round; total is cumulative through cutoff · — = evidence unavailable"
   }
 }

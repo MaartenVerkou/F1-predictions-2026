@@ -31,6 +31,7 @@ const {
   PROVIDER: FORMULA1_DASHBOARD_PROVIDER,
   PROVIDER_SCHEMA: FORMULA1_DASHBOARD_SCHEMA
 } = require("../src/formula1-dashboard-provider");
+const { topDamageEntities } = require("../src/destructors-damage");
 
 const ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
@@ -590,6 +591,12 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     round,
     standings: data.driverStandingsByRound.get(round) || []
   }));
+  const damageDriverLeaders = data.destructorsByRound
+    ? topDamageEntities(data.destructorsByRound, { maxRound: roundNumber, entityType: "driver" })
+    : [];
+  const damageTeamLeaders = data.destructorsByRound
+    ? topDamageEntities(data.destructorsByRound, { maxRound: roundNumber, entityType: "team" })
+    : [];
 
   const rawActuals = {
     drivers_championship_top_3: driverStandings
@@ -624,6 +631,12 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
         ? collapseTiedActuals("most_points_no_podium", topNoPodiumTeams)
         : String(questionsById.most_points_no_podium?.bonus_value || "All teams scored a podium"),
     most_dnfs_driver: collapseTiedActuals("most_dnfs_driver", mostDnfDrivers),
+    destructors_driver: damageDriverLeaders.length
+      ? collapseTiedActuals("destructors_driver", damageDriverLeaders)
+      : null,
+    destructors_team: damageTeamLeaders.length
+      ? collapseTiedActuals("destructors_team", damageTeamLeaders)
+      : null,
     teammate_battle_antonelli_russell: (() => {
       const question = questionsById.teammate_battle_antonelli_russell;
       const pair = Array.isArray(question?.options) ? question.options.slice(0, 2) : [];

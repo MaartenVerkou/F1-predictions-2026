@@ -821,6 +821,7 @@
     "legend_grid_wins_focus": "Startplatz wird nur für Rennsieger angezeigt",
     "legend_driver_of_day_focus": "1 = Fahrer des Tages · 0 = anderer Fahrer · — = Quelle fehlt",
     "legend_sprint_focus": "Nur Sprintpunkte; — = kein Sprint oder nicht verfügbar",
-    "legend_qualifying_focus": "Zelle zeigt Qualifying-Positionen; Summe ist der Siegabstand"
+    "legend_qualifying_focus": "Zelle zeigt Qualifying-Positionen; Summe ist der Siegabstand",
+    "legend_damage_focus": "Schadenskosten pro Rennen; Summe bis zum Stichtag · — = Nachweis nicht verfügbar"
   }
 }

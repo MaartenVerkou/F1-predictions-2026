@@ -52,6 +52,7 @@
 - [x] 6.2c Add question-linked Race data audit projections over the shared matrix, including points and podium focus, cutoff-aware totals, metadata-driven table selection, URL state, and read-only semantics.
 - [x] 6.2d Extend question-linked Race data audit projections with metadata-driven focus groups, reusable DNF/grid/sprint/qualifying metrics, compact cross-question summaries, and explicit unavailable states for unsupported evidence.
 - [x] 6.2e Add shared metric render modes for per-round count/points/comparison cells and a cutoff-aware additive footer, with metadata-driven focus profiles and tests for future-round exclusion.
+- [x] 6.2f Add Formula 1 Dashboard destructors component-cost evidence to the shared driver/constructor matrix and derive both destructors Actuals from the same normalized evidence path.
 - [ ] 6.3 Update Actuals, leaderboard, and analysis to consume shared services and remove duplicated semantic transformations.
 - [ ] 6.4 Keep loading, empty, error, permission, responsive, and accessibility states coherent across the four admin/public workflows.
 

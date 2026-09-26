@@ -209,10 +209,13 @@
       "race_data_focus": {
         "view": "drivers",
         "metric": "damage",
-        "matrixMetric": "points",
-        "kind": "unavailable",
-        "scope": "season",
-        "requiredEvidence": ["external.damage"]
+        "matrixMetric": "damage",
+        "kind": "matrix",
+        "scope": "through_cutoff",
+        "requiredEvidence": ["external.damage"],
+        "cellMode": "currency",
+        "footerMode": "sum",
+        "highlightMode": "rows"
       }
     },
     {
@@ -225,10 +228,13 @@
       "race_data_focus": {
         "view": "constructors",
         "metric": "damage",
-        "matrixMetric": "points",
-        "kind": "unavailable",
-        "scope": "season",
-        "requiredEvidence": ["external.damage"]
+        "matrixMetric": "damage",
+        "kind": "matrix",
+        "scope": "through_cutoff",
+        "requiredEvidence": ["external.damage"],
+        "cellMode": "currency",
+        "footerMode": "sum",
+        "highlightMode": "rows"
       }
     },
     {
