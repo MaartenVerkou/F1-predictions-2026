@@ -36,6 +36,10 @@ const {
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
 const { buildSeasonCatalog } = require("../season-catalog");
 const {
+  fetchFormula1DashboardSeasonData,
+  PROVIDER: FORMULA1_DASHBOARD_PROVIDER
+} = require("../formula1-dashboard-provider");
+const {
   applyTeamLineupHistory,
   applySeasonLineup,
   buildLineupProjection,
@@ -1150,28 +1154,47 @@ function registerAdminRoutes(app, deps) {
 
   async function buildCurrentSeasonActualsSnapshot({ questions, roster, races, season }) {
     const safeSeason = Number.isFinite(Number(season)) ? Number(season) : CURRENT_SEASON;
-    const [
-      driverStandingsJson,
-      constructorStandingsJson,
-      completedRaces,
-      completedQualifying,
-      completedSprints,
-      driverOfTheDayResultsHtml,
-      officialSeasonResultsHtml
-    ] = await Promise.all([
-      fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/driverStandings.json`),
-      fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/constructorStandings.json`),
-      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/results.json`, "Results"),
-      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/qualifying.json`, "QualifyingResults"),
-      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/sprint.json`, "SprintResults"),
-      fetchText(CURRENT_SEASON_DOTD_RESULTS_URL(safeSeason)).catch(() => null),
-      fetchText(CURRENT_SEASON_RESULTS_URL(safeSeason)).catch(() => null)
-    ]);
+    const configuredProvider = String(process.env.F1_DATA_PROVIDER || "").trim().toLowerCase();
+    let driverStandings = [];
+    let constructorStandings = [];
+    let completedRaces = [];
+    let completedQualifying = [];
+    let completedSprints = [];
+    let driverOfTheDayResultsHtml = null;
+    let officialSeasonResultsHtml = null;
+    let providerData = null;
 
-    const driverStandings =
-      driverStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
-    const constructorStandings =
-      constructorStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || [];
+    if (configuredProvider === FORMULA1_DASHBOARD_PROVIDER) {
+      providerData = await fetchFormula1DashboardSeasonData({ season: safeSeason });
+      const completedRoundSet = new Set(providerData.completedRounds || []);
+      completedRaces = (providerData.results || []).filter((race) => completedRoundSet.has(Number(race.round)));
+      completedQualifying = (providerData.qualifying || []).filter((race) => completedRoundSet.has(Number(race.round)));
+      completedSprints = (providerData.sprints || []).filter((race) => completedRoundSet.has(Number(race.round)));
+      const latestRound = Math.max(...Array.from(completedRoundSet), 0);
+      driverStandings = providerData.driverStandingsByRound.get(latestRound) || [];
+      constructorStandings = providerData.constructorStandingsByRound.get(latestRound) || [];
+      [driverOfTheDayResultsHtml, officialSeasonResultsHtml] = await Promise.all([
+        fetchText(CURRENT_SEASON_DOTD_RESULTS_URL(safeSeason)).catch(() => null),
+        fetchText(CURRENT_SEASON_RESULTS_URL(safeSeason)).catch(() => null)
+      ]);
+    } else {
+      const [driverStandingsJson, constructorStandingsJson, racesResult, qualifyingResult, sprintsResult, dotdHtml, officialHtml] = await Promise.all([
+        fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/driverStandings.json`),
+        fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/constructorStandings.json`),
+        fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/results.json`, "Results"),
+        fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/qualifying.json`, "QualifyingResults"),
+        fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/sprint.json`, "SprintResults"),
+        fetchText(CURRENT_SEASON_DOTD_RESULTS_URL(safeSeason)).catch(() => null),
+        fetchText(CURRENT_SEASON_RESULTS_URL(safeSeason)).catch(() => null)
+      ]);
+      driverStandings = driverStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
+      constructorStandings = constructorStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || [];
+      completedRaces = racesResult;
+      completedQualifying = qualifyingResult;
+      completedSprints = sprintsResult;
+      driverOfTheDayResultsHtml = dotdHtml;
+      officialSeasonResultsHtml = officialHtml;
+    }
     if (driverStandings.length === 0 || constructorStandings.length === 0 || completedRaces.length === 0) {
       throw new Error(`No completed ${safeSeason} season data is available yet.`);
     }
@@ -1343,16 +1366,20 @@ function registerAdminRoutes(app, deps) {
         String(latestCompletedRace.raceName || "").trim())
       : "";
 
-    const standingsByRoundJson = await Promise.all(
-      completedRounds.map((round) =>
-        fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/${round}/driverStandings.json`)
-      )
-    );
-    const roundStandings = standingsByRoundJson.map((payload, index) => ({
-      round: completedRounds[index],
-      standings:
-        payload?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || []
-    }));
+    const roundStandings = providerData
+      ? completedRounds.map((round) => ({
+        round,
+        standings: providerData.driverStandingsByRound.get(round) || []
+      }))
+      : (await Promise.all(
+        completedRounds.map((round) =>
+          fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/${round}/driverStandings.json`)
+        )
+      )).map((payload, index) => ({
+        round: completedRounds[index],
+        standings:
+          payload?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || []
+      }));
 
     const currentLeader = driverNameFromApi(driverStandings[0]?.Driver, roster.drivers || []);
     const topSprintRows = Array.from(sprintPointsByDriver.entries())

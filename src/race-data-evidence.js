@@ -20,7 +20,8 @@ const TEAM_NAME_ALIASES = {
 
 const SOURCE_TYPES = {
   JOLPICA: "jolpica_ergast",
-  FORMULA1: "formula1"
+  FORMULA1: "formula1",
+  FORMULA1_DASHBOARD: "formula1_dashboard"
 };
 
 function parseNum(value, fallback = null) {
@@ -159,7 +160,10 @@ function buildEvidenceBundle({
   catalogRevision = null,
   cutoffRound = null,
   sourceIdentity = null,
-  payloadRevision = null
+  payloadRevision = null,
+  provider = null,
+  providerSchema = null,
+  provenance = null
 }) {
   const round = Number(roundNumber);
   const race = (data?.results || []).find((item) => Number(item?.round) === round) || {};
@@ -219,6 +223,7 @@ function buildEvidenceBundle({
       race: sourceUrls.race || null,
       qualifying: sourceUrls.qualifying || null,
       sprint: sourceUrls.sprint || null,
+      startingGrid: sourceUrls.startingGrid || null,
       driverStandings: sourceUrls.driverStandings || null,
       constructorStandings: sourceUrls.constructorStandings || null,
       driverOfTheDay: sourceUrls.driverOfTheDay || null
@@ -240,8 +245,9 @@ function buildEvidenceBundle({
       driverOfTheDayId: canonicalId(canonicalCatalog, "driver", data?.driverOfTheDayByRound?.get(round))
     },
     raw: {
-      provider: "jolpica-ergast",
-      providerSchema: "ergast-v1",
+      provider: String(provider || data?.provider || "jolpica-ergast"),
+      providerSchema: String(providerSchema || data?.providerSchema || "ergast-v1"),
+      provenance: provenance || data?.provenanceByRound?.get(round) || null,
       race,
       qualifying: qualifyingRace,
       sprint: sprintRace,

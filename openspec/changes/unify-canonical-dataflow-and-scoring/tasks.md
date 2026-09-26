@@ -18,9 +18,9 @@
 - [ ] 2.2 Make import persistence idempotent for equivalent bundles and create a new evidence revision only when normalized facts or parser behavior changes.
 - [ ] 2.3 Add pure and integration tests for complete, partial, cancelled, future, reconstructed, duplicate, and changed imports.
 - [ ] 2.4 Route Race data and Actuals to the same persisted evidence/cutoff read model and verify that future data cannot leak into earlier rounds.
-- [ ] 2.5 Add a validated Formula 1 Dashboard provider adapter for calendar, race, starting-grid, qualifying, sprint, driver-standings, and constructor-standings endpoints with timeout/retry and immutable provenance.
-- [ ] 2.6 Normalize Formula 1 Dashboard rows to the provider-neutral evidence contract, resolve stable catalog IDs where unique, and preserve provider IDs/labels plus explicit unresolved/conflict reasons.
-- [ ] 2.7 Make the backfill/admin sync provider-selectable through server configuration, keeping Actuals and Race data on persisted evidence and preventing live API calls during rendering or scoring.
+- [x] 2.5 Add a validated Formula 1 Dashboard provider adapter for calendar, race, starting-grid, qualifying, sprint, driver-standings, and constructor-standings endpoints with timeout/retry and immutable provenance.
+- [x] 2.6 Normalize Formula 1 Dashboard rows to the provider-neutral evidence contract, resolve stable catalog IDs where unique, and preserve provider IDs/labels plus explicit unresolved/conflict reasons.
+- [x] 2.7 Make the backfill/admin sync provider-selectable through server configuration, keeping Actuals and Race data on persisted evidence and preventing live API calls during rendering or scoring.
 - [ ] 2.8 Add provider fixtures/tests for successful constructor mapping, sentinel statuses, partial/future rounds, malformed responses, idempotent revisions, and Formula 1 Dashboard versus existing-provider comparison output.
 
 ## 3. Shared derivation engine

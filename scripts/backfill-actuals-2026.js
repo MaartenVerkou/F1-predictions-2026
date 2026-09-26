@@ -26,6 +26,11 @@ const { ensurePostgresSchema } = require("../src/postgres-schema");
 const { resolveConfiguredRaceName } = require("../src/race-names");
 const { buildPersistedDataFromEvidence } = require("../src/race-evidence-derivation");
 const { buildSeasonCatalog } = require("../src/season-catalog");
+const {
+  fetchFormula1DashboardSeasonData,
+  PROVIDER: FORMULA1_DASHBOARD_PROVIDER,
+  PROVIDER_SCHEMA: FORMULA1_DASHBOARD_SCHEMA
+} = require("../src/formula1-dashboard-provider");
 
 const ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
@@ -38,6 +43,8 @@ const FORMULA1_DOTD_PATH = "awards/driver-of-the-day";
 const USER_AGENT = "f1-predictions-actuals-backfill";
 const BACKFILL_SOURCE_NOTE =
   "Backfilled from Jolpica/Ergast with Formula1.com cross-check; normalized evidence retains the provider payload";
+const FORMULA1_DASHBOARD_SOURCE_NOTE =
+  "Backfilled from Formula 1 Dashboard API; normalized evidence retains provider IDs, labels, and provenance";
 const TEAM_ENGINE_SWITCH_2027_2028_ACTUAL = "no";
 
 const DRIVER_NAME_ALIASES = {
@@ -76,7 +83,8 @@ function parseArgs(argv) {
     dbPath: process.env.DB_PATH || path.join(DATA_DIR, "app.db"),
     databaseUrl: String(process.env.DATABASE_URL || "").trim(),
     season: SEASON,
-    maxRound: null
+    maxRound: null,
+    provider: String(process.env.F1_DATA_PROVIDER || SOURCE_TYPES.JOLPICA).trim().toLowerCase()
   };
 
   for (const arg of argv) {
@@ -94,6 +102,8 @@ function parseArgs(argv) {
       args.season = Number(arg.slice("--season=".length));
     } else if (arg.startsWith("--max-round=")) {
       args.maxRound = Number(arg.slice("--max-round=".length));
+    } else if (arg.startsWith("--provider=")) {
+      args.provider = String(arg.slice("--provider=".length)).trim().toLowerCase();
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -104,6 +114,9 @@ function parseArgs(argv) {
   }
   if (args.maxRound != null && (!Number.isFinite(args.maxRound) || args.maxRound <= 0)) {
     throw new Error("--max-round must be a positive number.");
+  }
+  if (![SOURCE_TYPES.JOLPICA, FORMULA1_DASHBOARD_PROVIDER].includes(args.provider)) {
+    throw new Error(`Unsupported evidence provider: ${args.provider}`);
   }
   return args;
 }
@@ -697,7 +710,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
   return serialized;
 }
 
-async function fetchSeasonData({ season, roster }) {
+async function fetchJolpicaSeasonData({ season, roster }) {
   const driverOfTheDayUrl = `https://www.formula1.com/en/results/${season}/${FORMULA1_DOTD_PATH}`;
   const [resultsJson, qualifyingJson, sprintJson, dotdHtml] = await Promise.all([
     fetchAllRaceTableRaces(`${API_BASE}/${season}/results.json`, "Results"),
@@ -733,6 +746,10 @@ async function fetchSeasonData({ season, roster }) {
 
   return {
     season,
+    provider: SOURCE_TYPES.JOLPICA,
+    providerSchema: "ergast-v1",
+    sourceType: SOURCE_TYPES.JOLPICA,
+    sourceNote: BACKFILL_SOURCE_NOTE,
     results,
     qualifying,
     sprints,
@@ -742,6 +759,13 @@ async function fetchSeasonData({ season, roster }) {
     driverOfTheDayUrl,
     driverOfTheDayByRound: parseDriverOfTheDayByRound(dotdHtml, results, roster.drivers || [])
   };
+}
+
+async function fetchSeasonData({ season, roster, provider = SOURCE_TYPES.JOLPICA, maxRound = null }) {
+  if (provider === FORMULA1_DASHBOARD_PROVIDER) {
+    return fetchFormula1DashboardSeasonData({ season, maxRound });
+  }
+  return fetchJolpicaSeasonData({ season, roster });
 }
 
 function getRoundName(data, races, roundNumber) {
@@ -866,7 +890,10 @@ function writeActualsAndSnapshots(db, {
   rounds,
   snapshots,
   importId,
-  deriveContext
+  deriveContext,
+  sourceType = SOURCE_TYPES.JOLPICA,
+  sourceNote = BACKFILL_SOURCE_NOTE,
+  parserVersion = "evidence-v1"
 }) {
   const now = new Date().toISOString();
   let changedSnapshotCount = 0;
@@ -880,9 +907,9 @@ function writeActualsAndSnapshots(db, {
         syncId: snapshot.syncId,
         importId,
         fetchedAt: snapshot.evidence?.fetchedAt || now,
-        sourceType: SOURCE_TYPES.JOLPICA,
-        sourceNote: BACKFILL_SOURCE_NOTE,
-        parserVersion: "evidence-v1",
+        sourceType,
+        sourceNote,
+        parserVersion,
         calendarState: snapshot.calendarState || "completed",
         reconstructed: false,
         evidence: snapshot.evidence
@@ -913,14 +940,14 @@ function writeActualsAndSnapshots(db, {
         roundNumber: snapshot.roundNumber,
         roundName: snapshot.roundName,
         valuesByQuestion: snapshot.values,
-        sourceType: SOURCE_TYPES.JOLPICA,
-        sourceNote: BACKFILL_SOURCE_NOTE,
+        sourceType,
+        sourceNote,
         label: `R${snapshot.roundNumber} - ${snapshot.roundName}`,
         reviewStatus: REVIEW_STATUS_PENDING,
         preserveReviewIfUnchanged: true,
         catalogRevision: snapshot.evidence?.catalogRevision || null,
         evidenceRevision: snapshot.evidence?.payloadRevision || null,
-        derivationVersion: "evidence-derivation-v1"
+        derivationVersion: `${parserVersion}-derivation-v1`
       });
       snapshot.id = snapshotResult?.snapshotId || null;
       linkEvidenceToActualSnapshot(db, snapshot.id, snapshot.evidenceId, importId);
@@ -959,7 +986,21 @@ async function main() {
   const questions = readJsonFile(QUESTIONS_PATH).questions || [];
   const roster = readJsonFile(ROSTER_PATH);
   const races = readJsonFile(RACES_PATH).races || [];
-  const data = await fetchSeasonData({ season: args.season, roster });
+  const data = await fetchSeasonData({
+    season: args.season,
+    roster,
+    provider: args.provider,
+    maxRound: args.maxRound
+  });
+  const sourceType = data.sourceType || args.provider;
+  const sourceNote = data.sourceNote || (
+    sourceType === FORMULA1_DASHBOARD_PROVIDER
+      ? FORMULA1_DASHBOARD_SOURCE_NOTE
+      : BACKFILL_SOURCE_NOTE
+  );
+  const parserVersion = sourceType === FORMULA1_DASHBOARD_PROVIDER
+    ? `${FORMULA1_DASHBOARD_SCHEMA}-normalizer-v1`
+    : "evidence-v1";
   const totalRounds = races.length;
   const completedRounds = data.completedRounds.filter((round) =>
     args.maxRound == null ? true : round <= args.maxRound
@@ -988,13 +1029,21 @@ async function main() {
         roundNumber,
         roundName,
         fetchedAt: new Date().toISOString(),
-        sourceUrls: {
+        sourceUrls: data.sourceUrlsByRound?.get(roundNumber) || {
           race: API_BASE + "/" + args.season + "/" + roundNumber + "/results.json",
           qualifying: API_BASE + "/" + args.season + "/" + roundNumber + "/qualifying.json",
           sprint: API_BASE + "/" + args.season + "/" + roundNumber + "/sprint.json",
           driverStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/driverStandings.json",
           constructorStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/constructorStandings.json",
           driverOfTheDay: data.driverOfTheDayUrl
+        },
+        provider: data.provider,
+        providerSchema: data.providerSchema,
+        provenance: {
+          provider: data.provider,
+          providerSchema: data.providerSchema,
+          sourceIdentity: data.sourceIdentityByRound?.get(roundNumber) || null,
+          payloadRevision: data.payloadRevisionByRound?.get(roundNumber) || null
         }
       })
     };
@@ -1031,18 +1080,28 @@ async function main() {
           canonicalCatalog: seasonCatalog.canonical,
           catalogRevision: seasonCatalog.catalogRevision,
           cutoffRound: snapshot.roundNumber,
-          sourceIdentity: syncId + ":r" + snapshot.roundNumber,
-          payloadRevision: "evidence-v2:" + snapshot.roundNumber
+          sourceIdentity: data.sourceIdentityByRound?.get(snapshot.roundNumber)
+            || syncId + ":r" + snapshot.roundNumber,
+          payloadRevision: data.payloadRevisionByRound?.get(snapshot.roundNumber)
+            || parserVersion + ":" + snapshot.roundNumber,
+          provider: data.provider,
+          providerSchema: data.providerSchema,
+          provenance: {
+            provider: data.provider,
+            providerSchema: data.providerSchema,
+            sourceIdentity: data.sourceIdentityByRound?.get(snapshot.roundNumber) || null,
+            payloadRevision: data.payloadRevisionByRound?.get(snapshot.roundNumber) || null
+          }
         });
       });
       importId = createRaceDataImport(db, {
         season: args.season,
         syncId,
-        sourceType: SOURCE_TYPES.JOLPICA,
-        parserVersion: "evidence-v1",
+        sourceType,
+        parserVersion,
         requestedRounds: completedRounds.length,
         reconstructed: false,
-        sourceNote: BACKFILL_SOURCE_NOTE
+        sourceNote
       });
       snapshots.forEach((snapshot) => {
         snapshot.syncId = syncId;
@@ -1060,7 +1119,10 @@ async function main() {
         latestValues: { ...existingActuals, ...latestSnapshot.values },
         snapshots: persistedSnapshots,
         importId,
-        deriveContext: derivedContext
+        deriveContext: derivedContext,
+        sourceType,
+        sourceNote,
+        parserVersion
       });
       const latestDerived = persistedSnapshots.find((snapshot) => snapshot.roundNumber === (completedRounds.at(-1)));
       latestValues = { ...existingActuals, ...(latestDerived?.values || {}) };
@@ -1082,6 +1144,7 @@ async function main() {
       JSON.stringify(
         {
           mode: "apply",
+          provider: sourceType,
           database: args.databaseUrl ? "postgres" : "sqlite",
           dbPath: args.dbPath,
           updatedAt: result.updatedAt,
@@ -1109,6 +1172,7 @@ async function main() {
     JSON.stringify(
       {
         mode: "dry-run",
+        provider: sourceType,
         database: args.databaseUrl ? "postgres" : "sqlite",
         dbPath: args.dbPath,
         completedRounds,
@@ -1144,6 +1208,8 @@ module.exports = {
   buildPersistedDataFromEvidence,
   compareSnapshotValues,
   deriveSnapshotsFromPersistedEvidence,
+  fetchJolpicaSeasonData,
+  fetchSeasonData,
   parseDriverOfTheDayByRound,
   shortRaceLabel
 };
