@@ -9,6 +9,7 @@ This change makes Inputs the upstream contract and gives every later stage a sin
 - Treat the canonical season catalog as the only semantic source for drivers, teams, races, assignments, aliases, provider references, and season-specific metadata.
 - Add a readiness/read-model contract so Questions, Race data, Actuals, and scoring consume the same resolved catalog and report unresolved mappings instead of guessing.
 - Persist normalized race evidence before derivation, with canonical entity references, cutoff context, provenance, and an idempotent import identity.
+- Keep the public preview isolated from production while bootstrapping it with validated provider evidence; deterministic synthetic fixtures remain test-only and are never used as the audit dataset.
 - Replace route/script-specific actuals logic with one season-aware derivation engine that reads Inputs and persisted evidence.
 - Make actual snapshots and the published actual set season-scoped, versioned, reviewable, and traceable to the catalog and evidence revisions.
 - Make scoring use one shared canonical-value service and the season's reviewed/published actual set.
@@ -33,4 +34,3 @@ This change makes Inputs the upstream contract and gives every later stage a sin
 - Shared services used by `src/season-inputs.js`, `src/race-data-evidence.js`, `src/actuals-snapshots.js`, `src/leaderboard-model.js`, sync/backfill scripts, and admin routes.
 - Admin Inputs, Questions, Race data, Actuals, leaderboard, analysis, and scoring read models and their tests.
 - Preview fixtures and end-to-end checks; production deployment remains gated on explicit preview approval.
-

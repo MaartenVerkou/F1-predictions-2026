@@ -1,6 +1,6 @@
 ## Context
 
-See `proposal.md` for the motivation and scope. The existing code already has canonical Inputs tables, normalized race evidence, actual snapshots, canonical answer helpers, and a leaderboard model, but the boundaries are incomplete: actual derivation is duplicated in the admin route and backfill script, scoring is duplicated across routes, and the global `actuals` table is not season-scoped. The preview must remain sanitized and production PostgreSQL must remain untouched until explicit approval.
+See `proposal.md` for the motivation and scope. The existing code already has canonical Inputs tables, normalized race evidence, actual snapshots, canonical answer helpers, and a leaderboard model, but the boundaries are incomplete: actual derivation is duplicated in the admin route and backfill script, scoring is duplicated across routes, and the public preview must remain isolated and production PostgreSQL must remain untouched until explicit approval. Its audit dataset must be provider-backed; deterministic fixtures are only for automated tests and local UI work.
 
 The durable boundary and its ownership consequences are recorded in [ADR 0006](../../../adr/0006-inputs-canonical-boundary.md).
 
@@ -79,3 +79,7 @@ Add columns/tables and dual-read compatibility first. Backfill or report resolva
 5. Route admin sync, backfill, Actuals, Race data, and scoring through shared services; keep legacy label reads until migration reports are clean.
 6. Refresh the preview from the feature commit, run health, targeted, full, build, and critical Playwright checks, and wait for explicit preview approval.
 7. Only then merge/deploy to production using the approved immutable artifact. Rollback is the previous image plus the retained compatibility columns/tables; no destructive data migration is required.
+
+### 8. Use provider-backed evidence for the public preview
+
+The public sanitized preview SHALL use the same normalized provider-import path as an admin sync, backed by an isolated preview PostgreSQL database. Preview creation SHALL seed canonical Inputs, fetch the completed public rounds from the approved provider, persist evidence and pending actual snapshots, and expose source/provenance metadata. It SHALL fail if the provider import fails; it SHALL not fall back to generated positions, synthetic points, or a production database clone. Deterministic fixture seeding remains available only through an explicitly test-only helper.

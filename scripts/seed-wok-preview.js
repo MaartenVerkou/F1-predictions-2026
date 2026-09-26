@@ -1,5 +1,7 @@
 "use strict";
 
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const { createAppDatabase } = require("../src/app-database");
 const {
   SOURCE_TYPES,
@@ -208,7 +210,11 @@ function buildPreviewLineupEntries(seasonCatalog, round) {
   return entries.concat(replacements.slice(replacementIndex));
 }
 
-function seedSanitizedPreview(database, now = new Date().toISOString()) {
+/**
+ * Keep the deterministic fixture available for unit tests and local UI tests.
+ * It is deliberately not used by the public preview lifecycle anymore.
+ */
+function seedFixturePreview(database, now = new Date().toISOString()) {
   if (String(process.env.WOK_PREVIEW_DATA_MODE || "").trim().toLowerCase() !== "sanitized") {
     throw new Error("Preview fixture seeding requires WOK_PREVIEW_DATA_MODE=sanitized");
   }
@@ -309,13 +315,144 @@ function seedSanitizedPreview(database, now = new Date().toISOString()) {
   };
 }
 
-function main() {
-  const database = createAppDatabase({ databaseUrl: process.env.DATABASE_URL });
-  try {
-    console.log(JSON.stringify(seedSanitizedPreview(database)));
-  } finally {
-    database.close();
+function clearPreviewEvidence(database, season = 2026) {
+  const transaction = database.transaction(() => {
+    database.prepare(
+      "DELETE FROM actual_snapshot_values WHERE snapshot_id IN (SELECT id FROM actual_snapshots WHERE season = ?)"
+    ).run(Number(season));
+    database.prepare("DELETE FROM actual_snapshots WHERE season = ?").run(Number(season));
+    database.prepare("DELETE FROM race_data_snapshots WHERE season = ?").run(Number(season));
+    database.prepare("DELETE FROM race_data_imports WHERE season = ?").run(Number(season));
+    // The legacy projection is intentionally empty until an admin publishes a
+    // reviewed snapshot. The preview database is isolated and may be reset.
+    database.prepare("DELETE FROM actuals").run();
+
+    // Remove only the old fixture-only current-season replacement. The
+    // canonical roster and real provider data must never contain this entity.
+    const stale = database.prepare(
+      "SELECT id FROM drivers WHERE slug = 'preview-replacement-driver'"
+    ).all().map((row) => Number(row.id));
+    if (stale.length > 0) {
+      const placeholders = stale.map(() => "?").join(",");
+      database.prepare(`DELETE FROM driver_team_assignments WHERE driver_id IN (${placeholders})`).run(...stale);
+      database.prepare(`DELETE FROM season_drivers WHERE driver_id IN (${placeholders})`).run(...stale);
+      database.prepare(`DELETE FROM entity_aliases WHERE entity_type = 'driver' AND entity_id IN (${placeholders})`).run(...stale);
+      database.prepare(`DELETE FROM entity_provider_refs WHERE entity_type = 'driver' AND entity_id IN (${placeholders})`).run(...stale);
+      database.prepare(`DELETE FROM drivers WHERE id IN (${placeholders})`).run(...stale);
+    }
+  });
+  transaction();
+}
+
+function prepareProviderPreview(database, {
+  season = 2026,
+  now = new Date().toISOString()
+} = {}) {
+  ensureRaceDataSchema(database);
+  ensureActualSnapshotColumns(database);
+  const seeded = seedSeasonInputs(database, { season, now });
+  clearPreviewEvidence(database, season);
+  return seeded;
+}
+
+function runProviderBackfill({
+  season = 2026,
+  maxRound = null,
+  spawn = spawnSync
+} = {}) {
+  const args = [
+    path.join(__dirname, "backfill-actuals-2026.js"),
+    "--apply",
+    `--season=${Number(season)}`
+  ];
+  if (maxRound != null) args.push(`--max-round=${Number(maxRound)}`);
+  const result = spawn(process.execPath, args, {
+    encoding: "utf8",
+    env: { ...process.env },
+    maxBuffer: 50 * 1024 * 1024
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      String(result.stderr || result.stdout || `Provider backfill failed for season ${season}`).trim()
+    );
   }
+  let details = {};
+  try {
+    details = JSON.parse(String(result.stdout || "").trim());
+  } catch (_error) {
+    throw new Error("Provider backfill completed without a machine-readable result.");
+  }
+  return details;
+}
+
+function summarizeProviderPreview(database, {
+  season = 2026,
+  seasons = [],
+  backfill = {}
+} = {}) {
+  const importRow = database.prepare(
+    "SELECT id, sync_id, source_type, parser_version, requested_rounds, completed_rounds, status FROM race_data_imports WHERE season = ? ORDER BY id DESC LIMIT 1"
+  ).get(Number(season));
+  const snapshots = database.prepare(
+    "SELECT round_number, round_name, coverage_status, unresolved_count FROM race_data_snapshots WHERE season = ? ORDER BY round_number"
+  ).all(Number(season));
+  return {
+    sourceType: importRow?.source_type || SOURCE_TYPES.JOLPICA,
+    sourceNote: "Provider-backed preview evidence; isolated from production",
+    importId: importRow ? Number(importRow.id) : null,
+    import: importRow || null,
+    snapshotCount: snapshots.length,
+    rounds: snapshots.map((row) => Number(row.round_number)),
+    incompleteRounds: snapshots
+      .filter((row) => row.coverage_status !== "complete" || Number(row.unresolved_count || 0) > 0)
+      .map((row) => ({
+        round: Number(row.round_number),
+        name: row.round_name,
+        coverage: row.coverage_status,
+        unresolved: Number(row.unresolved_count || 0)
+      })),
+    backfill: {
+      latestRound: backfill.latestRound || null,
+      changedSnapshotCount: Number(backfill.changedSnapshotCount || 0),
+      comparison: backfill.comparison || null
+    },
+    seasons
+  };
+}
+
+function seedProviderPreview({
+  databaseUrl = String(process.env.DATABASE_URL || ""),
+  sqlitePath = process.env.DB_PATH,
+  season = 2026,
+  now = new Date().toISOString(),
+  runBackfill = runProviderBackfill
+} = {}) {
+  if (!databaseUrl.trim() && !sqlitePath) {
+    throw new Error("Provider preview seeding requires DATABASE_URL or DB_PATH");
+  }
+
+  const database = createAppDatabase({ databaseUrl, sqlitePath });
+  try {
+    prepareProviderPreview(database, { season, now });
+  } finally {
+    database.close?.();
+  }
+
+  const backfill = runBackfill({ season });
+  const finalized = createAppDatabase({ databaseUrl, sqlitePath });
+  try {
+    const seasons = seedPreviewSeasonFixtures(finalized);
+    return summarizeProviderPreview(finalized, { season, seasons, backfill });
+  } finally {
+    finalized.close?.();
+  }
+}
+
+function main() {
+  console.log(JSON.stringify(seedProviderPreview({
+    databaseUrl: String(process.env.DATABASE_URL || ""),
+    sqlitePath: process.env.DB_PATH
+  })));
 }
 
 if (require.main === module) {
@@ -327,4 +464,17 @@ if (require.main === module) {
   }
 }
 
-module.exports = { seedSanitizedPreview, buildEvidence };
+// Backwards-compatible fixture export for focused unit tests. The CLI above
+// always uses provider-backed evidence and never calls this fixture path.
+const seedSanitizedPreview = seedFixturePreview;
+
+module.exports = {
+  buildEvidence,
+  clearPreviewEvidence,
+  prepareProviderPreview,
+  runProviderBackfill,
+  seedFixturePreview,
+  seedProviderPreview,
+  seedSanitizedPreview,
+  summarizeProviderPreview
+};
