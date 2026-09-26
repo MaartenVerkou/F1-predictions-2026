@@ -5,11 +5,13 @@ const { resolveConfiguredRaceName } = require("../race-names");
 const {
   REVIEW_STATUS_PENDING,
   REVIEW_STATUS_REVIEWED,
+  loadPublishedActuals,
   fetchSnapshotValues: loadSnapshotValues,
   findLatestRoundSnapshotForSeason: loadLatestRoundSnapshotForSeason,
   findSnapshotById,
   listLatestSnapshotsForSeason,
   markSnapshotReviewed,
+  publishActualSnapshot,
   upsertSnapshotForRound
 } = require("../actuals-snapshots");
 const {
@@ -3730,11 +3732,10 @@ function registerAdminRoutes(app, deps) {
       : null;
     const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
     const races = catalog?.races?.map((race) => race.display_name) || [];
-    const actualRows = seasonContext.syncable ? db.prepare("SELECT * FROM actuals").all() : [];
-    const persistedActuals = actualRows.reduce((acc, row) => {
-      acc[row.question_id] = row.value;
-      return acc;
-    }, {});
+    const publishedActuals = seasonContext.selected
+      ? loadPublishedActuals(db, season)
+      : { available: false, values: {} };
+    const persistedActuals = publishedActuals.values || {};
     const draftActuals =
       req.session &&
       req.session.adminActualsDraft &&
@@ -3825,6 +3826,7 @@ function registerAdminRoutes(app, deps) {
       raceTargets: racesWithTargets,
       selectedRaceTarget,
       selectedSnapshotMeta,
+      publishedActuals,
       pendingReviewTargets,
       requiresPastUnlock,
       allowPastEdit,
@@ -3856,13 +3858,7 @@ function registerAdminRoutes(app, deps) {
         races,
         season: CURRENT_SEASON
       });
-      const existingActuals = db
-        .prepare("SELECT question_id, value FROM actuals")
-        .all()
-        .reduce((acc, row) => {
-          acc[row.question_id] = row.value;
-          return acc;
-        }, {});
+      const existingActuals = loadPublishedActuals(db, requestedSeason).values || {};
       const draftActuals = { ...existingActuals };
 
       let filledCount = 0;
@@ -4012,6 +4008,17 @@ function registerAdminRoutes(app, deps) {
       snapshotId,
       reviewedByUserId: adminUser?.id
     });
+    try {
+      publishActualSnapshot(db, {
+        season,
+        snapshotId,
+        publishedByUserId: adminUser?.id
+      });
+    } catch (err) {
+      return res.redirect(
+        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent(err.message)}`
+      );
+    }
     const label = snapshot.round_number
       ? `R${snapshot.round_number} - ${String(snapshot.round_name || "").trim() || `Round ${snapshot.round_number}`}`
       : `Snapshot #${snapshot.id}`;
@@ -4094,6 +4101,13 @@ function registerAdminRoutes(app, deps) {
             round: selectedRoundNumber
           } : null
         });
+        if (snapshotResult?.snapshotId) {
+          publishActualSnapshot(db, {
+            season,
+            snapshotId: snapshotResult.snapshotId,
+            publishedByUserId: adminUser?.id
+          });
+        }
         successMessage = snapshotResult?.snapshotId
           ? `Snapshot saved for R${selectedRoundNumber} - ${roundName} and marked reviewed.`
           : `No values saved for R${selectedRoundNumber} - ${roundName}.`;
@@ -4111,24 +4125,6 @@ function registerAdminRoutes(app, deps) {
       }
       return res.redirect(redirectTo);
     }
-
-    const clearAll = db.prepare("DELETE FROM actuals");
-    const upsert = db.prepare(
-      `
-      INSERT INTO actuals (question_id, value, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(question_id)
-      DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-      `
-    );
-
-    const tx = db.transaction(() => {
-      clearAll.run();
-      Object.entries(valuesByQuestion).forEach(([questionId, value]) => {
-        upsert.run(questionId, value, now);
-      });
-    });
-    tx();
 
     if (req.session) {
       delete req.session.adminActualsDraft;
@@ -4156,13 +4152,20 @@ function registerAdminRoutes(app, deps) {
         evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.payload?.payloadRevision || null
       });
       if (archivedSnapshot?.snapshotId) {
+        publishActualSnapshot(db, {
+          season,
+          snapshotId: archivedSnapshot.snapshotId,
+          publishedByUserId: adminUser?.id
+        });
         const label = latestRoundSnapshot?.round_number
           ? `R${latestRoundSnapshot.round_number}`
           : `snapshot #${archivedSnapshot.snapshotId}`;
         successMessage = `Actuals saved. ${label} marked reviewed.`;
       }
     } catch (archiveErr) {
-      successMessage = `Actuals saved. Snapshot archive skipped: ${archiveErr.message}`;
+      return res.redirect(
+        `/admin/actuals?season=${encodeURIComponent(season)}&error=${encodeURIComponent(`Actuals were not published: ${archiveErr.message}`)}`
+      );
     }
 
     const redirectTo = `/admin/actuals?season=${encodeURIComponent(season)}&success=${encodeURIComponent(successMessage)}`;
@@ -5070,6 +5073,7 @@ function registerAdminRoutes(app, deps) {
         const groupId = Number(req.params.groupId);
         const mode = String(req.query.mode || "actuals").trim().toLowerCase();
         const analysisMode = mode === "sim200" ? "sim200" : "actuals";
+        const analysisSeason = Number(req.query.season || CURRENT_SEASON);
         if (!groupId) {
           return res.redirect(
             `/admin/analysis?error=${encodeURIComponent("Invalid test group id.")}`
@@ -5141,11 +5145,7 @@ function registerAdminRoutes(app, deps) {
             originalPlayerCount
           });
         } else {
-          const actualRows = db.prepare("SELECT * FROM actuals").all();
-          const actualsMap = actualRows.reduce((acc, row) => {
-            acc[row.question_id] = row.value;
-            return acc;
-          }, {});
+          const actualsMap = loadPublishedActuals(db, analysisSeason).values || {};
           analysis = buildGroupAnalysis(
             groupId,
             questions,

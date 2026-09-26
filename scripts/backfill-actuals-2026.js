@@ -5,8 +5,10 @@ const path = require("path");
 const {
   REVIEW_STATUS_PENDING,
   ensureActualSnapshotColumns,
+  ensurePublishedActualsSchema,
   fetchSnapshotValues,
   findLatestSnapshotForRound,
+  loadPublishedActuals,
   upsertSnapshotForRound
 } = require("../src/actuals-snapshots");
 const {
@@ -774,14 +776,8 @@ function deriveSnapshotsFromPersistedEvidence(db, {
   }));
 }
 
-function loadExistingActuals(db) {
-  return db
-    .prepare("SELECT question_id, value FROM actuals")
-    .all()
-    .reduce((acc, row) => {
-      acc[row.question_id] = row.value;
-      return acc;
-    }, {});
+function loadExistingActuals(db, season) {
+  return loadPublishedActuals(db, season).values || {};
 }
 
 function compareSnapshotValues(existingValues, derivedValues) {
@@ -818,6 +814,7 @@ function ensureActualsSchema(db) {
   if (db.dialect === "postgres") {
     ensurePostgresSchema(db);
     ensureActualSnapshotColumns(db);
+    ensurePublishedActualsSchema(db);
     ensureRaceDataSchema(db);
     return;
   }
@@ -860,6 +857,7 @@ function ensureActualsSchema(db) {
       ON actual_snapshot_values(snapshot_id);
   `);
   ensureActualSnapshotColumns(db);
+  ensurePublishedActualsSchema(db);
   ensureRaceDataSchema(db);
 }
 
@@ -1018,7 +1016,7 @@ async function main() {
         db.pragma("busy_timeout = 5000");
       }
       ensureActualsSchema(db);
-      existingActuals = loadExistingActuals(db);
+      existingActuals = loadExistingActuals(db, args.season);
       const syncId = "backfill-" + args.season + "-" + Date.now();
       const seasonCatalog = buildSeasonCatalog(db, args.season, { questions });
       snapshots.forEach((snapshot) => {

@@ -3,6 +3,9 @@
 const REVIEW_STATUS_PENDING = "pending";
 const REVIEW_STATUS_REVIEWED = "reviewed";
 
+const PUBLISHED_ACTUALS_UNAVAILABLE = "not_published";
+const PUBLISHED_ACTUALS_SNAPSHOT_NOT_REVIEWED = "snapshot_not_reviewed";
+
 function normalizeReviewStatus(raw) {
   return String(raw || "").trim().toLowerCase() === REVIEW_STATUS_PENDING
     ? REVIEW_STATUS_PENDING
@@ -81,6 +84,28 @@ function ensureActualSnapshotColumns(db) {
 
     CREATE INDEX IF NOT EXISTS idx_actual_snapshots_review_status
       ON actual_snapshots(season, review_status, round_number);
+  `);
+}
+
+/**
+ * Keep the season-level publication pointer separate from the historical
+ * snapshot rows. A reviewed snapshot is evidence ready for publication; the
+ * pointer is the explicit contract used by public scoring.
+ */
+function ensurePublishedActualsSchema(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS published_actual_sets (
+      season INTEGER PRIMARY KEY,
+      snapshot_id INTEGER NOT NULL,
+      published_at TEXT NOT NULL,
+      published_by_user_id INTEGER,
+      catalog_revision TEXT,
+      evidence_revision TEXT,
+      derivation_version TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_published_actual_sets_snapshot
+      ON published_actual_sets(snapshot_id);
   `);
 }
 
@@ -316,6 +341,147 @@ function findSnapshotById(db, snapshotId, options = {}) {
   return isSnapshotWithinRoundLimit(snapshot, options) ? snapshot : null;
 }
 
+function findPublishedActualSnapshot(db, season) {
+  ensurePublishedActualsSchema(db);
+  const safeSeason = Number(season);
+  if (!Number.isFinite(safeSeason)) return null;
+  const pointer = db
+    .prepare(
+      `
+      SELECT
+        pas.season AS published_season,
+        pas.published_at AS set_published_at,
+        pas.published_by_user_id,
+        pas.catalog_revision AS set_catalog_revision,
+        pas.evidence_revision AS set_evidence_revision,
+        pas.derivation_version AS set_derivation_version,
+        a.*
+      FROM published_actual_sets pas
+      JOIN actual_snapshots a ON a.id = pas.snapshot_id
+      WHERE pas.season = ?
+      LIMIT 1
+      `
+    )
+    .get(safeSeason);
+  if (!pointer) return null;
+  const snapshot = mapSnapshotRow(pointer);
+  if (!snapshot || Number(snapshot.season) !== safeSeason) return null;
+  return {
+    ...snapshot,
+    published_at: pointer.set_published_at || snapshot.published_at || null,
+    published_by_user_id:
+      pointer.published_by_user_id == null
+        ? null
+        : Number(pointer.published_by_user_id),
+    published_catalog_revision: pointer.set_catalog_revision || null,
+    published_evidence_revision: pointer.set_evidence_revision || null,
+    published_derivation_version: pointer.set_derivation_version || null
+  };
+}
+
+function loadPublishedActuals(db, season) {
+  ensurePublishedActualsSchema(db);
+  const safeSeason = Number(season);
+  const empty = {
+    available: false,
+    reason: PUBLISHED_ACTUALS_UNAVAILABLE,
+    season: Number.isFinite(safeSeason) ? safeSeason : null,
+    snapshot: null,
+    values: {}
+  };
+  if (!Number.isFinite(safeSeason)) return empty;
+
+  const snapshot = findPublishedActualSnapshot(db, safeSeason);
+  if (!snapshot) return empty;
+  if (normalizeReviewStatus(snapshot.review_status) !== REVIEW_STATUS_REVIEWED) {
+    return {
+      ...empty,
+      reason: PUBLISHED_ACTUALS_SNAPSHOT_NOT_REVIEWED,
+      snapshot
+    };
+  }
+  return {
+    available: true,
+    reason: null,
+    season: safeSeason,
+    snapshot,
+    values: fetchSnapshotValues(db, snapshot.id)
+  };
+}
+
+function publishActualSnapshot(db, {
+  season,
+  snapshotId,
+  publishedByUserId = null,
+  publishedAt = new Date().toISOString()
+}) {
+  ensurePublishedActualsSchema(db);
+  const safeSeason = Number(season);
+  const safeSnapshotId = Number(snapshotId);
+  if (!Number.isFinite(safeSeason) || !Number.isFinite(safeSnapshotId)) {
+    throw new Error("A valid season and actual snapshot are required for publication.");
+  }
+  const snapshot = findSnapshotById(db, safeSnapshotId);
+  if (!snapshot || Number(snapshot.season) !== safeSeason) {
+    throw new Error("The actual snapshot does not belong to the selected season.");
+  }
+  if (normalizeReviewStatus(snapshot.review_status) !== REVIEW_STATUS_REVIEWED) {
+    throw new Error("Only a reviewed actual snapshot can be published.");
+  }
+  const safePublishedAt = String(publishedAt || new Date().toISOString());
+  const safeUserId = Number.isFinite(Number(publishedByUserId))
+    ? Number(publishedByUserId)
+    : null;
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+      UPDATE actual_snapshots
+      SET published_at = NULL
+      WHERE season = ? AND id <> ?
+      `
+    ).run(safeSeason, safeSnapshotId);
+    db.prepare(
+      `
+      UPDATE actual_snapshots
+      SET published_at = ?, updated_at = COALESCE(updated_at, created_at)
+      WHERE id = ?
+      `
+    ).run(safePublishedAt, safeSnapshotId);
+    db.prepare(
+      `
+      INSERT INTO published_actual_sets (
+        season,
+        snapshot_id,
+        published_at,
+        published_by_user_id,
+        catalog_revision,
+        evidence_revision,
+        derivation_version
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(season)
+      DO UPDATE SET
+        snapshot_id = excluded.snapshot_id,
+        published_at = excluded.published_at,
+        published_by_user_id = excluded.published_by_user_id,
+        catalog_revision = excluded.catalog_revision,
+        evidence_revision = excluded.evidence_revision,
+        derivation_version = excluded.derivation_version
+      `
+    ).run(
+      safeSeason,
+      safeSnapshotId,
+      safePublishedAt,
+      safeUserId,
+      snapshot.catalog_revision || null,
+      snapshot.evidence_revision || null,
+      snapshot.derivation_version || null
+    );
+  });
+  tx();
+  return loadPublishedActuals(db, safeSeason);
+}
+
 function filterNonEmptyValues(valuesByQuestion) {
   return Object.entries(valuesByQuestion || {}).filter(([, value]) => value != null && value !== "");
 }
@@ -549,16 +715,22 @@ function markSnapshotReviewed(db, {
 }
 
 module.exports = {
+  PUBLISHED_ACTUALS_SNAPSHOT_NOT_REVIEWED,
+  PUBLISHED_ACTUALS_UNAVAILABLE,
   REVIEW_STATUS_PENDING,
   REVIEW_STATUS_REVIEWED,
   ensureActualSnapshotColumns,
+  ensurePublishedActualsSchema,
   fetchSnapshotValues,
   findLatestRoundSnapshotForSeason,
   findLatestSnapshotForRound,
+  findPublishedActualSnapshot,
   findSnapshotById,
+  loadPublishedActuals,
   listLatestSnapshotsForSeason,
   markSnapshotReviewed,
   normalizeReviewStatus,
+  publishActualSnapshot,
   snapshotValuesEqual,
   upsertSnapshotForRound
 };

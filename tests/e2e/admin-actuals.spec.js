@@ -14,6 +14,7 @@ test("admin actuals focuses review on a selected pending race and can mark it re
   db.exec(`
     DELETE FROM actual_snapshot_values;
     DELETE FROM actual_snapshots;
+    DELETE FROM published_actual_sets;
     DELETE FROM actuals;
   `);
   const snapshotResult = db.prepare(

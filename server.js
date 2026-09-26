@@ -14,6 +14,8 @@ const leaderboardModel = require("./src/leaderboard-model");
 const {
   REVIEW_STATUS_PENDING,
   ensureActualSnapshotColumns,
+  ensurePublishedActualsSchema,
+  loadPublishedActuals,
   listLatestSnapshotsForSeason
 } = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
@@ -840,6 +842,7 @@ function ensureQuestionSettingsColumns() {
 
 ensureQuestionSettingsColumns();
 ensureActualSnapshotColumns(db);
+ensurePublishedActualsSchema(db);
 ensureRaceDataSchema(db);
 ensureSeasonInputsSchema(db);
 
@@ -2909,7 +2912,7 @@ function predictionsClosed() {
 
 function isLeaderboardAvailable() {
   if (LEADERBOARD_ENABLED) return true;
-  return !!db.prepare("SELECT 1 FROM actuals LIMIT 1").get();
+  return loadPublishedActuals(db, CURRENT_SEASON).available;
 }
 
 function clampNumber(value, min, max) {
@@ -3470,10 +3473,17 @@ function fetchSnapshotValuesBySnapshotIds(snapshotIds) {
 function getLatestPreviewRoundDeltas({ groupId, questions, leaderboardInputs, excludeHiddenAdmins = false }) {
   const safeGroupId = Number(groupId || 0);
   if (!Number.isFinite(safeGroupId) || safeGroupId <= 0) return {};
+  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
+  if (!publishedActuals.available) return {};
   const races = getRaces();
   const snapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
-    maxRoundNumber: Array.isArray(races) ? races.length : null
-  });
+    maxRoundNumber:
+      Number.isFinite(Number(publishedActuals.snapshot?.round_number))
+        ? Number(publishedActuals.snapshot.round_number)
+        : Array.isArray(races)
+          ? races.length
+          : null
+  }).filter((snapshot) => snapshot.review_status === "reviewed");
   if (snapshots.length < 2) return {};
 
   const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(snapshots.map((snapshot) => snapshot.id));
@@ -3508,12 +3518,9 @@ function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
   if (!Number.isFinite(groupId) || groupId <= 0) return null;
   const questions = getQuestions(locale);
   if (!Array.isArray(questions) || questions.length === 0) return null;
-  const actualRows = db.prepare("SELECT question_id, value FROM actuals").all();
-  if (actualRows.length === 0) return null;
-  const actualsByQuestion = actualRows.reduce((acc, row) => {
-    acc[row.question_id] = row.value;
-    return acc;
-  }, {});
+  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
+  if (!publishedActuals.available) return null;
+  const actualsByQuestion = publishedActuals.values || {};
   const excludeHiddenAdmins = isGlobalGroup(group);
   const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
   const latestRoundDeltasByParticipantId = getLatestPreviewRoundDeltas({
@@ -5364,11 +5371,8 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
   const canViewQuestionBreakdown = Boolean(user);
   const questions = getQuestions(locale);
   const races = getRaces();
-  const actualRows = db.prepare("SELECT * FROM actuals").all();
-  const currentActuals = actualRows.reduce((acc, row) => {
-    acc[row.question_id] = row.value;
-    return acc;
-  }, {});
+  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
+  const currentActuals = publishedActuals.values || {};
   const snapshotRows = db
     .prepare(
       `

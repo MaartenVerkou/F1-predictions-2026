@@ -1,5 +1,8 @@
 const leaderboardModel = require("../leaderboard-model");
-const { listLatestSnapshotsForSeason } = require("../actuals-snapshots");
+const {
+  listLatestSnapshotsForSeason,
+  loadPublishedActuals
+} = require("../actuals-snapshots");
 const { canonicalizeQuestionValue } = require("../canonical-answers");
 
 function registerAuthRoutes(app, deps) {
@@ -173,10 +176,15 @@ function registerAuthRoutes(app, deps) {
   };
 
   const buildPreviewRoundDeltas = ({ members, responses, questions }) => {
+    const publishedActuals = loadPublishedActuals(db, PREVIEW_SEASON);
+    if (!publishedActuals.available) return {};
     const maxRoundNumber = getPreviewMaxRoundNumber();
     const snapshots = listLatestSnapshotsForSeason(db, PREVIEW_SEASON, {
-      maxRoundNumber
-    });
+      maxRoundNumber:
+        Number.isFinite(Number(publishedActuals.snapshot?.round_number))
+          ? Number(publishedActuals.snapshot.round_number)
+          : maxRoundNumber
+    }).filter((snapshot) => snapshot.review_status === "reviewed");
     if (snapshots.length < 2) return {};
 
     const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(
@@ -213,12 +221,9 @@ function registerAuthRoutes(app, deps) {
     const questions = typeof getQuestions === "function" ? getQuestions(locale) : [];
     if (!Array.isArray(questions) || questions.length === 0) return null;
 
-    const actualRows = db.prepare("SELECT question_id, value FROM actuals").all();
-    if (actualRows.length === 0) return null;
-    const actuals = actualRows.reduce((acc, row) => {
-      acc[row.question_id] = row.value;
-      return acc;
-    }, {});
+    const publishedActuals = loadPublishedActuals(db, PREVIEW_SEASON);
+    if (!publishedActuals.available) return null;
+    const actuals = publishedActuals.values || {};
 
     const questionMap = questions.reduce((acc, question) => {
       acc[question.id] = question;
@@ -927,12 +932,9 @@ function registerAuthRoutes(app, deps) {
     const questions = typeof getQuestions === "function" ? getQuestions(locale) : [];
     if (!Array.isArray(questions) || questions.length === 0) return {};
 
-    const actualRows = db.prepare("SELECT question_id, value FROM actuals").all();
-    if (actualRows.length === 0) return {};
-    const actualsByQuestion = actualRows.reduce((acc, row) => {
-      acc[row.question_id] = row.value;
-      return acc;
-    }, {});
+    const publishedActuals = loadPublishedActuals(db, PREVIEW_SEASON);
+    if (!publishedActuals.available) return {};
+    const actualsByQuestion = publishedActuals.values || {};
 
     const participantId = String(userId);
     return groups.reduce((acc, group) => {

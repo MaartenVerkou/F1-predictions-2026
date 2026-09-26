@@ -12,7 +12,10 @@ const {
   linkEvidenceToActualSnapshot,
   saveRaceDataSnapshot
 } = require("../src/race-data-evidence");
-const { ensureActualSnapshotColumns } = require("../src/actuals-snapshots");
+const {
+  ensureActualSnapshotColumns,
+  ensurePublishedActualsSchema
+} = require("../src/actuals-snapshots");
 const roster = require("../data/roster.json");
 const races = require("../data/races.json").races;
 const { DRIVER_TEAM_ASSIGNMENTS, seedSeasonInputs } = require("./seed-season-inputs");
@@ -224,6 +227,7 @@ function seedFixturePreview(database, now = new Date().toISOString()) {
 
   ensureRaceDataSchema(database);
   ensureActualSnapshotColumns(database);
+  ensurePublishedActualsSchema(database);
   seedSeasonInputs(database, { season: 2026, now });
   const replacement = seedPreviewReplacement(database, now);
   const seasonCatalog = buildSeasonCatalog(database, 2026);
@@ -297,9 +301,6 @@ function seedFixturePreview(database, now = new Date().toISOString()) {
       completedRounds: snapshots.length,
       completedAt: now
     });
-    database.prepare(
-      "INSERT INTO actuals (question_id, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(question_id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
-    ).run("all_teams_score_points", "yes", now);
     return { importId, snapshots };
   });
   const result = transaction();
@@ -350,6 +351,7 @@ function prepareProviderPreview(database, {
 } = {}) {
   ensureRaceDataSchema(database);
   ensureActualSnapshotColumns(database);
+  ensurePublishedActualsSchema(database);
   const seeded = seedSeasonInputs(database, { season, now });
   clearPreviewEvidence(database, season);
   return seeded;

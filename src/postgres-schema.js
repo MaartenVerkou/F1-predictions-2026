@@ -21,6 +21,7 @@ const APP_TABLES = [
   "entity_provider_refs",
   "actual_snapshots",
   "actual_snapshot_values",
+  "published_actual_sets",
   "race_data_imports",
   "race_data_snapshots",
   "question_settings",
@@ -357,6 +358,19 @@ CREATE INDEX IF NOT EXISTS idx_actual_snapshots_season_round
   ON actual_snapshots(season, round_number, created_at);
 CREATE INDEX IF NOT EXISTS idx_actual_snapshot_values_snapshot
   ON actual_snapshot_values(snapshot_id);
+
+CREATE TABLE IF NOT EXISTS published_actual_sets (
+  season INTEGER PRIMARY KEY,
+  snapshot_id INTEGER NOT NULL,
+  published_at TEXT NOT NULL,
+  published_by_user_id INTEGER,
+  catalog_revision TEXT,
+  evidence_revision TEXT,
+  derivation_version TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_published_actual_sets_snapshot
+  ON published_actual_sets(snapshot_id);
 
 CREATE TABLE IF NOT EXISTS question_settings (
   question_id TEXT PRIMARY KEY,

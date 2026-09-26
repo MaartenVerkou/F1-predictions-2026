@@ -3,6 +3,10 @@
 const path = require("path");
 const Database = require("better-sqlite3");
 const { expect, test } = require("@playwright/test");
+const {
+  ensurePublishedActualsSchema,
+  publishActualSnapshot
+} = require("../../src/actuals-snapshots");
 
 const DB_PATH = path.join(__dirname, "..", "..", ".tmp", "playwright-state", "app.db");
 
@@ -68,6 +72,7 @@ function upsertUser(db, { name, email, isAdmin = 0 }) {
 
 function seedLeaderboardInsights(db, { includeThirdSnapshot = false } = {}) {
   const now = new Date().toISOString();
+  ensurePublishedActualsSchema(db);
   const devAdmin = upsertUser(db, {
     name: "Dev Admin",
     email: "dev@example.com",
@@ -79,6 +84,7 @@ function seedLeaderboardInsights(db, { includeThirdSnapshot = false } = {}) {
 
   db.prepare("DELETE FROM actual_snapshot_values").run();
   db.prepare("DELETE FROM actual_snapshots").run();
+  db.prepare("DELETE FROM published_actual_sets").run();
   db.prepare("DELETE FROM actuals").run();
   db.prepare("DELETE FROM responses WHERE group_id = ?").run(groupId);
   db.prepare("DELETE FROM guest_responses WHERE group_id = ?").run(groupId);
@@ -185,6 +191,13 @@ function seedLeaderboardInsights(db, { includeThirdSnapshot = false } = {}) {
     snapshotIds.round3 = Number(round3.lastInsertRowid);
     saveSnapshotValues(round3.lastInsertRowid, round3Actuals, { updateCurrent: true });
   }
+
+  publishActualSnapshot(db, {
+    season: 2026,
+    snapshotId: includeThirdSnapshot ? snapshotIds.round3 : snapshotIds.round2,
+    publishedByUserId: devAdmin.id,
+    publishedAt: now
+  });
 
   const privateGroupId = 990001;
   db.prepare("DELETE FROM responses WHERE group_id = ?").run(privateGroupId);
