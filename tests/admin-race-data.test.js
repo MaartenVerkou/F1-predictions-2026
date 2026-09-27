@@ -5,11 +5,15 @@ const assert = require("node:assert/strict");
 const {
   auditResultLabel,
   auditSourceState,
+  compactQuestionLabel,
+  fallbackEntityCode,
+  fallbackRaceCode,
   buildRaceDataFocusOptions,
   buildRaceDataMetricOptions,
   resolveRaceDataFocus,
   buildRaceDataAuditView,
   buildCorrectedRaceEvidence,
+  isSafeRaceDataReturnPath,
   registerAdminRoutes
 } = require("../src/routes/admin");
 
@@ -80,7 +84,25 @@ test("buildRaceDataAuditView marks missing and future evidence without inventing
   assert.equal(view.selectedRound.label, "R1 - Monaco Grand Prix");
   assert.equal(view.detailRows[0].racePoints, 25);
   assert.equal(view.detailRows[0].finishLabel, "P1");
+  assert.equal(view.detailRows[0].driverCode, "ANT");
+  assert.equal(view.detailRows[0].constructorCode, "MER");
   assert.equal(view.selectedRound.snapshot.id, 10);
+});
+
+test("compact identity and race codes are deterministic presentation helpers", () => {
+  assert.equal(fallbackEntityCode("George Russell"), "RUS");
+  assert.equal(fallbackEntityCode("Aston Martin", "team"), "AST");
+  assert.equal(fallbackRaceCode("Australian Grand Prix"), "AUS");
+  assert.equal(fallbackRaceCode("Las Vegas Grand Prix"), "LVE");
+  assert.equal(compactQuestionLabel({ id: "destructors_team", prompt: "Long prompt" }, "damage"), "Destructors Championship");
+});
+
+test("race-data review return paths stay local to the race-data workspace", () => {
+  assert.equal(isSafeRaceDataReturnPath("/admin/race-data?season=2026&round=4"), true);
+  assert.equal(isSafeRaceDataReturnPath("/admin/race-data#review"), true);
+  assert.equal(isSafeRaceDataReturnPath("https://example.test/admin/race-data"), false);
+  assert.equal(isSafeRaceDataReturnPath("//example.test/admin/race-data"), false);
+  assert.equal(isSafeRaceDataReturnPath("/admin/actuals"), false);
 });
 
 test("selected summary reflects partial and cancelled calendar states", () => {
@@ -505,6 +527,8 @@ test("race data focus options are driven by question metadata", () => {
     ["constructors_championship_top_3", "constructors", "points"]
   ]);
   assert.deepEqual(options.map((option) => option.questionNumber), [null, 1, 2]);
+  assert.equal(options[1].shortLabel, "Podium finishers");
+  assert.equal(options[2].shortLabel, "Championship top 3");
   assert.equal(resolveRaceDataFocus({
     questions,
     focusId: "all_podium_finishers",

@@ -94,11 +94,69 @@ function fallbackEntityCode(value, kind = "driver") {
   const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "—";
   if (kind === "team" && parts.length > 1) {
-    const initials = parts.map((part) => part.replace(/[^A-Za-z0-9]/g, "")[0] || "").join("");
-    if (initials.length >= 2) return initials.slice(0, 3).toUpperCase();
+    const condensed = parts.join("").replace(/[^A-Za-z0-9]/g, "");
+    if (condensed) return condensed.slice(0, 3).toUpperCase();
   }
   const lastPart = parts.at(-1).replace(/[^A-Za-z0-9]/g, "");
   return (lastPart || parts.join("")).slice(0, 3).toUpperCase() || "—";
+}
+
+function fallbackRaceCode(value) {
+  const words = String(value || "")
+    .replace(/[^A-Za-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((word) => !["grand", "prix", "gp"].includes(word.toLowerCase()));
+  if (!words.length) return "—";
+  if (words.length > 1) {
+    return `${words[0][0] || ""}${words[1].slice(0, 2)}`.toUpperCase();
+  }
+  return words[0].slice(0, 3).toUpperCase() || "—";
+}
+
+const COMPACT_QUESTION_LABELS = {
+  championship_top3: "Championship top 3",
+  constructors_championship_top_3: "Championship top 3",
+  drivers_championship_top_3: "Championship top 3",
+  last_standing: "Championship last",
+  drivers_championship_last: "Championship last",
+  grid_wins: "Lowest-grid winners",
+  lowest_grid_win_position: "Lowest-grid win",
+  podiums: "Podium finishers",
+  all_podium_finishers: "Podium finishers",
+  no_podium_points: "Points without podium",
+  most_points_no_podium: "Points without podium",
+  driver_of_day: "Driver of the Day",
+  most_driver_of_the_day: "Driver of the Day",
+  dnf_by_race: "Three races · most DNFs",
+  dnfs: "Most DNFs",
+  most_dnfs_driver: "Most DNFs",
+  most_dnfs_constructor: "Most DNFs",
+  sprint_points: "Sprint points",
+  teammate_points: "Teammate points",
+  qualifying_h2h: "Qualifying head-to-head",
+  closest_qualifying_teammates: "Closest qualifying",
+  alpine_comparison: "Team comparison",
+  damage: "Destructors Championship",
+  destructors_driver: "Destructors Championship",
+  destructors_team: "Destructors Championship",
+  engine_switch: "Power-unit changes",
+  all_teams_points: "Constructor points"
+};
+
+function compactQuestionLabel(question, metric) {
+  const id = String(question?.id || "").trim();
+  const mapped = COMPACT_QUESTION_LABELS[id] || COMPACT_QUESTION_LABELS[String(metric || "").trim().toLowerCase()];
+  if (mapped) return mapped;
+  const prompt = String(question?.prompt || id || "Question").trim();
+  return prompt.length > 42 ? `${prompt.slice(0, 39).trimEnd()}…` : prompt;
+}
+
+function isSafeRaceDataReturnPath(value) {
+  const path = String(value || "").trim();
+  return /^\/admin\/race-data(?:[?#]|$)/.test(path)
+    && !path.includes("://")
+    && !path.startsWith("//");
 }
 
 function sortAuditRows(rows, valueField = "points") {
@@ -244,7 +302,8 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       requiredEvidence: Array.isArray(projection?.requiredEvidence) ? projection.requiredEvidence.slice() : [],
       questionId: id,
       questionNumber,
-      label: String(question.prompt || id)
+      label: String(question.prompt || id),
+      shortLabel: compactQuestionLabel(question, metric)
     });
     seen.add(id);
   }
@@ -642,14 +701,29 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       )
     )
   ).filter(Boolean);
+  const driverCodeByName = new Map(
+    driverEntities.map((entity) => [
+      entity.name,
+      entity.code || fallbackEntityCode(entity.name, "driver")
+    ])
+  );
+  const teamCodeByName = new Map(
+    teamEntities.map((entity) => [
+      entity.name,
+      entity.code || fallbackEntityCode(entity.name, "team")
+    ])
+  );
   const detailRows = detailNames.map((driver) => {
     const race = raceByDriver.get(driver) || null;
     const qualifying = qualifyingByDriver.get(driver) || null;
     const sprint = sprintByDriver.get(driver) || null;
     return {
       driver,
+      driverCode: driverCodeByName.get(driver) || fallbackEntityCode(driver, "driver"),
       driverId: race?.driver_id ?? qualifying?.driver_id ?? sprint?.driver_id ?? null,
       constructor: race?.constructor || qualifying?.constructor || sprint?.constructor || null,
+      constructorCode: teamCodeByName.get(race?.constructor || qualifying?.constructor || sprint?.constructor || "")
+        || fallbackEntityCode(race?.constructor || qualifying?.constructor || sprint?.constructor || "", "team"),
       grid: race?.grid ?? null,
       qualifyingPosition: qualifying?.position ?? null,
       sprintPosition: sprint?.position ?? null,
@@ -2925,6 +2999,16 @@ function registerAdminRoutes(app, deps) {
       catalogRevision: catalog?.catalogRevision || null,
       focus
     });
+    const raceCodeByName = new Map(
+      (catalog?.races || []).map((race) => [
+        race.display_name,
+        String(race.race_code || "").trim().toUpperCase() || fallbackRaceCode(race.display_name)
+      ])
+    );
+    view.rounds = view.rounds.map((round) => ({
+      ...round,
+      code: raceCodeByName.get(round.raceName) || fallbackRaceCode(round.raceName)
+    }));
     view.raceResultColumns = RACE_RESULT_COLUMNS.map((column) => {
       const translated = t(column.labelKey);
       return {
@@ -2947,7 +3031,9 @@ function registerAdminRoutes(app, deps) {
       view,
       viewMode,
       catalogRevision: catalog?.catalogRevision || null,
-      catalogReadiness: catalog?.readiness || null
+      catalogReadiness: catalog?.readiness || null,
+      raceDataError: req.query.error ? String(req.query.error) : null,
+      raceDataSuccess: req.query.success ? String(req.query.success) : null
     };
     if (String(req.query.fragment || "").trim().toLowerCase() === "round") {
       return res.render("partials/admin_race_data_round_region", model);
@@ -3180,18 +3266,22 @@ function registerAdminRoutes(app, deps) {
     const snapshotId = Number(req.body.snapshotId || 0);
     const target = String(req.body.target || "current").trim() || "current";
     const unlockPast = String(req.body.unlockPast || "").trim() === "1";
+    const rawReturnTo = String(req.body.returnTo || "").trim();
+    const returnTo = isSafeRaceDataReturnPath(rawReturnTo) ? rawReturnTo : null;
+    const fallbackPath = `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}`;
+    const redirectReview = (key, message) => res.redirect(
+      withQueryParam(returnTo || fallbackPath, key, message)
+    );
     let snapshot = null;
     try {
       assertSeasonMutationAllowed(seasonContext, { historicalCorrection: unlockPast });
       snapshot = findSnapshotById(db, snapshotId, getSnapshotRoundOptions(season));
       if (snapshot && Number(snapshot.season) !== season) snapshot = null;
     } catch (err) {
-      return res.redirect(`/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}&error=${encodeURIComponent(err.message)}`);
+      return redirectReview("error", err.message);
     }
     if (!snapshot) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent("Snapshot not found.")}`
-      );
+      return redirectReview("error", "Snapshot not found.");
     }
 
     markSnapshotReviewed(db, {
@@ -3205,16 +3295,12 @@ function registerAdminRoutes(app, deps) {
         publishedByUserId: adminUser?.id
       });
     } catch (err) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent(err.message)}`
-      );
+      return redirectReview("error", err.message);
     }
     const label = snapshot.round_number
       ? `R${snapshot.round_number} - ${String(snapshot.round_name || "").trim() || `Round ${snapshot.round_number}`}`
       : `Snapshot #${snapshot.id}`;
-    return res.redirect(
-      `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&success=${encodeURIComponent(`${label} marked as reviewed.`)}`
-    );
+    return redirectReview("success", `${label} marked as reviewed.`);
   });
 
 
@@ -4757,10 +4843,14 @@ function registerAdminRoutes(app, deps) {
 module.exports = {
   auditResultLabel,
   auditSourceState,
+  compactQuestionLabel,
+  fallbackEntityCode,
+  fallbackRaceCode,
   buildRaceDataFocusOptions,
   buildRaceDataMetricOptions,
   resolveRaceDataFocus,
   buildRaceDataAuditView,
   buildCorrectedRaceEvidence,
+  isSafeRaceDataReturnPath,
   registerAdminRoutes
 };

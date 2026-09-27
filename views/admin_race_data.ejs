@@ -39,5 +39,11 @@
     </div>
   <% } %>
 
+  <% if (raceDataError || raceDataSuccess) { %>
+    <div class="admin-feedback-context admin-race-data-feedback" role="status">
+      <div class="<%= raceDataError ? 'alert' : 'notice' %>"><%= raceDataError || raceDataSuccess %></div>
+    </div>
+  <% } %>
+
   <%- include('partials/admin_race_data_round_region') %>
 </div>

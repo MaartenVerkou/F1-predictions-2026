@@ -8187,3 +8187,96 @@ button.lang-option.is-active {
     width: 100%;
   }
 }
+
+/* The primary facts table is a compact review surface. Keep canonical names
+   discoverable through title/ARIA while using stable codes when the table
+   would otherwise force the facts off-screen. */
+.admin-race-data-review-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.admin-race-data-review-form button {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.admin-race-data-review-status {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-race-data-detail-table--result {
+  min-width: 760px;
+  table-layout: fixed;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--finish,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--finish {
+  width: 52px;
+  min-width: 52px;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver,
+.admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+  width: 82px;
+  min-width: 82px;
+  max-width: 82px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--status {
+  min-width: 86px;
+  width: 86px;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-full-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-full-label {
+  display: none;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-compact-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-compact-label {
+  display: inline;
+}
+
+.admin-race-data-question-form select {
+  width: min(430px, 100%);
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.admin-race-data-feedback {
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.admin-race-data-feedback .notice {
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: 6px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 92%, var(--accent) 8%);
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-detail-table--result {
+    min-width: 700px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver,
+  .admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+    width: 68px;
+    min-width: 68px;
+    max-width: 68px;
+  }
+}

@@ -93,6 +93,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /<tbody data-race-data-body="<%= viewMode %>">/);
   assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
   assert.match(page, /admin-race-data-selector-stack/);
+  assert.match(page, /raceDataError \|\| raceDataSuccess/);
   assert.match(page, /class="admin-race-data-selector-form admin-race-data-round-form" data-race-data-round-form/);
   assert.doesNotMatch(region, /class="admin-race-data-controls"/);
   assert.match(region, /questions_label/);
@@ -101,9 +102,15 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /class="admin-race-data-table-section"/);
   assert.match(region, /class="admin-race-data-table-toolbar"/);
   assert.doesNotMatch(region, /admin-race-data-toolbar/);
-  assert.doesNotMatch(region, /open_actuals|derived_actuals|selectedSnapshot|derivedActuals/);
+  assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
   assert.match(region, /data-race-data-result-row/);
   assert.match(region, /data-race-data-edit disabled/);
+  assert.match(region, /action="\/admin\/actuals\/review"/);
+  assert.match(region, /name="returnTo"/);
+  assert.match(region, /data-race-data-review-status/);
+  assert.match(region, /admin_race_data_entity_label/);
+  assert.match(region, /round\.code/);
+  assert.match(region, /option\.shortLabel/);
   assert.doesNotMatch(region, /admin-race-data-edit-column/);
   assert.match(region, /data-race-data-editor/);
   assert.match(region, /resultColumns\.forEach/);
@@ -116,6 +123,8 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(styles, /\.admin-race-data-controls\s*\{/);
   assert.match(styles, /\.admin-race-data-table-section\s*\{/);
   assert.match(styles, /\.admin-race-data-table-toolbar\s*\{/);
+  assert.match(styles, /\.admin-race-data-review-form\s*\{/);
+  assert.match(styles, /\.admin-race-data-detail-table--result \.admin-race-data-result-cell--driver \.admin-race-data-compact-label/);
   assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);
 });
 
