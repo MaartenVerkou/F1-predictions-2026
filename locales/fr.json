@@ -618,7 +618,6 @@
     "reviewed_label": "Reviewed",
     "last_reviewed_label": "Derniere verification",
     "mark_latest_reviewed": "Mark latest synced round reviewed",
-    "preview_autofill": "Preview autofill in form",
     "run_sync_now": "Run season sync now",
     "sync_help": "Preview autofill only changes the form. Season sync updates live actuals plus every completed-race snapshot and leaves the latest synced round pending review.",
     "target_label": "Actuals target",

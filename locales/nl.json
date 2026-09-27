@@ -161,7 +161,6 @@
     "reviewed_label": "Gecontroleerd",
     "last_reviewed_label": "Laatst gecontroleerd",
     "mark_latest_reviewed": "Markeer laatste gesyncte race als gecontroleerd",
-    "preview_autofill": "Autofill vooraf bekijken",
     "run_sync_now": "Seizoenssync nu uitvoeren",
     "sync_help": "Autofill vooraf bekijken wijzigt alleen het formulier. Seizoenssync werkt live uitslagen en alle snapshots van gereden races bij en laat de nieuwste gesyncte race op controle wachten.",
     "target_label": "Doel voor uitslagen",

@@ -23,6 +23,14 @@ test("admin feedback uses the shared context wrapper", () => {
   }
 });
 
+test("admin actuals exposes only the persisted evidence sync action", () => {
+  const view = readView("admin_actuals.ejs");
+  assert.doesNotMatch(view, /autofill-current-season/);
+  assert.doesNotMatch(view, /preview_autofill/);
+  assert.match(view, /run-auto-update/);
+  assert.match(view, /admin_actuals\.mark_snapshot_reviewed/);
+});
+
 test("team lineup overview keeps the toolbar concise", () => {
   const view = readView("admin_inputs.ejs");
   const help = view.indexOf("admin-inputs-lineup-help");
