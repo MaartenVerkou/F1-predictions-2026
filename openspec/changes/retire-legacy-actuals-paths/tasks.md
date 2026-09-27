@@ -11,6 +11,6 @@
 
 ## 3. Verify and preview
 
-- [ ] 3.1 Run syntax checks, focused tests, full tests, build checks, and strict OpenSpec validation.
-- [ ] 3.2 Rebuild the isolated preview in place without deleting its PostgreSQL state; verify health and the Actuals review flow.
-- [ ] 3.3 Review the final diff for accidental data/schema changes and document production as unchanged.
+- [x] 3.1 Run syntax checks, focused tests, full tests, build checks, and strict OpenSpec validation.
+- [x] 3.2 Rebuild the isolated preview in place without deleting its PostgreSQL state; verify health and the Actuals review flow.
+- [x] 3.3 Review the final diff for accidental data/schema changes and document production as unchanged.
