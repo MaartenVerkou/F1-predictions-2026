@@ -376,7 +376,7 @@
     "tip_race_gp_wins_only": "Alleen Grand Prix-zeges.",
     "tip_races_grand_prix_only": "Alleen Grand Prix-races.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "Zoals bepaald door https://www.racingstatisticsf1.com/f1-destructors-championship"
+    "tip_damage_source": "Gebaseerd op de wekelijkse Destructors Championship-posts van u/Dense-Strategy-867 op Reddit (r/formula1)."
   },
   "join_guest": {
     "page_title": "Meedoen als gast",

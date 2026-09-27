@@ -185,7 +185,7 @@
     "tip_race_gp_wins_only": "Nur Grand-Prix-Siege.",
     "tip_races_grand_prix_only": "Nur Grand-Prix-Rennen.",
     "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "Bestimmt durch https://www.racingstatisticsf1.com/f1-destructors-championship"
+    "tip_damage_source": "Basierend auf den woechentlichen Destructors-Championship-Beitraegen von u/Dense-Strategy-867 auf Reddit (r/formula1)."
   },
   "join_guest": {
     "page_title": "Als Gast beitreten",

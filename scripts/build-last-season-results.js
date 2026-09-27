@@ -6,7 +6,7 @@ const parsedSeason = Number(process.argv[2] || process.env.LAST_SEASON || DEFAUL
 const SEASON = Number.isFinite(parsedSeason) && parsedSeason > 0 ? parsedSeason : DEFAULT_SEASON;
 const API_BASE = "https://api.jolpi.ca/ergast/f1";
 const OUT_PATH = path.join(__dirname, "..", "data", "last-season-results.json");
-const DESTRUCTORS_SOURCE_URL = "https://www.racingstatisticsf1.com/f1-destructors-championship";
+const DESTRUCTORS_SOURCE_URL = "https://www.reddit.com/user/Dense-Strategy-867/";
 const DRIVER_OF_THE_DAY_SOURCE_URL = "https://tracinginsights.com/2025/driver-of-the-day/";
 
 function driverName(driver) {
