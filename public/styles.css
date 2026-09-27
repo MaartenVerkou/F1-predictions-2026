@@ -3212,6 +3212,159 @@ button:disabled {
   }
 }
 
+/* Actuals is a compact derivation index; editing facts belongs in Race Data. */
+.admin-actuals-toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.admin-actuals-source-note {
+  margin: 0;
+  padding: 6px 0;
+}
+
+.admin-actuals-overview {
+  min-width: 0;
+}
+
+.admin-actuals-overview-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.admin-actuals-overview-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+
+.admin-actuals-overview-table th,
+.admin-actuals-overview-table td {
+  padding: 8px 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-actuals-overview-table thead th {
+  background: color-mix(in srgb, var(--card) 90%, var(--border));
+  border-bottom: 2px solid var(--border);
+}
+
+.admin-actuals-overview-table tr:last-child th,
+.admin-actuals-overview-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-actuals-overview-table th:last-child,
+.admin-actuals-overview-table td:last-child {
+  border-right: 0;
+}
+
+.admin-actuals-question-column,
+.admin-actuals-question-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: min(360px, 42vw);
+  min-width: 260px;
+  text-align: left !important;
+  background: var(--card);
+}
+
+.admin-actuals-overview-table thead .admin-actuals-question-column {
+  z-index: 3;
+  background: color-mix(in srgb, var(--card) 90%, var(--border));
+}
+
+.admin-actuals-question-cell {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 2px 8px;
+  white-space: normal;
+}
+
+.admin-actuals-question-number {
+  grid-row: span 2;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.admin-actuals-question-prompt {
+  font-weight: 700;
+}
+
+.admin-actuals-question-cell small,
+.admin-actuals-round-column small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.admin-actuals-round-column {
+  min-width: 70px;
+}
+
+.admin-actuals-round-column a,
+.admin-actuals-value-cell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-actuals-round-column a:hover,
+.admin-actuals-round-column a:focus-visible,
+.admin-actuals-value-cell a:hover,
+.admin-actuals-value-cell a:focus-visible {
+  text-decoration: underline;
+}
+
+.admin-actuals-round-column.is-future,
+.admin-actuals-value-cell.is-future {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.admin-actuals-value-cell {
+  min-width: 70px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.admin-actuals-value-cell.is-pending {
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--text) 32%, transparent);
+}
+
+@media (max-width: 720px) {
+  .admin-actuals-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-actuals-toolbar .admin-target-form,
+  .admin-actuals-toolbar .admin-target-field,
+  .admin-actuals-toolbar select {
+    width: 100%;
+  }
+
+  .admin-actuals-question-column,
+  .admin-actuals-question-cell {
+    width: 230px;
+    min-width: 230px;
+  }
+}
+
 @media (max-width: 860px) {
   .admin-race-data-matrix {
     --admin-race-entity-width: 110px;
@@ -7676,4 +7829,194 @@ button.lang-option.is-active {
 
 .admin-race-data-table-section {
   margin-top: 10px;
+}
+
+/* Race-data review workspace: factual results first, derived metrics second. */
+.admin-race-data-source-meta {
+  margin-left: auto;
+  align-self: center;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-race-data-detail-first {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-race-data-detail-meta,
+.admin-race-data-revision-meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.admin-race-data-detail-table--result {
+  min-width: 860px;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-position {
+  width: 54px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-edit-column {
+  width: 72px;
+  text-align: center !important;
+}
+
+.admin-race-data-correction {
+  position: relative;
+}
+
+.admin-race-data-correction summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.admin-race-data-correction summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-race-data-correction[open] summary,
+.admin-race-data-correction summary:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--card) 88%, var(--accent) 12%);
+}
+
+.admin-race-data-correction-form {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 8;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(90px, 1fr));
+  gap: 6px;
+  width: min(330px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+  text-align: left;
+}
+
+.admin-race-data-correction-form label {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-race-data-correction-form input,
+.admin-race-data-correction-form textarea {
+  min-width: 0;
+  width: 100%;
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
+.admin-race-data-correction-form label:nth-of-type(5),
+.admin-race-data-correction-form button,
+.admin-race-data-correction-confirm {
+  grid-column: 1 / -1;
+}
+
+.admin-race-data-correction-confirm {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-race-data-correction-confirm input {
+  width: auto;
+}
+
+.admin-race-data-table-section[data-race-data-championship] {
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-race-data-table-section[data-race-data-championship] .admin-race-data-table-toolbar {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.admin-race-data-metric-tabs {
+  max-width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.admin-race-data-metric-tab {
+  min-height: 30px;
+  padding: 4px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-race-data-derivation {
+  display: grid;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-race-data-derivation-heading,
+.admin-race-data-question-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  min-width: 0;
+}
+
+.admin-race-data-derivation-heading h2 {
+  margin: 0;
+}
+
+.admin-race-data-derivation-heading p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.admin-race-data-question-form label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-race-data-question-form select {
+  width: clamp(240px, 42vw, 560px);
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-source-meta {
+    margin-left: 0;
+  }
+
+  .admin-race-data-table-section[data-race-data-championship] .admin-race-data-table-toolbar,
+  .admin-race-data-derivation-heading,
+  .admin-race-data-question-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-race-data-question-form select {
+    width: 100%;
+  }
 }

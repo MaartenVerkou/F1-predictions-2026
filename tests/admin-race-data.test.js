@@ -6,8 +6,10 @@ const {
   auditResultLabel,
   auditSourceState,
   buildRaceDataFocusOptions,
+  buildRaceDataMetricOptions,
   resolveRaceDataFocus,
   buildRaceDataAuditView,
+  buildCorrectedRaceEvidence,
   registerAdminRoutes
 } = require("../src/routes/admin");
 
@@ -340,6 +342,56 @@ test("constructor points focus keeps both seat values separate from the team tot
   assert.equal(group.summary.summaryValue, 43);
 });
 
+test("constructor metric views aggregate the transformed seat values without falling back to points", () => {
+  const evidence = (round, alphaStatus, betaStatus) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: {
+        rows: [
+          { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: alphaStatus === "Finished" ? 1 : null, points: alphaStatus === "Finished" ? 25 : 0, status: alphaStatus },
+          { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: betaStatus === "Finished" ? 2 : null, points: betaStatus === "Finished" ? 18 : 0, status: betaStatus }
+        ]
+      },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: {
+        drivers: [
+          { entity_id: 101, entity: "Driver Alpha", position: 1, points: round === 1 ? 25 : 43 },
+          { entity_id: 102, entity: "Driver Beta", position: 2, points: round === 1 ? 0 : 18 }
+        ],
+        constructors: [{ entity_id: 201, entity: "Team A", position: 1, points: round === 1 ? 25 : 61 }]
+      }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [evidence(1, "Finished", "Retired"), evidence(2, "Finished", "Finished")],
+    snapshotRows: [],
+    selectedRound: 2,
+    focus: { id: "most_dnfs_constructor", view: "constructors", metric: "dnfs", matrixMetric: "dnfs" }
+  });
+
+  const constructor = view.constructors[0];
+  assert.deepEqual(constructor.cells.map((cell) => cell.label), ["1", "0"]);
+  assert.equal(constructor.summaryValue, 1);
+  assert.equal(constructor.focusPosition, 1);
+  assert.deepEqual(view.constructorGroups[0].drivers.map((driver) => driver.cells.map((cell) => cell.label)), [
+    ["0", "0"],
+    ["1", "0"]
+  ]);
+  assert.match(view.focusSummary.value, /Team A/);
+});
+
 test("constructor detail fills an unassigned seat without inventing a driver result", () => {
   const view = buildRaceDataAuditView({
     races: ["Australian Grand Prix"],
@@ -360,21 +412,76 @@ test("constructor detail fills an unassigned seat without inventing a driver res
   assert.equal(drivers[1].seatNumber, 2);
 });
 
-test("race data is exposed as a read-only admin workspace", () => {
+test("race data exposes a read-only workspace plus a protected correction route", () => {
   const routes = {};
   const app = {
     get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
-    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers.at(-1); }
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers; }
   };
+  const requireAdmin = () => {};
   registerAdminRoutes(app, {
     db: {},
-    requireAdmin: () => {},
+    requireAdmin,
     getCurrentUser: () => ({ id: 1 }),
     logEvent: () => {}
   });
 
   assert.equal(typeof routes["GET /admin/race-data"], "function");
   assert.equal(routes["POST /admin/race-data"], undefined);
+  assert.equal(typeof routes["POST /admin/race-data/correction"][1], "function");
+  assert.equal(routes["POST /admin/race-data/correction"][0], requireAdmin);
+});
+
+test("race-data corrections validate the selected canonical row and never accept an invalid position", () => {
+  const baseSnapshot = {
+    payload: {
+      race: {
+        rows: [{ driver_id: 101, driver: "Driver Alpha", position: 2, positionText: "2", grid: 4, points: 18, status: "Finished" }]
+      }
+    }
+  };
+  assert.throws(
+    () => buildCorrectedRaceEvidence(baseSnapshot, {
+      driverId: "999",
+      position: "1",
+      grid: "1",
+      points: "25",
+      status: "Finished"
+    }),
+    /not present in this race evidence/
+  );
+  assert.throws(
+    () => buildCorrectedRaceEvidence(baseSnapshot, {
+      driverId: "101",
+      position: "0",
+      grid: "4",
+      points: "18",
+      status: "Retired"
+    }),
+    /Finish position must be empty or a valid value/
+  );
+  const corrected = buildCorrectedRaceEvidence(baseSnapshot, {
+    driverId: "101",
+    position: "1",
+    grid: "4",
+    points: "25",
+    status: "Finished"
+  });
+  assert.equal(corrected.race.rows[0].position, 1);
+  assert.equal(baseSnapshot.payload.race.rows[0].position, 2);
+});
+
+test("race data metrics are available independently of question focus", () => {
+  const options = buildRaceDataMetricOptions((key) => key);
+  assert.deepEqual(options.map((option) => option.metric), [
+    "points",
+    "podiums",
+    "dnfs",
+    "grid_wins",
+    "driver_of_day",
+    "sprint_points",
+    "damage"
+  ]);
 });
 
 test("race data focus options are driven by question metadata", () => {
@@ -560,8 +667,12 @@ test("question focus projections expose DNF and grid-winner facts without changi
   assert.equal(dnfView.drivers.find((row) => row.name === "Driver Beta").cells[0].label, "1");
   const dnfDriver = dnfView.drivers.find((row) => row.name === "Driver Beta");
   assert.equal(dnfDriver.summaryValue, 1);
+  assert.equal(dnfDriver.focusPosition, 1);
   assert.equal(dnfDriver.focusRow, true);
   assert.equal(dnfDriver.cells[0].focusHit, false);
+  const dnfDetail = dnfView.detailRows.find((row) => row.driver === "Driver Beta");
+  assert.equal(dnfDetail.racePosition, null);
+  assert.equal(dnfDetail.raceLabel, "Ret");
   assert.equal(dnfView.drivers.find((row) => row.name === "Driver Alpha").cells[0].label, "0");
   assert.match(dnfView.focusSummary.value, /Driver Beta/);
 

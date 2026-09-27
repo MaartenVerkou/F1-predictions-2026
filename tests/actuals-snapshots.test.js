@@ -237,6 +237,41 @@ test("actual snapshots keep catalog and evidence provenance in the review lifecy
   assert.equal(latest.published_at, null);
 });
 
+test("a changed evidence derivation stays pending while published scoring remains on the prior revision", (t) => {
+  const { db, tempDir } = createTempDb();
+  t.after(() => {
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  ensureActualSnapshotColumns(db);
+  ensurePublishedActualsSchema(db);
+  const published = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:1" },
+    sourceType: "race_data_derivation",
+    evidenceRevision: "evidence-base",
+    reviewStatus: REVIEW_STATUS_REVIEWED
+  });
+  publishActualSnapshot(db, { season: 2026, snapshotId: published.snapshotId, publishedByUserId: 7 });
+
+  const corrected = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:2" },
+    sourceType: "race_data_derivation",
+    evidenceRevision: "evidence-correction",
+    reviewStatus: REVIEW_STATUS_PENDING,
+    preserveReviewIfUnchanged: true
+  });
+  assert.notEqual(corrected.snapshotId, published.snapshotId);
+  assert.equal(corrected.reviewStatus, REVIEW_STATUS_PENDING);
+  assert.deepEqual(loadPublishedActuals(db, 2026).values, { q1: "driver:1" });
+});
+
 test("published actuals are unavailable until an explicit reviewed snapshot is published", (t) => {
   const { db, tempDir } = createTempDb();
   t.after(() => {

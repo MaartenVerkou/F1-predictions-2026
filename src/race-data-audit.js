@@ -377,11 +377,70 @@ function applyDriverPointsMetric(row, rounds) {
 function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRows = []) {
   const metric = String(focus.matrixMetric || focus.metric || "points");
   if (metric === "damage") return applyDamageMetric(row, rounds, focus, "team");
-  if (metric !== "qualifying_h2h") return row;
-
   const teamDrivers = driverRows
     .filter((driver) => String(driver.constructor || "") === String(row.name || ""))
     .sort((left, right) => (Number(left.seatNumber) || 999) - (Number(right.seatNumber) || 999));
+  if (["podiums", "dnfs", "driver_of_day", "sprint_points"].includes(metric)) {
+    let total = 0;
+    let observed = false;
+    row.cells = row.cells.map((cell, index) => {
+      if (cell.afterCutoff) {
+        return focusCell(cell, { label: "—", title: "After selected cutoff", hit: false, state: "future" });
+      }
+      const values = teamDrivers
+        .map((driver) => driver.cells?.[index])
+        .filter((driverCell) => driverCell && driverCell.label !== "—" && Number.isFinite(Number(driverCell.label)))
+        .map((driverCell) => Number(driverCell.label));
+      if (!values.length) {
+        return focusCell(cell, { label: "—", title: "Evidence unavailable for this constructor", hit: false, state: "incomplete" });
+      }
+      const roundTotal = values.reduce((sum, value) => sum + value, 0);
+      total += roundTotal;
+      observed = true;
+      return focusCell(cell, {
+        label: roundTotal,
+        value: roundTotal,
+        hit: false,
+        title: `${roundTotal} ${metric.replace(/_/g, " ")} for ${row.name}`
+      });
+    });
+    row.summaryValue = observed ? total : null;
+    row.summaryLabel = observed ? String(total) : "—";
+    row.focusSortValue = row.summaryValue;
+    row.focusMeta = { count: observed ? total : null };
+    return row;
+  }
+  if (metric === "grid_wins") {
+    let total = 0;
+    let observed = false;
+    row.cells = row.cells.map((cell, index) => {
+      if (cell.afterCutoff) {
+        return focusCell(cell, { label: "—", title: "After selected cutoff", hit: false, state: "future" });
+      }
+      const wins = teamDrivers
+        .map((driver) => driver.cells?.[index])
+        .filter((driverCell) => driverCell && driverCell.label !== "—");
+      if (!wins.length) {
+        return focusCell(cell, { label: "—", title: "No constructor race win", hit: false });
+      }
+      const roundWins = wins.length;
+      total += roundWins;
+      observed = true;
+      return focusCell(cell, {
+        label: roundWins,
+        value: roundWins,
+        hit: false,
+        title: `${roundWins} winning grid${roundWins === 1 ? "" : "s"} for ${row.name}`
+      });
+    });
+    row.summaryValue = observed ? total : null;
+    row.summaryLabel = observed ? String(total) : "—";
+    row.focusSortValue = row.summaryValue;
+    row.focusMeta = { count: observed ? total : null };
+    return row;
+  }
+  if (metric !== "qualifying_h2h") return row;
+
   const left = teamDrivers[0] || null;
   const right = teamDrivers[1] || null;
   if (focus.highlightMode === "rows") {
@@ -624,7 +683,8 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
   }
 
   if (metric === "podiums" || metric === "dnfs" || metric === "driver_of_day" || metric === "sprint_points") {
-    const ordered = [...drivers].sort((a, b) => Number(b.summaryValue ?? -1) - Number(a.summaryValue ?? -1));
+    const metricRows = focus.view === "constructors" ? constructors : drivers;
+    const ordered = [...metricRows].sort((a, b) => Number(b.summaryValue ?? -1) - Number(a.summaryValue ?? -1));
     const topValue = Number(ordered[0]?.summaryValue);
     const leaders = ordered.filter((row) => Number(row.summaryValue) === topValue && Number.isFinite(topValue));
     const label = metric === "podiums" ? "podium finishes"
@@ -782,6 +842,16 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
   const sortedConstructors = lastStandingFocus
     ? sortLastStandingRows(nextConstructors)
     : sortFocusRows(nextConstructors, direction);
+  const usesChampionshipPosition = metric === "points"
+    || ["championship_top3", "last_standing", "teammate_points"].includes(focusMetric);
+  const assignDisplayPositions = (rows) => rows.forEach((row, index) => {
+    const sourceValue = numeric(row.focusSortValue ?? row.summaryValue ?? row.points);
+    row.focusPosition = usesChampionshipPosition
+      ? (row.championshipPosition || index + 1)
+      : (sourceValue == null ? null : index + 1);
+  });
+  assignDisplayPositions(sortedDrivers);
+  assignDisplayPositions(sortedConstructors);
   const focusColumns = markFocusColumns({
     focus: resolvedFocus,
     rounds,

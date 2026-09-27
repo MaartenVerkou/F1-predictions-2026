@@ -12,12 +12,15 @@ const targetTimingLabel = (target) => {
   if (target.timing === 'future') return t('admin_actuals.timing_future');
   return t('admin_actuals.timing_current_race');
 };
-const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === 'archived' && allowPastEdit && selectedRaceTarget);
 %>
 
 <div class="card admin-page-card admin-actuals-page">
-  <h1><%= t('admin_actuals.heading') %></h1>
-  <p class="muted admin-page-intro"><%= t('admin_actuals.intro') %></p>
+  <div class="admin-actuals-heading">
+    <div>
+      <h1><%= t('admin_actuals.heading') %></h1>
+      <p class="muted admin-page-intro">Derived from persisted Race Data; review before publishing to scoring.</p>
+    </div>
+  </div>
 
   <% if (seasonContext?.invalidRequestedSeason) { %>
     <div class="admin-feedback-context">
@@ -27,16 +30,12 @@ const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === '
 
   <% if (saveError || saveSuccess) { %>
     <div class="admin-feedback-context">
-      <% if (saveError) { %>
-        <div class="alert" role="alert"><%= saveError %></div>
-      <% } %>
-      <% if (saveSuccess) { %>
-        <div class="alert admin-success" role="status"><%= saveSuccess %></div>
-      <% } %>
+      <% if (saveError) { %><div class="alert" role="alert"><%= saveError %></div><% } %>
+      <% if (saveSuccess) { %><div class="alert admin-success" role="status"><%= saveSuccess %></div><% } %>
     </div>
   <% } %>
 
-  <div class="admin-actuals-target-row" data-admin-race-review-workspace>
+  <div class="admin-actuals-toolbar" data-admin-race-review-workspace>
     <form method="get" action="/admin/actuals" class="admin-target-form admin-actuals-target-form" data-admin-actuals-target-form>
       <label class="admin-field admin-target-field">
         <span class="muted"><%= t('admin_inputs.season') %></span>
@@ -47,7 +46,7 @@ const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === '
         </select>
       </label>
       <label class="admin-field admin-target-field">
-        <span class="muted"><%= t('admin_actuals.target_label') %></span>
+        <span class="muted">Review round</span>
         <select name="target" onchange="this.form.submit()">
           <option value="current" <%= actualsTarget === 'current' ? 'selected' : '' %>><%= t('admin_actuals.current_live_actuals') %></option>
           <% raceTargets.forEach((target) => { %>
@@ -75,301 +74,65 @@ const seasonReadOnly = !seasonContext?.syncable && !(seasonContext?.status === '
       </form>
     <% } else if (selectedRaceTarget && selectedRaceTarget.snapshotId && selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'pending') { %>
       <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-target-action">
-    <%- csrfField() %>
+        <%- csrfField() %>
         <input type="hidden" name="season" value="<%= season %>" />
         <input type="hidden" name="snapshotId" value="<%= selectedSnapshotMeta.id %>" />
         <input type="hidden" name="target" value="<%= actualsTarget %>" />
-        <% if (selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
-          <input type="hidden" name="unlockPast" value="1" />
-        <% } %>
+        <% if (selectedRaceTarget.timing === 'past') { %><input type="hidden" name="unlockPast" value="1" /><% } %>
         <button type="submit" class="secondary"><%= t('admin_actuals.mark_snapshot_reviewed') %></button>
       </form>
     <% } else if (selectedRaceTarget && selectedRaceTarget.snapshotId && selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'reviewed' && selectedSnapshotMeta.reviewed_at) { %>
       <span class="muted admin-target-meta"><%= t('admin_actuals.last_reviewed_label') %>: <strong><%= formatAdminDate(selectedSnapshotMeta.reviewed_at) %></strong></span>
     <% } %>
-  </div>
 
-  <% if (actualsTarget === 'current' && seasonContext?.syncable) { %>
-    <div class="admin-actions admin-actuals-actions">
-      <form method="post" action="/admin/actuals/run-auto-update" class="admin-inline-form">
-    <%- csrfField() %>
+    <% if (actualsTarget === 'current' && seasonContext?.syncable) { %>
+      <form method="post" action="/admin/actuals/run-auto-update" class="admin-inline-form admin-actuals-sync-form">
+        <%- csrfField() %>
         <input type="hidden" name="season" value="<%= season %>" />
         <button type="submit" class="secondary"><%= t('admin_actuals.run_sync_now') %></button>
       </form>
-      <span class="muted admin-actions-help"><%= t('admin_actuals.sync_help') %></span>
-    </div>
-  <% } %>
-
-  <form method="post" action="/admin/actuals" data-admin-actuals-form data-initial-dirty="<%= hasDraft ? 'true' : 'false' %>">
-    <%- csrfField() %>
-    <input type="hidden" name="season" value="<%= season %>" />
-    <input type="hidden" name="actualsTarget" value="<%= actualsTarget %>" />
-    <% if (selectedRaceTarget && selectedRaceTarget.timing === 'past' && !requiresPastUnlock) { %>
-      <input type="hidden" name="unlockPast" value="1" />
     <% } %>
-    <% const sourceOptionsFor = (question) => {
-      if (question.options_source === 'drivers') return roster.driver_options || roster.drivers;
-      if (question.options_source === 'teams') return roster.team_options || roster.teams;
-      if (question.options_source === 'races') return roster.race_options || races;
-      return [];
-    }; %>
-    <% const multiActualSingleChoiceIds = new Set([
-      'most_driver_of_the_day',
-      'most_dnfs_driver',
-      'destructors_driver',
-      'destructors_team',
-      'most_points_no_podium',
-      'closest_qualifying_teammates'
-    ]); %>
-    <% const multiActualDriverFieldIds = new Set(['lowest_grid_win_position']); %>
-    <fieldset class="admin-fieldset-reset" <%= (requiresPastUnlock || seasonReadOnly) ? 'disabled' : '' %>>
+  </div>
 
-    <% questions.forEach(question => { 
-      const sourceOptions = sourceOptionsFor(question);
-      const options = (question.options || []).concat(sourceOptions || []);
-      const optionValue = (option) => typeof option === 'object' ? option.value : option;
-      const optionLabel = (option) => typeof option === 'object' ? option.label : option;
-      const type = question.type || 'text';
-      let saved = actuals[question.id];
-      if (saved) {
-        try {
-          saved = JSON.parse(saved);
-        } catch (err) {}
-      }
-    %>
-      <div class="question admin-actuals-question">
-        <div class="admin-actuals-question-title"><%= question.prompt %></div>
-        <% if (question.helper) { %>
-          <div class="muted"><%= question.helper %></div>
-        <% } %>
+  <div class="admin-feedback-context admin-actuals-source-note" role="note">
+    <span class="muted">Each cell is the derived answer for that race. Select a cell to inspect its evidence in Race Data.</span>
+  </div>
 
-        <% if (type === 'ranking') { 
-          const count = Number(question.count) || 3;
-          const selections = Array.isArray(saved) ? saved : [];
-        %>
-          <div class="ranking-group" data-count="<%= count %>">
-            <% for (let i = 1; i <= count; i += 1) { %>
-              <select class="ranking-select" name="<%= question.id %>_<%= i %>">
-                <option value=""><%= t('questions.select_position') %> <%= i %></option>
-                <% options.forEach(option => { %>
-                  <option value="<%= optionValue(option) %>" <%= selections[i - 1] === optionValue(option) || selections[i - 1] === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-                <% }) %>
-              </select>
-            <% } %>
-          </div>
-        <% } else if (type === 'single_choice' && multiActualSingleChoiceIds.has(question.id)) {
-          const selections = Array.isArray(saved) ? saved : (saved ? [saved] : []);
-        %>
-          <div class="checkbox-grid">
-            <% options.forEach(option => { %>
-              <label class="muted">
-                <input type="checkbox" name="<%= question.id %>" value="<%= optionValue(option) %>" <%= selections.includes(optionValue(option)) || selections.includes(option) ? 'checked' : '' %> />
-                <%= optionLabel(option) %>
-              </label>
+  <div class="admin-actuals-overview" data-admin-actuals-form>
+    <div class="admin-actuals-overview-wrap">
+      <table class="admin-actuals-overview-table">
+        <thead>
+          <tr>
+            <th scope="col" class="admin-actuals-question-column">Question</th>
+            <% (actualOverviewTargets || []).forEach((target) => { %>
+              <th scope="col" class="admin-actuals-round-column <%= target.timing === 'future' ? 'is-future' : '' %>">
+                <a href="/admin/race-data?season=<%= season %>&round=<%= target.roundNumber %>&view=drivers&focus=points">R<%= target.roundNumber %></a>
+                <small><%= target.reviewStatus || '—' %></small>
+              </th>
             <% }) %>
-          </div>
-        <% } else if (type === 'single_choice') { %>
-          <select name="<%= question.id %>">
-            <option value=""><%= t('questions.select_one') %></option>
-            <% options.forEach(option => { %>
-              <option value="<%= optionValue(option) %>" <%= saved === optionValue(option) || saved === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-            <% }) %>
-          </select>
-        <% } else if (type === 'multi_select') { 
-          const selections = Array.isArray(saved) ? saved : [];
-        %>
-          <div class="checkbox-grid">
-            <% options.forEach(option => { %>
-              <label class="muted">
-                <input type="checkbox" name="<%= question.id %>" value="<%= optionValue(option) %>" <%= selections.includes(optionValue(option)) || selections.includes(option) ? 'checked' : '' %> />
-                <%= optionLabel(option) %>
-              </label>
-            <% }) %>
-          </div>
-        <% } else if (type === 'multi_select_limited') { 
-          const dnfByRace = saved?.dnf_by_race || {};
-        %>
-          <div class="admin-actuals-dnf-card">
-            <div class="muted"><%= t('admin_actuals.enter_dnfs_per_race') %></div>
-            <div class="actuals-dnf-grid">
-              <% races.forEach((race, idx) => { %>
-                <label class="muted actuals-dnf-row">
-                  <span class="actuals-dnf-race"><%= race %></span>
-                  <div class="number-spinner number-spinner-minimal actuals-dnf-spinner" data-number-spinner>
-                    <input type="number" min="0" max="99" name="<%= question.id %>_dnf_<%= idx %>" value="<%= dnfByRace[race] ?? '' %>" />
-                    <div class="number-spinner-controls">
-                      <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="<%= t('admin.increase_value') %>" title="<%= t('admin.increase_value') %>">
-                        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                          <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                      </button>
-                      <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="<%= t('admin.decrease_value') %>" title="<%= t('admin.decrease_value') %>">
-                        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                          <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </label>
+          </tr>
+        </thead>
+        <tbody>
+          <% (actualOverviewRows || []).forEach((row) => { %>
+            <tr>
+              <th scope="row" class="admin-actuals-question-cell">
+                <span class="admin-actuals-question-number"><%= String(row.questionNumber).padStart(2, '0') %></span>
+                <span class="admin-actuals-question-prompt"><%= row.question.prompt %></span>
+                <small><%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %></small>
+              </th>
+              <% row.cells.forEach((cell) => { %>
+                <td class="admin-actuals-value-cell <%= cell.timing === 'future' ? 'is-future' : '' %> <%= cell.reviewStatus === 'pending' ? 'is-pending' : '' %>">
+                  <% if (cell.hasValue || cell.reviewStatus) { %>
+                    <a href="<%= cell.href %>" title="Open Race Data derivation"><%= cell.value %></a>
+                  <% } else { %>
+                    <span class="muted">—</span>
+                  <% } %>
+                </td>
               <% }) %>
-            </div>
-          </div>
-        <% } else if (type === 'teammate_battle') { 
-          const savedObj = saved || {};
-        %>
-          <div class="inline-actions admin-actuals-control-row">
-            <select name="<%= question.id %>_winner" data-toggle-diff="<%= question.id %>">
-              <option value=""><%= t('questions.select_winner') %></option>
-              <% (question.options || []).forEach(option => { %>
-                <option value="<%= optionValue(option) %>" <%= savedObj.winner === optionValue(option) || savedObj.winner === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-              <% }) %>
-              <option value="tie" <%= savedObj.winner === 'tie' ? 'selected' : '' %>><%= t('questions.tie') %></option>
-            </select>
-            <div class="number-spinner number-spinner-minimal" data-number-spinner>
-              <input type="number" name="<%= question.id %>_diff" data-diff-for="<%= question.id %>" placeholder="<%= t('questions.points_diff') %>" min="0" max="999" value="<%= savedObj.diff ?? '' %>" />
-              <div class="number-spinner-controls">
-                <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="<%= t('admin.increase_value') %>" title="<%= t('admin.increase_value') %>">
-                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                  </svg>
-                </button>
-                <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="<%= t('admin.decrease_value') %>" title="<%= t('admin.decrease_value') %>">
-                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        <% } else if (type === 'boolean_with_optional_driver') { 
-          const savedObj = saved || {};
-        %>
-          <div class="inline-actions admin-actuals-control-row">
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="yes" <%= savedObj.choice === 'yes' ? 'checked' : '' %> />
-              <%= t('questions.yes') %>
-            </label>
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="no" <%= savedObj.choice === 'no' ? 'checked' : '' %> />
-              <%= t('questions.no') %>
-            </label>
-            <select name="<%= question.id %>_driver" data-toggle-driver="<%= question.id %>">
-              <option value=""><%= t('questions.select_driver_if_yes') %></option>
-              <% (roster.driver_options || roster.drivers).forEach(option => { %>
-                <option value="<%= optionValue(option) %>" <%= savedObj.driver === optionValue(option) || savedObj.driver === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-              <% }) %>
-            </select>
-          </div>
-        <% } else if (type === 'numeric_with_driver') { 
-          const savedObj = saved || {};
-        %>
-          <div class="inline-actions admin-actuals-control-row">
-            <div class="number-spinner number-spinner-minimal" data-number-spinner>
-              <input type="number" name="<%= question.id %>_value" placeholder="<%= t('questions.number') %>" min="0" max="999" value="<%= savedObj.value ?? '' %>" />
-              <div class="number-spinner-controls">
-                <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="<%= t('admin.increase_value') %>" title="<%= t('admin.increase_value') %>">
-                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                  </svg>
-                </button>
-                <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="<%= t('admin.decrease_value') %>" title="<%= t('admin.decrease_value') %>">
-                  <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                    <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <select name="<%= question.id %>_driver">
-              <option value=""><%= t('questions.select_driver') %></option>
-              <% (roster.driver_options || roster.drivers).forEach(option => { %>
-                <option value="<%= optionValue(option) %>" <%= savedObj.driver === optionValue(option) || savedObj.driver === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-              <% }) %>
-            </select>
-          </div>
-        <% } else if (type === 'single_choice_with_driver') { 
-          const savedObj = saved || {};
-          const positionOptions = question.options || [];
-          const driverSelections = Array.isArray(savedObj.driver) ? savedObj.driver : (savedObj.driver ? [savedObj.driver] : []);
-        %>
-          <% if (multiActualDriverFieldIds.has(question.id)) { %>
-            <div>
-              <select name="<%= question.id %>_value">
-                <option value=""><%= t('questions.select_position') %></option>
-                <% positionOptions.forEach(option => { %>
-                  <option value="<%= optionValue(option) %>" <%= savedObj.value === optionValue(option) || savedObj.value === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-                <% }) %>
-              </select>
-              <div class="checkbox-grid">
-                <% (roster.driver_options || roster.drivers).forEach(option => { %>
-                  <label class="muted">
-                    <input type="checkbox" name="<%= question.id %>_driver" value="<%= optionValue(option) %>" <%= driverSelections.includes(optionValue(option)) || driverSelections.includes(option) ? 'checked' : '' %> />
-                    <%= optionLabel(option) %>
-                  </label>
-                <% }) %>
-              </div>
-            </div>
-          <% } else { %>
-            <div class="inline-actions admin-actuals-control-row">
-              <select name="<%= question.id %>_value">
-                <option value=""><%= t('questions.select_position') %></option>
-                <% positionOptions.forEach(option => { %>
-                  <option value="<%= optionValue(option) %>" <%= savedObj.value === optionValue(option) || savedObj.value === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-                <% }) %>
-              </select>
-              <select name="<%= question.id %>_driver">
-                <option value=""><%= t('questions.select_driver') %></option>
-                <% (roster.driver_options || roster.drivers).forEach(option => { %>
-                  <option value="<%= optionValue(option) %>" <%= savedObj.driver === optionValue(option) || savedObj.driver === option ? 'selected' : '' %>><%= optionLabel(option) %></option>
-                <% }) %>
-              </select>
-            </div>
-          <% } %>
-        <% } else if (type === 'boolean') { %>
-          <div class="inline-actions admin-actuals-control-row">
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="yes" <%= saved === 'yes' ? 'checked' : '' %> />
-              <%= t('questions.yes') %>
-            </label>
-            <label class="muted">
-              <input type="radio" name="<%= question.id %>" value="no" <%= saved === 'no' ? 'checked' : '' %> />
-              <%= t('questions.no') %>
-            </label>
-          </div>
-        <% } else if (type === 'numeric') { %>
-          <div class="number-spinner number-spinner-minimal" data-number-spinner>
-            <input type="number" name="<%= question.id %>" min="0" max="999" value="<%= saved ?? '' %>" />
-            <div class="number-spinner-controls">
-              <button type="button" class="number-spinner-btn is-up" data-spinner-step="up" aria-label="<%= t('admin.increase_value') %>" title="<%= t('admin.increase_value') %>">
-                <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                  <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-              </button>
-              <button type="button" class="number-spinner-btn is-down" data-spinner-step="down" aria-label="<%= t('admin.decrease_value') %>" title="<%= t('admin.decrease_value') %>">
-                <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
-                  <path d="M2.25 7.5 6 3.75 9.75 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-              </button>
-            </div>
-          </div>
-        <% } else if (type === 'textarea') { %>
-          <textarea name="<%= question.id %>" rows="3"><%= saved || '' %></textarea>
-        <% } else { %>
-          <input type="text" name="<%= question.id %>" value="<%= saved || '' %>" />
-        <% } %>
-      </div>
-    <% }) %>
-
-    <div class="questions-save-row admin-actuals-save-row">
-      <button type="submit"><%= actualsTarget === 'current' ? t('admin_actuals.save_actuals') : t('admin_actuals.save_snapshot') %></button>
-      <span
-        class="muted admin-actuals-save-feedback <%= hasDraft ? 'is-visible is-unsaved' : '' %>"
-        data-admin-actuals-unsaved-note
-        data-unsaved-label="<%= t('questions.autosave_unsaved') %>"
-        data-saving-label="<%= t('questions.autosave_saving') %>"
-      ><%= hasDraft ? t('questions.autosave_unsaved') : '' %></span>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
     </div>
-    </fieldset>
-  </form>
+  </div>
 </div>
-
-<%- include('partials/footer') %>

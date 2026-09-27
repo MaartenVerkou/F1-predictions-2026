@@ -4,11 +4,11 @@ const { runActualsAutoUpdate } = require("../actuals-auto-update");
 const { resolveConfiguredRaceName } = require("../race-names");
 const {
   REVIEW_STATUS_PENDING,
-  REVIEW_STATUS_REVIEWED,
   loadPublishedActuals,
   fetchSnapshotValues: loadSnapshotValues,
   findLatestRoundSnapshotForSeason: loadLatestRoundSnapshotForSeason,
   findSnapshotById,
+  linkEvidenceToActualSnapshot,
   listLatestSnapshotsForSeason,
   markSnapshotReviewed,
   publishActualSnapshot,
@@ -16,10 +16,12 @@ const {
 } = require("../actuals-snapshots");
 const {
   findRaceDataSnapshot,
-  listRaceDataImports,
+  listRaceDataSnapshotRevisions,
   listRaceDataSnapshots,
+  saveCorrectedRaceDataSnapshot,
   summarizeEvidence
 } = require("../race-data-evidence");
+const { deriveSnapshotsFromPersistedEvidence } = require("../../scripts/backfill-actuals-2026");
 const {
   addEntityAlias,
   addProviderReference,
@@ -58,6 +60,11 @@ const {
   applyRaceDataFocus,
   defaultRaceDataHighlightMode
 } = require("../race-data-audit");
+const {
+  actualOverviewViewForQuestion,
+  buildRaceDataMetricOptions,
+  formatActualOverviewValue
+} = require("../race-data-review-model");
 const { topDamageEntities } = require("../destructors-damage");
 
 
@@ -180,7 +187,7 @@ function buildAuditMatrixCell({
   };
 }
 
-function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship points" } = {}) {
+function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship points", metricOptions = [] } = {}) {
   const options = [{
     id: "points",
     view: "all",
@@ -191,6 +198,12 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
     label: pointsLabel
   }];
   const seen = new Set(["points"]);
+  for (const metricOption of metricOptions || []) {
+    const id = String(metricOption?.id || "").trim();
+    if (!id || seen.has(id)) continue;
+    options.push({ ...metricOption });
+    seen.add(id);
+  }
   let questionNumber = 0;
   for (const question of questions || []) {
     const projection = question?.race_data_focus;
@@ -236,8 +249,8 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
   return options;
 }
 
-function resolveRaceDataFocus({ questions = [], focusId = "points", viewMode = "drivers", pointsLabel = "Championship points" } = {}) {
-  const options = buildRaceDataFocusOptions(questions, { pointsLabel });
+function resolveRaceDataFocus({ questions = [], focusId = "points", viewMode = "drivers", pointsLabel = "Championship points", metricOptions = [] } = {}) {
+  const options = buildRaceDataFocusOptions(questions, { pointsLabel, metricOptions });
   const requested = options.find((option) => option.id === String(focusId || "points"));
   if (requested && (requested.view === "all" || requested.view === viewMode)) {
     return { ...requested, view: viewMode };
@@ -633,17 +646,27 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     const sprint = sprintByDriver.get(driver) || null;
     return {
       driver,
+      driverId: race?.driver_id ?? qualifying?.driver_id ?? sprint?.driver_id ?? null,
       constructor: race?.constructor || qualifying?.constructor || sprint?.constructor || null,
       grid: race?.grid ?? null,
       qualifyingPosition: qualifying?.position ?? null,
       sprintPosition: sprint?.position ?? null,
       sprintStatus: sprint?.status || null,
       sprintPoints: sprint?.points ?? null,
-      racePosition: race?.positionText || null,
+      // A provider may encode a non-classified result with position `0`.
+      // Keep the numeric finish position only for classified finishers so the
+      // detail table can use the status label (Ret/DNS/DNQ) for the others.
+      racePosition: Number(race?.position) > 0 ? (race?.positionText || String(race.position)) : null,
       raceLabel: auditResultLabel(race),
       raceStatus: race?.status || null,
       racePoints: race?.points ?? null
     };
+  }).sort((left, right) => {
+    const leftPosition = Number(left.racePosition);
+    const rightPosition = Number(right.racePosition);
+    const leftRank = Number.isFinite(leftPosition) && leftPosition > 0 ? leftPosition : 999;
+    const rightRank = Number.isFinite(rightPosition) && rightPosition > 0 ? rightPosition : 999;
+    return leftRank - rightRank || String(left.driver).localeCompare(String(right.driver));
   });
 
   return {
@@ -655,8 +678,8 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     selectedRoundNumber: selected?.roundNumber || cutoffRoundNumber,
     cutoffRoundNumber,
     selectedEvidence: selected?.evidence || null,
+    selectedSnapshotId: selected?.evidence?.id || null,
     selectedSummary,
-    selectedImportId: selected?.evidence?.import_id || null,
     detailRows,
     latestEvidence,
     latestEvidenceRound,
@@ -669,6 +692,91 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   };
 }
 
+function parseCorrectionNumber(raw, label, { integer = true, min = 0, max = 1000 } = {}) {
+  const text = String(raw == null ? "" : raw).trim();
+  if (!text) return null;
+  const value = Number(text);
+  if (!Number.isFinite(value) || (integer && !Number.isInteger(value)) || value < min || value > max) {
+    throw new Error(`${label} must be empty or a valid value between ${min} and ${max}.`);
+  }
+  return value;
+}
+
+function buildCorrectedRaceEvidence(baseSnapshot, input) {
+  const payload = baseSnapshot?.payload;
+  if (!payload || !Array.isArray(payload.race?.rows)) {
+    throw new Error("The selected race evidence cannot be edited.");
+  }
+  const driverId = parseCorrectionNumber(input.driverId, "Driver id", { min: 1, max: 100000000 });
+  const driverName = String(input.driver || "").trim();
+  const row = payload.race.rows.find((candidate) => (
+    driverId != null
+      ? Number(candidate.driver_id) === driverId
+      : driverName && String(candidate.driver || "").trim() === driverName
+  ));
+  if (!row) throw new Error("The selected driver is not present in this race evidence.");
+
+  const nextPayload = JSON.parse(JSON.stringify(payload));
+  const nextRow = nextPayload.race.rows.find((candidate) => (
+    driverId != null
+      ? Number(candidate.driver_id) === driverId
+      : driverName && String(candidate.driver || "").trim() === driverName
+  ));
+  const position = parseCorrectionNumber(input.position, "Finish position", { min: 1, max: 99 });
+  const grid = parseCorrectionNumber(input.grid, "Grid position", { min: 1, max: 99 });
+  const points = parseCorrectionNumber(input.points, "Points", { integer: false, min: 0, max: 200 });
+  const status = String(input.status == null ? "" : input.status).trim();
+  if (status.length > 120) throw new Error("Status is too long.");
+
+  nextRow.position = position;
+  nextRow.positionText = position == null ? null : String(position);
+  nextRow.grid = grid;
+  nextRow.points = points == null ? Number(nextRow.points || 0) : points;
+  if (status) nextRow.status = status;
+  else if (position != null) nextRow.status = "Finished";
+  return nextPayload;
+}
+
+function rederiveActualSnapshotFromRaceEvidence({
+  db,
+  season,
+  roundNumber,
+  roundName,
+  questions,
+  roster,
+  races,
+  catalog,
+  evidenceSnapshot
+}) {
+  const derived = deriveSnapshotsFromPersistedEvidence(db, {
+    season,
+    rounds: [Number(roundNumber)],
+    questions,
+    roster,
+    races,
+    totalRounds: races.length
+  })[0];
+  const values = derived?.values || {};
+  const result = upsertSnapshotForRound(db, {
+    season,
+    roundNumber,
+    roundName: roundName || derived?.roundName || `Round ${roundNumber}`,
+    valuesByQuestion: values,
+    sourceType: "race_data_derivation",
+    sourceNote: "Derived from the persisted race-data evidence revision",
+    label: `R${roundNumber} - ${roundName || derived?.roundName || `Round ${roundNumber}`}`,
+    reviewStatus: REVIEW_STATUS_PENDING,
+    preserveReviewIfUnchanged: true,
+    catalogRevision: catalog?.catalogRevision || null,
+    evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.sync_id || null,
+    derivationVersion: "race-data-derivation-v2"
+  });
+  if (result?.snapshotId && evidenceSnapshot?.id) {
+    linkEvidenceToActualSnapshot(db, result.snapshotId, evidenceSnapshot.id, evidenceSnapshot.import_id || null);
+  }
+  return { ...result, valueCount: Object.keys(values).length };
+}
+
 function registerAdminRoutes(app, deps) {
   const {
     db,
@@ -677,7 +785,6 @@ function registerAdminRoutes(app, deps) {
     getQuestions,
     getRoster,
     getRaces,
-    clampNumber,
     generateUniqueGroupId,
     dataDir,
     dbPath,
@@ -791,139 +898,6 @@ function registerAdminRoutes(app, deps) {
     return loadSnapshotValues(db, snapshotId);
   }
 
-  function upsertActualsSnapshot({
-    season,
-    roundNumber,
-    roundName = "",
-    valuesByQuestion,
-    sourceType = "manual",
-    sourceNote = "",
-    createdByUserId = null,
-    label = "",
-    reviewStatus = REVIEW_STATUS_REVIEWED,
-    preserveReviewIfUnchanged = false,
-    catalogRevision = null,
-    evidenceRevision = null,
-    derivationVersion = "actuals-v1",
-    manualCorrection = null,
-    publishedAt = null
-  }) {
-    return upsertSnapshotForRound(db, {
-      season,
-      roundNumber,
-      roundName,
-      valuesByQuestion,
-      sourceType,
-      sourceNote,
-      createdByUserId,
-      label,
-      reviewStatus,
-      preserveReviewIfUnchanged,
-      catalogRevision,
-      evidenceRevision,
-      derivationVersion,
-      manualCorrection,
-      publishedAt
-    });
-  }
-
-  function buildStoredActualsFromBody(body, questions, races, now) {
-    const valuesByQuestion = {};
-    for (const question of questions) {
-      const type = question.type || "text";
-      if (type === "ranking") {
-        const count = Number(question.count) || 3;
-        const selections = [];
-        for (let i = 1; i <= count; i += 1) {
-          const value = body[`${question.id}_${i}`];
-          if (!value) continue;
-          selections.push(value);
-        }
-        if (selections.length === 0) continue;
-        valuesByQuestion[question.id] = JSON.stringify(selections);
-        continue;
-      }
-      if (type === "multi_select") {
-        const selected = body[question.id];
-        if (!selected) continue;
-        const selections = Array.isArray(selected) ? selected : [selected];
-        valuesByQuestion[question.id] = JSON.stringify(selections);
-        continue;
-      }
-      if (type === "multi_select_limited") {
-        const dnfByRace = {};
-        races.forEach((race, index) => {
-          const value = body[`${question.id}_dnf_${index}`];
-          const countValue = clampNumber(value, 0, 999);
-          if (countValue != null) {
-            dnfByRace[race] = countValue;
-          }
-        });
-        valuesByQuestion[question.id] = JSON.stringify({ dnf_by_race: dnfByRace });
-        continue;
-      }
-      if (type === "teammate_battle") {
-        const winner = body[`${question.id}_winner`];
-        const diffRaw = body[`${question.id}_diff`];
-        if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
-          continue;
-        }
-        const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
-        valuesByQuestion[question.id] = JSON.stringify({ winner, diff });
-        continue;
-      }
-      if (type === "boolean_with_optional_driver") {
-        const choice = body[question.id];
-        const driver = body[`${question.id}_driver`];
-        if (!choice) continue;
-        valuesByQuestion[question.id] = JSON.stringify({ choice, driver });
-        continue;
-      }
-      if (type === "numeric_with_driver") {
-        const valueRaw = body[`${question.id}_value`];
-        const driver = body[`${question.id}_driver`];
-        if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
-          continue;
-        }
-        const value = clampNumber(valueRaw, 0, 999);
-        valuesByQuestion[question.id] = JSON.stringify({ value, driver });
-        continue;
-      }
-      if (type === "single_choice_with_driver") {
-        const value = body[`${question.id}_value`];
-        const driverRaw = body[`${question.id}_driver`];
-        const driverSelections = Array.isArray(driverRaw)
-          ? driverRaw.filter(Boolean)
-          : (driverRaw ? [driverRaw] : []);
-        const driver = MULTI_ACTUAL_DRIVER_FIELD_IDS.has(question.id)
-          ? (driverSelections.length <= 1 ? (driverSelections[0] || null) : driverSelections)
-          : (driverSelections[0] || "");
-        if ((!value || value === "") && (!driver || driver === "")) {
-          continue;
-        }
-        valuesByQuestion[question.id] = JSON.stringify({ value, driver });
-        continue;
-      }
-
-      const answer = body[question.id];
-      if (type === "single_choice" && MULTI_ACTUAL_SINGLE_CHOICE_IDS.has(question.id)) {
-        if (!answer) continue;
-        const selections = Array.isArray(answer) ? answer.filter(Boolean) : [answer];
-        if (selections.length === 0) continue;
-        valuesByQuestion[question.id] = JSON.stringify(selections);
-        continue;
-      }
-      if (answer === undefined || answer === "") continue;
-      if (type === "numeric") {
-        const value = clampNumber(answer, 0, 999);
-        if (value == null) continue;
-        valuesByQuestion[question.id] = String(value);
-        continue;
-      }
-      valuesByQuestion[question.id] = String(answer).trim();
-    }
-    return valuesByQuestion;
-  }
 
   function validatePointsOverrideType(question, parsedOverride) {
     const basePoints = question?._basePoints;
@@ -2793,6 +2767,82 @@ function registerAdminRoutes(app, deps) {
     );
   });
 
+  app.post("/admin/race-data/correction", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const round = Number(req.body.round || 0);
+    const viewMode = String(req.body.view || "drivers").toLowerCase() === "constructors"
+      ? "constructors"
+      : "drivers";
+    const focus = String(req.body.focus || "points").trim() || "points";
+    const redirectTo = `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(round)}&view=${encodeURIComponent(viewMode)}&focus=${encodeURIComponent(focus)}`;
+    const adminUser = getCurrentUser(req);
+    try {
+      if (String(req.body.confirmCorrection || "") !== "1") {
+        throw new Error("Confirm the protected race-data correction before saving.");
+      }
+      if (!Number.isInteger(season) || season < 1900 || !Number.isInteger(round) || round < 1) {
+        throw new Error("Choose a valid season and round.");
+      }
+      const snapshot = findRaceDataSnapshot(db, season, round);
+      if (!snapshot) throw new Error("No persisted race evidence exists for this round.");
+      const snapshotId = Number(req.body.snapshotId);
+      if (!Number.isInteger(snapshotId) || snapshotId !== Number(snapshot.id)) {
+        throw new Error("This evidence changed while you were editing. Reload the round and try again.");
+      }
+      const correctedEvidence = buildCorrectedRaceEvidence(snapshot, req.body);
+      const correctionId = saveCorrectedRaceDataSnapshot(db, {
+        baseSnapshot: snapshot,
+        evidence: correctedEvidence,
+        correctedByUserId: adminUser?.id,
+        correctionReason: req.body.correctionReason,
+        sourceNote: "Admin correction from Race Data review"
+      });
+      const correctionSnapshot = findRaceDataSnapshot(db, season, round);
+      const sourceQuestions = getQuestions("en", { includeMeta: true });
+      const seasonContext = resolveAdminSeasonContext(db, {
+        requestedSeason: season,
+        currentSeason: CURRENT_SEASON
+      });
+      const catalog = seasonContext.selected
+        ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
+        : null;
+      const races = catalog?.races?.map((race) => race.display_name) || [];
+      const roster = buildRoundAwareRoster({
+        db,
+        season,
+        roundNumber: round,
+        races,
+        fallbackRoster: { drivers: [], teams: [], races },
+        seasonCatalog: catalog
+      });
+      const derivation = rederiveActualSnapshotFromRaceEvidence({
+        db,
+        season,
+        roundNumber: round,
+        roundName: correctionSnapshot?.round_name || snapshot.round_name,
+        questions: sourceQuestions,
+        roster,
+        races,
+        catalog,
+        evidenceSnapshot: correctionSnapshot
+      });
+      logEvent("info", "admin_race_data_correction_created", {
+        userId: adminUser?.id || null,
+        season,
+        round,
+        baseSnapshotId: snapshot.id,
+        correctionSnapshotId: correctionId,
+        derivedActualSnapshotId: derivation?.snapshotId || null,
+        derivedValueCount: derivation?.valueCount || 0,
+        driverId: req.body.driverId || null,
+        reason: String(req.body.correctionReason || "").trim()
+      });
+      return res.redirect(withQueryParam(redirectTo, "success", "Race evidence correction saved and actuals re-derived for review."));
+    } catch (err) {
+      return res.redirect(withQueryParam(redirectTo, "error", err.message));
+    }
+  });
+
   app.get("/admin/race-data", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
@@ -2806,7 +2856,8 @@ function registerAdminRoutes(app, deps) {
       includeMeta: true
     });
     const pointsLabel = t("admin_race_data.focus_points");
-    const focusOptions = buildRaceDataFocusOptions(sourceQuestions, { pointsLabel });
+    const metricOptions = buildRaceDataMetricOptions(t, { pointsLabel });
+    const focusOptions = buildRaceDataFocusOptions(sourceQuestions, { pointsLabel, metricOptions });
     const requestedFocusId = String(req.query.focus || "points").trim() || "points";
     const requestedFocus = focusOptions.find((option) => option.id === requestedFocusId) || null;
     const requestedView = String(req.query.view || "").trim().toLowerCase();
@@ -2821,7 +2872,8 @@ function registerAdminRoutes(app, deps) {
       questions: sourceQuestions,
       focusId: requestedFocusId,
       viewMode,
-      pointsLabel
+      pointsLabel,
+      metricOptions
     });
     const focusMetricLabels = {
       points: t("admin_race_data.points"),
@@ -2844,7 +2896,6 @@ function registerAdminRoutes(app, deps) {
       : null;
     const races = catalog?.races?.map((race) => race.display_name) || [];
     const evidenceRows = listRaceDataSnapshots(db, season);
-    const importRows = listRaceDataImports(db, season);
     const snapshotRows = listLatestSnapshotsForSeason(db, season, {
       maxRoundNumber: races.length
     });
@@ -2870,7 +2921,12 @@ function registerAdminRoutes(app, deps) {
       catalogRevision: catalog?.catalogRevision || null,
       focus
     });
+    view.evidenceRevisions = view.selectedEvidence
+      ? listRaceDataSnapshotRevisions(db, season, view.selectedRoundNumber)
+      : [];
     view.focusOptions = focusOptions;
+    view.metricOptions = metricOptions;
+    view.questionOptions = focusOptions.filter((option) => option.questionId);
     const model = {
       user,
       season,
@@ -2879,10 +2935,6 @@ function registerAdminRoutes(app, deps) {
       locale,
       view,
       viewMode,
-      importRows,
-      selectedImport: view.selectedImportId
-        ? importRows.find((item) => item.id === view.selectedImportId) || null
-        : null,
       catalogRevision: catalog?.catalogRevision || null,
       catalogReadiness: catalog?.readiness || null
     };
@@ -2954,6 +3006,28 @@ function registerAdminRoutes(app, deps) {
         updatedAt: snapshotMeta ? snapshotMeta.updated_at || snapshotMeta.created_at || null : null
       };
     });
+    const actualOverviewValuesByRound = new Map(
+      racesWithTargets
+        .filter((target) => target.snapshotId)
+        .map((target) => [target.roundNumber, fetchSnapshotValues(target.snapshotId)])
+    );
+    const actualOverviewRows = questions.map((question, index) => ({
+      question,
+      questionNumber: index + 1,
+      baseView: actualOverviewViewForQuestion(question),
+      cells: racesWithTargets.map((target) => {
+        const values = actualOverviewValuesByRound.get(target.roundNumber) || {};
+        const rawValue = values[question.id];
+        return {
+          value: formatActualOverviewValue(rawValue),
+          hasValue: rawValue != null && String(rawValue).trim() !== "",
+          reviewStatus: target.reviewStatus || null,
+          roundNumber: target.roundNumber,
+          timing: target.timing,
+          href: `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(target.roundNumber)}&view=${encodeURIComponent(actualOverviewViewForQuestion(question))}&focus=${encodeURIComponent(question.id)}`
+        };
+      })
+    }));
 
     const pendingReviewTargets = racesWithTargets.filter(
       (target) => target.reviewStatus === REVIEW_STATUS_PENDING
@@ -2998,6 +3072,8 @@ function registerAdminRoutes(app, deps) {
       roster,
       races,
       actuals,
+      actualOverviewRows,
+      actualOverviewTargets: racesWithTargets,
       actualsTarget: selectedTarget,
       raceTargets: racesWithTargets,
       selectedRaceTarget,
@@ -3130,153 +3206,6 @@ function registerAdminRoutes(app, deps) {
     );
   });
 
-  app.post("/admin/actuals", requireAdmin, (req, res) => {
-    const adminUser = getCurrentUser(req);
-    const season = Number(req.body.season || CURRENT_SEASON);
-    const seasonContext = resolveAdminSeasonContext(db, {
-      requestedSeason: season,
-      currentSeason: CURRENT_SEASON
-    });
-    const sourceQuestions = getQuestions();
-    const catalog = seasonContext.selected
-      ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
-      : null;
-    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
-    const races = catalog?.races?.map((race) => race.display_name) || [];
-    const now = new Date().toISOString();
-    const selectedTarget = String(req.body.actualsTarget || "current").trim() || "current";
-    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
-    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
-    if (
-      selectedRoundNumber != null &&
-      (!Number.isFinite(selectedRoundNumber) ||
-        selectedRoundNumber < 1 ||
-        selectedRoundNumber > races.length)
-    ) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&error=${encodeURIComponent("Selected race is outside the configured calendar.")}`
-      );
-    }
-    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
-    const latestRoundNumber =
-      Number.isFinite(Number(latestRoundSnapshot?.round_number))
-        ? Number(latestRoundSnapshot.round_number)
-        : null;
-    const isPastRaceTarget =
-      selectedRoundNumber != null &&
-      latestRoundNumber != null &&
-      selectedRoundNumber < latestRoundNumber;
-    const allowPastEdit = String(req.body.unlockPast || "").trim() === "1";
-
-    try {
-      assertSeasonMutationAllowed(seasonContext, { historicalCorrection: allowPastEdit });
-    } catch (err) {
-      return res.redirect(`/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent(err.message)}`);
-    }
-
-    if (isPastRaceTarget && !allowPastEdit) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent("Unlock past-race editing before saving changes.")}`
-      );
-    }
-
-    const valuesByQuestion = buildStoredActualsFromBody(req.body, questions, races, now);
-
-    if (selectedRoundNumber != null) {
-      const evidenceSnapshot = findRaceDataSnapshot(db, season, selectedRoundNumber);
-      const roundName = races[selectedRoundNumber - 1] || `Round ${selectedRoundNumber}`;
-      let successMessage;
-      try {
-        const snapshotResult = upsertActualsSnapshot({
-          season,
-          roundNumber: selectedRoundNumber,
-          roundName,
-          valuesByQuestion,
-          sourceType: "manual",
-          sourceNote: "Manual save from admin actuals race selector",
-          createdByUserId: adminUser?.id,
-          label: `R${selectedRoundNumber} - ${roundName}`,
-          reviewStatus: REVIEW_STATUS_REVIEWED,
-          catalogRevision: catalog?.catalogRevision || null,
-          evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.payload?.payloadRevision || null,
-          manualCorrection: allowPastEdit ? {
-            reason: "historical_correction",
-            round: selectedRoundNumber
-          } : null
-        });
-        if (snapshotResult?.snapshotId) {
-          publishActualSnapshot(db, {
-            season,
-            snapshotId: snapshotResult.snapshotId,
-            publishedByUserId: adminUser?.id
-          });
-        }
-        successMessage = snapshotResult?.snapshotId
-          ? `Snapshot saved for R${selectedRoundNumber} - ${roundName} and marked reviewed.`
-          : `No values saved for R${selectedRoundNumber} - ${roundName}.`;
-      } catch (err) {
-        return res.redirect(
-          `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&unlockPast=${allowPastEdit ? "1" : "0"}&error=${encodeURIComponent(err.message)}`
-        );
-      }
-      if (req.session) {
-        delete req.session.adminActualsDraft;
-      }
-      const redirectTo = `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}${allowPastEdit ? "&unlockPast=1" : ""}&success=${encodeURIComponent(successMessage)}`;
-      if (req.session) {
-        return req.session.save(() => res.redirect(redirectTo));
-      }
-      return res.redirect(redirectTo);
-    }
-
-    if (req.session) {
-      delete req.session.adminActualsDraft;
-    }
-
-    let successMessage = "Actuals saved.";
-    try {
-      const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
-      const evidenceSnapshot = latestRoundSnapshot?.round_number
-        ? findRaceDataSnapshot(db, season, latestRoundSnapshot.round_number)
-        : null;
-      const archivedSnapshot = upsertActualsSnapshot({
-        season,
-        roundNumber: latestRoundSnapshot?.round_number || null,
-        roundName: String(latestRoundSnapshot?.round_name || "").trim(),
-        valuesByQuestion,
-        sourceType: "manual",
-        sourceNote: "Manual save from admin actuals",
-        createdByUserId: adminUser?.id,
-        label: latestRoundSnapshot?.round_number
-          ? `R${latestRoundSnapshot.round_number} - ${String(latestRoundSnapshot?.round_name || "Manual update").trim() || "Manual update"}`
-          : `Manual save ${now.slice(0, 10)}`,
-        reviewStatus: REVIEW_STATUS_REVIEWED,
-        catalogRevision: catalog?.catalogRevision || null,
-        evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.payload?.payloadRevision || null
-      });
-      if (archivedSnapshot?.snapshotId) {
-        publishActualSnapshot(db, {
-          season,
-          snapshotId: archivedSnapshot.snapshotId,
-          publishedByUserId: adminUser?.id
-        });
-        const label = latestRoundSnapshot?.round_number
-          ? `R${latestRoundSnapshot.round_number}`
-          : `snapshot #${archivedSnapshot.snapshotId}`;
-        successMessage = `Actuals saved. ${label} marked reviewed.`;
-      }
-    } catch (archiveErr) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&error=${encodeURIComponent(`Actuals were not published: ${archiveErr.message}`)}`
-      );
-    }
-
-    const redirectTo = `/admin/actuals?season=${encodeURIComponent(season)}&success=${encodeURIComponent(successMessage)}`;
-    if (req.session) {
-      return req.session.save(() => res.redirect(redirectTo));
-    }
-    return res.redirect(redirectTo);
-  });
 
   app.get("/admin/overview", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
@@ -4818,7 +4747,9 @@ module.exports = {
   auditResultLabel,
   auditSourceState,
   buildRaceDataFocusOptions,
+  buildRaceDataMetricOptions,
   resolveRaceDataFocus,
   buildRaceDataAuditView,
+  buildCorrectedRaceEvidence,
   registerAdminRoutes
 };

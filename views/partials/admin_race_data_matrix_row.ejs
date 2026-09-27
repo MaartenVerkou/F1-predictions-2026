@@ -11,7 +11,7 @@
   <% if (isGroupedDriver) { %>
     <% if (groupIsFirst) { %>
       <td rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-rank">
-        <%= group.summary.championshipPosition || '—' %>
+        <%= group.summary.focusPosition || group.summary.championshipPosition || '—' %>
       </td>
     <% } %>
     <% if (groupIsFirst) { %>
@@ -20,7 +20,7 @@
       </th>
     <% } %>
   <% } else { %>
-    <td class="admin-race-data-sticky admin-race-data-rank"><%= row.championshipPosition || index + 1 %></td>
+    <td class="admin-race-data-sticky admin-race-data-rank"><%= row.focusPosition || row.championshipPosition || index + 1 %></td>
     <th scope="row" class="admin-race-data-sticky admin-race-data-entity" data-race-data-identity-cell="drivers">
       <%- include('admin_race_data_entity_label', { fullLabel: row.name, compactLabel: row.code || row.name }) %>
     </th>

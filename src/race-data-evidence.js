@@ -1,5 +1,7 @@
 "use strict";
 
+const crypto = require("node:crypto");
+
 const DRIVER_NAME_ALIASES = {
   andreakimiantonelli: "Kimi Antonelli",
   carlossainz: "Carlos Sainz Jr.",
@@ -374,7 +376,8 @@ function ensureRaceDataSchema(db) {
       "calendar_state TEXT NOT NULL DEFAULT 'completed', " +
       "reconstructed INTEGER NOT NULL DEFAULT 0, coverage_status TEXT NOT NULL, " +
       "catalog_revision TEXT, source_identity TEXT, payload_revision TEXT, cutoff_round INTEGER, " +
-      "unresolved_count INTEGER NOT NULL DEFAULT 0, " +
+      "unresolved_count INTEGER NOT NULL DEFAULT 0, revision_kind TEXT NOT NULL DEFAULT 'provider', " +
+      "supersedes_snapshot_id INTEGER, correction_reason TEXT, corrected_by_user_id INTEGER, corrected_at TEXT, " +
       "payload_json TEXT NOT NULL, created_at TEXT NOT NULL, " +
       "UNIQUE(season, round_number, sync_id)); " +
     "CREATE INDEX IF NOT EXISTS idx_race_data_snapshots_season_round " +
@@ -405,7 +408,12 @@ function ensureRaceDataSchema(db) {
     ["source_identity", "TEXT"],
     ["payload_revision", "TEXT"],
     ["cutoff_round", "INTEGER"],
-    ["unresolved_count", "INTEGER NOT NULL DEFAULT 0"]
+    ["unresolved_count", "INTEGER NOT NULL DEFAULT 0"],
+    ["revision_kind", "TEXT NOT NULL DEFAULT 'provider'"],
+    ["supersedes_snapshot_id", "INTEGER"],
+    ["correction_reason", "TEXT"],
+    ["corrected_by_user_id", "INTEGER"],
+    ["corrected_at", "TEXT"]
   ];
   for (const [name, type] of additions) {
     if (!snapshotColumns.has(name)) {
@@ -415,15 +423,33 @@ function ensureRaceDataSchema(db) {
   db.exec(
     "UPDATE race_data_snapshots SET parser_version = COALESCE(NULLIF(parser_version, ''), 'evidence-v1'), " +
       "calendar_state = COALESCE(NULLIF(calendar_state, ''), 'completed'), " +
-      "reconstructed = COALESCE(reconstructed, 0) " +
+      "reconstructed = COALESCE(reconstructed, 0), " +
+      "revision_kind = COALESCE(NULLIF(revision_kind, ''), 'provider') " +
       "WHERE parser_version IS NULL OR parser_version = '' OR calendar_state IS NULL OR " +
-      "calendar_state = '' OR reconstructed IS NULL;"
+      "calendar_state = '' OR reconstructed IS NULL OR revision_kind IS NULL OR revision_kind = '';"
   );
 }
 
 function parseJsonColumn(value, fallback) {
   if (value == null || value === "") return fallback;
   try { return JSON.parse(String(value)); } catch (error) { return fallback; }
+}
+
+function mapRaceDataSnapshotRow(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    id: Number(row.id),
+    import_id: row.import_id == null ? null : Number(row.import_id),
+    season: Number(row.season),
+    round_number: Number(row.round_number),
+    reconstructed: Boolean(Number(row.reconstructed || 0)),
+    unresolved_count: Number(row.unresolved_count || 0),
+    revision_kind: String(row.revision_kind || "provider"),
+    supersedes_snapshot_id: row.supersedes_snapshot_id == null ? null : Number(row.supersedes_snapshot_id),
+    corrected_by_user_id: row.corrected_by_user_id == null ? null : Number(row.corrected_by_user_id),
+    payload: parseEvidencePayload(row.payload_json)
+  };
 }
 
 function mapDestructorsSourcePost(row) {
@@ -596,6 +622,11 @@ function saveRaceDataSnapshot(db, {
   sourceIdentity = null,
   payloadRevision = null,
   cutoffRound = null,
+  revisionKind = "provider",
+  supersedesSnapshotId = null,
+  correctionReason = null,
+  correctedByUserId = null,
+  correctedAt = null,
   evidence
 }) {
   const safeSeason = parseNum(season);
@@ -650,8 +681,9 @@ function saveRaceDataSnapshot(db, {
         import_id, season, round_number, round_name, sync_id, fetched_at, source_type,
         source_note, parser_version, calendar_state, reconstructed,
        catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
-       coverage_status, payload_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       coverage_status, revision_kind, supersedes_snapshot_id, correction_reason,
+       corrected_by_user_id, corrected_at, payload_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       importId == null ? null : Number(importId),
@@ -670,9 +702,14 @@ function saveRaceDataSnapshot(db, {
      String(payloadRevision || evidence.payloadRevision || "").trim() || null,
      safeCutoffRound,
      evidence.unresolved ? Object.values(evidence.unresolved).reduce((total, value) => total + Number(value || 0), 0) : 0,
-      String(evidence?.coverage?.status || "incomplete"),
-      payload,
-      now
+     String(evidence?.coverage?.status || "incomplete"),
+     String(revisionKind || "provider").trim() || "provider",
+     supersedesSnapshotId == null ? null : parseNum(supersedesSnapshotId),
+     String(correctionReason || "").trim() || null,
+     correctedByUserId == null ? null : parseNum(correctedByUserId),
+     correctedAt || null,
+     payload,
+     now
     );
   return Number(result.lastInsertRowid);
 }
@@ -690,13 +727,70 @@ function linkEvidenceToActualSnapshot(db, snapshotId, evidenceId, importId = nul
   );
 }
 
+function listRaceDataSnapshotRevisions(db, season, roundNumber) {
+  const rows = db
+    .prepare(
+      `SELECT id, import_id, season, round_number, round_name, sync_id, fetched_at,
+              source_type, source_note, parser_version, calendar_state, reconstructed,
+              catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
+              coverage_status, revision_kind, supersedes_snapshot_id, correction_reason,
+              corrected_by_user_id, corrected_at, payload_json, created_at
+       FROM race_data_snapshots
+       WHERE season = ? AND round_number = ?
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all(Number(season), Number(roundNumber));
+  return rows.map(mapRaceDataSnapshotRow);
+}
+
+function saveCorrectedRaceDataSnapshot(db, {
+  baseSnapshot,
+  evidence,
+  correctedByUserId,
+  correctionReason,
+  roundName = baseSnapshot?.round_name,
+  sourceNote = "Admin correction"
+}) {
+  const season = parseNum(baseSnapshot?.season);
+  const roundNumber = parseNum(baseSnapshot?.round_number);
+  const userId = parseNum(correctedByUserId);
+  const reason = String(correctionReason || "").trim();
+  if (!baseSnapshot?.id || season == null || roundNumber == null || !evidence || userId == null || !reason) {
+    throw new Error("A correction requires a base snapshot, evidence, admin, and reason.");
+  }
+  const now = new Date().toISOString();
+  return saveRaceDataSnapshot(db, {
+    season,
+    roundNumber,
+    roundName,
+    syncId: `admin-correction-${season}-${roundNumber}-${crypto.randomUUID()}`,
+    fetchedAt: now,
+    sourceType: "admin_correction",
+    sourceNote,
+    parserVersion: baseSnapshot.parser_version || "evidence-v1",
+    calendarState: baseSnapshot.calendar_state || "completed",
+    reconstructed: true,
+    catalogRevision: baseSnapshot.catalog_revision || null,
+    sourceIdentity: baseSnapshot.source_identity || null,
+    payloadRevision: `admin-${crypto.randomUUID()}`,
+    cutoffRound: baseSnapshot.cutoff_round || roundNumber,
+    revisionKind: "admin_correction",
+    supersedesSnapshotId: Number(baseSnapshot.id),
+    correctionReason: reason,
+    correctedByUserId: userId,
+    correctedAt: now,
+    evidence
+  });
+}
+
 function listRaceDataSnapshots(db, season) {
   const rows = db
     .prepare(
       `SELECT id, import_id, season, round_number, round_name, sync_id, fetched_at,
               source_type, source_note, parser_version, calendar_state, reconstructed,
               catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
-              coverage_status, payload_json, created_at
+              coverage_status, revision_kind, supersedes_snapshot_id, correction_reason,
+              corrected_by_user_id, corrected_at, payload_json, created_at
        FROM race_data_snapshots
        WHERE season = ?
        ORDER BY round_number ASC, created_at DESC, id DESC`
@@ -706,14 +800,7 @@ function listRaceDataSnapshots(db, season) {
   rows.forEach((row) => {
     const round = Number(row.round_number);
     if (!latestByRound.has(round)) {
-      latestByRound.set(round, {
-        ...row,
-        id: Number(row.id),
-        import_id: row.import_id == null ? null : Number(row.import_id),
-        season: Number(row.season),
-        round_number: round,
-        payload: parseEvidencePayload(row.payload_json)
-      });
+      latestByRound.set(round, mapRaceDataSnapshotRow(row));
     }
   });
   return Array.from(latestByRound.values()).sort((a, b) => a.round_number - b.round_number);
@@ -725,7 +812,8 @@ function findRaceDataSnapshot(db, season, roundNumber) {
       `SELECT id, import_id, season, round_number, round_name, sync_id, fetched_at,
               source_type, source_note, parser_version, calendar_state, reconstructed,
               catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
-              coverage_status, payload_json, created_at
+              coverage_status, revision_kind, supersedes_snapshot_id, correction_reason,
+              corrected_by_user_id, corrected_at, payload_json, created_at
        FROM race_data_snapshots
        WHERE season = ? AND round_number = ?
        ORDER BY created_at DESC, id DESC
@@ -733,14 +821,7 @@ function findRaceDataSnapshot(db, season, roundNumber) {
     )
     .get(Number(season), Number(roundNumber));
   if (!row) return null;
-  return {
-    ...row,
-    id: Number(row.id),
-    import_id: row.import_id == null ? null : Number(row.import_id),
-    season: Number(row.season),
-    round_number: Number(row.round_number),
-    payload: parseEvidencePayload(row.payload_json)
-  };
+  return mapRaceDataSnapshotRow(row);
 }
 
 function findEvidenceForActualSnapshot(db, snapshotId) {
@@ -750,7 +831,9 @@ function findEvidenceForActualSnapshot(db, snapshotId) {
               rds.fetched_at, rds.source_type, rds.source_note, rds.parser_version,
               rds.calendar_state, rds.reconstructed, rds.catalog_revision,
               rds.source_identity, rds.payload_revision, rds.cutoff_round,
-              rds.unresolved_count, rds.coverage_status, rds.payload_json, rds.created_at
+              rds.unresolved_count, rds.coverage_status, rds.revision_kind,
+              rds.supersedes_snapshot_id, rds.correction_reason,
+              rds.corrected_by_user_id, rds.corrected_at, rds.payload_json, rds.created_at
        FROM actual_snapshots AS snapshot
        LEFT JOIN race_data_snapshots AS rds
          ON rds.id = snapshot.source_data_snapshot_id
@@ -759,14 +842,7 @@ function findEvidenceForActualSnapshot(db, snapshotId) {
     )
     .get(Number(snapshotId));
   if (!row || !row.id) return null;
-  return {
-    ...row,
-    id: Number(row.id),
-    import_id: row.import_id == null ? null : Number(row.import_id),
-    season: Number(row.season),
-    round_number: Number(row.round_number),
-    payload: parseEvidencePayload(row.payload_json)
-  };
+  return mapRaceDataSnapshotRow(row);
 }
 
 function summarizeEvidence(payload) {
@@ -795,6 +871,7 @@ module.exports = {
   findRaceDataSnapshot,
   findRaceDataImport,
   linkEvidenceToActualSnapshot,
+  listRaceDataSnapshotRevisions,
   listRaceDataImports,
   listDestructorsSourcePosts,
   listRaceDataSnapshots,
@@ -803,6 +880,7 @@ module.exports = {
   normalizeLookupKey,
   parseEvidencePayload,
   saveDestructorsSourcePost,
+  saveCorrectedRaceDataSnapshot,
   saveRaceDataSnapshot,
   summarizeEvidence,
   teamNameFromApi,

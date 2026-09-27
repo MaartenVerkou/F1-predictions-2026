@@ -6,7 +6,7 @@ const { expect, test } = require("@playwright/test");
 
 const DB_PATH = path.join(__dirname, "..", "..", ".tmp", "playwright-state", "app.db");
 
-test("admin actuals focuses review on a selected pending race and can mark it reviewed", async ({ page }) => {
+test("admin actuals shows the derived question matrix and can mark a snapshot reviewed", async ({ page }) => {
   await page.goto("/");
 
   const db = new Database(DB_PATH);
@@ -109,8 +109,8 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
 
     const actualsMetrics = await page.evaluate(() => {
       const viewportWidth = document.documentElement.clientWidth;
-      const targetSelect = document.querySelector(".admin-target-form select");
-      const dnfRows = Array.from(document.querySelectorAll(".actuals-dnf-row"));
+      const targetSelect = document.querySelector('.admin-target-form select[name="target"]');
+      const overviewTable = document.querySelector(".admin-actuals-overview-table");
       return {
         theme: document.documentElement.getAttribute("data-theme"),
         overflowX: Math.max(
@@ -118,19 +118,15 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
           document.body.scrollWidth - document.body.clientWidth
         ),
         targetWidth: targetSelect ? Math.round(targetSelect.getBoundingClientRect().width) : 0,
-        maxDnfRight: dnfRows.reduce(
-          (max, row) => Math.max(max, Math.round(row.getBoundingClientRect().right)),
-          0
-        ),
-        dnfRows: dnfRows.length
+        overviewTableRight: overviewTable ? Math.round(overviewTable.getBoundingClientRect().right) : 0,
+        overviewRows: document.querySelectorAll(".admin-actuals-question-cell").length
       };
     });
 
     expect(actualsMetrics.theme).toBe(testCase.theme);
     expect(actualsMetrics.overflowX).toBeLessThanOrEqual(0);
     expect(actualsMetrics.targetWidth).toBeLessThanOrEqual(testCase.width);
-    expect(actualsMetrics.dnfRows).toBeGreaterThan(0);
-    expect(actualsMetrics.maxDnfRight).toBeLessThanOrEqual(testCase.width);
+    expect(actualsMetrics.overviewRows).toBeGreaterThan(0);
 
     await page.goto("/admin/overview");
     await page.evaluate((theme) => {

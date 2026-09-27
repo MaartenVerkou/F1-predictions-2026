@@ -8,7 +8,9 @@ const {
   createRaceDataImport,
   ensureRaceDataSchema,
   findRaceDataSnapshot,
+  listRaceDataSnapshotRevisions,
   listRaceDataSnapshots,
+  saveCorrectedRaceDataSnapshot,
   saveRaceDataSnapshot,
   summarizeEvidence
 } = require("../src/race-data-evidence");
@@ -268,4 +270,69 @@ test("persisted evidence is reusable by round and idempotent for the same sync",
   assert.equal(persisted.cutoff_round, 6);
   assert.equal(completeRaceDataImport(db, importId, { completedRounds: 1 }), 1);
   assert.equal(db.prepare("SELECT status, completed_rounds FROM race_data_imports WHERE id = ?").get(importId).status, "completed");
+});
+
+test("admin evidence corrections create an auditable revision without mutating the base", (t) => {
+  const Database = require("better-sqlite3");
+  const db = new Database(":memory:");
+  db.dialect = "sqlite";
+  db.exec(`
+    CREATE TABLE actual_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_data_import_id INTEGER,
+      source_data_snapshot_id INTEGER
+    );
+    CREATE TABLE responses (id INTEGER PRIMARY KEY, question_id TEXT, answer TEXT);
+    INSERT INTO responses (id, question_id, answer) VALUES (1, 'q1', 'driver:1');
+  `);
+  ensureRaceDataSchema(db);
+  t.after(() => db.close());
+
+  const baseEvidence = {
+    roundName: "Monaco Grand Prix",
+    cutoffRound: 6,
+    coverage: { status: "complete", sources: { race: { count: 1 } } },
+    race: { rows: [{ driver_id: 1, driver: "George Russell", position: 2, status: "Finished", points: 18 }] }
+  };
+  const baseId = saveRaceDataSnapshot(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    syncId: "sync-r6-base",
+    fetchedAt: "2026-09-21T00:00:00.000Z",
+    evidence: baseEvidence
+  });
+  const unrelatedId = saveRaceDataSnapshot(db, {
+    season: 2026,
+    roundNumber: 7,
+    roundName: "Barcelona-Catalunya Grand Prix",
+    syncId: "sync-r7-base",
+    fetchedAt: "2026-09-21T00:00:00.000Z",
+    evidence: { ...baseEvidence, roundName: "Barcelona-Catalunya Grand Prix", roundNumber: 7 }
+  });
+  db.prepare("INSERT INTO actual_snapshots (source_data_snapshot_id) VALUES (?)").run(baseId);
+  const correctedId = saveCorrectedRaceDataSnapshot(db, {
+    baseSnapshot: findRaceDataSnapshot(db, 2026, 6),
+    correctedByUserId: 42,
+    correctionReason: "Official classification corrected after steward decision.",
+    evidence: {
+      ...baseEvidence,
+      race: { rows: [{ ...baseEvidence.race.rows[0], position: 1, points: 25 }] }
+    }
+  });
+
+  assert.notEqual(correctedId, baseId);
+  const revisions = listRaceDataSnapshotRevisions(db, 2026, 6);
+  assert.equal(revisions.length, 2);
+  assert.equal(revisions[0].id, baseId);
+  assert.equal(revisions[1].id, correctedId);
+  assert.equal(revisions[1].revision_kind, "admin_correction");
+  assert.equal(revisions[1].supersedes_snapshot_id, baseId);
+  assert.equal(revisions[1].corrected_by_user_id, 42);
+  assert.equal(revisions[1].correction_reason, "Official classification corrected after steward decision.");
+  assert.equal(revisions[0].payload.race.rows[0].position, 2);
+  assert.equal(revisions[1].payload.race.rows[0].position, 1);
+  assert.equal(findRaceDataSnapshot(db, 2026, 7).id, unrelatedId);
+  assert.equal(db.prepare("SELECT source_data_snapshot_id FROM actual_snapshots LIMIT 1").get().source_data_snapshot_id, baseId);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM responses").get().count, 1);
 });
