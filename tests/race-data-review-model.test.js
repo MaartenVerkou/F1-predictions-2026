@@ -3,10 +3,30 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  RACE_RESULT_COLUMNS,
   actualOverviewViewForQuestion,
   buildRaceDataMetricOptions,
-  formatActualOverviewValue
+  formatActualOverviewValue,
+  formatRaceFinishLabel
 } = require("../src/race-data-review-model");
+
+test("race-result registry keeps facts in a stable review order", () => {
+  assert.deepEqual(RACE_RESULT_COLUMNS.map((column) => column.id), [
+    "finish",
+    "driver",
+    "constructor",
+    "qualifying",
+    "sprint",
+    "grid",
+    "status",
+    "points"
+  ]);
+  assert.equal(formatRaceFinishLabel(1), "P1");
+  assert.equal(formatRaceFinishLabel(2), "P2");
+  assert.equal(formatRaceFinishLabel(3), "P3");
+  assert.equal(formatRaceFinishLabel(14), "14");
+  assert.equal(formatRaceFinishLabel(0), "—");
+});
 
 test("race-data metric registry exposes one shared set of review metrics", () => {
   const options = buildRaceDataMetricOptions((key) => ({

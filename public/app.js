@@ -1206,6 +1206,7 @@ const initAdminLineupHistoryEditors = () => {
 
 let raceDataRegionController = null;
 let raceDataHistoryBound = false;
+let raceDataCorrectionBound = false;
 
 const syncRaceDataSeasonForm = (url) => {
   const form = document.querySelector('.admin-race-data-page .admin-inputs-season-form');
@@ -1250,6 +1251,7 @@ const requestRaceDataRegion = async (targetUrl, { pushHistory = false } = {}) =>
     region.replaceWith(nextRegion);
     syncRaceDataSeasonForm(cleanUrl);
     initRaceDataViewToggle();
+    initRaceDataCorrection();
   } catch (error) {
     if (error?.name === 'AbortError') return;
     region.removeAttribute('aria-busy');
@@ -1260,15 +1262,17 @@ const requestRaceDataRegion = async (targetUrl, { pushHistory = false } = {}) =>
 };
 
 const initRaceDataViewToggle = () => {
+  const page = document.querySelector('.admin-race-data-page');
   const region = document.querySelector('[data-race-data-round-region]');
-  if (!region || region.dataset.raceDataNavigationBound === 'true') return;
-  region.dataset.raceDataNavigationBound = 'true';
+  if (!page || !region || page.dataset.raceDataNavigationBound === 'true') return;
+  page.dataset.raceDataNavigationBound = 'true';
 
-  region.addEventListener('click', (event) => {
+  page.addEventListener('click', (event) => {
     const toggle = event.target.closest('[data-race-data-view-toggle]');
+    const metricToggle = event.target.closest('[data-race-data-metric-toggle]');
     const roundLink = event.target.closest('[data-race-data-round-link]');
-    const link = toggle || roundLink;
-    if (!link || !region.contains(link) || event.defaultPrevented) return;
+    const link = toggle || metricToggle || roundLink;
+    if (!link || !page.contains(link) || event.defaultPrevented) return;
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const url = new URL(link.href, window.location.href);
     if (url.origin !== window.location.origin) return;
@@ -1282,9 +1286,9 @@ const initRaceDataViewToggle = () => {
     void requestRaceDataRegion(url, { pushHistory: true });
   });
 
-  region.addEventListener('change', (event) => {
+  page.addEventListener('change', (event) => {
     const focusSelect = event.target.closest('[data-race-data-focus-form] select[name="focus"]');
-    if (focusSelect && region.contains(focusSelect)) {
+    if (focusSelect && page.contains(focusSelect)) {
       const form = focusSelect.form;
       const url = new URL(form?.action || window.location.href, window.location.href);
       const current = new URL(window.location.href);
@@ -1301,7 +1305,7 @@ const initRaceDataViewToggle = () => {
       return;
     }
     const select = event.target.closest('[data-race-data-round-form] select[name="round"]');
-    if (!select || !region.contains(select)) return;
+    if (!select || !page.contains(select)) return;
     const form = select.form;
     const url = new URL(form?.action || window.location.href, window.location.href);
     const current = new URL(window.location.href);
@@ -1321,6 +1325,66 @@ const initRaceDataViewToggle = () => {
     });
     raceDataHistoryBound = true;
   }
+};
+
+const initRaceDataCorrection = () => {
+  const page = document.querySelector('.admin-race-data-page');
+  if (!page || raceDataCorrectionBound) return;
+  raceDataCorrectionBound = true;
+
+  const selectRow = (row) => {
+    page.querySelectorAll('[data-race-data-result-row]').forEach((candidate) => {
+      const selected = candidate === row;
+      candidate.classList.toggle('is-selected', selected);
+      candidate.setAttribute('aria-selected', selected ? 'true' : 'false');
+    });
+    const edit = page.querySelector('[data-race-data-edit]');
+    if (edit) edit.disabled = !row;
+    const label = page.querySelector('[data-race-data-selection-label]');
+    if (label) label.textContent = row ? `${row.dataset.driverName || 'Result'} selected` : 'Select a result row';
+    const editor = page.querySelector('[data-race-data-editor]');
+    if (!row || !editor) return;
+    const setValue = (selector, value) => {
+      const input = editor.querySelector(selector);
+      if (input) input.value = value == null ? '' : value;
+    };
+    setValue('[data-race-data-editor-driver-id]', row.dataset.driverId);
+    setValue('[data-race-data-editor-driver]', row.dataset.driverName);
+    setValue('[data-race-data-editor-position]', row.dataset.racePosition);
+    setValue('[data-race-data-editor-grid]', row.dataset.grid);
+    setValue('[data-race-data-editor-status]', row.dataset.status);
+    setValue('[data-race-data-editor-points]', row.dataset.points);
+    const title = editor.querySelector('[data-race-data-editor-title]');
+    if (title) title.textContent = `Edit ${row.dataset.driverName || 'result'}`;
+  };
+
+  page.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-race-data-result-row]');
+    if (row && page.contains(row) && !event.target.closest('a, button, input, select, textarea')) {
+      selectRow(row);
+      return;
+    }
+    const edit = event.target.closest('[data-race-data-edit]');
+    if (edit && page.contains(edit) && !edit.disabled) {
+      const editor = page.querySelector('[data-race-data-editor]');
+      if (!editor) return;
+      editor.hidden = false;
+      editor.querySelector('input, textarea')?.focus();
+      return;
+    }
+    const close = event.target.closest('[data-race-data-editor-close]');
+    if (close && page.contains(close)) {
+      const editor = page.querySelector('[data-race-data-editor]');
+      if (editor) editor.hidden = true;
+    }
+  });
+
+  page.addEventListener('keydown', (event) => {
+    const row = event.target.closest('[data-race-data-result-row]');
+    if (!row || !page.contains(row) || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    selectRow(row);
+  });
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1348,6 +1412,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAdminInputTables();
   initAdminLineupHistoryEditors();
   initRaceDataViewToggle();
+  initRaceDataCorrection();
   initSignupPasswordMatch();
   initScrollToEndButton();
 });

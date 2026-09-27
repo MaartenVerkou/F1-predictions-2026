@@ -79,6 +79,7 @@ test("buildRaceDataAuditView marks missing and future evidence without inventing
   assert.equal(view.drivers[1].cells[0].label, "—");
   assert.equal(view.selectedRound.label, "R1 - Monaco Grand Prix");
   assert.equal(view.detailRows[0].racePoints, 25);
+  assert.equal(view.detailRows[0].finishLabel, "P1");
   assert.equal(view.selectedRound.snapshot.id, 10);
 });
 

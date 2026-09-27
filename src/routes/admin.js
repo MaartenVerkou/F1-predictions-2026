@@ -61,9 +61,11 @@ const {
   defaultRaceDataHighlightMode
 } = require("../race-data-audit");
 const {
+  RACE_RESULT_COLUMNS,
   actualOverviewViewForQuestion,
   buildRaceDataMetricOptions,
-  formatActualOverviewValue
+  formatActualOverviewValue,
+  formatRaceFinishLabel
 } = require("../race-data-review-model");
 const { topDamageEntities } = require("../destructors-damage");
 
@@ -656,7 +658,9 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       // A provider may encode a non-classified result with position `0`.
       // Keep the numeric finish position only for classified finishers so the
       // detail table can use the status label (Ret/DNS/DNQ) for the others.
+      racePositionNumber: Number(race?.position) > 0 ? Number(race.position) : null,
       racePosition: Number(race?.position) > 0 ? (race?.positionText || String(race.position)) : null,
+      finishLabel: formatRaceFinishLabel(race?.position),
       raceLabel: auditResultLabel(race),
       raceStatus: race?.status || null,
       racePoints: race?.points ?? null
@@ -2920,6 +2924,13 @@ function registerAdminRoutes(app, deps) {
       selectedRound: defaultRound,
       catalogRevision: catalog?.catalogRevision || null,
       focus
+    });
+    view.raceResultColumns = RACE_RESULT_COLUMNS.map((column) => {
+      const translated = t(column.labelKey);
+      return {
+        ...column,
+        label: translated && translated !== column.labelKey ? translated : column.fallback
+      };
     });
     view.evidenceRevisions = view.selectedEvidence
       ? listRaceDataSnapshotRevisions(db, season, view.selectedRoundNumber)

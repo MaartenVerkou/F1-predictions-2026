@@ -7,17 +7,30 @@
       <h1><%= t('admin_race_data.heading') %></h1>
       <p class="muted admin-page-intro"><%= t('admin_race_data.intro') %></p>
     </div>
-    <form method="get" action="/admin/race-data" class="admin-inputs-season-form">
-      <label for="admin-race-data-season"><%= t('admin_inputs.season') %></label>
-      <select id="admin-race-data-season" name="season" onchange="this.form.submit()">
-        <% (availableSeasons || []).forEach((availableSeason) => { %>
-          <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %> · <%= availableSeason.statusLabel %></option>
-        <% }) %>
-      </select>
-      <input type="hidden" name="view" value="<%= viewMode %>" />
-      <input type="hidden" name="round" value="<%= view.selectedRoundNumber || 1 %>" />
-      <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
-    </form>
+    <div class="admin-race-data-selector-stack" aria-label="Race data selection">
+      <form method="get" action="/admin/race-data" class="admin-race-data-selector-form admin-inputs-season-form">
+        <label for="admin-race-data-season"><%= t('admin_inputs.season') %></label>
+        <select id="admin-race-data-season" name="season" onchange="this.form.submit()">
+          <% (availableSeasons || []).forEach((availableSeason) => { %>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %> · <%= availableSeason.statusLabel %></option>
+          <% }) %>
+        </select>
+        <input type="hidden" name="view" value="<%= viewMode %>" />
+        <input type="hidden" name="round" value="<%= view.selectedRoundNumber || 1 %>" />
+        <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
+      </form>
+      <form method="get" action="/admin/race-data" class="admin-race-data-selector-form admin-race-data-round-form" data-race-data-round-form>
+        <label for="admin-race-data-round"><%= t('admin_race_data.round_short_label') %></label>
+        <select id="admin-race-data-round" name="round" onchange="this.form.submit()">
+          <% view.rounds.forEach((round) => { %>
+            <option value="<%= round.roundNumber %>" <%= round.roundNumber === view.selectedRoundNumber ? 'selected' : '' %>><%= round.label %></option>
+          <% }) %>
+        </select>
+        <input type="hidden" name="season" value="<%= season %>" />
+        <input type="hidden" name="view" value="<%= viewMode %>" />
+        <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
+      </form>
+    </div>
   </div>
 
   <% if (seasonContext?.invalidRequestedSeason) { %>

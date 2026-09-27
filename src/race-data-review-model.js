@@ -52,6 +52,26 @@ const METRIC_DEFINITIONS = [
   }
 ];
 
+// Keep the canonical race-result facts in one review-oriented order. The
+// detail table and its tests consume this registry instead of each inventing
+// a column sequence.
+const RACE_RESULT_COLUMNS = [
+  { id: "finish", labelKey: "admin_race_data.position", fallback: "Finish" },
+  { id: "driver", labelKey: "admin_race_data.driver", fallback: "Driver" },
+  { id: "constructor", labelKey: "admin_race_data.constructor", fallback: "Constructor" },
+  { id: "qualifying", labelKey: "admin_race_data.qualifying_short", fallback: "Qualifying" },
+  { id: "sprint", labelKey: "admin_race_data.sprint", fallback: "Sprint" },
+  { id: "grid", labelKey: "admin_race_data.grid", fallback: "Grid" },
+  { id: "status", labelKey: "admin_race_data.status", fallback: "Status" },
+  { id: "points", labelKey: "admin_race_data.points_short", fallback: "Points" }
+];
+
+function formatRaceFinishLabel(position) {
+  const numericPosition = Number(position);
+  if (!Number.isFinite(numericPosition) || numericPosition < 1) return "—";
+  return numericPosition <= 3 ? `P${numericPosition}` : String(numericPosition);
+}
+
 function translatedLabel(t, key, fallback) {
   const value = typeof t === "function" ? t(key) : "";
   return value && value !== key ? value : fallback;
@@ -101,7 +121,9 @@ function actualOverviewViewForQuestion(question) {
 
 module.exports = {
   METRIC_DEFINITIONS,
+  RACE_RESULT_COLUMNS,
   actualOverviewViewForQuestion,
   buildRaceDataMetricOptions,
-  formatActualOverviewValue
+  formatActualOverviewValue,
+  formatRaceFinishLabel
 };

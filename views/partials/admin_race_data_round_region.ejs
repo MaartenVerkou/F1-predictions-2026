@@ -1,106 +1,102 @@
-<% const numericEditValue = (value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : '';
+<% const resultColumns = view.raceResultColumns || [
+  { id: 'finish', label: 'Finish' },
+  { id: 'driver', label: 'Driver' },
+  { id: 'constructor', label: 'Constructor' },
+  { id: 'qualifying', label: 'Qualifying' },
+  { id: 'sprint', label: 'Sprint' },
+  { id: 'grid', label: 'Grid' },
+  { id: 'status', label: 'Status' },
+  { id: 'points', label: 'Points' }
+];
+const detailCellValue = (row, column) => {
+  if (column.id === 'finish') return row.racePosition ? row.finishLabel : (row.raceLabel || '—');
+  if (column.id === 'driver') return row.driver || '—';
+  if (column.id === 'constructor') return row.constructor || '—';
+  if (column.id === 'qualifying') return row.qualifyingPosition == null ? '—' : row.qualifyingPosition;
+  if (column.id === 'grid') return row.grid == null ? '—' : row.grid;
+  if (column.id === 'status') return row.raceStatus || row.sprintStatus || '—';
+  if (column.id === 'points') return row.racePoints == null ? '—' : row.racePoints;
+  return '—';
 }; %>
 <div class="admin-race-data-round-region" data-race-data-round-region>
-  <div class="admin-race-data-controls">
-    <form method="get" action="/admin/race-data" class="admin-race-data-round-form" data-race-data-round-form>
-      <input type="hidden" name="view" value="<%= viewMode %>" />
-      <input type="hidden" name="season" value="<%= season %>" />
-      <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
-      <label for="admin-race-data-round"><%= t('admin_race_data.round_short_label') %></label>
-      <select id="admin-race-data-round" name="round" onchange="this.form.submit()">
-        <% view.rounds.forEach((round) => { %>
-          <option value="<%= round.roundNumber %>" <%= round.roundNumber === view.selectedRoundNumber ? 'selected' : '' %>>
-            <%= round.label %>
-          </option>
-        <% }) %>
-      </select>
-      <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_round') %></button></noscript>
-    </form>
-    <% if (view.selectedEvidence) { %>
-      <span class="admin-race-data-source-meta muted">
-        <%= view.selectedEvidence.source_type || 'source' %>
-        · <%= view.selectedSummary?.status || 'incomplete' %>
-        <% if (view.selectedEvidence.revision_kind === 'admin_correction') { %> · corrected<% } %>
-      </span>
-    <% } %>
-  </div>
-
   <section class="admin-race-data-detail admin-race-data-detail-first" aria-labelledby="admin-race-data-detail-heading">
-    <div class="admin-race-data-detail-heading">
-      <div>
-        <h2 id="admin-race-data-detail-heading"><%= view.selectedRound?.label || t('admin_race_data.no_round') %></h2>
-        <p class="muted admin-race-data-detail-meta">
-          <%= view.selectedEvidence
-            ? `${view.detailRows.length} drivers · ${view.selectedEvidence.fetched_at || view.selectedEvidence.payload?.fetchedAt || 'source time unavailable'}`
-            : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %>
-        </p>
+    <h2 id="admin-race-data-detail-heading" class="sr-only"><%= view.selectedRound?.label || t('admin_race_data.no_round') %></h2>
+    <div class="admin-race-data-detail-toolbar">
+      <div class="admin-race-data-fact-meta muted">
+        <%= view.selectedEvidence
+          ? `${view.detailRows.length} drivers · ${view.selectedEvidence.source_type || 'source'} · ${view.selectedEvidence.fetched_at || view.selectedEvidence.payload?.fetchedAt || 'source time unavailable'}`
+          : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %>
       </div>
+      <% if (view.selectedEvidence) { %>
+        <div class="admin-race-data-detail-actions" data-race-data-detail-actions>
+          <span class="admin-race-data-selection-label muted" data-race-data-selection-label aria-live="polite">Select a result row</span>
+          <button type="button" class="secondary" data-race-data-edit disabled>Edit</button>
+        </div>
+      <% } %>
     </div>
 
     <div class="admin-race-data-detail-table-wrap">
       <table class="admin-race-data-detail-table admin-race-data-detail-table--result">
         <thead>
           <tr>
-            <th scope="col"><%= t('admin_race_data.position') %></th>
-            <th scope="col"><%= t('admin_race_data.driver') %></th>
-            <th scope="col"><%= t('admin_race_data.constructor') %></th>
-            <th scope="col"><%= t('admin_race_data.grid') %></th>
-            <th scope="col"><%= t('admin_race_data.qualifying_short') %></th>
-            <th scope="col"><%= t('admin_race_data.sprint') %></th>
-            <th scope="col"><%= t('admin_race_data.status') %></th>
-            <th scope="col"><%= t('admin_race_data.points_short') %></th>
-            <% if (view.selectedEvidence) { %><th scope="col" class="admin-race-data-edit-column">Edit</th><% } %>
+            <% resultColumns.forEach((column) => { %>
+              <th scope="col" class="admin-race-data-result-col admin-race-data-result-col--<%= column.id %>"><%= column.label %></th>
+            <% }) %>
           </tr>
         </thead>
         <tbody>
           <% if (view.detailRows.length) { %>
             <% view.detailRows.forEach((row) => { %>
-              <tr>
-                <td class="admin-race-data-result-position"><strong><%= row.racePosition || row.raceLabel || '—' %></strong></td>
-                <th scope="row"><%= row.driver %></th>
-                <td><%= row.constructor || '—' %></td>
-                <td><%= row.grid == null ? '—' : row.grid %></td>
-                <td><%= row.qualifyingPosition == null ? '—' : row.qualifyingPosition %></td>
-                <td>
-                  <%= row.sprintPosition == null ? '—' : row.sprintPosition %>
-                  <% if (row.sprintPoints != null && row.sprintPoints > 0) { %><small>+<%= row.sprintPoints %></small><% } %>
-                </td>
-                <td><%= row.raceStatus || row.sprintStatus || '—' %></td>
-                <td><%= row.racePoints == null ? '—' : row.racePoints %></td>
-                <% if (view.selectedEvidence) { %>
-                  <td class="admin-race-data-edit-column">
-                    <details class="admin-race-data-correction">
-                      <summary>Edit</summary>
-                      <form method="post" action="/admin/race-data/correction" class="admin-race-data-correction-form">
-                        <%- csrfField() %>
-                        <input type="hidden" name="season" value="<%= season %>" />
-                        <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
-                        <input type="hidden" name="view" value="<%= viewMode %>" />
-                        <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
-                        <input type="hidden" name="snapshotId" value="<%= view.selectedEvidence.id %>" />
-                        <input type="hidden" name="driverId" value="<%= row.driverId || '' %>" />
-                        <input type="hidden" name="driver" value="<%= row.driver %>" />
-                        <label>Finish <input name="position" type="number" min="1" max="99" value="<%= numericEditValue(row.racePosition) %>" /></label>
-                        <label>Grid <input name="grid" type="number" min="1" max="99" value="<%= numericEditValue(row.grid) %>" /></label>
-                        <label>Status <input name="status" maxlength="120" value="<%= row.raceStatus || '' %>" /></label>
-                        <label>Points <input name="points" type="number" min="0" max="200" step="0.1" value="<%= row.racePoints == null ? '' : row.racePoints %>" /></label>
-                        <label>Reason <textarea name="correctionReason" rows="2" required></textarea></label>
-                        <label class="admin-race-data-correction-confirm"><input type="checkbox" name="confirmCorrection" value="1" required /> Confirm protected correction</label>
-                        <button type="submit" class="secondary">Save revision</button>
-                      </form>
-                    </details>
-                  </td>
-                <% } %>
+              <tr class="admin-race-data-result-row" data-race-data-result-row tabindex="0" aria-selected="false"
+                  data-driver-id="<%= row.driverId || '' %>" data-driver-name="<%= row.driver || '' %>"
+                  data-race-position="<%= row.racePositionNumber || '' %>" data-grid="<%= row.grid || '' %>"
+                  data-status="<%= row.raceStatus || '' %>" data-points="<%= row.racePoints == null ? '' : row.racePoints %>">
+                <% resultColumns.forEach((column) => { %>
+                  <% if (column.id === 'driver') { %>
+                    <th scope="row" class="admin-race-data-result-cell admin-race-data-result-cell--driver"><%= detailCellValue(row, column) %></th>
+                  <% } else if (column.id === 'sprint') { %>
+                    <td class="admin-race-data-result-cell admin-race-data-result-cell--sprint">
+                      <%= row.sprintPosition == null ? '—' : row.sprintPosition %><% if (row.sprintPoints != null && row.sprintPoints > 0) { %> <small>+<%= row.sprintPoints %></small><% } %>
+                    </td>
+                  <% } else { %>
+                    <td class="admin-race-data-result-cell admin-race-data-result-cell--<%= column.id %>"><%= detailCellValue(row, column) %></td>
+                  <% } %>
+                <% }) %>
               </tr>
             <% }) %>
           <% } else { %>
-            <tr><td colspan="9" class="muted"><%= t('admin_race_data.no_evidence_detail') %></td></tr>
+            <tr><td colspan="<%= resultColumns.length %>" class="muted"><%= t('admin_race_data.no_evidence_detail') %></td></tr>
           <% } %>
         </tbody>
       </table>
     </div>
+
+    <% if (view.selectedEvidence) { %>
+      <div class="admin-race-data-correction-editor" data-race-data-editor hidden>
+        <div class="admin-race-data-correction-editor-heading">
+          <strong data-race-data-editor-title>Edit result</strong>
+          <button type="button" class="link-button" data-race-data-editor-close>Cancel</button>
+        </div>
+        <form method="post" action="/admin/race-data/correction" class="admin-race-data-correction-form" data-race-data-correction-form>
+          <%- csrfField() %>
+          <input type="hidden" name="season" value="<%= season %>" />
+          <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+          <input type="hidden" name="view" value="<%= viewMode %>" />
+          <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
+          <input type="hidden" name="snapshotId" value="<%= view.selectedEvidence.id %>" />
+          <input type="hidden" name="driverId" data-race-data-editor-driver-id />
+          <input type="hidden" name="driver" data-race-data-editor-driver />
+          <label>Finish <input name="position" type="number" min="1" max="99" data-race-data-editor-position /></label>
+          <label>Grid <input name="grid" type="number" min="1" max="99" data-race-data-editor-grid /></label>
+          <label>Status <input name="status" maxlength="120" data-race-data-editor-status /></label>
+          <label>Points <input name="points" type="number" min="0" max="200" step="0.1" data-race-data-editor-points /></label>
+          <label class="admin-race-data-correction-reason">Reason <textarea name="correctionReason" rows="2" required></textarea></label>
+          <label class="admin-race-data-correction-confirm"><input type="checkbox" name="confirmCorrection" value="1" required /> Confirm protected correction</label>
+          <button type="submit" class="secondary">Save revision</button>
+        </form>
+      </div>
+    <% } %>
+
     <% if (view.selectedEvidence) { %>
       <div class="admin-race-data-revision-meta muted">
         Revision <%= view.selectedEvidence.revision_kind || 'provider' %>
@@ -125,7 +121,7 @@
         <% (view.metricOptions || []).forEach((option) => { %>
           <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.focusId ? 'is-active' : '' %>"
              href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= view.selectedRoundNumber %>&focus=<%= option.id %>"
-             role="tab" aria-selected="<%= option.id === view.focusId ? 'true' : 'false' %>"><%= option.label %></a>
+             role="tab" aria-selected="<%= option.id === view.focusId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>"><%= option.label %></a>
         <% }) %>
       </div>
     </div>
@@ -180,7 +176,7 @@
         <h2 id="admin-race-data-derivation-heading">Derivation review</h2>
         <p class="muted">Inspect the evidence interpretation used for one question.</p>
       </div>
-      <form method="get" action="/admin/race-data" class="admin-race-data-question-form">
+      <form method="get" action="/admin/race-data" class="admin-race-data-question-form" data-race-data-focus-form>
         <input type="hidden" name="season" value="<%= season %>" />
         <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
         <input type="hidden" name="view" value="<%= viewMode %>" />

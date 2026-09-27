@@ -7805,6 +7805,211 @@ button.lang-option.is-active {
   background: var(--accent);
 }
 
+/* Final Race Data review layout: selectors stack in the page header and the
+   facts table starts immediately below it. */
+.admin-race-data-selector-stack {
+  display: grid;
+  gap: 6px;
+  width: min(360px, 100%);
+  min-width: 0;
+}
+
+.admin-race-data-selector-form {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-race-data-selector-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-race-data-selector-form select {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-race-data-detail-first {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-race-data-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+.admin-race-data-fact-meta,
+.admin-race-data-selection-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.admin-race-data-detail-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.admin-race-data-detail-actions button {
+  min-width: 72px;
+}
+
+.admin-race-data-result-row {
+  cursor: pointer;
+  outline: none;
+}
+
+.admin-race-data-result-row:hover > td,
+.admin-race-data-result-row:hover > th,
+.admin-race-data-result-row:focus-visible > td,
+.admin-race-data-result-row:focus-visible > th {
+  background: color-mix(in srgb, var(--card) 90%, var(--accent) 10%);
+}
+
+.admin-race-data-result-row.is-selected > td,
+.admin-race-data-result-row.is-selected > th {
+  background: color-mix(in srgb, var(--card) 82%, var(--accent) 18%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 55%, transparent), inset 0 -1px 0 color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.admin-race-data-detail-table--result {
+  min-width: 900px;
+}
+
+.admin-race-data-result-col--finish,
+.admin-race-data-result-cell--finish {
+  width: 62px;
+  text-align: center !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-result-col--driver,
+.admin-race-data-result-cell--driver {
+  min-width: 170px;
+  text-align: left !important;
+}
+
+.admin-race-data-result-col--constructor,
+.admin-race-data-result-cell--constructor {
+  min-width: 150px;
+  text-align: left !important;
+}
+
+.admin-race-data-result-cell--qualifying,
+.admin-race-data-result-cell--sprint,
+.admin-race-data-result-cell--grid,
+.admin-race-data-result-cell--points {
+  text-align: center !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-result-cell--status {
+  min-width: 112px;
+  text-align: left !important;
+}
+
+.admin-race-data-result-cell small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.admin-race-data-correction-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 94%, var(--accent) 6%);
+}
+
+.admin-race-data-correction-editor[hidden] {
+  display: none;
+}
+
+.admin-race-data-correction-editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-race-data-correction-editor .link-button {
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.admin-race-data-correction-editor .link-button:hover,
+.admin-race-data-correction-editor .link-button:focus-visible {
+  color: var(--text);
+}
+
+.admin-race-data-correction-editor .admin-race-data-correction-form {
+  position: static;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  width: auto;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.admin-race-data-correction-editor .admin-race-data-correction-reason,
+.admin-race-data-correction-editor .admin-race-data-correction-confirm,
+.admin-race-data-correction-editor .admin-race-data-correction-form button {
+  grid-column: 1 / -1;
+}
+
+.admin-race-data-table-section[data-race-data-championship] .admin-race-data-view-tabs {
+  flex: 0 0 auto;
+}
+
+.admin-race-data-table-section[data-race-data-championship] .admin-race-data-view-tabs .admin-race-data-tab {
+  border-radius: 6px;
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-heading {
+    display: grid;
+    gap: 10px;
+  }
+
+  .admin-race-data-selector-stack {
+    width: 100%;
+  }
+
+  .admin-race-data-detail-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-race-data-detail-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-race-data-correction-editor .admin-race-data-correction-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 
 /* Keep each control readable as a label-plus-selector pair, even when the
    controls wrap as a group on a narrow viewport. */
@@ -7839,11 +8044,6 @@ button.lang-option.is-active {
   white-space: nowrap;
 }
 
-.admin-race-data-detail-first {
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
 .admin-race-data-detail-meta,
 .admin-race-data-revision-meta {
   margin: 4px 0 0;
@@ -7857,39 +8057,6 @@ button.lang-option.is-active {
 .admin-race-data-detail-table--result .admin-race-data-result-position {
   width: 54px;
   font-variant-numeric: tabular-nums;
-}
-
-.admin-race-data-edit-column {
-  width: 72px;
-  text-align: center !important;
-}
-
-.admin-race-data-correction {
-  position: relative;
-}
-
-.admin-race-data-correction summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: 28px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-  list-style: none;
-}
-
-.admin-race-data-correction summary::-webkit-details-marker {
-  display: none;
-}
-
-.admin-race-data-correction[open] summary,
-.admin-race-data-correction summary:hover {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--card) 88%, var(--accent) 12%);
 }
 
 .admin-race-data-correction-form {
