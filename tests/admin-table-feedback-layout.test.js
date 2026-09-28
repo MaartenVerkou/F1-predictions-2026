@@ -93,6 +93,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /<tbody data-race-data-body="<%= viewMode %>">/);
   assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
   assert.match(page, /admin-race-data-selector-stack/);
+  assert.match(page, /admin_race_data\.season_overview/);
   assert.match(page, /raceDataError \|\| raceDataSuccess/);
   assert.match(page, /class="admin-race-data-selector-form admin-race-data-round-form" data-race-data-round-form/);
   assert.doesNotMatch(region, /class="admin-race-data-controls"/);
@@ -102,6 +103,9 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /admin_race_data\.race_result/);
   assert.match(region, /admin_race_data\.championship_standings/);
   assert.match(region, /admin-race-data-section-heading/);
+  assert.match(region, /view\.hasSelectedRound/);
+  assert.match(region, /roundQuery/);
+  assert.match(region, /admin-race-data-detail-meta/);
   assert.match(region, /class="admin-race-data-table-toolbar"/);
   assert.doesNotMatch(region, /admin-race-data-toolbar/);
   assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);

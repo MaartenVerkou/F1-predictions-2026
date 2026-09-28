@@ -28,6 +28,7 @@ const detailCellTitle = (row, column) => {
 const selectedSnapshot = view.selectedRound?.snapshot || null;
 const reviewStatus = String(selectedSnapshot?.review_status || '').toLowerCase();
 const reviewReturnTo = `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(view.selectedRoundNumber)}&view=${encodeURIComponent(viewMode)}&focus=${encodeURIComponent(view.focusId || 'points')}`;
+const roundQuery = view.hasSelectedRound ? `&round=${encodeURIComponent(view.selectedRoundNumber)}` : '';
 const formatReviewDate = (value) => {
   if (!value) return '';
   if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
@@ -35,16 +36,13 @@ const formatReviewDate = (value) => {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }; %>
 <div class="admin-race-data-round-region" data-race-data-round-region>
+  <% if (view.hasSelectedRound) { %>
   <section class="admin-race-data-detail admin-race-data-detail-first" aria-labelledby="admin-race-data-detail-heading">
-    <div class="admin-race-data-section-heading">
-      <h2 id="admin-race-data-detail-heading"><%= t('admin_race_data.race_result') %></h2>
-      <span class="admin-race-data-section-context muted"><%= view.selectedRound?.label || t('admin_race_data.no_round') %></span>
-    </div>
     <div class="admin-race-data-detail-toolbar">
-      <div class="admin-race-data-fact-meta muted">
-        <%= view.selectedEvidence
-          ? `${view.detailRows.length} drivers · ${view.selectedEvidence.source_type || 'source'} · ${view.selectedEvidence.fetched_at || view.selectedEvidence.payload?.fetchedAt || 'source time unavailable'}`
-          : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %>
+      <div class="admin-race-data-section-heading">
+        <h2 id="admin-race-data-detail-heading">
+          <%= t('admin_race_data.race_result') %><span class="admin-race-data-section-context muted"> · <%= view.selectedRound?.label || t('admin_race_data.no_round') %></span>
+        </h2>
       </div>
       <% if (view.selectedEvidence || selectedSnapshot) { %>
         <div class="admin-race-data-detail-actions" data-race-data-detail-actions>
@@ -101,6 +99,12 @@ const formatReviewDate = (value) => {
       </table>
     </div>
 
+    <div class="admin-race-data-detail-meta admin-race-data-fact-meta muted">
+      <%= view.selectedEvidence
+        ? `${view.detailRows.length} drivers · ${view.selectedEvidence.source_type || 'source'} · ${view.selectedEvidence.fetched_at || view.selectedEvidence.payload?.fetchedAt || 'source time unavailable'}`
+        : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %>
+    </div>
+
     <% if (view.selectedEvidence) { %>
       <div class="admin-race-data-correction-editor" data-race-data-editor hidden>
         <div class="admin-race-data-correction-editor-heading">
@@ -135,6 +139,7 @@ const formatReviewDate = (value) => {
       </div>
     <% } %>
   </section>
+  <% } %>
 
   <section class="admin-race-data-table-section" data-race-data-championship aria-labelledby="admin-race-data-championship-heading">
     <div class="admin-race-data-section-heading">
@@ -144,7 +149,7 @@ const formatReviewDate = (value) => {
       <div class="admin-race-data-tabs admin-race-data-view-tabs admin-race-data-switch" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
         <% ['drivers', 'constructors'].forEach((tableView) => { %>
           <a class="admin-race-data-tab <%= viewMode === tableView ? 'is-active' : '' %>"
-             href="/admin/race-data?season=<%= season %>&view=<%= tableView %>&round=<%= view.selectedRoundNumber %>&focus=<%= view.focusId || 'points' %>"
+             href="/admin/race-data?season=<%= season %>&view=<%= tableView %><%= roundQuery %>&focus=<%= view.focusId || 'points' %>"
              role="tab" aria-selected="<%= viewMode === tableView ? 'true' : 'false' %>" data-race-data-view-toggle="<%= tableView %>">
             <%= tableView === 'drivers' ? t('admin_race_data.drivers_view') : t('admin_race_data.constructors_view') %>
           </a>
@@ -153,13 +158,13 @@ const formatReviewDate = (value) => {
       <div class="admin-race-data-tabs admin-race-data-metric-tabs admin-race-data-switch" role="tablist" aria-label="Race data metric">
         <% (view.metricOptions || []).forEach((option) => { %>
           <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.focusId ? 'is-active' : '' %>"
-             href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= view.selectedRoundNumber %>&focus=<%= option.id %>"
+             href="/admin/race-data?season=<%= season %>&view=<%= viewMode %><%= roundQuery %>&focus=<%= option.id %>"
              role="tab" aria-selected="<%= option.id === view.focusId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>"><%= option.label %></a>
         <% }) %>
       </div>
       <form method="get" action="/admin/race-data" class="admin-race-data-metric-select-form" data-race-data-metric-select-form>
         <input type="hidden" name="season" value="<%= season %>" />
-        <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+        <% if (view.hasSelectedRound) { %><input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" /><% } %>
         <input type="hidden" name="view" value="<%= viewMode %>" />
         <label for="admin-race-data-metric-select">Content</label>
         <select id="admin-race-data-metric-select" name="focus" onchange="this.form.submit()">
@@ -222,7 +227,7 @@ const formatReviewDate = (value) => {
       </div>
       <form method="get" action="/admin/race-data" class="admin-race-data-question-form" data-race-data-focus-form>
         <input type="hidden" name="season" value="<%= season %>" />
-        <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+        <% if (view.hasSelectedRound) { %><input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" /><% } %>
         <input type="hidden" name="view" value="<%= viewMode %>" />
         <label for="admin-race-data-question"><%= t('admin_race_data.questions_label') %></label>
         <select id="admin-race-data-question" name="focus" onchange="const option=this.options[this.selectedIndex]; this.form.elements.view.value=option.dataset.raceDataFocusView || 'drivers'; this.form.submit()">

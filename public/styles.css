@@ -7817,6 +7817,7 @@ button.lang-option.is-active {
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 12px;
+  font-weight: 500;
 }
 
 .admin-race-data-detail-toolbar {

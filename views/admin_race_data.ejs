@@ -16,14 +16,15 @@
           <% }) %>
         </select>
         <input type="hidden" name="view" value="<%= viewMode %>" />
-        <input type="hidden" name="round" value="<%= view.selectedRoundNumber || 1 %>" />
+        <% if (view.hasSelectedRound) { %><input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" /><% } %>
         <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
       </form>
       <form method="get" action="/admin/race-data" class="admin-race-data-selector-form admin-race-data-round-form" data-race-data-round-form>
         <label for="admin-race-data-round"><%= t('admin_race_data.round_short_label') %></label>
         <select id="admin-race-data-round" name="round" onchange="this.form.submit()">
+          <option value="" <%= view.hasSelectedRound ? '' : 'selected' %>><%= t('admin_race_data.season_overview') %></option>
           <% view.rounds.forEach((round) => { %>
-            <option value="<%= round.roundNumber %>" <%= round.roundNumber === view.selectedRoundNumber ? 'selected' : '' %>><%= round.label %></option>
+            <option value="<%= round.roundNumber %>" <%= view.hasSelectedRound && round.roundNumber === view.selectedRoundNumber ? 'selected' : '' %>><%= round.label %></option>
           <% }) %>
         </select>
         <input type="hidden" name="season" value="<%= season %>" />

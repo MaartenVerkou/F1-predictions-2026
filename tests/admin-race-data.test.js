@@ -89,6 +89,34 @@ test("buildRaceDataAuditView marks missing and future evidence without inventing
   assert.equal(view.selectedRound.snapshot.id, 10);
 });
 
+test("season overview keeps standings at the latest evidence cutoff without showing a race result", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster: { drivers: ["Kimi Antonelli"], teams: ["Mercedes"] },
+    evidenceRows: [{
+      id: 2,
+      round_number: 2,
+      coverage_status: "complete",
+      payload: {
+        race: { rows: [] },
+        qualifying: { rows: [] },
+        sprint: { rows: [] },
+        standings: {
+          drivers: [{ entity: "Kimi Antonelli", position: 1, points: 43 }],
+          constructors: [{ entity: "Mercedes", position: 1, points: 43 }]
+        }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 2,
+    showRaceResult: false
+  });
+
+  assert.equal(view.hasSelectedRound, false);
+  assert.equal(view.selectedRoundNumber, 2);
+  assert.equal(view.drivers[0].points, 43);
+});
+
 test("compact identity and race codes are deterministic presentation helpers", () => {
   assert.equal(fallbackEntityCode("George Russell"), "RUS");
   assert.equal(fallbackEntityCode("Aston Martin", "team"), "AST");

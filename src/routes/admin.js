@@ -403,7 +403,7 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
   };
 }
 
-function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound, catalogRevision = null, focus = null }) {
+function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound, catalogRevision = null, focus = null, showRaceResult = true }) {
   const activeFocus = {
     id: "points",
     metric: "points",
@@ -788,6 +788,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     constructorGroups,
     selectedRound: selected,
     selectedRoundNumber: selected?.roundNumber || cutoffRoundNumber,
+    hasSelectedRound: showRaceResult !== false,
     cutoffRoundNumber,
     selectedEvidence: selected?.evidence || null,
     selectedSnapshotId: selected?.evidence?.id || null,
@@ -3011,9 +3012,11 @@ function registerAdminRoutes(app, deps) {
     const snapshotRows = listLatestSnapshotsForSeason(db, season, {
       maxRoundNumber: races.length
     });
-    const requestedRound = Number(req.query.round || 0);
+    const requestedRoundValue = String(req.query.round == null ? "" : req.query.round).trim();
+    const requestedRound = Number(requestedRoundValue || 0);
+    const hasSelectedRound = requestedRound > 0;
     const defaultRound =
-      requestedRound > 0
+      hasSelectedRound
         ? requestedRound
         : Number(evidenceRows.at(-1)?.round_number || 1);
     const roundRoster = buildRoundAwareRoster({
@@ -3030,6 +3033,7 @@ function registerAdminRoutes(app, deps) {
       evidenceRows,
       snapshotRows,
       selectedRound: defaultRound,
+      showRaceResult: hasSelectedRound,
       catalogRevision: catalog?.catalogRevision || null,
       focus
     });
