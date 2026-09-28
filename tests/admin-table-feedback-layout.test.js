@@ -248,3 +248,18 @@ test("race data variant switches share the bordered segmented shell", () => {
   const metricRule = styles.match(/\.admin-race-data-metric-tabs\s*\{([\s\S]*?)\}/)?.[1] || "";
   assert.doesNotMatch(metricRule, /padding-bottom/);
 });
+
+test("race data question metadata uses the Actuals subtitle treatment", () => {
+  const view = readView("partials/admin_race_data_round_region.ejs");
+  assert.match(view, /admin-race-data-question-picker/);
+  assert.match(view, /admin-race-data-question-meta/);
+  assert.match(view, /selectedQuestionTableLabel/);
+  assert.match(view, /selectedQuestionFocusLabel/);
+
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const metaRule = styles.match(/\.admin-race-data-question-meta\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(metaRule, /color:\s*var\(--muted\)/);
+  assert.match(metaRule, /font-size:\s*10px/);
+  assert.match(metaRule, /font-weight:\s*600/);
+  assert.match(metaRule, /text-overflow:\s*ellipsis/);
+});
