@@ -3238,7 +3238,7 @@ button:disabled {
   padding: 7px 5px;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  vertical-align: middle;
+  vertical-align: top;
   text-align: center;
   white-space: nowrap;
 }
@@ -3246,6 +3246,7 @@ button:disabled {
 .admin-actuals-overview-table thead th {
   background: color-mix(in srgb, var(--card) 90%, var(--border));
   border-bottom: 2px solid var(--border);
+  vertical-align: middle;
 }
 
 .admin-actuals-overview-table tr:last-child th,

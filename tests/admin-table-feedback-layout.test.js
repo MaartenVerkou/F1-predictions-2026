@@ -32,6 +32,8 @@ test("admin actuals is a read-only season overview", () => {
   assert.doesNotMatch(view, /admin-actuals-source-note|overview_source|pending_rounds|published_through|no_published_snapshot/);
   assert.match(view, /admin-actuals-question-view-link/);
   assert.match(view, /encodeURIComponent\(row\.question\.id\)/);
+  assert.match(view, /row\.focusLabel/);
+  assert.match(view, /cell\.displayLines/);
   assert.match(view, /admin-actuals-value-line/);
   assert.doesNotMatch(view, /data-admin-actuals-target-form/);
   assert.doesNotMatch(view, /name="target"/);

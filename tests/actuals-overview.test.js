@@ -9,8 +9,8 @@ test("builds one season overview from the latest persisted snapshot per round", 
     season: 2026,
     races: ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"],
     questions: [
-      { id: "points_question", prompt: "Who leads?", race_data_focus: { view: "drivers" } },
-      { id: "team_question", prompt: "Which team?", race_data_focus: { view: "constructors" } }
+      { id: "points_question", prompt: "Who leads?", race_data_focus: { view: "drivers", metric: "points" } },
+      { id: "team_question", prompt: "Which team?", race_data_focus: { view: "constructors", metric: "dnfs" } }
     ],
     snapshots: [
       { id: 101, round_number: 1, review_status: "reviewed", updated_at: "2026-03-10T00:00:00Z" },
@@ -19,7 +19,10 @@ test("builds one season overview from the latest persisted snapshot per round", 
     latestRoundNumber: 2,
     publishedActuals: { available: true, snapshot: { round_number: 1 } },
     fetchSnapshotValues: (snapshotId) => snapshotId === 101
-      ? { points_question: '["Antonelli","Russell","Leclerc"]' }
+      ? {
+        points_question: '["Antonelli","Russell","Leclerc"]',
+        team_question: '["Aston Martin","Red Bull Racing","Haas F1 Team"]'
+      }
       : { team_question: '"Mercedes"' }
   });
 
@@ -30,6 +33,10 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.equal(overview.publishedRound, 1);
   assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");
   assert.deepEqual(overview.rows[0].cells[0].lines, ["Antonelli", "Russell", "Leclerc"]);
+  assert.deepEqual(overview.rows[0].cells[0].displayLines, ["Antonelli", "Russell", "Leclerc"]);
+  assert.equal(overview.rows[0].focusLabel, "Points");
+  assert.equal(overview.rows[1].focusLabel, "DNF");
+  assert.deepEqual(overview.rows[1].cells[0].displayLines, ["Aston M.", "RBR", "HFT"]);
   assert.match(overview.rows[0].cells[0].href, /round=1/);
   assert.match(overview.rows[0].cells[0].href, /view=drivers/);
   assert.match(overview.rows[1].cells[0].href, /view=constructors/);

@@ -64,8 +64,8 @@
                 <span class="admin-actuals-question-prompt" title="<%= row.question.prompt %>"><%= row.question.prompt %></span>
                 <a class="admin-actuals-question-view-link"
                    href="/admin/race-data?season=<%= encodeURIComponent(season) %>&view=<%= encodeURIComponent(row.baseView) %>&focus=<%= encodeURIComponent(row.question.id) %>"
-                   title="<%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %>">
-                  <%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %>
+                   title="<%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %> · <%= row.focusLabel %>">
+                  <%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %> · <%= row.focusLabel %>
                 </a>
               </th>
               <% row.cells.forEach((cell) => { %>
@@ -74,7 +74,7 @@
                   data-review-status="<%= cell.reviewStatus || '' %>">
                   <% if (cell.hasValue || cell.reviewStatus) { %>
                     <a href="<%= cell.href %>" title="<%= cell.value %>">
-                      <% (cell.lines && cell.lines.length ? cell.lines : [cell.value]).forEach((line) => { %>
+                      <% (cell.displayLines && cell.displayLines.length ? cell.displayLines : [cell.value]).forEach((line) => { %>
                         <span class="admin-actuals-value-line"><%= line %></span>
                       <% }) %>
                     </a>

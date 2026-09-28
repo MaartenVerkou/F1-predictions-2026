@@ -5,6 +5,29 @@ const {
   formatActualOverviewValue
 } = require("./race-data-review-model");
 
+const OVERVIEW_FOCUS_LABELS = Object.freeze({
+  championship_top3: "Top 3",
+  last_standing: "Championship last",
+  grid_wins: "Lowest-grid win",
+  podiums: "Podiums",
+  no_podium_points: "Points without podium",
+  driver_of_day: "Driver of the Day",
+  dnfs: "DNF",
+  damage: "Destructors",
+  teammate_points: "Teammate points",
+  qualifying_h2h: "Qualifying",
+  alpine_comparison: "Team comparison",
+  dnf_by_race: "DNF by race",
+  title_decision: "Title decision",
+  all_teams_points: "Constructor points",
+  race1_champion: "Race 1 champion",
+  engine_top5: "Engine top 5",
+  ferrari_podium: "Podiums",
+  sprint_champion_same: "Sprint points",
+  engine_switch: "Engine switch",
+  points: "Points"
+});
+
 function normalizeRoundNumber(value) {
   const roundNumber = Number(value);
   return Number.isFinite(roundNumber) && roundNumber > 0
@@ -24,6 +47,50 @@ function formatActualOverviewLines(raw) {
     return value.map((item) => String(item)).filter((item) => item.trim() !== "");
   }
   return [formatActualOverviewValue(raw)];
+}
+
+function compactActualOverviewEntity(value, view) {
+  const text = String(value || "").trim();
+  if (!text || text === "—") return text;
+  if (/^(?:yes|no|more|less|\d+(?:\s+(?:pts?|dnfs?))?)$/i.test(text)) return text;
+
+  const words = text.split(/\s+/).filter(Boolean);
+  if (view === "drivers") {
+    return words.length > 1 ? words.at(-1) : text;
+  }
+  if (view === "constructors") {
+    if (words.length === 1) return text;
+    if (words.length === 2) return `${words[0]} ${words[1][0].toUpperCase()}.`;
+    return words
+      .map((word) => word.replace(/[^A-Za-z0-9]/g, "").charAt(0).toUpperCase())
+      .join("") || text;
+  }
+  return text;
+}
+
+function compactActualOverviewLine(line, view) {
+  return String(line || "")
+    .split(/,\s*/)
+    .map((segment) => segment
+      .split(" · ")
+      .map((part) => compactActualOverviewEntity(part, view))
+      .join(" · "))
+    .join(", ");
+}
+
+function formatActualOverviewDisplayLines(raw, view) {
+  return formatActualOverviewLines(raw).map((line) => compactActualOverviewLine(line, view));
+}
+
+function actualOverviewFocusLabel(question) {
+  const metric = String(question?.race_data_focus?.metric || "").trim().toLowerCase();
+  if (OVERVIEW_FOCUS_LABELS[metric]) return OVERVIEW_FOCUS_LABELS[metric];
+  const id = String(question?.id || "").trim().toLowerCase();
+  if (OVERVIEW_FOCUS_LABELS[id]) return OVERVIEW_FOCUS_LABELS[id];
+  if (!metric) return OVERVIEW_FOCUS_LABELS.points;
+  return metric
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase()) || "Race Data";
 }
 
 function buildActualsOverview({
@@ -75,6 +142,7 @@ function buildActualsOverview({
       question,
       questionNumber: index + 1,
       baseView,
+      focusLabel: actualOverviewFocusLabel(question),
       cells: targets.map((target) => {
         const values = valuesByRound.get(target.roundNumber) || {};
         const rawValue = values[question.id];
@@ -82,6 +150,7 @@ function buildActualsOverview({
         return {
           value: formatActualOverviewValue(rawValue),
           lines: formatActualOverviewLines(rawValue),
+          displayLines: formatActualOverviewDisplayLines(rawValue, baseView),
           hasValue,
           reviewStatus: target.reviewStatus,
           published: target.published,
