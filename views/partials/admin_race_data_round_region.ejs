@@ -234,8 +234,9 @@ const formatReviewDate = (value) => {
           <% (view.questionOptions || []).forEach((option) => {
             const tableLabel = option.view === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view');
             const questionPrefix = option.questionNumber == null ? '' : `${String(option.questionNumber).padStart(2, '0')}. `;
+            const focusLabel = option.focusLabel || tableLabel;
           %>
-            <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" title="<%= questionPrefix %><%= option.label %>" aria-label="<%= questionPrefix %><%= option.label %> · <%= tableLabel %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= questionPrefix %><%= option.shortLabel || option.label %> · <%= tableLabel %></option>
+            <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" title="<%= questionPrefix %><%= option.label %> · <%= tableLabel %> · <%= focusLabel %>" aria-label="<%= questionPrefix %><%= option.label %> · <%= tableLabel %> · <%= focusLabel %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= questionPrefix %><%= option.shortLabel || option.label %> · <%= tableLabel %> · <%= focusLabel %></option>
           <% }) %>
         </select>
         <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_focus') %></button></noscript>
@@ -243,7 +244,7 @@ const formatReviewDate = (value) => {
     </div>
     <% if (view.focus?.questionId && view.focusSummary) { %>
       <% const focusSummaryStatusKey = view.focusSummary.status === 'ready' ? 'focus_ready' : view.focusSummary.status === 'partial' ? 'focus_partial' : 'focus_unavailable'; %>
-      <div class="admin-race-data-focus-summary is-<%= view.focusSummary.status %>" data-race-data-focus-summary>
+      <div class="admin-race-data-focus-summary is-<%= view.focusSummary.status %>" data-race-data-focus-summary title="<%= view.focusSummary.tooltip || '' %>">
         <strong><%= view.focusSummary.value %></strong>
         <span class="admin-race-data-focus-summary-detail"><%= view.focusSummary.detail %></span>
         <span class="admin-race-data-focus-summary-status"><%= t(`admin_race_data.${focusSummaryStatusKey}`) %></span>

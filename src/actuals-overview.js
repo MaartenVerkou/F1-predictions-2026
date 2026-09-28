@@ -4,29 +4,7 @@ const {
   actualOverviewViewForQuestion,
   formatActualOverviewValue
 } = require("./race-data-review-model");
-
-const OVERVIEW_FOCUS_LABELS = Object.freeze({
-  championship_top3: "Top 3",
-  last_standing: "Championship last",
-  grid_wins: "Lowest-grid win",
-  podiums: "Podiums",
-  no_podium_points: "Points without podium",
-  driver_of_day: "Driver of the Day",
-  dnfs: "DNF",
-  damage: "Destructors",
-  teammate_points: "Teammate points",
-  qualifying_h2h: "Qualifying",
-  alpine_comparison: "Team comparison",
-  dnf_by_race: "Top 3 DNF races",
-  title_decision: "Title decision",
-  all_teams_points: "Constructor points",
-  race1_champion: "Race 1 champion",
-  engine_top5: "Engine top 5",
-  ferrari_podium: "Podiums",
-  sprint_champion_same: "Sprint points",
-  engine_switch: "Engine switch",
-  points: "Points"
-});
+const { raceDataFocusLabel } = require("./race-data-focus");
 
 // Keep the overview compact without making the visible race labels ambiguous.
 // These are the familiar three-letter F1 calendar codes; the fallback below
@@ -192,14 +170,7 @@ function formatActualOverviewDisplayLines(raw, view, question) {
 }
 
 function actualOverviewFocusLabel(question) {
-  const metric = String(question?.race_data_focus?.metric || "").trim().toLowerCase();
-  if (OVERVIEW_FOCUS_LABELS[metric]) return OVERVIEW_FOCUS_LABELS[metric];
-  const id = String(question?.id || "").trim().toLowerCase();
-  if (OVERVIEW_FOCUS_LABELS[id]) return OVERVIEW_FOCUS_LABELS[id];
-  if (!metric) return OVERVIEW_FOCUS_LABELS.points;
-  return metric
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase()) || "Race Data";
+  return raceDataFocusLabel(question);
 }
 
 function buildActualsOverview({

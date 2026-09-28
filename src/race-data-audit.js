@@ -682,6 +682,27 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
     return unavailable("This question requires an external announcement source.");
   }
 
+  // This is a set-valued question: every driver with at least one podium is
+  // part of the answer. Do not reduce it to the single driver with the most
+  // podiums, because that changes the meaning of the question in review.
+  if (metric === "podiums" && (focus.questionId === "all_podium_finishers" || focus.id === "all_podium_finishers")) {
+    const metricRows = focus.view === "constructors" ? constructors : drivers;
+    const podiumRows = metricRows
+      .filter((row) => Number.isFinite(Number(row.summaryValue)) && Number(row.summaryValue) > 0)
+      .sort((left, right) => Number(right.summaryValue) - Number(left.summaryValue) || String(left.name).localeCompare(String(right.name)));
+    if (!podiumRows.length) return unavailable("No podium finishers yet.");
+    const totalPodiums = podiumRows.reduce((sum, row) => sum + Number(row.summaryValue), 0);
+    const entityLabel = focus.view === "constructors"
+      ? (podiumRows.length === 1 ? "team" : "teams")
+      : (podiumRows.length === 1 ? "driver" : "drivers");
+    return {
+      ...base,
+      value: `${podiumRows.length} ${entityLabel}`,
+      detail: `${totalPodiums} podium finishes through R${cutoffRoundNumber}`,
+      tooltip: podiumRows.map((row) => `${row.name}: ${row.summaryValue}`).join(" · ")
+    };
+  }
+
   if (metric === "podiums" || metric === "dnfs" || metric === "driver_of_day" || metric === "sprint_points") {
     const metricRows = focus.view === "constructors" ? constructors : drivers;
     const ordered = [...metricRows].sort((a, b) => Number(b.summaryValue ?? -1) - Number(a.summaryValue ?? -1));

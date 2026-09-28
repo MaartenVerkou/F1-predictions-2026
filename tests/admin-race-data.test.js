@@ -614,7 +614,9 @@ test("race data focus options are driven by question metadata", () => {
   ]);
   assert.deepEqual(options.map((option) => option.questionNumber), [null, 1, 2]);
   assert.equal(options[1].shortLabel, "Podium finishers");
+  assert.equal(options[1].focusLabel, "Podiums");
   assert.equal(options[2].shortLabel, "Championship top 3");
+  assert.equal(options[2].focusLabel, "Points");
   assert.equal(resolveRaceDataFocus({
     questions,
     focusId: "all_podium_finishers",
@@ -734,6 +736,10 @@ test("podium focus projects binary results, counts podiums, and preserves cutoff
   assert.equal(view.drivers[1].focusRow, true);
   assert.equal(view.drivers[1].cells[0].markerGlyph, "");
   assert.equal(view.drivers[1].cells[2].afterCutoff, true);
+  assert.equal(view.focusSummary.value, "2 drivers");
+  assert.equal(view.focusSummary.detail, "3 podium finishes through R2");
+  assert.match(view.focusSummary.tooltip, /Driver Alpha: 2/);
+  assert.match(view.focusSummary.tooltip, /Driver Beta: 1/);
 });
 
 test("question focus projections expose DNF and grid-winner facts without changing evidence", () => {

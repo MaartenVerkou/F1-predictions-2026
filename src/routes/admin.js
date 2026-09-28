@@ -68,6 +68,7 @@ const {
 } = require("../race-data-review-model");
 const { buildActualsOverview } = require("../actuals-overview");
 const { topDamageEntities } = require("../destructors-damage");
+const { raceDataFocusLabel } = require("../race-data-focus");
 
 
 function auditResultLabel(row) {
@@ -255,7 +256,8 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
     questionId: null,
     questionNumber: null,
     group: "standings",
-    label: pointsLabel
+    label: pointsLabel,
+    focusLabel: raceDataFocusLabel({ metric: "points" })
   }];
   const seen = new Set(["points"]);
   for (const metricOption of metricOptions || []) {
@@ -303,7 +305,8 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       questionId: id,
       questionNumber,
       label: String(question.prompt || id),
-      shortLabel: compactQuestionLabel(question, metric)
+      shortLabel: compactQuestionLabel(question, metric),
+      focusLabel: raceDataFocusLabel(question)
     });
     seen.add(id);
   }
