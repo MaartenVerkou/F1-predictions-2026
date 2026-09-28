@@ -49,7 +49,7 @@ const formatReviewDate = (value) => {
           <span class="admin-race-data-selection-label muted" data-race-data-selection-label aria-live="polite">Select a result row</span>
           <% if (view.selectedEvidence) { %><button type="button" class="secondary" data-race-data-edit disabled>Edit</button><% } %>
           <% if (reviewStatus === 'pending' && selectedSnapshot?.id) { %>
-            <form method="post" action="/admin/actuals/review" class="admin-race-data-review-form" data-race-data-review-form>
+            <form method="post" action="/admin/race-data/review" class="admin-race-data-review-form" data-race-data-review-form>
               <%- csrfField() %>
               <input type="hidden" name="season" value="<%= season %>" />
               <input type="hidden" name="snapshotId" value="<%= selectedSnapshot.id %>" />

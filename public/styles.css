@@ -3212,17 +3212,14 @@ button:disabled {
   }
 }
 
-/* Actuals is a compact derivation index; editing facts belongs in Race Data. */
-.admin-actuals-toolbar {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 8px 12px;
+/* Actuals is a read-only derivation index; editing and review belong in Race Data. */
+.admin-actuals-page {
+  min-width: 0;
 }
 
 .admin-actuals-source-note {
   margin: 0;
-  padding: 6px 0;
+  color: var(--muted);
 }
 
 .admin-actuals-overview {
@@ -3230,13 +3227,7 @@ button:disabled {
 }
 
 .admin-actuals-overview-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
   scrollbar-width: thin;
-  border: 1px solid var(--border);
-  border-radius: 8px;
 }
 
 .admin-actuals-overview-table {
@@ -3288,7 +3279,7 @@ button:disabled {
   background: color-mix(in srgb, var(--card) 90%, var(--border));
 }
 
-.admin-actuals-question-cell {
+.admin-actuals-overview-table .admin-actuals-question-cell {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 2px 8px;
@@ -3303,7 +3294,10 @@ button:disabled {
 }
 
 .admin-actuals-question-prompt {
+  min-width: 0;
   font-weight: 700;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .admin-actuals-question-cell small,
@@ -3336,28 +3330,32 @@ button:disabled {
   opacity: 0.55;
 }
 
-.admin-actuals-value-cell {
-  min-width: 70px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-
+.admin-actuals-round-column.is-pending,
 .admin-actuals-value-cell.is-pending {
   box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--text) 32%, transparent);
 }
 
+.admin-actuals-value-cell {
+  width: 120px;
+  min-width: 86px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.admin-actuals-value-cell a {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-actuals-value-cell.is-published {
+  background: color-mix(in srgb, var(--card) 92%, var(--accent) 8%);
+}
+
 @media (max-width: 720px) {
-  .admin-actuals-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .admin-actuals-toolbar .admin-target-form,
-  .admin-actuals-toolbar .admin-target-field,
-  .admin-actuals-toolbar select {
-    width: 100%;
-  }
-
   .admin-actuals-question-column,
   .admin-actuals-question-cell {
     width: 230px;
@@ -4579,18 +4577,6 @@ button:disabled {
   margin: 0;
 }
 
-.admin-actuals-target-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px;
-  min-width: 0;
-}
-
-.admin-actuals-target-row > .admin-target-form {
-  flex: 1 1 340px;
-}
-
 .admin-target-action,
 .admin-target-meta {
   margin-left: auto;
@@ -4850,45 +4836,6 @@ button:disabled {
   width: 1%;
 }
 
-.admin-actuals-actions {
-  margin: 4px 0 2px;
-}
-
-.admin-actuals-question {
-  min-width: 0;
-}
-
-.admin-actuals-question-title {
-  font-weight: 700;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.admin-actuals-control-row {
-  align-items: flex-start;
-}
-
-.admin-actuals-control-row > select,
-.admin-actuals-control-row > input,
-.admin-actuals-control-row > .number-spinner {
-  flex: 1 1 190px;
-}
-
-.admin-actuals-control-row > label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 42px;
-}
-
-.admin-actuals-dnf-card {
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--rules-bg);
-  min-width: 0;
-}
-
 .admin-analysis-create-form {
   align-items: flex-end;
   margin: 0;
@@ -5009,8 +4956,7 @@ button:disabled {
   background: rgba(255, 45, 69, 0.15);
 }
 
-:root[data-theme="dark"] .admin-status-panel,
-:root[data-theme="dark"] .admin-actuals-dnf-card {
+:root[data-theme="dark"] .admin-status-panel {
   background: color-mix(in srgb, var(--card) 82%, var(--rules-bg));
   border-color: color-mix(in srgb, var(--border) 86%, #ffffff 6%);
 }
@@ -5203,8 +5149,7 @@ button:disabled {
     margin: 4px 0 0;
   }
 
-  .admin-status-panel,
-  .admin-actuals-dnf-card {
+  .admin-status-panel {
     padding: 11px;
   }
 
@@ -5225,28 +5170,6 @@ button:disabled {
   .admin-idea-actions form,
   .admin-idea-actions button {
     width: 100%;
-  }
-
-  .admin-actuals-control-row {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .admin-actuals-control-row > select,
-  .admin-actuals-control-row > input,
-  .admin-actuals-control-row > .number-spinner {
-    width: 100%;
-    flex-basis: auto;
-  }
-
-  .actuals-dnf-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .actuals-dnf-row {
-    grid-template-columns: minmax(0, 1fr) 82px;
-    gap: 10px;
   }
 
   .table-actions {
@@ -6455,28 +6378,6 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-}
-
-.admin-actuals-save-row {
-  margin-top: 12px;
-}
-
-.admin-actuals-save-feedback {
-  min-height: 1.2em;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-}
-
-.admin-actuals-save-feedback.is-visible {
-  opacity: 1;
-}
-
-.admin-actuals-save-feedback.is-unsaved {
-  color: color-mix(in srgb, var(--text) 76%, #b16a00);
-}
-
-.admin-actuals-save-feedback.is-saving {
-  color: var(--muted);
 }
 
 .questions-responses-link {

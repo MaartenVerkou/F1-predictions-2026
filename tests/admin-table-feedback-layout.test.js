@@ -23,12 +23,18 @@ test("admin feedback uses the shared context wrapper", () => {
   }
 });
 
-test("admin actuals exposes only the persisted evidence sync action", () => {
+test("admin actuals is a read-only season overview", () => {
   const view = readView("admin_actuals.ejs");
   assert.doesNotMatch(view, /autofill-current-season/);
   assert.doesNotMatch(view, /preview_autofill/);
-  assert.match(view, /run-auto-update/);
-  assert.match(view, /admin_actuals\.mark_snapshot_reviewed/);
+  assert.match(view, /admin-race-data-selector-form admin-actuals-season-form/);
+  assert.match(view, /data-admin-actuals-form/);
+  assert.match(view, /admin-race-data-legend/);
+  assert.doesNotMatch(view, /data-admin-actuals-target-form/);
+  assert.doesNotMatch(view, /name="target"/);
+  assert.doesNotMatch(view, /admin\/actuals\/review/);
+  assert.doesNotMatch(view, /run-auto-update/);
+  assert.doesNotMatch(view, /Mark this snapshot reviewed/);
 });
 
 test("team lineup overview keeps the toolbar concise", () => {
@@ -113,7 +119,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
   assert.match(region, /data-race-data-result-row/);
   assert.match(region, /data-race-data-edit disabled/);
-  assert.match(region, /action="\/admin\/actuals\/review"/);
+  assert.match(region, /action="\/admin\/race-data\/review"/);
   assert.match(region, /name="returnTo"/);
   assert.match(region, /data-race-data-review-status/);
   assert.match(region, /admin_race_data_entity_label/);

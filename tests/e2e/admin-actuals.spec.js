@@ -6,7 +6,7 @@ const { expect, test } = require("@playwright/test");
 
 const DB_PATH = path.join(__dirname, "..", "..", ".tmp", "playwright-state", "app.db");
 
-test("admin actuals shows the derived question matrix and can mark a snapshot reviewed", async ({ page }) => {
+test("admin actuals shows the derived question matrix while Race Data owns review", async ({ page }) => {
   await page.goto("/");
 
   const db = new Database(DB_PATH);
@@ -53,38 +53,27 @@ test("admin actuals shows the derived question matrix and can mark a snapshot re
     VALUES (?, ?, ?)
     `
   ).run(snapshotId, "all_teams_score_points", "yes");
-  db.prepare(
-    `
-    INSERT INTO actuals (question_id, value, updated_at)
-    VALUES (?, ?, ?)
-    `
-  ).run("all_teams_score_points", "yes", now);
   db.close();
 
   await page.goto("/admin/actuals");
 
-  const workspace = page.locator("[data-admin-race-review-workspace]");
-  await expect(workspace).toBeVisible();
-  await expect(page.locator("[data-admin-actuals-target-form] select")).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/round snapshot still needs admin review/i);
-  await expect(page.locator("body")).not.toContainText(/No saved snapshot yet|Saving will create one/i);
-  await expect(page.locator("body")).not.toContainText(/Last sync:|Status:/i);
-  await expect(page.locator("[data-admin-actuals-form]")).toContainText("Does every team score points?");
-  await expect(workspace.getByRole("button", { name: /Mark this snapshot reviewed/i })).toBeVisible();
-
-  await workspace.getByRole("button", { name: /Mark this snapshot reviewed/i }).click();
-
-  await expect(page.getByText(/marked as reviewed/i)).toBeVisible();
-  await expect(workspace.getByText(/Last reviewed:/i)).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/0 round snapshot/i);
-
-  await page.goto("/admin/actuals?target=round%3A8");
+  await expect(page.locator("[data-admin-actuals-season-form] select[name=season]")).toBeVisible();
+  await expect(page.locator("[data-admin-actuals-target-form]")).toHaveCount(0);
   await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/No saved snapshot yet|Saving will create one|This race is still in the future/i);
+  await expect(page.locator("[data-admin-actuals-form]")).toContainText("Does every team score points?");
+  await expect(page.locator('[data-admin-actuals-round="6"][data-review-status="pending"]').first()).toBeVisible();
+  await expect(page.locator('a[href*="/admin/race-data"][href*="round=6"]').first()).toBeVisible();
+  await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
 
-  await page.goto("/admin/actuals?target=round%3A5");
-  await expect(workspace.getByRole("button", { name: /Continue and make changes/i })).toBeVisible();
-  await expect(page.locator("body")).not.toContainText(/This race is in the past|Editing it updates the archived snapshot/i);
+  await page.goto("/admin/race-data?season=2026&round=6&view=drivers&focus=points");
+  const reviewForm = page.locator("[data-race-data-review-form]");
+  await expect(reviewForm).toBeVisible();
+  await reviewForm.getByRole("button", { name: /Mark reviewed/i }).click();
+  await expect(page.getByText(/marked as reviewed/i)).toBeVisible();
+
+  await page.goto("/admin/actuals?season=2026");
+  await expect(page.locator('[data-admin-actuals-round="6"][data-review-status="reviewed"]').first()).toBeVisible();
+  await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
 });
 
 test("admin actuals and admin tables fit phone-width screens", async ({ page }) => {
@@ -109,7 +98,7 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
 
     const actualsMetrics = await page.evaluate(() => {
       const viewportWidth = document.documentElement.clientWidth;
-      const targetSelect = document.querySelector('.admin-target-form select[name="target"]');
+      const seasonSelect = document.querySelector('[data-admin-actuals-season-form] select[name="season"]');
       const overviewTable = document.querySelector(".admin-actuals-overview-table");
       return {
         theme: document.documentElement.getAttribute("data-theme"),
@@ -117,7 +106,7 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
           document.documentElement.scrollWidth - viewportWidth,
           document.body.scrollWidth - document.body.clientWidth
         ),
-        targetWidth: targetSelect ? Math.round(targetSelect.getBoundingClientRect().width) : 0,
+        seasonWidth: seasonSelect ? Math.round(seasonSelect.getBoundingClientRect().width) : 0,
         overviewTableRight: overviewTable ? Math.round(overviewTable.getBoundingClientRect().right) : 0,
         overviewRows: document.querySelectorAll(".admin-actuals-question-cell").length
       };
@@ -125,7 +114,7 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
 
     expect(actualsMetrics.theme).toBe(testCase.theme);
     expect(actualsMetrics.overflowX).toBeLessThanOrEqual(0);
-    expect(actualsMetrics.targetWidth).toBeLessThanOrEqual(testCase.width);
+    expect(actualsMetrics.seasonWidth).toBeLessThanOrEqual(testCase.width);
     expect(actualsMetrics.overviewRows).toBeGreaterThan(0);
 
     await page.goto("/admin/overview");

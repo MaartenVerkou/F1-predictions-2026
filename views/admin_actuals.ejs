@@ -1,24 +1,21 @@
 <%- include('partials/header', { title: t('admin_actuals.page_title'), user }) %>
 <%- include('partials/admin_nav', { active: 'actuals', season }) %>
-<% const formatAdminDate = (value) => {
-  if (!value) return '-';
-  if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString();
-};
-const targetTimingLabel = (target) => {
-  if (!target) return '';
-  if (target.timing === 'past') return t('admin_actuals.timing_past');
-  if (target.timing === 'future') return t('admin_actuals.timing_future');
-  return t('admin_actuals.timing_current_race');
-};
-%>
 
-<div class="card admin-page-card admin-actuals-page">
-  <div class="admin-actuals-heading">
+<div class="card admin-page-card admin-race-data-page admin-actuals-page">
+  <div class="admin-race-data-heading">
     <div>
       <h1><%= t('admin_actuals.heading') %></h1>
-      <p class="muted admin-page-intro">Derived from persisted Race Data; review before publishing to scoring.</p>
+      <p class="muted admin-page-intro"><%= t('admin_actuals.intro') %></p>
+    </div>
+    <div class="admin-race-data-selector-stack">
+      <form method="get" action="/admin/actuals" class="admin-race-data-selector-form admin-actuals-season-form" data-admin-actuals-season-form>
+        <label for="admin-actuals-season"><%= t('admin_inputs.season') %></label>
+        <select id="admin-actuals-season" name="season" onchange="this.form.submit()">
+          <% (availableSeasons || []).forEach((availableSeason) => { %>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %> · <%= availableSeason.statusLabel %></option>
+          <% }) %>
+        </select>
+      </form>
     </div>
   </div>
 
@@ -35,79 +32,38 @@ const targetTimingLabel = (target) => {
     </div>
   <% } %>
 
-  <div class="admin-actuals-toolbar" data-admin-race-review-workspace>
-    <form method="get" action="/admin/actuals" class="admin-target-form admin-actuals-target-form" data-admin-actuals-target-form>
-      <label class="admin-field admin-target-field">
-        <span class="muted"><%= t('admin_inputs.season') %></span>
-        <select name="season" onchange="this.form.submit()">
-          <% (availableSeasons || []).forEach((availableSeason) => { %>
-            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %> · <%= availableSeason.statusLabel %></option>
-          <% }) %>
-        </select>
-      </label>
-      <label class="admin-field admin-target-field">
-        <span class="muted">Review round</span>
-        <select name="target" onchange="this.form.submit()">
-          <option value="current" <%= actualsTarget === 'current' ? 'selected' : '' %>><%= t('admin_actuals.current_live_actuals') %></option>
-          <% raceTargets.forEach((target) => { %>
-            <% const timing = targetTimingLabel(target); %>
-            <option value="<%= target.key %>" <%= actualsTarget === target.key ? 'selected' : '' %>>
-              <%= 'R' + target.roundNumber + ' - ' + target.raceName %><%= timing ? ' (' + timing + ')' : '' %>
-            </option>
-          <% }) %>
-        </select>
-      </label>
-      <% if (requiresPastUnlock) { %>
-        <input type="hidden" name="unlockPast" value="0" />
-      <% } else if (selectedRaceTarget && selectedRaceTarget.timing === 'past') { %>
-        <input type="hidden" name="unlockPast" value="1" />
-      <% } %>
-      <noscript><button type="submit" class="secondary"><%= t('admin_actuals.open_target') %></button></noscript>
-    </form>
-
-    <% if (selectedRaceTarget && selectedRaceTarget.timing === 'past' && requiresPastUnlock) { %>
-      <form method="get" action="/admin/actuals" class="admin-inline-form admin-target-action">
-        <input type="hidden" name="season" value="<%= season %>" />
-        <input type="hidden" name="target" value="<%= actualsTarget %>" />
-        <input type="hidden" name="unlockPast" value="1" />
-        <button type="submit" class="secondary"><%= t('admin_actuals.continue_make_changes') %></button>
-      </form>
-    <% } else if (selectedRaceTarget && selectedRaceTarget.snapshotId && selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'pending') { %>
-      <form method="post" action="/admin/actuals/review" class="admin-inline-form admin-target-action">
-        <%- csrfField() %>
-        <input type="hidden" name="season" value="<%= season %>" />
-        <input type="hidden" name="snapshotId" value="<%= selectedSnapshotMeta.id %>" />
-        <input type="hidden" name="target" value="<%= actualsTarget %>" />
-        <% if (selectedRaceTarget.timing === 'past') { %><input type="hidden" name="unlockPast" value="1" /><% } %>
-        <button type="submit" class="secondary"><%= t('admin_actuals.mark_snapshot_reviewed') %></button>
-      </form>
-    <% } else if (selectedRaceTarget && selectedRaceTarget.snapshotId && selectedSnapshotMeta && selectedSnapshotMeta.review_status === 'reviewed' && selectedSnapshotMeta.reviewed_at) { %>
-      <span class="muted admin-target-meta"><%= t('admin_actuals.last_reviewed_label') %>: <strong><%= formatAdminDate(selectedSnapshotMeta.reviewed_at) %></strong></span>
+  <div class="admin-actuals-source-note admin-race-data-legend" role="note">
+    <span><%= t('admin_actuals.overview_source') %></span>
+    <% if (actualsOverview?.pendingCount) { %>
+      <span><%= t('admin_actuals.pending_rounds', { count: actualsOverview.pendingCount }) %></span>
     <% } %>
-
-    <% if (actualsTarget === 'current' && seasonContext?.syncable) { %>
-      <form method="post" action="/admin/actuals/run-auto-update" class="admin-inline-form admin-actuals-sync-form">
-        <%- csrfField() %>
-        <input type="hidden" name="season" value="<%= season %>" />
-        <button type="submit" class="secondary"><%= t('admin_actuals.run_sync_now') %></button>
-      </form>
+    <% if (publishedActuals?.available && actualsOverview?.publishedRound) { %>
+      <span><%= t('admin_actuals.published_through', { round: actualsOverview.publishedRound }) %></span>
+    <% } else { %>
+      <span><%= t('admin_actuals.no_published_snapshot') %></span>
     <% } %>
-  </div>
-
-  <div class="admin-feedback-context admin-actuals-source-note" role="note">
-    <span class="muted">Each cell is the derived answer for that race. Select a cell to inspect its evidence in Race Data.</span>
   </div>
 
   <div class="admin-actuals-overview" data-admin-actuals-form>
-    <div class="admin-actuals-overview-wrap">
+    <div class="admin-race-data-table-wrap admin-actuals-overview-wrap">
       <table class="admin-actuals-overview-table">
         <thead>
           <tr>
             <th scope="col" class="admin-actuals-question-column">Question</th>
             <% (actualOverviewTargets || []).forEach((target) => { %>
-              <th scope="col" class="admin-actuals-round-column <%= target.timing === 'future' ? 'is-future' : '' %>">
+              <% const statusLabel = target.reviewStatus === 'pending'
+                ? t('admin_actuals.needs_review')
+                : target.reviewStatus === 'reviewed'
+                  ? t('admin_actuals.reviewed')
+                  : target.timing === 'future'
+                    ? t('admin_actuals.timing_future')
+                    : '—'; %>
+              <th scope="col"
+                  class="admin-actuals-round-column <%= target.timing === 'future' ? 'is-future' : '' %> <%= target.reviewStatus === 'pending' ? 'is-pending' : '' %>"
+                  data-admin-actuals-round="<%= target.roundNumber %>"
+                  data-review-status="<%= target.reviewStatus || '' %>">
                 <a href="/admin/race-data?season=<%= season %>&round=<%= target.roundNumber %>&view=drivers&focus=points">R<%= target.roundNumber %></a>
-                <small><%= target.reviewStatus || '—' %></small>
+                <small title="<%= statusLabel %>"><%= statusLabel %></small>
               </th>
             <% }) %>
           </tr>
@@ -121,9 +77,11 @@ const targetTimingLabel = (target) => {
                 <small><%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %></small>
               </th>
               <% row.cells.forEach((cell) => { %>
-                <td class="admin-actuals-value-cell <%= cell.timing === 'future' ? 'is-future' : '' %> <%= cell.reviewStatus === 'pending' ? 'is-pending' : '' %>">
+                <td class="admin-actuals-value-cell <%= cell.timing === 'future' ? 'is-future' : '' %> <%= cell.reviewStatus === 'pending' ? 'is-pending' : '' %> <%= cell.published ? 'is-published' : '' %>"
+                    data-admin-actuals-round="<%= cell.roundNumber %>"
+                    data-review-status="<%= cell.reviewStatus || '' %>">
                   <% if (cell.hasValue || cell.reviewStatus) { %>
-                    <a href="<%= cell.href %>" title="Open Race Data derivation"><%= cell.value %></a>
+                    <a href="<%= cell.href %>" title="Open Race Data"><%= cell.value %></a>
                   <% } else { %>
                     <span class="muted">—</span>
                   <% } %>

@@ -34,8 +34,8 @@
 
 - [x] 4.1 Add additive schema for snapshot provenance, season-scoped published actuals, explicit corrections, and review transitions.
 - [x] 4.2 Implement dual-read/canonical-write behavior and migrate current live actual reads/writes without changing reviewed historical snapshots.
-- [ ] 4.3 Update Actuals UI and review actions to show one compact source/revision state, publish only reviewed snapshots, and preserve correction history.
-- [ ] 4.4 Add tests for unchanged re-sync, changed re-sync, manual correction, no-published-actuals, and multi-season isolation.
+- [x] 4.3 Update Actuals UI and review actions to show one compact source/revision state, publish only reviewed snapshots, and preserve correction history.
+- [x] 4.4 Add tests for unchanged re-sync, changed re-sync, manual correction, no-published-actuals, and multi-season isolation.
 
 ## 5. One scoring service
 

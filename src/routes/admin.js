@@ -61,13 +61,12 @@ const {
   defaultRaceDataHighlightMode
 } = require("../race-data-audit");
 const {
-  actualOverviewViewForQuestion,
   buildRaceResultColumns,
   buildRaceDataMetricOptions,
-  formatActualOverviewValue,
   formatRaceFinishLabel,
   getRaceSessionRows
 } = require("../race-data-review-model");
+const { buildActualsOverview } = require("../actuals-overview");
 const { topDamageEntities } = require("../destructors-damage");
 
 
@@ -1003,8 +1002,11 @@ function registerAdminRoutes(app, deps) {
     return { maxRoundNumber: catalog.races.length || getRaces().length };
   }
 
-  function findLatestRoundSnapshotForSeason(season) {
-    return loadLatestRoundSnapshotForSeason(db, season, getSnapshotRoundOptions());
+  function findLatestRoundSnapshotForSeason(season, options = {}) {
+    return loadLatestRoundSnapshotForSeason(db, season, {
+      ...getSnapshotRoundOptions(season),
+      ...options
+    });
   }
 
   function fetchSnapshotValues(snapshotId) {
@@ -3095,105 +3097,24 @@ function registerAdminRoutes(app, deps) {
     const publishedActuals = seasonContext.selected
       ? loadPublishedActuals(db, season)
       : { available: false, values: {} };
-    const persistedActuals = publishedActuals.values || {};
-    const draftActuals =
-      req.session &&
-      req.session.adminActualsDraft &&
-      typeof req.session.adminActualsDraft === "object" &&
-      seasonContext.syncable &&
-      req.session.adminActualsDraft.target === "current" &&
-      req.session.adminActualsDraft.values &&
-      typeof req.session.adminActualsDraft.values === "object"
-        ? req.session.adminActualsDraft.values
-        : null;
-    const latestSnapshots = listLatestSnapshotsForSeason(db, season, {
-      maxRoundNumber: races.length
-    });
-    const latestSnapshotByRound = new Map(
-      latestSnapshots.map((snapshot) => [Number(snapshot.round_number), snapshot])
-    );
-    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
-    const requestedTarget = String(req.query.target || "").trim();
+    const latestSnapshots = seasonContext.selected
+      ? listLatestSnapshotsForSeason(db, season, { maxRoundNumber: races.length })
+      : [];
+    const latestRoundSnapshot = seasonContext.selected
+      ? findLatestRoundSnapshotForSeason(season, { maxRoundNumber: races.length })
+      : null;
     const latestRoundNumber =
       Number.isFinite(Number(latestRoundSnapshot?.round_number))
         ? Number(latestRoundSnapshot.round_number)
         : null;
-    const racesWithTargets = races.map((raceName, index) => {
-      const roundNumber = index + 1;
-      const snapshotMeta = latestSnapshotByRound.get(roundNumber) || null;
-      let timing = "future";
-      if (latestRoundNumber != null) {
-        if (roundNumber < latestRoundNumber) timing = "past";
-        else if (roundNumber === latestRoundNumber) timing = "current";
-      }
-      return {
-        key: `round:${roundNumber}`,
-        roundNumber,
-        raceName,
-        timing,
-        snapshotId: snapshotMeta ? Number(snapshotMeta.id) : null,
-        snapshotLabel: snapshotMeta ? String(snapshotMeta.label || "").trim() : "",
-        reviewStatus: snapshotMeta ? snapshotMeta.review_status : null,
-        reviewedAt: snapshotMeta ? snapshotMeta.reviewed_at || null : null,
-        updatedAt: snapshotMeta ? snapshotMeta.updated_at || snapshotMeta.created_at || null : null
-      };
-    });
-    const actualOverviewValuesByRound = new Map(
-      racesWithTargets
-        .filter((target) => target.snapshotId)
-        .map((target) => [target.roundNumber, fetchSnapshotValues(target.snapshotId)])
-    );
-    const actualOverviewRows = questions.map((question, index) => ({
-      question,
-      questionNumber: index + 1,
-      baseView: actualOverviewViewForQuestion(question),
-      cells: racesWithTargets.map((target) => {
-        const values = actualOverviewValuesByRound.get(target.roundNumber) || {};
-        const rawValue = values[question.id];
-        return {
-          value: formatActualOverviewValue(rawValue),
-          hasValue: rawValue != null && String(rawValue).trim() !== "",
-          reviewStatus: target.reviewStatus || null,
-          roundNumber: target.roundNumber,
-          timing: target.timing,
-          href: `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(target.roundNumber)}&view=${encodeURIComponent(actualOverviewViewForQuestion(question))}&focus=${encodeURIComponent(question.id)}`
-        };
-      })
-    }));
-
-    const pendingReviewTargets = racesWithTargets.filter(
-      (target) => target.reviewStatus === REVIEW_STATUS_PENDING
-    );
-    const selectedTarget = requestedTarget || pendingReviewTargets.at(-1)?.key || "current";
-    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
-    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
-    const selectedRaceTarget =
-      selectedRoundNumber != null
-        ? racesWithTargets.find((race) => race.roundNumber === selectedRoundNumber) || null
-        : null;
-    const selectedSnapshotMeta =
-      selectedRaceTarget && selectedRaceTarget.snapshotId
-        ? latestSnapshotByRound.get(selectedRaceTarget.roundNumber) || null
-        : null;
-    const selectedSnapshotValues =
-      selectedRaceTarget && selectedRaceTarget.snapshotId
-        ? fetchSnapshotValues(selectedRaceTarget.snapshotId)
-        : null;
-    const actuals =
-      selectedTarget === "current"
-        ? (draftActuals || persistedActuals)
-        : (draftActuals || selectedSnapshotValues || persistedActuals);
-    const isPastRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "past");
-    const isFutureRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "future");
-    const allowPastEdit = String(req.query.unlockPast || "").trim() === "1";
-    const requiresPastUnlock = isPastRaceTarget && !allowPastEdit;
-    const roster = buildRoundAwareRoster({
-      db,
+    const overview = buildActualsOverview({
       season,
-      roundNumber: selectedRoundNumber || latestRoundNumber || races.length || 1,
       races,
-      fallbackRoster: { drivers: [], teams: [], races },
-      seasonCatalog: catalog
+      questions,
+      snapshots: latestSnapshots,
+      latestRoundNumber,
+      publishedActuals,
+      fetchSnapshotValues
     });
     res.render("admin_actuals", {
       user,
@@ -3201,21 +3122,12 @@ function registerAdminRoutes(app, deps) {
       season,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
-      roster,
       races,
-      actuals,
-      actualOverviewRows,
-      actualOverviewTargets: racesWithTargets,
-      actualsTarget: selectedTarget,
-      raceTargets: racesWithTargets,
-      selectedRaceTarget,
-      selectedSnapshotMeta,
+      actualOverviewRows: overview.rows,
+      actualOverviewTargets: overview.targets,
+      actualsOverview: overview,
       publishedActuals,
-      pendingReviewTargets,
-      requiresPastUnlock,
-      allowPastEdit,
-      isFutureRaceTarget,
-      hasDraft: Boolean(draftActuals),
+      latestRoundNumber,
       saveError,
       saveSuccess,
       catalogRevision: catalog?.catalogRevision || null,
@@ -3291,7 +3203,7 @@ function registerAdminRoutes(app, deps) {
     }
   });
 
-  app.post("/admin/actuals/review", requireAdmin, (req, res) => {
+  app.post("/admin/race-data/review", requireAdmin, (req, res) => {
     const adminUser = getCurrentUser(req);
     const season = Number(req.body.season || req.query.season || CURRENT_SEASON);
     const seasonContext = resolveAdminSeasonContext(db, {
@@ -3303,7 +3215,8 @@ function registerAdminRoutes(app, deps) {
     const unlockPast = String(req.body.unlockPast || "").trim() === "1";
     const rawReturnTo = String(req.body.returnTo || "").trim();
     const returnTo = isSafeRaceDataReturnPath(rawReturnTo) ? rawReturnTo : null;
-    const fallbackPath = `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}`;
+    const targetRound = /^round:(\d+)$/.exec(target)?.[1] || "";
+    const fallbackPath = `/admin/race-data?season=${encodeURIComponent(season)}${targetRound ? `&round=${encodeURIComponent(targetRound)}` : ""}&view=drivers&focus=points`;
     const redirectReview = (key, message) => res.redirect(
       withQueryParam(returnTo || fallbackPath, key, message)
     );
