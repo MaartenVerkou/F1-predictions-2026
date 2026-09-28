@@ -3276,13 +3276,16 @@ button:disabled {
 }
 
 .admin-actuals-overview-table .admin-actuals-question-cell {
+  white-space: normal;
+}
+
+.admin-actuals-question-content {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
   grid-template-rows: auto auto;
   gap: 2px 8px;
   align-content: start;
   align-items: start;
-  white-space: normal;
 }
 
 .admin-actuals-question-number {

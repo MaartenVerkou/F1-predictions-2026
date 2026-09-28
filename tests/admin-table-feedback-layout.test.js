@@ -36,6 +36,7 @@ test("admin actuals is a read-only season overview", () => {
   assert.match(view, /cell\.displayLines/);
   assert.match(view, /cell\.displayMode/);
   assert.match(view, /target\.raceName/);
+  assert.match(view, /admin-actuals-question-content/);
   assert.match(view, /admin-actuals-value-line/);
   assert.doesNotMatch(view, /data-admin-actuals-target-form/);
   assert.doesNotMatch(view, /name="target"/);
