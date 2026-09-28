@@ -28,6 +28,57 @@ const OVERVIEW_FOCUS_LABELS = Object.freeze({
   points: "Points"
 });
 
+// Keep the overview compact without making the visible race labels ambiguous.
+// These are the familiar three-letter F1 calendar codes; the fallback below
+// keeps the formatter useful for future calendars that are not in this list.
+const ACTUALS_RACE_CODE_ALIASES = Object.freeze([
+  ["australian", "AUS"],
+  ["chinese", "CHN"],
+  ["japanese", "JPN"],
+  ["miami", "MIA"],
+  ["canadian", "CAN"],
+  ["monaco", "MON"],
+  ["barcelona", "BCN"],
+  ["austrian", "AUT"],
+  ["british", "GBR"],
+  ["belgian", "BEL"],
+  ["hungarian", "HUN"],
+  ["dutch", "NED"],
+  ["italian", "ITA"],
+  ["spanish", "ESP"],
+  ["azerbaijan", "AZE"],
+  ["singapore", "SIN"],
+  ["united states", "USA"],
+  ["mexico city", "MEX"],
+  ["mexico", "MEX"],
+  ["sao paulo", "SAO"],
+  ["las vegas", "LAS"],
+  ["qatar", "QAT"],
+  ["abu dhabi", "ABU"]
+]);
+
+function actualOverviewRaceCode(value) {
+  const normalized = String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  if (!normalized) return "—";
+
+  const alias = ACTUALS_RACE_CODE_ALIASES.find(([name]) => normalized.startsWith(name));
+  if (alias) return alias[1];
+
+  const words = normalized.split(/\s+/).filter((word) => !["grand", "prix", "gp"].includes(word));
+  if (!words.length) return "—";
+  if (words.length > 1) {
+    const initials = words.map((word) => word.charAt(0)).join("");
+    if (initials.length >= 3) return initials.slice(0, 3).toUpperCase();
+    return `${words[0].charAt(0)}${words[1].slice(0, 2)}`.toUpperCase();
+  }
+  return words[0].slice(0, 3).toUpperCase() || "—";
+}
+
 function normalizeRoundNumber(value) {
   const roundNumber = Number(value);
   return Number.isFinite(roundNumber) && roundNumber > 0
@@ -157,6 +208,7 @@ function buildActualsOverview({
       key: `round:${roundNumber}`,
       roundNumber,
       raceName: displayRaceName,
+      raceCode: actualOverviewRaceCode(displayRaceName),
       timing,
       snapshotId: snapshot ? Number(snapshot.id) : null,
       reviewStatus: snapshot?.review_status || null,

@@ -32,6 +32,7 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.deepEqual(overview.targets.map((target) => target.reviewStatus), ["reviewed", "pending", null]);
   assert.deepEqual(overview.targets.map((target) => target.published), [true, false, false]);
   assert.deepEqual(overview.targets.map((target) => target.raceName), ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"]);
+  assert.deepEqual(overview.targets.map((target) => target.raceCode), ["AUS", "CHN", "JPN"]);
   assert.equal(overview.pendingCount, 1);
   assert.equal(overview.publishedRound, 1);
   assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");

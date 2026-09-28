@@ -52,7 +52,7 @@
                   data-review-status="<%= target.reviewStatus || '' %>">
                 <a href="/admin/race-data?season=<%= season %>&round=<%= target.roundNumber %>&view=drivers&focus=points"
                    title="R<%= target.roundNumber %> · <%= target.raceName %>">
-                  <span class="admin-actuals-round-name"><%= target.raceName %></span>
+                  <span class="admin-actuals-round-name"><%= target.raceCode %></span>
                 </a>
                 <small title="<%= statusLabel %>"><%= statusLabel %></small>
               </th>

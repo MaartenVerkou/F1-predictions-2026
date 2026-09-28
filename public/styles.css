@@ -3329,11 +3329,10 @@ button:disabled {
 }
 
 .admin-actuals-round-name {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  display: block;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-actuals-round-column small {
