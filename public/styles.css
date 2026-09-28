@@ -2016,7 +2016,7 @@ button:disabled {
 
 .admin-race-data-round-region {
   display: grid;
-  gap: 0;
+  gap: 24px;
 }
 
 /* Let the page controls shrink to the card; the matrix owns horizontal scroll. */
@@ -8081,7 +8081,7 @@ button.lang-option.is-active {
 
 .admin-race-data-table-section[data-race-data-championship] {
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 0;
   padding-top: 0;
 }
 

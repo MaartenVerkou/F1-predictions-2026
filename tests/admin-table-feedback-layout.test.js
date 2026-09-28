@@ -133,9 +133,12 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(styles, /\.admin-race-data-table-toolbar\s*\{/);
   assert.match(styles, /\.admin-race-data-section-heading\s*\{/);
   assert.match(styles, /\.admin-race-data-section-heading h2\s*\{/);
+  const roundRegionStyles = styles.match(/\.admin-race-data-round-region\s*\{([\s\S]*?)\n\}/);
+  assert.ok(roundRegionStyles, "race data round region styles should be explicit");
+  assert.match(roundRegionStyles[1], /gap:\s*24px/);
   const championshipStyles = styles.match(/\.admin-race-data-table-section\[data-race-data-championship\]\s*\{([\s\S]*?)\n\}/);
   assert.ok(championshipStyles, "championship section styles should be explicit");
-  assert.match(championshipStyles[1], /margin-top:\s*16px/);
+  assert.match(championshipStyles[1], /margin-top:\s*0/);
   assert.match(championshipStyles[1], /padding-top:\s*0/);
   assert.doesNotMatch(championshipStyles[1], /border-top/);
   const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
