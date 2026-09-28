@@ -8,6 +8,7 @@ const PROVIDER_SCHEMA = "openf1-v1";
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_RETRIES = 5;
 const DEFAULT_MIN_INTERVAL_MS = 1000;
+const MAX_RETRY_AFTER_MS = 30_000;
 const SESSION_KEYS = [
   "practice1",
   "practice2",
@@ -237,10 +238,10 @@ async function createRequester({
           if (![408, 425, 429, 500, 502, 503, 504].includes(response.status) || attempt >= retries) throw error;
           lastError = error;
           const retryAfterSeconds = Number(response.headers?.get?.("retry-after") || 0);
-          const retryWait = Math.max(
+          const retryWait = Math.min(MAX_RETRY_AFTER_MS, Math.max(
             Number(minIntervalMs),
             retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : 250 * (attempt + 1)
-          );
+          ));
           await new Promise((resolve) => setTimeout(resolve, retryWait));
         } catch (error) {
           lastError = error.name === "AbortError" ? new Error("OpenF1 timed out for " + url) : error;

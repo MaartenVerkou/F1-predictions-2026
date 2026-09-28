@@ -127,6 +127,7 @@ function readJsonFile(filePath) {
 
 const SUPPORTING_FETCH_TIMEOUT_MS = 15_000;
 const SUPPORTING_FETCH_RETRIES = 5;
+const SUPPORTING_MAX_RETRY_AFTER_MS = 30_000;
 
 async function fetchSupporting(url, parseResponse) {
   let lastError = null;
@@ -147,7 +148,10 @@ async function fetchSupporting(url, parseResponse) {
       }
       lastError = error;
       const retryAfter = Number(res.headers.get("retry-after") || 0);
-      const waitMs = Math.max(750 * (attempt + 1), retryAfter > 0 ? retryAfter * 1000 : 0);
+      const waitMs = Math.min(
+        SUPPORTING_MAX_RETRY_AFTER_MS,
+        Math.max(750 * (attempt + 1), retryAfter > 0 ? retryAfter * 1000 : 0)
+      );
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     } catch (error) {
       if (error?.nonRetryable) throw error;
