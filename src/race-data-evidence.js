@@ -1,6 +1,12 @@
 "use strict";
 
 const crypto = require("node:crypto");
+const {
+  DEFAULT_SCORING_RULES,
+  reconcileStandings,
+  scoreResultRows,
+  scoringRulesTableValue
+} = require("./season-scoring-rules");
 
 const DRIVER_NAME_ALIASES = {
   andreakimiantonelli: "Kimi Antonelli",
@@ -22,7 +28,6 @@ const TEAM_NAME_ALIASES = {
 
 const SOURCE_TYPES = {
   OPENF1: "openf1",
-  JOLPICA: "jolpica_ergast",
   FORMULA1: "formula1",
   FORMULA1_DASHBOARD: "formula1_dashboard",
   REDDIT_DESTRUCTORS: "reddit_destructors"
@@ -112,18 +117,22 @@ function normalizeResultRow(row, roster, kind, canonicalCatalog = null) {
 }
 
 function normalizeStandingsRow(row, roster, entityType, canonicalCatalog = null) {
-  const entity =
-    entityType === "driver"
+  const entity = row?.entity
+    || (entityType === "driver"
       ? driverNameFromApi(row?.Driver, roster?.drivers || [])
-      : teamNameFromApi(row?.Constructor, roster?.teams || []);
+      : teamNameFromApi(row?.Constructor, roster?.teams || []));
   if (!entity) return null;
   return {
     entity,
     entity_label: entity,
-    entity_id: canonicalId(canonicalCatalog, entityType === "driver" ? "driver" : "team", entity),
+    entity_id: canonicalCatalog
+      ? canonicalId(canonicalCatalog, entityType === "driver" ? "driver" : "team", entity)
+      : row?.entity_id == null ? null : Number(row.entity_id),
     provider_entity_id: String((entityType === "driver" ? row?.Driver?.driverId : row?.Constructor?.constructorId) || "").trim() || null,
     position: parseNum(row?.position),
-    points: parseNum(row?.points, 0)
+    points: parseNum(row?.points, 0),
+    wins: parseNum(row?.wins, 0),
+    podiums: parseNum(row?.podiums, 0)
   };
 }
 
@@ -232,7 +241,8 @@ function buildEvidenceBundle({
   payloadRevision = null,
   provider = null,
   providerSchema = null,
-  provenance = null
+  provenance = null,
+  scoringRules = DEFAULT_SCORING_RULES
 }) {
   const round = Number(roundNumber);
   const race = (data?.results || []).find((item) => Number(item?.round) === round) || {};
@@ -254,9 +264,10 @@ function buildEvidenceBundle({
   const canonicalRaceRows = sessionRows("race", "race");
   const canonicalQualifyingRows = sessionRows("qualifying", "qualifying");
   const canonicalSprintRows = sessionRows("sprint", "sprint");
-  const raceRows = canonicalRaceRows.length
+  const rawRaceRows = canonicalRaceRows.length
     ? canonicalRaceRows
     : normalizeSourceRows(race.Results, roster, "race", canonicalCatalog);
+  const raceRows = scoreResultRows(rawRaceRows, "race", scoringRules);
   const qualifyingRows = canonicalQualifyingRows.length
     ? canonicalQualifyingRows
     : normalizeSourceRows(
@@ -264,9 +275,10 @@ function buildEvidenceBundle({
         roster,
         "qualifying", canonicalCatalog
       );
-  const sprintRows = canonicalSprintRows.length
+  const rawSprintRows = canonicalSprintRows.length
     ? canonicalSprintRows
     : normalizeSourceRows(sprintRace.SprintResults, roster, "sprint", canonicalCatalog);
+  const sprintRows = scoreResultRows(rawSprintRows, "sprint", scoringRules);
   const practice1Rows = sessionRows("practice1", "practice");
   const practice2Rows = sessionRows("practice2", "practice");
   const practice3Rows = sessionRows("practice3", "practice");
@@ -338,7 +350,7 @@ function buildEvidenceBundle({
     coverage.status = "incomplete";
   }
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     season: parseNum(data?.season, null),
     roundNumber: round,
     roundName: String(roundName || race?.raceName || `Round ${round}`).trim(),
@@ -348,6 +360,7 @@ function buildEvidenceBundle({
     sourceIdentity: String(sourceIdentity || "").trim() || null,
     payloadRevision: String(payloadRevision || "").trim() || null,
     unresolved,
+    scoringRules: scoringRulesTableValue(scoringRules),
     sourceUrls: {
       race: sourceUrls.race || null,
       qualifying: sourceUrls.qualifying || null,
@@ -398,6 +411,14 @@ function buildEvidenceBundle({
       drivers: normalizedDriverStandings,
       constructors: normalizedConstructorStandings
     },
+    legacyStandings: {
+      drivers: data?.legacyDriverStandingsByRound?.get(round) || [],
+      constructors: data?.legacyConstructorStandingsByRound?.get(round) || []
+    },
+    reconciliation: data?.reconciliationByRound?.get(round) || {
+      drivers: reconcileStandings([], normalizedDriverStandings),
+      constructors: reconcileStandings([], normalizedConstructorStandings)
+    },
     external: {
       driverOfTheDay: data?.driverOfTheDayByRound?.get(round) || null,
       driverOfTheDayId: canonicalId(canonicalCatalog, "driver", data?.driverOfTheDayByRound?.get(round)),
@@ -408,8 +429,8 @@ function buildEvidenceBundle({
       }
     },
     raw: {
-      provider: String(provider || data?.provider || "jolpica-ergast"),
-      providerSchema: String(providerSchema || data?.providerSchema || "ergast-v1"),
+      provider: String(provider || data?.provider || "openf1"),
+      providerSchema: String(providerSchema || data?.providerSchema || "openf1-v1"),
       provenance: provenance || data?.provenanceByRound?.get(round) || null,
       race,
       qualifying: qualifyingRace,
@@ -634,7 +655,7 @@ function listDestructorsSourcePosts(db, season, { roundNumber = null } = {}) {
 function createRaceDataImport(db, {
   season,
   syncId,
-  sourceType = SOURCE_TYPES.JOLPICA,
+  sourceType = SOURCE_TYPES.OPENF1,
   parserVersion = "evidence-v1",
   requestedRounds = 0,
   reconstructed = false,
@@ -707,7 +728,7 @@ function saveRaceDataSnapshot(db, {
   syncId,
   importId = null,
   fetchedAt,
-  sourceType = SOURCE_TYPES.JOLPICA,
+  sourceType = SOURCE_TYPES.OPENF1,
   sourceNote = "",
   parserVersion = "evidence-v1",
   calendarState = "completed",

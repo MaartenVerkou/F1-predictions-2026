@@ -25,6 +25,11 @@ const { createAppDatabase } = require("../src/app-database");
 const { ensurePostgresSchema } = require("../src/postgres-schema");
 const { resolveConfiguredRaceName } = require("../src/race-names");
 const { buildPersistedDataFromEvidence } = require("../src/race-evidence-derivation");
+const {
+  deriveStandingsForRounds,
+  DEFAULT_SCORING_RULES,
+  readSeasonScoringRules
+} = require("../src/season-scoring-rules");
 const { buildSeasonCatalog } = require("../src/season-catalog");
 const {
   fetchOpenF1SeasonData,
@@ -42,11 +47,10 @@ const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questi
 const ROSTER_PATH = process.env.ROSTER_PATH || path.join(DATA_DIR, "roster.json");
 const RACES_PATH = process.env.RACES_PATH || path.join(DATA_DIR, "races.json");
 const SEASON = Number(process.env.F1_SEASON || 2026);
-const API_BASE = "https://api.jolpi.ca/ergast/f1";
 const FORMULA1_DOTD_PATH = "awards/driver-of-the-day";
 const USER_AGENT = "f1-predictions-actuals-backfill";
 const BACKFILL_SOURCE_NOTE =
-  "Reconstructed from OpenF1 session evidence, Jolpica/Ergast standings, Formula1.com Driver of the Day, and the approved destructors source";
+  "Reconstructed from OpenF1 session evidence, Formula1.com Driver of the Day, and the approved destructors source; championship points are derived from the selected season scoring rules";
 const TEAM_ENGINE_SWITCH_2027_2028_ACTUAL = "no";
 
 const DRIVER_NAME_ALIASES = {
@@ -193,13 +197,13 @@ function resolveCanonicalName(raw, allowedValues, aliasMap = {}) {
 
 function driverNameFromApi(driver, rosterDrivers) {
   if (!driver) return null;
-  const raw = `${driver.givenName || ""} ${driver.familyName || ""}`.trim();
+  const raw = String(driver.entity || `${driver.givenName || ""} ${driver.familyName || ""}`).trim();
   return resolveCanonicalName(raw, rosterDrivers, DRIVER_NAME_ALIASES);
 }
 
 function teamNameFromApi(constructor, rosterTeams) {
   if (!constructor) return null;
-  return resolveCanonicalName(constructor.name, rosterTeams, TEAM_NAME_ALIASES);
+  return resolveCanonicalName(String(constructor.entity || constructor.name || "").trim(), rosterTeams, TEAM_NAME_ALIASES);
 }
 
 function parseNum(value, fallback = 0) {
@@ -405,7 +409,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
 
   const pointsByDriver = new Map();
   driverStandings.forEach((row) => {
-    const driver = driverNameFromApi(row.Driver, roster.drivers || []);
+    const driver = driverNameFromApi(row.Driver || row, roster.drivers || []);
     if (driver) pointsByDriver.set(driver, parseNum(row.points));
   });
 
@@ -428,8 +432,8 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     let dnfCountThisRace = 0;
 
     apiResults.forEach((row) => {
-      const driver = driverNameFromApi(row.Driver, roster.drivers || []);
-      const team = teamNameFromApi(row.Constructor, roster.teams || []);
+      const driver = driverNameFromApi(row.Driver || row, roster.drivers || []);
+      const team = teamNameFromApi(row.Constructor || row, roster.teams || []);
       const position = parseNum(row.position, 0);
 
       if (position >= 1 && position <= 3 && driver) podiumDrivers.add(driver);
@@ -457,8 +461,8 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     const rows = Array.isArray(race.QualifyingResults) ? race.QualifyingResults : [];
     const byTeam = new Map();
     rows.forEach((row) => {
-      const team = teamNameFromApi(row.Constructor, roster.teams || []);
-      const driver = driverNameFromApi(row.Driver, roster.drivers || []);
+      const team = teamNameFromApi(row.Constructor || row, roster.teams || []);
+      const driver = driverNameFromApi(row.Driver || row, roster.drivers || []);
       if (!team || !driver) return;
       if (!byTeam.has(team)) byTeam.set(team, []);
       byTeam.get(team).push({ driver, position: parseNum(row.position, 999) });
@@ -491,7 +495,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     const sprintRows = Array.isArray(race.SprintResults) ? race.SprintResults : [];
     if (sprintRows.length > 0) sprintRoundSet.add(Number(race.round));
     sprintRows.forEach((row) => {
-      const driver = driverNameFromApi(row.Driver, roster.drivers || []);
+      const driver = driverNameFromApi(row.Driver || row, roster.drivers || []);
       if (!driver) return;
       sprintPointsByDriver.set(
         driver,
@@ -524,7 +528,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     : null;
   const constructorsNoPodium = constructorStandings
     .map((row) => ({
-      name: teamNameFromApi(row.Constructor, roster.teams || []),
+      name: teamNameFromApi(row.Constructor || row, roster.teams || []),
       points: parseNum(row.points)
     }))
     .filter((row) => row.name && !podiumTeams.has(row.name));
@@ -541,7 +545,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     Array.from(dotdCounts.entries()).map(([name, count]) => ({ name, count })),
     (row) => Number(row.count || 0)
   ).map((row) => row.name);
-  const currentLeader = driverNameFromApi(driverStandings[0]?.Driver, roster.drivers || []);
+  const currentLeader = driverNameFromApi(driverStandings[0]?.Driver || driverStandings[0], roster.drivers || []);
   const topSprintRows = Array.from(sprintPointsByDriver.entries())
     .map(([name, points]) => ({ name, points }))
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
@@ -564,11 +568,11 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
   const rawActuals = {
     drivers_championship_top_3: driverStandings
       .slice(0, 3)
-      .map((row) => driverNameFromApi(row.Driver, roster.drivers || []))
+      .map((row) => driverNameFromApi(row.Driver || row, roster.drivers || []))
       .filter(Boolean),
     constructors_championship_top_3: constructorStandings
       .slice(0, 3)
-      .map((row) => teamNameFromApi(row.Constructor, roster.teams || []))
+      .map((row) => teamNameFromApi(row.Constructor || row, roster.teams || []))
       .filter(Boolean),
     drivers_championship_last: driverNameFromApi(
       driverStandings[driverStandings.length - 1]?.Driver,
@@ -629,22 +633,22 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     alpine_vs_cadillac_audi:
       parseNum(
         constructorStandings.find(
-          (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Alpine"
+          (row) => teamNameFromApi(row.Constructor || row, roster.teams || []) === "Alpine"
         )?.points
       ) >
       parseNum(
         constructorStandings.find(
-          (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Cadillac"
+          (row) => teamNameFromApi(row.Constructor || row, roster.teams || []) === "Cadillac"
         )?.points
       ) +
         parseNum(
           constructorStandings.find(
-            (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Audi"
+            (row) => teamNameFromApi(row.Constructor || row, roster.teams || []) === "Audi"
           )?.points
         ) +
         parseNum(
           constructorStandings.find(
-            (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Aston Martin"
+            (row) => teamNameFromApi(row.Constructor || row, roster.teams || []) === "Aston Martin"
           )?.points
         )
         ? "More"
@@ -663,7 +667,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     mini_q2_mercedes_engines_top5:
       constructorStandings
         .slice(0, 5)
-        .map((row) => teamNameFromApi(row.Constructor, roster.teams || []))
+        .map((row) => teamNameFromApi(row.Constructor || row, roster.teams || []))
         .filter((team) => mercedesEngineTeams.has(team)).length >= 4
         ? "yes"
         : "no",
@@ -686,28 +690,11 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
   return serialized;
 }
 
-async function fetchJolpicaSupportingData({ season, roster, completedRounds, completedRaces }) {
-  const rounds = Array.from(new Set((completedRounds || []).map(Number).filter(Number.isFinite)));
-  const driverStandingsByRound = new Map();
-  const constructorStandingsByRound = new Map();
-  for (const round of rounds) {
-    const driverPayload = await fetchJson(API_BASE + "/" + season + "/" + round + "/driverStandings.json");
-    const constructorPayload = await fetchJson(API_BASE + "/" + season + "/" + round + "/constructorStandings.json");
-    driverStandingsByRound.set(
-      round,
-      driverPayload?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || []
-    );
-    constructorStandingsByRound.set(
-      round,
-      constructorPayload?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || []
-    );
-  }
+async function fetchFormula1SupportingData({ season, roster, completedRaces }) {
   const driverOfTheDayUrl =
     "https://www.formula1.com/en/results/" + season + "/" + FORMULA1_DOTD_PATH;
   const dotdHtml = await fetchText(driverOfTheDayUrl).catch(() => "");
   return {
-    driverStandingsByRound,
-    constructorStandingsByRound,
     driverOfTheDayUrl,
     driverOfTheDayByRound: parseDriverOfTheDayByRound(
       dotdHtml,
@@ -740,7 +727,8 @@ async function fetchOpenF1CanonicalSeasonData({
   roster,
   races,
   calendarByName = {},
-  maxRound = null
+  maxRound = null,
+  scoringRules = DEFAULT_SCORING_RULES
 }) {
   const calendar = calendarForOpenF1(races, calendarByName);
   const sessions = await fetchOpenF1SeasonData({
@@ -748,23 +736,31 @@ async function fetchOpenF1CanonicalSeasonData({
     calendar,
     maxRound
   });
-  const supporting = await fetchJolpicaSupportingData({
+  const derivedStandings = deriveStandingsForRounds(
+    sessions.completedRounds.map((roundNumber) => ({
+      roundNumber,
+      raceRows: sessions.results.find((row) => Number(row.round) === Number(roundNumber))?.Results || [],
+      sprintRows: sessions.sprints.find((row) => Number(row.round) === Number(roundNumber))?.SprintResults || []
+    })),
+    scoringRules
+  );
+  const supporting = await fetchFormula1SupportingData({
     season,
     roster,
-    completedRounds: sessions.completedRounds,
     completedRaces: sessions.results
   });
   const sourceUrlsByRound = new Map();
   sessions.completedRounds.forEach((round) => {
     const urls = { ...(sessions.sourceUrlsByRound?.get(round) || {}) };
-    urls.driverStandings = API_BASE + "/" + season + "/" + round + "/driverStandings.json";
-    urls.constructorStandings = API_BASE + "/" + season + "/" + round + "/constructorStandings.json";
     urls.driverOfTheDay = supporting.driverOfTheDayUrl;
     sourceUrlsByRound.set(round, urls);
   });
   return {
     ...sessions,
     ...supporting,
+    driverStandingsByRound: new Map(Array.from(derivedStandings.entries()).map(([round, standings]) => [round, standings.drivers])),
+    constructorStandingsByRound: new Map(Array.from(derivedStandings.entries()).map(([round, standings]) => [round, standings.constructors])),
+    derivedStandingsByRound: derivedStandings,
     sourceUrlsByRound,
     provider: OPENF1_PROVIDER,
     providerSchema: OPENF1_SCHEMA,
@@ -779,7 +775,8 @@ async function fetchSeasonData({
   races = [],
   calendarByName = {},
   provider = OPENF1_PROVIDER,
-  maxRound = null
+  maxRound = null,
+  scoringRules = DEFAULT_SCORING_RULES
 }) {
   assertStandardEvidenceProvider(provider);
   if (provider !== OPENF1_PROVIDER) {
@@ -788,7 +785,19 @@ async function fetchSeasonData({
       "; " + provider + " is not a session provider."
     );
   }
-  return fetchOpenF1CanonicalSeasonData({ season, roster, races, calendarByName, maxRound });
+  return fetchOpenF1CanonicalSeasonData({ season, roster, races, calendarByName, maxRound, scoringRules });
+}
+
+function readRunScoringRules(args) {
+  let db = null;
+  try {
+    db = createAppDatabase({ databaseUrl: args.databaseUrl, sqlitePath: args.dbPath });
+    return readSeasonScoringRules(db, args.season) || DEFAULT_SCORING_RULES;
+  } catch (_error) {
+    return DEFAULT_SCORING_RULES;
+  } finally {
+    db?.close?.();
+  }
 }
 
 function getRoundName(data, races, roundNumber) {
@@ -805,10 +814,11 @@ function deriveSnapshotsFromPersistedEvidence(db, {
   questions,
   roster,
   races,
-  totalRounds
+  totalRounds,
+  scoringRules = DEFAULT_SCORING_RULES
 }) {
   const persistedRows = listRaceDataSnapshots(db, season);
-  const data = buildPersistedDataFromEvidence(persistedRows, season);
+  const data = buildPersistedDataFromEvidence(persistedRows, season, { scoringRules });
   return rounds.map((roundNumber) => ({
     roundNumber,
     roundName: getRoundName(data, races, roundNumber),
@@ -914,7 +924,7 @@ function writeActualsAndSnapshots(db, {
   snapshots,
   importId,
   deriveContext,
-  sourceType = SOURCE_TYPES.JOLPICA,
+  sourceType = SOURCE_TYPES.OPENF1,
   sourceNote = BACKFILL_SOURCE_NOTE,
   parserVersion = "evidence-v1"
 }) {
@@ -1011,13 +1021,15 @@ async function main() {
   const raceCatalog = readJsonFile(RACES_PATH);
   const races = raceCatalog.races || [];
   const calendarByName = raceCatalog.calendar?.[String(args.season)] || {};
+  const scoringRules = readRunScoringRules(args);
   const data = await fetchSeasonData({
     season: args.season,
     roster,
     races,
     calendarByName,
     provider: args.provider,
-    maxRound: args.maxRound
+    maxRound: args.maxRound,
+    scoringRules
   });
   const sourceType = data.sourceType || args.provider;
   const sourceNote = data.sourceNote || BACKFILL_SOURCE_NOTE;
@@ -1053,12 +1065,11 @@ async function main() {
         roundName,
         fetchedAt: new Date().toISOString(),
         sourceUrls: data.sourceUrlsByRound?.get(roundNumber) || {
-          driverStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/driverStandings.json",
-          constructorStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/constructorStandings.json",
           driverOfTheDay: data.driverOfTheDayUrl
         },
         provider: data.provider,
         providerSchema: data.providerSchema,
+        scoringRules,
         provenance: {
           provider: data.provider,
           providerSchema: data.providerSchema,
@@ -1089,7 +1100,8 @@ async function main() {
       if (existingEvidenceRows.length) {
         const existingEvidenceData = buildPersistedDataFromEvidence(
           existingEvidenceRows,
-          args.season
+          args.season,
+          { scoringRules }
         );
         if (existingEvidenceData.destructorsByRound.size > 0) {
           data.destructorsByRound = existingEvidenceData.destructorsByRound;
@@ -1127,6 +1139,7 @@ async function main() {
             || parserVersion + ":" + snapshot.roundNumber,
           provider: data.provider,
           providerSchema: data.providerSchema,
+          scoringRules,
           provenance: {
             provider: data.provider,
             providerSchema: data.providerSchema,
@@ -1153,7 +1166,7 @@ async function main() {
         syncId,
         calendarState: "completed"
       }));
-      const derivedContext = { questions, roster, races, totalRounds };
+      const derivedContext = { questions, roster, races, totalRounds, scoringRules };
       result = writeActualsAndSnapshots(db, {
         season: args.season,
         rounds: completedRounds,
@@ -1250,7 +1263,7 @@ module.exports = {
   compareSnapshotValues,
   deriveSnapshotsFromPersistedEvidence,
   fetchOpenF1CanonicalSeasonData,
-  fetchJolpicaSupportingData,
+  fetchFormula1SupportingData,
   fetchSeasonData,
   parseArgs,
   parseDriverOfTheDayByRound,

@@ -568,6 +568,7 @@ test("race data metrics are available independently of question focus", () => {
   const options = buildRaceDataMetricOptions((key) => key);
   assert.deepEqual(options.map((option) => option.metric), [
     "points",
+    "championship_points_results",
     "podiums",
     "dnfs",
     "grid_wins",
@@ -680,11 +681,11 @@ test("last championship focus inverts the championship order", () => {
     }
   });
 
-  assert.equal(view.focusSummary.value, "Sergio Perez · P23");
+  assert.equal(view.focusSummary.value, "Lance Stroll · P3");
   assert.deepEqual(view.drivers.map((row) => row.name), [
+    "Lance Stroll",
     "Sergio Perez",
-    "Valtteri Bottas",
-    "Lance Stroll"
+    "Valtteri Bottas"
   ]);
 });
 

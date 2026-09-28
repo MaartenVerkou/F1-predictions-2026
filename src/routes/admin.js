@@ -65,6 +65,13 @@ const {
 const { buildActualsOverview } = require("../actuals-overview");
 const { topDamageEntities } = require("../destructors-damage");
 const { raceDataFocusLabel } = require("../race-data-focus");
+const {
+  DEFAULT_SCORING_RULES,
+  deriveStandingsForRounds,
+  reconcileStandings,
+  readSeasonScoringRules,
+  scoringRulesTableValue
+} = require("../season-scoring-rules");
 
 
 function auditResultLabel(row) {
@@ -320,7 +327,9 @@ function resolveRaceDataFocus({ questions = [], focusId = "points", viewMode = "
 
 function resolveActiveRaceDataMetricId({ focus = null, metricOptions = [] } = {}) {
   const metric = String(focus?.matrixMetric || focus?.metric || "points").trim().toLowerCase();
-  const preferredId = metric === "points" ? "points" : `metric:${metric}`;
+  const preferredId = ["points", "championship_points_results"].includes(metric)
+    ? metric
+    : `metric:${metric}`;
   return metricOptions.some((option) => option.id === preferredId) ? preferredId : "points";
 }
 
@@ -407,7 +416,7 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
   };
 }
 
-function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound, catalogRevision = null, focus = null, showRaceResult = true }) {
+function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound, catalogRevision = null, focus = null, showRaceResult = true, scoringRules = DEFAULT_SCORING_RULES }) {
   const activeFocus = {
     id: "points",
     metric: "points",
@@ -468,11 +477,27 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
             : selected.summary.status
       }
     : null;
+  const derivedStandingsByRound = deriveStandingsForRounds(
+    evidenceRows.map((row) => ({
+      roundNumber: Number(row.round_number),
+      raceRows: row.payload?.race?.rows || [],
+      sprintRows: row.payload?.sprint?.rows || []
+    })),
+    scoringRules
+  );
   const selectedPayload = selected?.evidence?.payload || null;
-  const selectedDriverStandings = selectedPayload?.standings?.drivers || [];
-  const selectedConstructorStandings = selectedPayload?.standings?.constructors || [];
+  const selectedDerivedStandings = derivedStandingsByRound.get(cutoffRoundNumber) || { drivers: [], constructors: [] };
+  const selectedLegacyStandings = selectedPayload?.legacyStandings || selectedPayload?.standings || { drivers: [], constructors: [] };
+  const selectedDriverStandings = selectedDerivedStandings.drivers.length
+    ? selectedDerivedStandings.drivers
+    : (selectedPayload?.standings?.drivers || []);
+  const selectedConstructorStandings = selectedDerivedStandings.constructors.length
+    ? selectedDerivedStandings.constructors
+    : (selectedPayload?.standings?.constructors || []);
   const selectedDriverMap = new Map(selectedDriverStandings.map((row) => [row.entity, row]));
   const selectedConstructorMap = new Map(selectedConstructorStandings.map((row) => [row.entity, row]));
+  const selectedLegacyDriverMap = new Map(selectedLegacyStandings.drivers.map((row) => [row.entity, row]));
+  const selectedLegacyConstructorMap = new Map(selectedLegacyStandings.constructors.map((row) => [row.entity, row]));
   const selectedDriverIdMap = new Map(
     selectedDriverStandings
       .filter((row) => row.entity_id != null)
@@ -525,7 +550,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
           ? (podiumHit ? "Podium finish" : "No podium finish")
           : round.evidence ? "No classified row" : "Evidence unavailable")
         : row || qualifyingOutcome
-          ? [row?.status || qualifyingOutcome || resultLabel, row?.grid != null ? "grid " + row.grid : null, row?.points != null ? row.points + " pts" : null, markerMeta.markerTitle || null]
+          ? [row?.status || qualifyingOutcome || resultLabel, row?.grid != null ? "grid " + row.grid : null, row?.calculatedPoints != null || row?.points != null ? (row.calculatedPoints ?? row.points) + " pts" : null, markerMeta.markerTitle || null]
             .filter(Boolean)
             .join(" · ")
           : round.evidence ? "No classified row" : "Evidence unavailable";
@@ -547,6 +572,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     const standing = (entity.id != null ? selectedDriverIdMap.get(Number(entity.id)) : null)
       || selectedDriverMap.get(driver)
       || null;
+    const legacyStanding = selectedLegacyDriverMap.get(driver) || null;
     const constructor = entity.teamName || cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
     const constructorEntity = teamEntities.find((item) => item.name === constructor);
     const summaryValue = podiumFocus
@@ -562,6 +588,10 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       constructorCode: constructorEntity?.code || (constructor ? fallbackEntityCode(constructor, "team") : null),
       cells,
       points: standing?.points ?? null,
+      legacyPoints: legacyStanding?.points ?? null,
+      reconciliationStatus: legacyStanding == null || standing == null
+        ? "missing"
+        : Number(legacyStanding.points) === Number(standing.points) ? "match" : "difference",
       summaryValue,
       championshipPosition: standing?.position ?? null
     };
@@ -589,7 +619,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
           idField: "team_id",
           nameField: "constructor"
         })))
-        .reduce((total, row) => total + Number(row.points || 0), 0);
+        .reduce((total, row) => total + Number(row.calculatedPoints ?? row.points ?? 0), 0);
       const podiumPosition = buildConstructorPodiumPosition(raceRows, entity);
       return buildAuditMatrixCell({
         round,
@@ -602,6 +632,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     const standing = (entity.id != null ? selectedConstructorIdMap.get(Number(entity.id)) : null)
       || selectedConstructorMap.get(team)
       || null;
+    const legacyStanding = selectedLegacyConstructorMap.get(team) || null;
     return {
       name: team,
       code: entity.code || fallbackEntityCode(team, "team"),
@@ -609,6 +640,10 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       powerUnit: entity.powerUnit || null,
       cells,
       points: standing?.points ?? null,
+      legacyPoints: legacyStanding?.points ?? null,
+      reconciliationStatus: legacyStanding == null || standing == null
+        ? "missing"
+        : Number(legacyStanding.points) === Number(standing.points) ? "match" : "difference",
       summaryValue: standing?.points ?? null,
       championshipPosition: standing?.position ?? null,
       podiumSummary: buildAuditPodiumSummary(cells)
@@ -775,7 +810,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       finishLabel: formatRaceFinishLabel(race?.position),
       raceLabel: auditResultLabel(race),
       raceStatus: race?.status || null,
-      racePoints: race?.points ?? null
+      racePoints: race?.calculatedPoints ?? race?.points ?? null
     };
   }).sort((left, right) => {
     const leftPosition = Number(left.racePosition);
@@ -805,7 +840,12 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     focus: activeFocus,
     focusId: activeFocus.id,
     focusSummary: focusProjection.summary,
-    focusFooter: focusProjection.footer
+    focusFooter: focusProjection.footer,
+    scoringRules: scoringRulesTableValue(scoringRules),
+    selectedReconciliation: {
+      drivers: reconcileStandings(selectedLegacyStandings.drivers, selectedDerivedStandings.drivers),
+      constructors: reconcileStandings(selectedLegacyStandings.constructors, selectedDerivedStandings.constructors)
+    }
   };
 }
 
@@ -2205,6 +2245,12 @@ function registerAdminRoutes(app, deps) {
     const catalog = seasonContext.selected
       ? listSeasonInputs(db, season)
       : { season: null, drivers: [], teams: [], races: [], assignments: [], unresolved: [] };
+    const scoringRules = catalog.season?.id
+      ? (() => {
+          const rules = readSeasonScoringRules(db, catalog.season.id);
+          return rules ? scoringRulesTableValue(rules) : null;
+        })()
+      : null;
     const explicitRound = Number(req.query.round);
     const latestEvidenceRound = Number(
       db.prepare("SELECT MAX(round_number) AS round_number FROM race_data_snapshots WHERE season = ?").get(Number(season))?.round_number || 0
@@ -2233,6 +2279,7 @@ function registerAdminRoutes(app, deps) {
       lineupRound,
       teamLineupHistory,
       catalog,
+      scoringRules,
       unresolvedMappingCount,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
@@ -2975,7 +3022,7 @@ function registerAdminRoutes(app, deps) {
     const sourceQuestions = getQuestions(locale, {
       includeMeta: true
     });
-    const pointsLabel = t("admin_race_data.focus_points");
+    const pointsLabel = "Championship points results";
     const metricOptions = buildRaceDataMetricOptions(t, { pointsLabel });
     const focusOptions = buildRaceDataFocusOptions(sourceQuestions, { pointsLabel, metricOptions });
     const requestedFocusId = String(req.query.focus || "points").trim() || "points";
@@ -2996,7 +3043,8 @@ function registerAdminRoutes(app, deps) {
       metricOptions
     });
     const focusMetricLabels = {
-      points: t("admin_race_data.points"),
+      points: "Championship points results",
+      championship_points_results: "Points",
       podiums: t("admin_race_data.focus_podiums"),
       dnfs: t("admin_race_data.focus_dnfs"),
       grid_wins: t("admin_race_data.focus_grid_wins"),
@@ -3014,6 +3062,9 @@ function registerAdminRoutes(app, deps) {
     const catalog = seasonContext.selected
       ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
       : null;
+    const scoringRules = catalog?.season?.id
+      ? (readSeasonScoringRules(db, catalog.season.id) || DEFAULT_SCORING_RULES)
+      : DEFAULT_SCORING_RULES;
     const races = catalog?.races?.map((race) => race.display_name) || [];
     const evidenceRows = listRaceDataSnapshots(db, season);
     const snapshotRows = listLatestSnapshotsForSeason(db, season, {
@@ -3042,7 +3093,8 @@ function registerAdminRoutes(app, deps) {
       selectedRound: defaultRound,
       showRaceResult: hasSelectedRound,
       catalogRevision: catalog?.catalogRevision || null,
-      focus
+      focus,
+      scoringRules
     });
     const raceCodeByName = new Map(
       (catalog?.races || []).map((race) => [

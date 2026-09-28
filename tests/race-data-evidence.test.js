@@ -142,7 +142,7 @@ test("evidence keeps provider identity and raw session details for future deriva
   assert.deepEqual(evidence.qualifying.rows[0].qualifyingTimes, {
     q1: "1:20.000", q2: "1:19.000", q3: "1:18.000"
   });
-  assert.equal(evidence.raw.provider, "jolpica-ergast");
+  assert.equal(evidence.raw.provider, "openf1");
   assert.equal(evidence.raw.race.Results[0].Driver.driverId, "russell");
 });
 

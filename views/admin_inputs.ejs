@@ -73,6 +73,22 @@
         <% if (query?.success) { %><div class="alert success" role="status"><%= query.success %></div><% } %>
       </div>
     <% } %>
+    <section class="admin-inputs-scoring-overview" aria-labelledby="admin-inputs-scoring-heading">
+      <div class="admin-inputs-scoring-heading">
+        <h2 id="admin-inputs-scoring-heading">Scoring rules</h2>
+        <% if (scoringRules) { %><span class="muted"><%= scoringRules.revision %> · <%= scoringRules.source %></span><% } %>
+      </div>
+      <% if (scoringRules) { %>
+        <div class="admin-inputs-scoring-grid">
+          <div><strong>Race</strong><span><%= Object.entries(scoringRules.racePoints).map(([position, points]) => `${position}:${points}`).join(' · ') %></span></div>
+          <div><strong>Sprint</strong><span><%= Object.entries(scoringRules.sprintPoints).map(([position, points]) => `${position}:${points}`).join(' · ') %></span></div>
+          <div><strong>Fastest lap</strong><span><%= scoringRules.fastestLap.eligible ? `${scoringRules.fastestLap.points} pts from P${scoringRules.fastestLap.minimumFinish}` : 'No bonus' %></span></div>
+          <div><strong>Constructors</strong><span><%= scoringRules.constructorAggregation === 'sum-driver-points' ? 'Sum of driver points' : scoringRules.constructorAggregation %></span></div>
+        </div>
+      <% } else { %>
+        <p class="muted">No scoring rules configured for this season.</p>
+      <% } %>
+    </section>
     <% if (tab === 'drivers') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="drivers" data-table-capabilities="edit,add,remove">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>

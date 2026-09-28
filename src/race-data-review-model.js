@@ -5,8 +5,15 @@ const METRIC_DEFINITIONS = [
     id: "points",
     metric: "points",
     matrixMetric: "points",
+    labelKey: "admin_race_data.championship_points_results",
+    fallback: "Championship points results"
+  },
+  {
+    id: "championship_points_results",
+    metric: "championship_points_results",
+    matrixMetric: "championship_points_results",
     labelKey: "admin_race_data.points",
-    fallback: "Championship points"
+    fallback: "Points"
   },
   {
     id: "metric:podiums",

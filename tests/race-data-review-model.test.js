@@ -70,6 +70,7 @@ test("race-data metric registry exposes one shared set of review metrics", () =>
   }[key] || key));
   assert.deepEqual(options.map((option) => option.id), [
     "points",
+    "championship_points_results",
     "metric:podiums",
     "metric:dnfs",
     "metric:grid_wins",
@@ -78,6 +79,7 @@ test("race-data metric registry exposes one shared set of review metrics", () =>
     "metric:damage"
   ]);
   assert.equal(options.find((option) => option.id === "metric:dnfs").label, "DNFs");
+  assert.equal(options.find((option) => option.id === "championship_points_results").label, "Points");
   assert.equal(options.every((option) => option.view === "all"), true);
 });
 

@@ -1,5 +1,12 @@
 "use strict";
 
+const {
+  DEFAULT_SCORING_RULES,
+  deriveStandingsForRounds,
+  reconcileStandings,
+  scoreResultRows
+} = require("./season-scoring-rules");
+
 function canonicalDriverParts(name) {
   const parts = String(name || "").trim().split(/\s+/);
   return {
@@ -12,7 +19,9 @@ function buildApiRowFromEvidence(row) {
   return {
     position: row.position == null ? (row.positionText || "") : String(row.position),
     grid: row.grid == null ? "" : String(row.grid),
-    points: row.points == null ? "0" : String(row.points),
+    points: row.calculatedPoints == null
+      ? (row.points == null ? "0" : String(row.points))
+      : String(row.calculatedPoints),
     status: row.status || "",
     laps: row.laps == null ? "" : String(row.laps),
     Driver: canonicalDriverParts(row.driver),
@@ -45,24 +54,33 @@ function sessionMetaFromPayload(payload, sessionKey, fallbackSection) {
   };
 }
 
-function buildPersistedDataFromEvidence(evidenceRows, season) {
+function buildPersistedDataFromEvidence(evidenceRows, season, { scoringRules = DEFAULT_SCORING_RULES } = {}) {
   const results = [];
   const qualifying = [];
   const sprints = [];
-  const driverStandingsByRound = new Map();
-  const constructorStandingsByRound = new Map();
   const driverOfTheDayByRound = new Map();
   const destructorsByRound = new Map();
   const destructorsErrorsByRound = new Map();
   const sessionsByRound = new Map();
+  const legacyDriverStandingsByRound = new Map();
+  const legacyConstructorStandingsByRound = new Map();
+  const roundsForStandings = [];
 
   for (const row of evidenceRows || []) {
     const payload = row.payload || {};
     const round = Number(row.round_number);
     if (!Number.isFinite(round)) continue;
-    const raceEvidenceRows = rowsFromSession(payload, "race", payload.race);
+    const raceEvidenceRows = scoreResultRows(
+      rowsFromSession(payload, "race", payload.race),
+      "race",
+      scoringRules
+    );
     const qualifyingEvidenceRows = rowsFromSession(payload, "qualifying", payload.qualifying);
-    const sprintEvidenceRows = rowsFromSession(payload, "sprint", payload.sprint);
+    const sprintEvidenceRows = scoreResultRows(
+      rowsFromSession(payload, "sprint", payload.sprint),
+      "sprint",
+      scoringRules
+    );
     const canonicalSessions = {};
     [
       "practice1",
@@ -80,7 +98,10 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
         payload[sessionKey] || (sessionKey === "race" ? payload.race : null)
       );
     });
+    canonicalSessions.race = { ...(canonicalSessions.race || {}), rows: raceEvidenceRows };
+    canonicalSessions.sprint = { ...(canonicalSessions.sprint || {}), rows: sprintEvidenceRows };
     sessionsByRound.set(round, canonicalSessions);
+    roundsForStandings.push({ roundNumber: round, raceRows: raceEvidenceRows, sprintRows: sprintEvidenceRows });
     const raceRows = raceEvidenceRows.map(buildApiRowFromEvidence);
     results.push({
       round,
@@ -99,12 +120,12 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
       round,
       SprintResults: sprintRows
     });
-    driverStandingsByRound.set(round, (payload.standings?.drivers || []).map((item) => ({
+    legacyDriverStandingsByRound.set(round, (payload.standings?.drivers || []).map((item) => ({
       position: item.position == null ? "" : String(item.position),
       points: item.points == null ? "0" : String(item.points),
       Driver: canonicalDriverParts(item.entity)
     })));
-    constructorStandingsByRound.set(round, (payload.standings?.constructors || []).map((item) => ({
+    legacyConstructorStandingsByRound.set(round, (payload.standings?.constructors || []).map((item) => ({
       position: item.position == null ? "" : String(item.position),
       points: item.points == null ? "0" : String(item.points),
       Constructor: { name: item.entity }
@@ -136,6 +157,29 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
     if (damage?.error) destructorsErrorsByRound.set(round, String(damage.error));
   }
 
+  const derivedStandingsByRound = deriveStandingsForRounds(roundsForStandings, scoringRules);
+  const driverStandingsByRound = new Map();
+  const constructorStandingsByRound = new Map();
+  const reconciliationByRound = new Map();
+  derivedStandingsByRound.forEach((standings, round) => {
+    driverStandingsByRound.set(round, standings.drivers.map((item) => ({
+      ...item,
+      position: String(item.position),
+      points: String(item.points),
+      Driver: canonicalDriverParts(item.entity)
+    })));
+    constructorStandingsByRound.set(round, standings.constructors.map((item) => ({
+      ...item,
+      position: String(item.position),
+      points: String(item.points),
+      Constructor: { name: item.entity }
+    })));
+    reconciliationByRound.set(round, {
+      drivers: reconcileStandings(legacyDriverStandingsByRound.get(round), standings.drivers),
+      constructors: reconcileStandings(legacyConstructorStandingsByRound.get(round), standings.constructors)
+    });
+  });
+
   return {
     season: Number(season),
     results: results.sort((a, b) => a.round - b.round),
@@ -144,6 +188,10 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
     completedRounds: results.map((row) => row.round),
     driverStandingsByRound,
     constructorStandingsByRound,
+    derivedStandingsByRound,
+    legacyDriverStandingsByRound,
+    legacyConstructorStandingsByRound,
+    reconciliationByRound,
     driverOfTheDayByRound,
     destructorsByRound,
     destructorsErrorsByRound,

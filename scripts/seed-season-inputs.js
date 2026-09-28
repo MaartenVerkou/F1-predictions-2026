@@ -6,7 +6,6 @@ const { createAppDatabase } = require("../src/app-database");
 const {
   ENTITY_TYPES,
   addEntityAlias,
-  addProviderReference,
   createOrGetSeason,
   ensureSeasonInputsSchema,
   slugify,
@@ -88,10 +87,6 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
 }
 
-function providerKeyForDriver(name) {
-  return slugify(name).replace(/-/g, "_").replace(/_jr$/, "");
-}
-
 function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() } = {}) {
   ensureSeasonInputsSchema(db);
   const roster = readJson(ROSTER_PATH);
@@ -115,7 +110,6 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       });
       teamIds.set(teamName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, alias: teamName, source: "seed", now });
-      addProviderReference(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, provider: "jolpica", providerKey: slugify(teamName), providerLabel: teamName, now });
       const displayOrder = TEAM_DISPLAY_ORDER.indexOf(teamName) + 1 || TEAM_DISPLAY_ORDER.length + 1;
       upsertSeasonTeam(db, { seasonId: seasonRow.id, teamId: id, displayOrder, orderBasis: "official", now });
     }
@@ -133,7 +127,6 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       });
       driverIds.set(driverName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, alias: driverName, source: "seed", now });
-      addProviderReference(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, provider: "jolpica", providerKey: providerKeyForDriver(driverName), providerLabel: driverName, now });
       const driverNumber = roster.driver_numbers?.[driverName];
       if (driverNumber == null) throw new Error(`Missing canonical driver number for ${driverName}.`);
       upsertSeasonDriver(db, { seasonId: seasonRow.id, driverId: id, driverNumber, now });
@@ -218,7 +211,6 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
         });
       }
       addEntityAlias(db, { entityType: ENTITY_TYPES.RACE, entityId: raceId, seasonId: seasonRow.id, alias: raceName, source: "seed", now });
-      addProviderReference(db, { entityType: ENTITY_TYPES.RACE, entityId: raceId, provider: "jolpica", providerKey: `${season}-round-${roundNumber}`, providerLabel: raceName, now });
       raceIds.push(raceId);
     });
     return { seasonId: seasonRow.id, driverCount: driverIds.size, teamCount: teamIds.size, raceCount: raceIds.length };

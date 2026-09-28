@@ -399,7 +399,7 @@ function summarizeProviderPreview(database, {
     "SELECT round_number, round_name, coverage_status, unresolved_count FROM race_data_snapshots WHERE season = ? ORDER BY round_number"
   ).all(Number(season));
   return {
-    sourceType: importRow?.source_type || SOURCE_TYPES.JOLPICA,
+    sourceType: importRow?.source_type || SOURCE_TYPES.OPENF1,
     sourceNote: "Provider-backed preview evidence; isolated from production",
     importId: importRow ? Number(importRow.id) : null,
     import: importRow || null,

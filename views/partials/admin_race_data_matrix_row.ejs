@@ -32,9 +32,9 @@
 
   <% if (isGroupedDriver) { %>
     <% if (groupIsFirst) { %>
-      <%- include('admin_race_data_summary_cell', { row: group.summary, viewMode: 'constructors', rowspan: groupSize }) %>
+      <%- include('admin_race_data_summary_cell', { row: group.summary, viewMode: 'constructors', rowspan: groupSize, focusId }) %>
     <% } %>
   <% } else { %>
-    <%- include('admin_race_data_summary_cell', { row, viewMode, rowspan: null }) %>
+    <%- include('admin_race_data_summary_cell', { row, viewMode, rowspan: null, focusId }) %>
   <% } %>
 </tr>

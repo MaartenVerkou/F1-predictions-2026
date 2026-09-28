@@ -6,6 +6,7 @@ const {
   formatDamageCost,
   formatDamageCostExact
 } = require("./destructors-damage");
+const { DEFAULT_SCORING_RULES, pointsForResult } = require("./season-scoring-rules");
 
 const CLASSIFIED_STATUS_RE = /^(finished|lapped|lap\s+down|\+\d+\s+lap|\+\d+\.\d+s?)$/i;
 const NON_DNF_STATUS_RE = /^(dns|dnq|did not start|did not qualify|dsq|disqualified|nc|not classified|wd|withdrew)$/i;
@@ -33,6 +34,19 @@ function isDnfStatus(status) {
 function roundRows(round, section) {
   if (section === "damage") return round?.evidence?.payload?.external?.damage?.rows || [];
   return round?.evidence?.payload?.[section]?.rows || [];
+}
+
+function calculatedPoints(round, row, sessionType) {
+  if (!row) return 0;
+  if (row.calculatedPoints != null) return Number(row.calculatedPoints) || 0;
+  // Older snapshots stored normalized result points without a marker. Keep
+  // those snapshots readable while new imports persist calculatedPoints.
+  if (row.points != null) return Number(row.points) || 0;
+  return pointsForResult(
+    row,
+    sessionType,
+    round?.evidence?.payload?.scoringRules || DEFAULT_SCORING_RULES
+  );
 }
 
 function damageEntityMatches(candidate, row, entityType) {
@@ -68,7 +82,7 @@ function focusCell(cell, { label, title, hit = false, state = null, value } = {}
 function sprintPointsForDriver(round, entity) {
   return roundRows(round, "sprint")
     .filter((row) => entityMatches(row, entity, { idField: "driver_id", nameField: "driver" }))
-    .reduce((total, row) => total + Number(row.points || 0), 0);
+    .reduce((total, row) => total + calculatedPoints(round, row, "sprint"), 0);
 }
 
 function qualifyingRowsForTeam(round, team) {
@@ -80,7 +94,7 @@ function qualifyingRowsForTeam(round, team) {
 function racePointsForDriver(round, entity) {
   return roundRows(round, "race")
     .filter((row) => entityMatches(row, entity, { idField: "driver_id", nameField: "driver" }))
-    .reduce((total, row) => total + Number(row.points || 0), 0);
+    .reduce((total, row) => total + calculatedPoints(round, row, "race"), 0);
 }
 
 function championshipPointsForDriver(round, entity) {
@@ -361,8 +375,8 @@ function applyDriverPointsMetric(row, rounds) {
       });
     }
 
-    const points = [...raceRows, ...sprintRows]
-      .reduce((total, candidate) => total + Number(candidate.points || 0), 0);
+    const points = raceRows.reduce((total, candidate) => total + calculatedPoints(round, candidate, "race"), 0)
+      + sprintRows.reduce((total, candidate) => total + calculatedPoints(round, candidate, "sprint"), 0);
     return focusCell(cell, {
       label: points,
       title: row.name + ": " + points + " championship points",
@@ -854,7 +868,11 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
     focus?.highlightMode || defaultRaceDataHighlightMode(focusMetric)
   ).trim().toLowerCase();
   const resolvedFocus = { ...focus, matrixMetric: metric, highlightMode };
-  const nextDrivers = driverRows.map((row) => applyDriverMetric(row, rounds, resolvedFocus, cutoffRoundNumber));
+  const nextDrivers = driverRows.map((row) => (
+    metric === "championship_points_results"
+      ? applyDriverPointsMetric(row, rounds)
+      : applyDriverMetric(row, rounds, resolvedFocus, cutoffRoundNumber)
+  ));
   const nextConstructors = constructorRows.map((row) => applyConstructorMetric(row, rounds, resolvedFocus, cutoffRoundNumber, nextDrivers));
   const direction = focus?.sort === "asc" ? "asc" : "desc";
   const sortedDrivers = lastStandingFocus
@@ -863,7 +881,7 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
   const sortedConstructors = lastStandingFocus
     ? sortLastStandingRows(nextConstructors)
     : sortFocusRows(nextConstructors, direction);
-  const usesChampionshipPosition = metric === "points"
+  const usesChampionshipPosition = ["points", "championship_points_results"].includes(metric)
     || ["championship_top3", "last_standing", "teammate_points"].includes(focusMetric);
   const assignDisplayPositions = (rows) => rows.forEach((row, index) => {
     const sourceValue = numeric(row.focusSortValue ?? row.summaryValue ?? row.points);

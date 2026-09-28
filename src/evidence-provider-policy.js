@@ -2,15 +2,13 @@
 
 const PROVIDER_POLICY = Object.freeze({
   session: "openf1",
-  standings: "jolpica_ergast",
+  standings: "derived_race_results",
   driverOfTheDay: "formula1",
   destructors: "reddit_destructors"
 });
 
 const UNSUPPORTED_STANDARD_PROVIDERS = new Set([
-  "formula1_dashboard",
-  "jolpica_ergast",
-  "jolpica"
+  "formula1_dashboard"
 ]);
 
 function normalizeProvider(value) {
@@ -25,7 +23,7 @@ function assertStandardEvidenceProvider(value) {
       "Formula 1 standard-session evidence no longer accepts " +
       provider +
       ". Use OpenF1 for practice, sprint qualifying, sprint, qualifying, grid, and race data; " +
-      "Jolpica/Ergast is reserved for championship standings."
+      "championship standings are derived from persisted race and sprint results."
     );
   }
   throw new Error(

@@ -1,6 +1,11 @@
 "use strict";
 
 const { assertAssignmentIntervals } = require("./season-lineup");
+const {
+  DEFAULT_SCORING_RULES,
+  ensureSeasonScoringRulesSchema,
+  seedSeasonScoringRules
+} = require("./season-scoring-rules");
 
 const ENTITY_TYPES = Object.freeze({
   DRIVER: "driver",
@@ -265,6 +270,14 @@ function ensureSeasonInputsSchema(db) {
   addColumnIfMissing("drivers", "nationality_code", "TEXT");
   addColumnIfMissing("drivers", "date_of_birth", "TEXT");
 
+  ensureSeasonScoringRulesSchema(db);
+  db.prepare("SELECT id FROM seasons ORDER BY id").all().forEach((season) => {
+    seedSeasonScoringRules(db, {
+      seasonId: Number(season.id),
+      rules: DEFAULT_SCORING_RULES
+    });
+  });
+
   if (hasColumn("season_drivers", "active")) {
     db.exec(
       "DELETE FROM season_drivers WHERE active = 0 AND NOT EXISTS " +
@@ -287,11 +300,18 @@ function ensureSeasonInputsSchema(db) {
 
 function createOrGetSeason(db, { year, label = String(year), status = "active", now = new Date().toISOString() }) {
   const existing = db.prepare("SELECT id, year, label, status FROM seasons WHERE year = ? LIMIT 1").get(Number(year));
-  if (existing) return { ...existing, id: Number(existing.id), year: Number(existing.year) };
+  if (existing) {
+    ensureSeasonScoringRulesSchema(db);
+    seedSeasonScoringRules(db, { seasonId: Number(existing.id), rules: DEFAULT_SCORING_RULES, now });
+    return { ...existing, id: Number(existing.id), year: Number(existing.year) };
+  }
   const result = db.prepare(
     "INSERT INTO seasons (year, label, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
   ).run(Number(year), String(label), String(status), now, now);
-  return { id: Number(result.lastInsertRowid), year: Number(year), label: String(label), status: String(status) };
+  const seasonId = Number(result.lastInsertRowid);
+  ensureSeasonScoringRulesSchema(db);
+  seedSeasonScoringRules(db, { seasonId, rules: DEFAULT_SCORING_RULES, now });
+  return { id: seasonId, year: Number(year), label: String(label), status: String(status) };
 }
 
 function upsertDriver(db, {

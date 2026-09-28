@@ -11,22 +11,22 @@ const {
 test("the source policy has one owner for each fact family", () => {
   assert.deepEqual(PROVIDER_POLICY, {
     session: "openf1",
-    standings: "jolpica_ergast",
+    standings: "derived_race_results",
     driverOfTheDay: "formula1",
     destructors: "reddit_destructors"
   });
   assert.equal(assertStandardEvidenceProvider("openf1"), "openf1");
-  assert.equal(isCanonicalProviderFor("standings", "jolpica_ergast"), true);
+  assert.equal(isCanonicalProviderFor("standings", "derived_race_results"), true);
   assert.equal(isCanonicalProviderFor("destructors", "reddit_destructors"), true);
 });
 
 test("legacy standard-results providers fail with an actionable migration error", () => {
   assert.throws(
     () => assertStandardEvidenceProvider("formula1_dashboard"),
-    /Use OpenF1.*Jolpica\/Ergast is reserved for championship standings/
+    /Use OpenF1.*championship standings are derived/
   );
   assert.throws(
     () => assertStandardEvidenceProvider("jolpica_ergast"),
-    /Use OpenF1/
+    /Unsupported standard-session evidence provider/
   );
 });
