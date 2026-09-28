@@ -32,18 +32,6 @@
     </div>
   <% } %>
 
-  <div class="admin-actuals-source-note admin-race-data-legend" role="note">
-    <span><%= t('admin_actuals.overview_source') %></span>
-    <% if (actualsOverview?.pendingCount) { %>
-      <span><%= t('admin_actuals.pending_rounds', { count: actualsOverview.pendingCount }) %></span>
-    <% } %>
-    <% if (publishedActuals?.available && actualsOverview?.publishedRound) { %>
-      <span><%= t('admin_actuals.published_through', { round: actualsOverview.publishedRound }) %></span>
-    <% } else { %>
-      <span><%= t('admin_actuals.no_published_snapshot') %></span>
-    <% } %>
-  </div>
-
   <div class="admin-actuals-overview" data-admin-actuals-form>
     <div class="admin-race-data-table-wrap admin-actuals-overview-wrap">
       <table class="admin-actuals-overview-table">
@@ -73,15 +61,23 @@
             <tr>
               <th scope="row" class="admin-actuals-question-cell">
                 <span class="admin-actuals-question-number"><%= String(row.questionNumber).padStart(2, '0') %></span>
-                <span class="admin-actuals-question-prompt"><%= row.question.prompt %></span>
-                <small><%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %></small>
+                <span class="admin-actuals-question-prompt" title="<%= row.question.prompt %>"><%= row.question.prompt %></span>
+                <a class="admin-actuals-question-view-link"
+                   href="/admin/race-data?season=<%= encodeURIComponent(season) %>&view=<%= encodeURIComponent(row.baseView) %>&focus=<%= encodeURIComponent(row.question.id) %>"
+                   title="<%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %>">
+                  <%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %>
+                </a>
               </th>
               <% row.cells.forEach((cell) => { %>
                 <td class="admin-actuals-value-cell <%= cell.timing === 'future' ? 'is-future' : '' %> <%= cell.reviewStatus === 'pending' ? 'is-pending' : '' %> <%= cell.published ? 'is-published' : '' %>"
                     data-admin-actuals-round="<%= cell.roundNumber %>"
-                    data-review-status="<%= cell.reviewStatus || '' %>">
+                  data-review-status="<%= cell.reviewStatus || '' %>">
                   <% if (cell.hasValue || cell.reviewStatus) { %>
-                    <a href="<%= cell.href %>" title="Open Race Data"><%= cell.value %></a>
+                    <a href="<%= cell.href %>" title="<%= cell.value %>">
+                      <% (cell.lines && cell.lines.length ? cell.lines : [cell.value]).forEach((line) => { %>
+                        <span class="admin-actuals-value-line"><%= line %></span>
+                      <% }) %>
+                    </a>
                   <% } else { %>
                     <span class="muted">—</span>
                   <% } %>

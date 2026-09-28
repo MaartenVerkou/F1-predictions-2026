@@ -12,6 +12,20 @@ function normalizeRoundNumber(value) {
     : null;
 }
 
+function formatActualOverviewLines(raw) {
+  if (raw == null || String(raw).trim() === "") return [];
+  let value = raw;
+  try {
+    value = JSON.parse(raw);
+  } catch (err) {
+    // Snapshot values may be plain strings as well as JSON.
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter((item) => item.trim() !== "");
+  }
+  return [formatActualOverviewValue(raw)];
+}
+
 function buildActualsOverview({
   season,
   races = [],
@@ -67,6 +81,7 @@ function buildActualsOverview({
         const hasValue = rawValue != null && String(rawValue).trim() !== "";
         return {
           value: formatActualOverviewValue(rawValue),
+          lines: formatActualOverviewLines(rawValue),
           hasValue,
           reviewStatus: target.reviewStatus,
           published: target.published,

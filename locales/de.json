@@ -607,11 +607,7 @@
     "page_title": "Set actuals",
     "heading": "Season actuals",
     "intro": "Übersicht der abgeleiteten Antworten aus gespeicherten Renndaten. Quelle vor der Veröffentlichung für die Wertung prüfen.",
-    "overview_source": "Nur-Lese-Übersicht. Quelldaten in Renndaten prüfen und korrigieren.",
-    "pending_rounds": "{count} Rennen warten auf Prüfung",
-    "published_through": "Veröffentlicht bis R{round}",
-    "no_published_snapshot": "Kein Snapshot veröffentlicht",
-    "timing_future": "future",
+      "timing_future": "future",
     "needs_review": "needs review",
     "reviewed": "reviewed"
   },

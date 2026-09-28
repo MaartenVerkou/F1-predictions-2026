@@ -607,11 +607,7 @@
     "page_title": "Set actuals",
     "heading": "Season actuals",
     "intro": "Aperçu des réponses dérivées des données de course enregistrées. Vérifiez la source avant publication pour le score.",
-    "overview_source": "Aperçu en lecture seule. Vérifiez et corrigez les données sources dans Données de course.",
-    "pending_rounds": "{count} course(s) en attente de vérification",
-    "published_through": "Publié jusqu'à R{round}",
-    "no_published_snapshot": "Aucun snapshot publié",
-    "timing_future": "future",
+      "timing_future": "future",
     "needs_review": "needs review",
     "reviewed": "reviewed"
   },

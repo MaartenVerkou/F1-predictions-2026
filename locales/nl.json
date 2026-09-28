@@ -150,11 +150,7 @@
     "page_title": "Uitslagen invullen",
     "heading": "Seizoensuitslagen",
     "intro": "Overzicht van afgeleide antwoorden uit opgeslagen racedata. Controleer de bron daar voordat je publiceert voor scoring.",
-    "overview_source": "Alleen-lezen overzicht. Controleer en corrigeer opgeslagen brondata bij Racedata.",
-    "pending_rounds": "{count} race(s) wachten op controle",
-    "published_through": "Gepubliceerd tot en met R{round}",
-    "no_published_snapshot": "Geen gepubliceerde snapshot",
-    "timing_future": "toekomstig",
+      "timing_future": "toekomstig",
     "needs_review": "controle nodig",
     "reviewed": "gecontroleerd"
   },

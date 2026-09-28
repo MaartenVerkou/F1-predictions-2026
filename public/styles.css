@@ -3217,11 +3217,6 @@ button:disabled {
   min-width: 0;
 }
 
-.admin-actuals-source-note {
-  margin: 0;
-  color: var(--muted);
-}
-
 .admin-actuals-overview {
   min-width: 0;
 }
@@ -3240,7 +3235,7 @@ button:disabled {
 
 .admin-actuals-overview-table th,
 .admin-actuals-overview-table td {
-  padding: 8px 10px;
+  padding: 7px 5px;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
@@ -3268,8 +3263,8 @@ button:disabled {
   position: sticky;
   left: 0;
   z-index: 2;
-  width: min(360px, 42vw);
-  min-width: 260px;
+  width: min(280px, 31vw);
+  min-width: 200px;
   text-align: left !important;
   background: var(--card);
 }
@@ -3296,11 +3291,11 @@ button:disabled {
 .admin-actuals-question-prompt {
   min-width: 0;
   font-weight: 700;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.admin-actuals-question-cell small,
 .admin-actuals-round-column small {
   color: var(--muted);
   font-size: 10px;
@@ -3308,7 +3303,24 @@ button:disabled {
 }
 
 .admin-actuals-round-column {
-  min-width: 70px;
+  min-width: 58px;
+}
+
+.admin-actuals-question-view-link {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.admin-actuals-question-view-link:hover,
+.admin-actuals-question-view-link:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
 }
 
 .admin-actuals-round-column a,
@@ -3336,19 +3348,31 @@ button:disabled {
 }
 
 .admin-actuals-value-cell {
-  width: 120px;
-  min-width: 86px;
-  max-width: 180px;
+  width: 84px;
+  min-width: 64px;
+  max-width: 96px;
   overflow: hidden;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
 
+.admin-actuals-overview-table .admin-actuals-value-cell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .admin-actuals-value-cell a {
   display: block;
   overflow: hidden;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.admin-actuals-value-line {
+  display: block;
 }
 
 .admin-actuals-value-cell.is-published {
@@ -3358,8 +3382,14 @@ button:disabled {
 @media (max-width: 720px) {
   .admin-actuals-question-column,
   .admin-actuals-question-cell {
-    width: 230px;
-    min-width: 230px;
+    width: 210px;
+    min-width: 210px;
+  }
+
+  .admin-actuals-value-cell {
+    width: 76px;
+    min-width: 60px;
+    max-width: 88px;
   }
 }
 

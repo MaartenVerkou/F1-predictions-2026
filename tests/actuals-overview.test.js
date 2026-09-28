@@ -19,7 +19,7 @@ test("builds one season overview from the latest persisted snapshot per round", 
     latestRoundNumber: 2,
     publishedActuals: { available: true, snapshot: { round_number: 1 } },
     fetchSnapshotValues: (snapshotId) => snapshotId === 101
-      ? { points_question: '"Antonelli"' }
+      ? { points_question: '["Antonelli","Russell","Leclerc"]' }
       : { team_question: '"Mercedes"' }
   });
 
@@ -28,7 +28,8 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.deepEqual(overview.targets.map((target) => target.published), [true, false, false]);
   assert.equal(overview.pendingCount, 1);
   assert.equal(overview.publishedRound, 1);
-  assert.equal(overview.rows[0].cells[0].value, "Antonelli");
+  assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");
+  assert.deepEqual(overview.rows[0].cells[0].lines, ["Antonelli", "Russell", "Leclerc"]);
   assert.match(overview.rows[0].cells[0].href, /round=1/);
   assert.match(overview.rows[0].cells[0].href, /view=drivers/);
   assert.match(overview.rows[1].cells[0].href, /view=constructors/);

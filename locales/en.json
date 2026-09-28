@@ -156,11 +156,7 @@
     "page_title": "Set actuals",
     "heading": "Season actuals",
     "intro": "Overview of derived answers from stored Race Data. Review the source there before publishing for scoring.",
-    "overview_source": "Read-only overview. Review and correct stored evidence in Race Data.",
-    "pending_rounds": "{count} round(s) pending review",
-    "published_through": "Published through R{round}",
-    "no_published_snapshot": "No published snapshot",
-    "timing_future": "future",
+      "timing_future": "future",
     "needs_review": "needs review",
     "reviewed": "reviewed"
   },

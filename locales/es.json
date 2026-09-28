@@ -607,11 +607,7 @@
     "page_title": "Set actuals",
     "heading": "Season actuals",
     "intro": "Resumen de respuestas derivadas de los datos de carrera guardados. Revisa la fuente antes de publicarlos para puntuar.",
-    "overview_source": "Resumen de solo lectura. Revisa y corrige los datos guardados en Datos de carrera.",
-    "pending_rounds": "{count} carrera(s) pendientes de revisión",
-    "published_through": "Publicado hasta R{round}",
-    "no_published_snapshot": "No hay snapshot publicado",
-    "timing_future": "future",
+      "timing_future": "future",
     "needs_review": "needs review",
     "reviewed": "reviewed"
   },
