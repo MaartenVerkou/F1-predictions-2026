@@ -10,6 +10,7 @@ const {
   fallbackRaceCode,
   buildRaceDataFocusOptions,
   buildRaceDataMetricOptions,
+  resolveActiveRaceDataMetricId,
   resolveRaceDataFocus,
   buildRaceDataAuditView,
   buildCorrectedRaceEvidence,
@@ -574,6 +575,22 @@ test("race data metrics are available independently of question focus", () => {
     "sprint_points",
     "damage"
   ]);
+});
+
+test("question focus keeps its underlying content variant selected", () => {
+  const metricOptions = buildRaceDataMetricOptions((key) => key);
+  assert.equal(resolveActiveRaceDataMetricId({
+    focus: { id: "all_teams_score_points", metric: "points", matrixMetric: "points" },
+    metricOptions
+  }), "points");
+  assert.equal(resolveActiveRaceDataMetricId({
+    focus: { id: "all_podium_finishers", metric: "podiums", matrixMetric: "podiums" },
+    metricOptions
+  }), "metric:podiums");
+  assert.equal(resolveActiveRaceDataMetricId({
+    focus: { id: "unknown", metric: "not_a_metric", matrixMetric: "not_a_metric" },
+    metricOptions
+  }), "points");
 });
 
 test("race data focus options are driven by question metadata", () => {

@@ -156,9 +156,9 @@ const formatReviewDate = (value) => {
       </div>
       <div class="admin-race-data-tabs admin-race-data-metric-tabs admin-race-data-switch" role="tablist" aria-label="Race data metric">
         <% (view.metricOptions || []).forEach((option) => { %>
-          <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.focusId ? 'is-active' : '' %>"
+          <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.activeMetricId ? 'is-active' : '' %>"
              href="/admin/race-data?season=<%= season %>&view=<%= viewMode %><%= roundQuery %>&focus=<%= option.id %>"
-             role="tab" aria-selected="<%= option.id === view.focusId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>"><%= option.label %></a>
+             role="tab" aria-selected="<%= option.id === view.activeMetricId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>"><%= option.label %></a>
         <% }) %>
       </div>
       <form method="get" action="/admin/race-data" class="admin-race-data-metric-select-form" data-race-data-metric-select-form>
@@ -168,7 +168,7 @@ const formatReviewDate = (value) => {
         <label for="admin-race-data-metric-select">Content</label>
         <select id="admin-race-data-metric-select" name="focus" onchange="this.form.submit()">
           <% (view.metricOptions || []).forEach((option) => { %>
-            <option value="<%= option.id %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %></option>
+            <option value="<%= option.id %>" <%= option.id === view.activeMetricId ? 'selected' : '' %>><%= option.label %></option>
           <% }) %>
         </select>
       </form>

@@ -114,6 +114,8 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.doesNotMatch(region, /class="admin-race-data-controls"/);
   assert.match(region, /questions_label/);
   assert.match(region, /data-race-data-round-link/);
+  assert.match(region, /option\.id === view\.activeMetricId/);
+  assert.match(region, /admin-race-data-metric-tab <%= option\.id === view\.activeMetricId \? 'is-active' : '' %>/);
   assert.match(region, /class="admin-race-data-table-section"/);
   assert.match(region, /admin_race_data\.championship_standings/);
   assert.doesNotMatch(region, /admin_race_data\.race_result/);

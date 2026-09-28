@@ -319,6 +319,12 @@ function resolveRaceDataFocus({ questions = [], focusId = "points", viewMode = "
   return { ...options[0], view: viewMode };
 }
 
+function resolveActiveRaceDataMetricId({ focus = null, metricOptions = [] } = {}) {
+  const metric = String(focus?.matrixMetric || focus?.metric || "points").trim().toLowerCase();
+  const preferredId = metric === "points" ? "points" : `metric:${metric}`;
+  return metricOptions.some((option) => option.id === preferredId) ? preferredId : "points";
+}
+
 function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
   if (evidence) return evidence.coverage_status || evidence.payload?.coverage?.status || "incomplete";
   return Number(roundNumber) > Number(latestEvidenceRound || 0) ? "future" : "not_synced";
@@ -3058,6 +3064,7 @@ function registerAdminRoutes(app, deps) {
       : [];
     view.focusOptions = focusOptions;
     view.metricOptions = metricOptions;
+    view.activeMetricId = resolveActiveRaceDataMetricId({ focus, metricOptions });
     view.questionOptions = focusOptions.filter((option) => option.questionId);
     const model = {
       user,
@@ -4793,6 +4800,7 @@ module.exports = {
   fallbackRaceCode,
   buildRaceDataFocusOptions,
   buildRaceDataMetricOptions,
+  resolveActiveRaceDataMetricId,
   resolveRaceDataFocus,
   buildRaceDataAuditView,
   buildCorrectedRaceEvidence,
