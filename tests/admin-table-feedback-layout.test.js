@@ -141,6 +141,9 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(championshipStyles[1], /margin-top:\s*0/);
   assert.match(championshipStyles[1], /padding-top:\s*0/);
   assert.doesNotMatch(championshipStyles[1], /border-top/);
+  const derivationStyles = styles.match(/\.admin-race-data-derivation\s*\{([\s\S]*?)\n\}/);
+  assert.ok(derivationStyles, "derivation section styles should be explicit");
+  assert.doesNotMatch(derivationStyles[1], /border-top|padding-top/);
   const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
   assert.match(app, /data-race-data-round-form\] select\[name="round"\]/);
   assert.match(app, /roundSelect\.value = round \|\| ''/);
