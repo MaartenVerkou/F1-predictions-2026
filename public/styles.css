@@ -8081,6 +8081,7 @@ button.lang-option.is-active {
 
 .admin-race-data-table-section[data-race-data-championship] {
   gap: 10px;
+  margin-top: 16px;
   padding-top: 0;
 }
 
