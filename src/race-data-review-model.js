@@ -95,6 +95,13 @@ function extractSessionRows(section) {
 
 function getRaceSessionRows(payload, sessionKey) {
   const aliases = SESSION_ALIASES[sessionKey] || [sessionKey];
+  const canonicalSessions = payload?.sessions;
+  if (canonicalSessions && typeof canonicalSessions === "object") {
+    for (const alias of aliases) {
+      const canonicalRows = extractSessionRows(canonicalSessions[alias]);
+      if (canonicalRows.length) return canonicalRows;
+    }
+  }
   for (const alias of aliases) {
     const direct = extractSessionRows(payload?.[alias]);
     if (direct.length) return direct;

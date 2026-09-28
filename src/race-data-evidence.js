@@ -21,6 +21,7 @@ const TEAM_NAME_ALIASES = {
 };
 
 const SOURCE_TYPES = {
+  OPENF1: "openf1",
   JOLPICA: "jolpica_ergast",
   FORMULA1: "formula1",
   FORMULA1_DASHBOARD: "formula1_dashboard",
@@ -178,11 +179,29 @@ function normalizeDamageRow(row, roster, canonicalCatalog = null) {
   };
 }
 
-function normalizeCoverage({ race = [], qualifying = [], sprint = [], damage = [], damageAvailable = null, driverStandings = [], constructorStandings = [] }) {
+function normalizeCoverage({
+  race = [],
+  qualifying = [],
+  sprint = [],
+  practice1 = [],
+  practice2 = [],
+  practice3 = [],
+  sprintQualifying = [],
+  startingGrid = [],
+  damage = [],
+  damageAvailable = null,
+  driverStandings = [],
+  constructorStandings = []
+}) {
   const coverage = {
     race: { available: race.length > 0, count: race.length },
     qualifying: { available: qualifying.length > 0, count: qualifying.length },
     sprint: { available: sprint.length > 0, count: sprint.length },
+    practice1: { available: practice1.length > 0, count: practice1.length },
+    practice2: { available: practice2.length > 0, count: practice2.length },
+    practice3: { available: practice3.length > 0, count: practice3.length },
+    sprintQualifying: { available: sprintQualifying.length > 0, count: sprintQualifying.length },
+    startingGrid: { available: startingGrid.length > 0, count: startingGrid.length },
     damage: { available: damageAvailable == null ? damage.length > 0 : Boolean(damageAvailable), count: damage.length },
     driverStandings: { available: driverStandings.length > 0, count: driverStandings.length },
     constructorStandings: {
@@ -221,15 +240,56 @@ function buildEvidenceBundle({
     (data?.qualifying || []).find((item) => Number(item?.round) === round) || {};
   const sprintRace =
     (data?.sprints || []).find((item) => Number(item?.round) === round) || {};
+  const providerSessions = data?.sessionsByRound instanceof Map
+    ? data.sessionsByRound.get(round) || {}
+    : {};
+  const sessionRows = (key, kind = key) => normalizeSourceRows(
+    providerSessions?.[key]?.rows || [],
+    roster,
+    kind,
+    canonicalCatalog
+  );
   const driverStandings = data?.driverStandingsByRound?.get(round) || [];
   const constructorStandings = data?.constructorStandingsByRound?.get(round) || [];
-  const raceRows = normalizeSourceRows(race.Results, roster, "race", canonicalCatalog);
-  const qualifyingRows = normalizeSourceRows(
-    qualifyingRace.QualifyingResults,
-    roster,
-    "qualifying", canonicalCatalog
-  );
-  const sprintRows = normalizeSourceRows(sprintRace.SprintResults, roster, "sprint", canonicalCatalog);
+  const canonicalRaceRows = sessionRows("race", "race");
+  const canonicalQualifyingRows = sessionRows("qualifying", "qualifying");
+  const canonicalSprintRows = sessionRows("sprint", "sprint");
+  const raceRows = canonicalRaceRows.length
+    ? canonicalRaceRows
+    : normalizeSourceRows(race.Results, roster, "race", canonicalCatalog);
+  const qualifyingRows = canonicalQualifyingRows.length
+    ? canonicalQualifyingRows
+    : normalizeSourceRows(
+        qualifyingRace.QualifyingResults,
+        roster,
+        "qualifying", canonicalCatalog
+      );
+  const sprintRows = canonicalSprintRows.length
+    ? canonicalSprintRows
+    : normalizeSourceRows(sprintRace.SprintResults, roster, "sprint", canonicalCatalog);
+  const practice1Rows = sessionRows("practice1", "practice");
+  const practice2Rows = sessionRows("practice2", "practice");
+  const practice3Rows = sessionRows("practice3", "practice");
+  const sprintQualifyingRows = sessionRows("sprintQualifying", "qualifying");
+  const startingGridRows = sessionRows("startingGrid", "race");
+  const effectiveStartingGridRows = startingGridRows.length
+    ? startingGridRows
+    : raceRows.filter((row) => row.grid != null);
+  const sessionPayload = (key, rows, fallback = {}) => ({
+    provider: fallback.provider || provider || data?.provider || null,
+    providerSchema: fallback.providerSchema || providerSchema || data?.providerSchema || null,
+    sessionKey: fallback.sessionKey || null,
+    meetingKey: fallback.meetingKey || null,
+    sessionName: fallback.sessionName || key,
+    sessionType: fallback.sessionType || null,
+    dateStart: fallback.dateStart || null,
+    dateEnd: fallback.dateEnd || null,
+    available: fallback.available == null ? rows.length > 0 : Boolean(fallback.available),
+    status: fallback.status || (rows.length > 0 ? "available" : "unavailable"),
+    unavailableReason: fallback.unavailableReason || (rows.length > 0 ? null : "No persisted rows"),
+    sourceUrl: fallback.sourceUrl || null,
+    rows
+  });
   const damageMap = data?.destructorsByRound instanceof Map
     ? data.destructorsByRound
     : data?.damageByRound instanceof Map ? data.damageByRound : null;
@@ -249,6 +309,11 @@ function buildEvidenceBundle({
     race: raceRows,
     qualifying: qualifyingRows,
     sprint: sprintRows,
+    practice1: practice1Rows,
+    practice2: practice2Rows,
+    practice3: practice3Rows,
+    sprintQualifying: sprintQualifyingRows,
+    startingGrid: effectiveStartingGridRows,
     damage: damageRows,
     damageAvailable: damageSourceAvailable,
     driverStandings: normalizedDriverStandings,
@@ -287,6 +352,10 @@ function buildEvidenceBundle({
       race: sourceUrls.race || null,
       qualifying: sourceUrls.qualifying || null,
       sprint: sourceUrls.sprint || null,
+      practice1: sourceUrls.practice1 || null,
+      practice2: sourceUrls.practice2 || null,
+      practice3: sourceUrls.practice3 || null,
+      sprintQualifying: sourceUrls.sprintQualifying || null,
       startingGrid: sourceUrls.startingGrid || null,
       damage: sourceUrls.damage || null,
       driverStandings: sourceUrls.driverStandings || null,
@@ -301,6 +370,30 @@ function buildEvidenceBundle({
     },
     qualifying: { rows: qualifyingRows },
     sprint: { rows: sprintRows },
+    practice: {
+      practice1: { rows: practice1Rows },
+      practice2: { rows: practice2Rows },
+      practice3: { rows: practice3Rows }
+    },
+    sprintQualifying: { rows: sprintQualifyingRows },
+    sessions: {
+      practice1: sessionPayload("practice1", practice1Rows, providerSessions.practice1),
+      practice2: sessionPayload("practice2", practice2Rows, providerSessions.practice2),
+      practice3: sessionPayload("practice3", practice3Rows, providerSessions.practice3),
+      sprintQualifying: sessionPayload(
+        "sprintQualifying",
+        sprintQualifyingRows,
+        providerSessions.sprintQualifying
+      ),
+      sprint: sessionPayload("sprint", sprintRows, providerSessions.sprint),
+      qualifying: sessionPayload("qualifying", qualifyingRows, providerSessions.qualifying),
+      startingGrid: sessionPayload(
+        "startingGrid",
+        effectiveStartingGridRows,
+        providerSessions.startingGrid
+      ),
+      race: sessionPayload("race", raceRows, providerSessions.race)
+    },
     standings: {
       drivers: normalizedDriverStandings,
       constructors: normalizedConstructorStandings
@@ -321,6 +414,7 @@ function buildEvidenceBundle({
       race,
       qualifying: qualifyingRace,
       sprint: sprintRace,
+      sessions: providerSessions,
       destructors: damageSourceRows,
       driverStandings,
       constructorStandings

@@ -38,10 +38,6 @@ const {
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
 const { buildSeasonCatalog } = require("../season-catalog");
 const {
-  fetchFormula1DashboardSeasonData,
-  PROVIDER: FORMULA1_DASHBOARD_PROVIDER
-} = require("../formula1-dashboard-provider");
-const {
   applyTeamLineupHistory,
   applySeasonLineup,
   buildLineupProjection,

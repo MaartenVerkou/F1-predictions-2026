@@ -27,10 +27,13 @@ const { resolveConfiguredRaceName } = require("../src/race-names");
 const { buildPersistedDataFromEvidence } = require("../src/race-evidence-derivation");
 const { buildSeasonCatalog } = require("../src/season-catalog");
 const {
-  fetchFormula1DashboardSeasonData,
-  PROVIDER: FORMULA1_DASHBOARD_PROVIDER,
-  PROVIDER_SCHEMA: FORMULA1_DASHBOARD_SCHEMA
-} = require("../src/formula1-dashboard-provider");
+  fetchOpenF1SeasonData,
+  PROVIDER: OPENF1_PROVIDER,
+  PROVIDER_SCHEMA: OPENF1_SCHEMA
+} = require("../src/openf1-provider");
+const {
+  assertStandardEvidenceProvider
+} = require("../src/evidence-provider-policy");
 const { topDamageEntities } = require("../src/destructors-damage");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -43,9 +46,7 @@ const API_BASE = "https://api.jolpi.ca/ergast/f1";
 const FORMULA1_DOTD_PATH = "awards/driver-of-the-day";
 const USER_AGENT = "f1-predictions-actuals-backfill";
 const BACKFILL_SOURCE_NOTE =
-  "Backfilled from Jolpica/Ergast with Formula1.com cross-check; normalized evidence retains the provider payload";
-const FORMULA1_DASHBOARD_SOURCE_NOTE =
-  "Backfilled from Formula 1 Dashboard API; normalized evidence retains provider IDs, labels, and provenance";
+  "Reconstructed from OpenF1 session evidence, Jolpica/Ergast standings, Formula1.com Driver of the Day, and the approved destructors source";
 const TEAM_ENGINE_SWITCH_2027_2028_ACTUAL = "no";
 
 const DRIVER_NAME_ALIASES = {
@@ -85,7 +86,7 @@ function parseArgs(argv) {
     databaseUrl: String(process.env.DATABASE_URL || "").trim(),
     season: SEASON,
     maxRound: null,
-    provider: String(process.env.F1_DATA_PROVIDER || SOURCE_TYPES.JOLPICA).trim().toLowerCase()
+    provider: String(process.env.F1_DATA_PROVIDER || OPENF1_PROVIDER).trim().toLowerCase()
   };
 
   for (const arg of argv) {
@@ -116,9 +117,7 @@ function parseArgs(argv) {
   if (args.maxRound != null && (!Number.isFinite(args.maxRound) || args.maxRound <= 0)) {
     throw new Error("--max-round must be a positive number.");
   }
-  if (![SOURCE_TYPES.JOLPICA, FORMULA1_DASHBOARD_PROVIDER].includes(args.provider)) {
-    throw new Error(`Unsupported evidence provider: ${args.provider}`);
-  }
+  assertStandardEvidenceProvider(args.provider);
   return args;
 }
 
@@ -141,58 +140,6 @@ async function fetchJson(url) {
     throw new Error(`${res.status} ${res.statusText} for ${url}`);
   }
   throw new Error(`Failed to fetch after retries: ${url}`);
-}
-
-function withPagination(url, limit, offset) {
-  const parsed = new URL(url);
-  parsed.searchParams.set("limit", String(limit));
-  parsed.searchParams.set("offset", String(offset));
-  return parsed.toString();
-}
-
-function mergeRaceRows(existing, incoming, resultKey) {
-  if (!existing) {
-    return {
-      ...incoming,
-      [resultKey]: Array.isArray(incoming?.[resultKey]) ? incoming[resultKey].slice() : []
-    };
-  }
-  const merged = existing;
-  const seen = new Set(
-    (merged[resultKey] || []).map((row) =>
-      [row?.number, row?.Driver?.driverId, row?.position, row?.grid].join(":")
-    )
-  );
-  for (const row of incoming?.[resultKey] || []) {
-    const key = [row?.number, row?.Driver?.driverId, row?.position, row?.grid].join(":");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    merged[resultKey].push(row);
-  }
-  return merged;
-}
-
-async function fetchAllRaceTableRaces(url, resultKey) {
-  const limit = 100;
-  let offset = 0;
-  let total = Infinity;
-  const byRound = new Map();
-
-  while (offset < total) {
-    const payload = await fetchJson(withPagination(url, limit, offset));
-    total = parseNum(payload?.MRData?.total, 0);
-    const pageLimit = parseNum(payload?.MRData?.limit, limit) || limit;
-    const races = payload?.MRData?.RaceTable?.Races || [];
-    for (const race of races) {
-      const round = Number(race.round);
-      if (!Number.isFinite(round)) continue;
-      byRound.set(round, mergeRaceRows(byRound.get(round), race, resultKey));
-    }
-    offset += pageLimit;
-    if (pageLimit <= 0) break;
-  }
-
-  return Array.from(byRound.values()).sort((a, b) => parseNum(a.round) - parseNum(b.round));
 }
 
 async function fetchText(url) {
@@ -723,62 +670,91 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
   return serialized;
 }
 
-async function fetchJolpicaSeasonData({ season, roster }) {
-  const driverOfTheDayUrl = `https://www.formula1.com/en/results/${season}/${FORMULA1_DOTD_PATH}`;
-  const [resultsJson, qualifyingJson, sprintJson, dotdHtml] = await Promise.all([
-    fetchAllRaceTableRaces(`${API_BASE}/${season}/results.json`, "Results"),
-    fetchAllRaceTableRaces(`${API_BASE}/${season}/qualifying.json`, "QualifyingResults"),
-    fetchAllRaceTableRaces(`${API_BASE}/${season}/sprint.json`, "SprintResults"),
-    fetchText(driverOfTheDayUrl).catch(() => "")
-  ]);
-
-  const results = resultsJson || [];
-  const qualifying = qualifyingJson || [];
-  const sprints = sprintJson || [];
-  const completedRounds = results
-    .map((race) => Number(race.round))
-    .filter((round) => Number.isFinite(round) && round > 0)
-    .sort((a, b) => a - b);
-
+async function fetchJolpicaSupportingData({ season, roster, completedRounds, completedRaces }) {
+  const rounds = Array.from(new Set((completedRounds || []).map(Number).filter(Number.isFinite)));
   const driverStandingsByRound = new Map();
   const constructorStandingsByRound = new Map();
-  for (const round of completedRounds) {
-    const driverPayload = await fetchJson(`${API_BASE}/${season}/${round}/driverStandings.json`);
-    const constructorPayload = await fetchJson(`${API_BASE}/${season}/${round}/constructorStandings.json`);
+  for (const round of rounds) {
+    const driverPayload = await fetchJson(API_BASE + "/" + season + "/" + round + "/driverStandings.json");
+    const constructorPayload = await fetchJson(API_BASE + "/" + season + "/" + round + "/constructorStandings.json");
     driverStandingsByRound.set(
       round,
-      driverPayload?.MRData?.StandingsTable?.StandingsLists?.[0]
-        ?.DriverStandings || []
+      driverPayload?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || []
     );
     constructorStandingsByRound.set(
       round,
-      constructorPayload?.MRData?.StandingsTable?.StandingsLists?.[0]
-        ?.ConstructorStandings || []
+      constructorPayload?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || []
     );
   }
-
+  const driverOfTheDayUrl =
+    "https://www.formula1.com/en/results/" + season + "/" + FORMULA1_DOTD_PATH;
+  const dotdHtml = await fetchText(driverOfTheDayUrl).catch(() => "");
   return {
-    season,
-    provider: SOURCE_TYPES.JOLPICA,
-    providerSchema: "ergast-v1",
-    sourceType: SOURCE_TYPES.JOLPICA,
-    sourceNote: BACKFILL_SOURCE_NOTE,
-    results,
-    qualifying,
-    sprints,
-    completedRounds,
     driverStandingsByRound,
     constructorStandingsByRound,
     driverOfTheDayUrl,
-    driverOfTheDayByRound: parseDriverOfTheDayByRound(dotdHtml, results, roster.drivers || [])
+    driverOfTheDayByRound: parseDriverOfTheDayByRound(
+      dotdHtml,
+      completedRaces || [],
+      roster.drivers || []
+    )
   };
 }
 
-async function fetchSeasonData({ season, roster, provider = SOURCE_TYPES.JOLPICA, maxRound = null }) {
-  if (provider === FORMULA1_DASHBOARD_PROVIDER) {
-    return fetchFormula1DashboardSeasonData({ season, maxRound });
+function calendarForOpenF1(races) {
+  return (races || []).map((race, index) => {
+    if (race && typeof race === "object") return { ...race, round: Number(race.round || index + 1) };
+    return { round: index + 1, name: String(race || "").trim() };
+  });
+}
+
+async function fetchOpenF1CanonicalSeasonData({ season, roster, races, maxRound = null }) {
+  const calendar = calendarForOpenF1(races);
+  const sessions = await fetchOpenF1SeasonData({
+    season,
+    calendar,
+    maxRound
+  });
+  const supporting = await fetchJolpicaSupportingData({
+    season,
+    roster,
+    completedRounds: sessions.completedRounds,
+    completedRaces: sessions.results
+  });
+  const sourceUrlsByRound = new Map();
+  sessions.completedRounds.forEach((round) => {
+    const urls = { ...(sessions.sourceUrlsByRound?.get(round) || {}) };
+    urls.driverStandings = API_BASE + "/" + season + "/" + round + "/driverStandings.json";
+    urls.constructorStandings = API_BASE + "/" + season + "/" + round + "/constructorStandings.json";
+    urls.driverOfTheDay = supporting.driverOfTheDayUrl;
+    sourceUrlsByRound.set(round, urls);
+  });
+  return {
+    ...sessions,
+    ...supporting,
+    sourceUrlsByRound,
+    provider: OPENF1_PROVIDER,
+    providerSchema: OPENF1_SCHEMA,
+    sourceType: SOURCE_TYPES.OPENF1,
+    sourceNote: BACKFILL_SOURCE_NOTE
+  };
+}
+
+async function fetchSeasonData({
+  season,
+  roster,
+  races = [],
+  provider = OPENF1_PROVIDER,
+  maxRound = null
+}) {
+  assertStandardEvidenceProvider(provider);
+  if (provider !== OPENF1_PROVIDER) {
+    throw new Error(
+      "Standard session imports require " + OPENF1_PROVIDER +
+      "; " + provider + " is not a session provider."
+    );
   }
-  return fetchJolpicaSeasonData({ season, roster });
+  return fetchOpenF1CanonicalSeasonData({ season, roster, races, maxRound });
 }
 
 function getRoundName(data, races, roundNumber) {
@@ -924,7 +900,7 @@ function writeActualsAndSnapshots(db, {
         sourceNote,
         parserVersion,
         calendarState: snapshot.calendarState || "completed",
-        reconstructed: false,
+        reconstructed: sourceType === SOURCE_TYPES.OPENF1,
         evidence: snapshot.evidence
       });
       snapshot.evidenceId = evidenceId;
@@ -1002,17 +978,14 @@ async function main() {
   const data = await fetchSeasonData({
     season: args.season,
     roster,
+    races,
     provider: args.provider,
     maxRound: args.maxRound
   });
   const sourceType = data.sourceType || args.provider;
-  const sourceNote = data.sourceNote || (
-    sourceType === FORMULA1_DASHBOARD_PROVIDER
-      ? FORMULA1_DASHBOARD_SOURCE_NOTE
-      : BACKFILL_SOURCE_NOTE
-  );
-  const parserVersion = sourceType === FORMULA1_DASHBOARD_PROVIDER
-    ? `${FORMULA1_DASHBOARD_SCHEMA}-normalizer-v1`
+  const sourceNote = data.sourceNote || BACKFILL_SOURCE_NOTE;
+  const parserVersion = sourceType === SOURCE_TYPES.OPENF1
+    ? OPENF1_SCHEMA + "-normalizer-v1"
     : "evidence-v1";
   const totalRounds = races.length;
   const completedRounds = data.completedRounds.filter((round) =>
@@ -1043,9 +1016,6 @@ async function main() {
         roundName,
         fetchedAt: new Date().toISOString(),
         sourceUrls: data.sourceUrlsByRound?.get(roundNumber) || {
-          race: API_BASE + "/" + args.season + "/" + roundNumber + "/results.json",
-          qualifying: API_BASE + "/" + args.season + "/" + roundNumber + "/qualifying.json",
-          sprint: API_BASE + "/" + args.season + "/" + roundNumber + "/sprint.json",
           driverStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/driverStandings.json",
           constructorStandings: API_BASE + "/" + args.season + "/" + roundNumber + "/constructorStandings.json",
           driverOfTheDay: data.driverOfTheDayUrl
@@ -1078,6 +1048,27 @@ async function main() {
         db.pragma("busy_timeout = 5000");
       }
       ensureActualsSchema(db);
+      const existingEvidenceRows = listRaceDataSnapshots(db, args.season);
+      if (existingEvidenceRows.length) {
+        const existingEvidenceData = buildPersistedDataFromEvidence(
+          existingEvidenceRows,
+          args.season
+        );
+        if (existingEvidenceData.destructorsByRound.size > 0) {
+          data.destructorsByRound = existingEvidenceData.destructorsByRound;
+          data.destructorsErrorsByRound = existingEvidenceData.destructorsErrorsByRound;
+        }
+        snapshots.forEach((snapshot) => {
+          snapshot.values = serializedActualsForRound({
+            questions,
+            roster,
+            races,
+            data,
+            roundNumber: snapshot.roundNumber,
+            totalRounds
+          });
+        });
+      }
       existingActuals = loadExistingActuals(db, args.season);
       const syncId = "backfill-" + args.season + "-" + Date.now();
       const seasonCatalog = buildSeasonCatalog(db, args.season, { questions });
@@ -1113,7 +1104,7 @@ async function main() {
         sourceType,
         parserVersion,
         requestedRounds: completedRounds.length,
-        reconstructed: false,
+        reconstructed: sourceType === SOURCE_TYPES.OPENF1,
         sourceNote
       });
       snapshots.forEach((snapshot) => {
@@ -1221,8 +1212,10 @@ module.exports = {
   buildPersistedDataFromEvidence,
   compareSnapshotValues,
   deriveSnapshotsFromPersistedEvidence,
-  fetchJolpicaSeasonData,
+  fetchOpenF1CanonicalSeasonData,
+  fetchJolpicaSupportingData,
   fetchSeasonData,
+  parseArgs,
   parseDriverOfTheDayByRound,
   shortRaceLabel
 };

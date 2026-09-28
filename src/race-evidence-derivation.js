@@ -20,6 +20,31 @@ function buildApiRowFromEvidence(row) {
   };
 }
 
+function rowsFromSession(payload, sessionKey, fallbackSection) {
+  const sessions = payload?.sessions;
+  const canonicalRows = Array.isArray(sessions?.[sessionKey]?.rows)
+    ? sessions[sessionKey].rows
+    : [];
+  if (canonicalRows.length) return canonicalRows;
+  return Array.isArray(fallbackSection?.rows) ? fallbackSection.rows : [];
+}
+
+function sessionMetaFromPayload(payload, sessionKey, fallbackSection) {
+  const session = payload?.sessions?.[sessionKey];
+  if (session && typeof session === "object") {
+    return {
+      ...session,
+      rows: rowsFromSession(payload, sessionKey, fallbackSection)
+    };
+  }
+  return {
+    available: Array.isArray(fallbackSection?.rows) && fallbackSection.rows.length > 0,
+    status: fallbackSection?.rows?.length ? "available" : "unavailable",
+    unavailableReason: fallbackSection?.rows?.length ? null : "No persisted rows",
+    rows: rowsFromSession(payload, sessionKey, fallbackSection)
+  };
+}
+
 function buildPersistedDataFromEvidence(evidenceRows, season) {
   const results = [];
   const qualifying = [];
@@ -29,12 +54,34 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
   const driverOfTheDayByRound = new Map();
   const destructorsByRound = new Map();
   const destructorsErrorsByRound = new Map();
+  const sessionsByRound = new Map();
 
   for (const row of evidenceRows || []) {
     const payload = row.payload || {};
     const round = Number(row.round_number);
     if (!Number.isFinite(round)) continue;
-    const raceRows = (payload.race?.rows || []).map(buildApiRowFromEvidence);
+    const raceEvidenceRows = rowsFromSession(payload, "race", payload.race);
+    const qualifyingEvidenceRows = rowsFromSession(payload, "qualifying", payload.qualifying);
+    const sprintEvidenceRows = rowsFromSession(payload, "sprint", payload.sprint);
+    const canonicalSessions = {};
+    [
+      "practice1",
+      "practice2",
+      "practice3",
+      "sprintQualifying",
+      "sprint",
+      "qualifying",
+      "startingGrid",
+      "race"
+    ].forEach((sessionKey) => {
+      canonicalSessions[sessionKey] = sessionMetaFromPayload(
+        payload,
+        sessionKey,
+        payload[sessionKey] || (sessionKey === "race" ? payload.race : null)
+      );
+    });
+    sessionsByRound.set(round, canonicalSessions);
+    const raceRows = raceEvidenceRows.map(buildApiRowFromEvidence);
     results.push({
       round,
       raceName: payload.roundName || row.round_name || ("Round " + round),
@@ -42,12 +89,12 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
       Circuit: { circuitName: payload.race?.circuit || null },
       Results: raceRows
     });
-    const qualifyingRows = (payload.qualifying?.rows || []).map(buildApiRowFromEvidence);
+    const qualifyingRows = qualifyingEvidenceRows.map(buildApiRowFromEvidence);
     if (qualifyingRows.length) qualifying.push({
       round,
       QualifyingResults: qualifyingRows
     });
-    const sprintRows = (payload.sprint?.rows || []).map(buildApiRowFromEvidence);
+    const sprintRows = sprintEvidenceRows.map(buildApiRowFromEvidence);
     if (sprintRows.length) sprints.push({
       round,
       SprintResults: sprintRows
@@ -99,12 +146,14 @@ function buildPersistedDataFromEvidence(evidenceRows, season) {
     constructorStandingsByRound,
     driverOfTheDayByRound,
     destructorsByRound,
-    destructorsErrorsByRound
+    destructorsErrorsByRound,
+    sessionsByRound
   };
 }
 
 module.exports = {
   buildApiRowFromEvidence,
   buildPersistedDataFromEvidence,
-  canonicalDriverParts
+  canonicalDriverParts,
+  rowsFromSession
 };
