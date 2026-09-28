@@ -8322,6 +8322,27 @@ button.lang-option.is-active {
   display: none;
 }
 
+/* Drivers/Constructors and metric choices are the same segmented control.
+   Keep the shell on the group so every variant has a complete outline. */
+.admin-race-data-switch {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 92%, var(--border));
+  box-sizing: border-box;
+}
+
+.admin-race-data-switch.admin-race-data-metric-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
 .admin-race-data-switch .admin-race-data-tab {
   min-height: 32px;
   padding: 6px 12px;

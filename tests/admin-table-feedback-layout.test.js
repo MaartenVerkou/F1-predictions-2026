@@ -197,3 +197,11 @@ test("race data matrix palette follows the active theme", () => {
     /:root\[data-theme="dark"\]\s+\.admin-race-data-matrix\s*\{[\s\S]*?--card:\s*#0f1730/
   );
 });
+
+test("race data variant switches share the bordered segmented shell", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const switchRule = styles.match(/\.admin-race-data-switch\s*\{([\s\S]*?)\}/)?.[1] || "";
+  assert.match(switchRule, /border:\s*1px solid var\(--border\)/);
+  assert.match(switchRule, /border-radius:\s*8px/);
+  assert.match(styles, /\.admin-race-data-metric-tabs[^}]*overflow-x:\s*auto/);
+});
