@@ -12,6 +12,6 @@
 
 ## 3. Verification and preview
 
-- [ ] 3.1 Run focused tests, full tests, and strict OpenSpec validation.
-- [ ] 3.2 Rebuild the isolated preview and verify desktop and phone-width Inputs and Race Data flows, including tab visibility, Results label, and compact table behavior.
-- [ ] 3.3 Review the final diff for duplicated styles, unintended data changes, and production-impacting changes; record the verified preview URL.
+- [x] 3.1 Run focused tests, full tests, and strict OpenSpec validation.
+- [x] 3.2 Rebuild the isolated preview and verify desktop and phone-width Inputs and Race Data flows, including tab visibility, Results label, and compact table behavior.
+- [x] 3.3 Review the final diff for duplicated styles, unintended data changes, and production-impacting changes; record the verified preview URL.
