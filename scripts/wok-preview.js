@@ -319,7 +319,15 @@ function seedSanitizedPreview(descriptor) {
   if (descriptor.dataMode !== "sanitized") return { seeded: false, mode: descriptor.dataMode };
   const result = spawnSync(
     "docker",
-    ["exec", descriptor.containerName, "node", "scripts/seed-wok-preview.js"],
+    [
+      "exec",
+      ...(String(process.env.WOK_PREVIEW_MAX_ROUND || "").trim()
+        ? ["-e", `WOK_PREVIEW_MAX_ROUND=${String(process.env.WOK_PREVIEW_MAX_ROUND).trim()}`]
+        : []),
+      descriptor.containerName,
+      "node",
+      "scripts/seed-wok-preview.js"
+    ],
     { encoding: "utf8" }
   );
   if (result.status !== 0) {

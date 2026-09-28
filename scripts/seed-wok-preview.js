@@ -440,7 +440,11 @@ function seedProviderPreview({
     database.close?.();
   }
 
-  const backfill = runBackfill({ season });
+  const configuredMaxRound = Number(process.env.WOK_PREVIEW_MAX_ROUND || 0);
+  const maxRound = Number.isInteger(configuredMaxRound) && configuredMaxRound > 0
+    ? configuredMaxRound
+    : null;
+  const backfill = runBackfill({ season, maxRound });
   const finalized = createAppDatabase({ databaseUrl, sqlitePath });
   try {
     const seasons = seedPreviewSeasonFixtures(finalized);
