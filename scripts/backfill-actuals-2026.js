@@ -125,38 +125,50 @@ function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
 }
 
-async function fetchJson(url) {
-  for (let attempt = 0; attempt <= 5; attempt += 1) {
-    const res = await fetch(url, {
-      headers: { "user-agent": USER_AGENT }
-    });
-    if (res.ok) return res.json();
-    if (res.status === 429 && attempt < 5) {
+const SUPPORTING_FETCH_TIMEOUT_MS = 15_000;
+const SUPPORTING_FETCH_RETRIES = 5;
+
+async function fetchSupporting(url, parseResponse) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= SUPPORTING_FETCH_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), SUPPORTING_FETCH_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, {
+        headers: { "user-agent": USER_AGENT },
+        signal: controller.signal
+      });
+      if (res.ok) return parseResponse(res);
+      const error = new Error(`${res.status} ${res.statusText} for ${url}`);
+      const retryable = [408, 425, 429, 500, 502, 503, 504].includes(res.status);
+      if (!retryable || attempt >= SUPPORTING_FETCH_RETRIES) {
+        error.nonRetryable = !retryable;
+        throw error;
+      }
+      lastError = error;
       const retryAfter = Number(res.headers.get("retry-after") || 0);
-      const waitMs = retryAfter > 0 ? retryAfter * 1000 : 750 * (attempt + 1);
+      const waitMs = Math.max(750 * (attempt + 1), retryAfter > 0 ? retryAfter * 1000 : 0);
       await new Promise((resolve) => setTimeout(resolve, waitMs));
-      continue;
+    } catch (error) {
+      if (error?.nonRetryable) throw error;
+      lastError = error.name === "AbortError"
+        ? new Error(`Timed out after ${SUPPORTING_FETCH_TIMEOUT_MS}ms for ${url}`)
+        : error;
+      if (attempt >= SUPPORTING_FETCH_RETRIES) throw lastError;
+      await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
+    } finally {
+      clearTimeout(timeout);
     }
-    throw new Error(`${res.status} ${res.statusText} for ${url}`);
   }
-  throw new Error(`Failed to fetch after retries: ${url}`);
+  throw lastError || new Error(`Failed to fetch after retries: ${url}`);
+}
+
+async function fetchJson(url) {
+  return fetchSupporting(url, (res) => res.json());
 }
 
 async function fetchText(url) {
-  for (let attempt = 0; attempt <= 5; attempt += 1) {
-    const res = await fetch(url, {
-      headers: { "user-agent": USER_AGENT }
-    });
-    if (res.ok) return res.text();
-    if (res.status === 429 && attempt < 5) {
-      const retryAfter = Number(res.headers.get("retry-after") || 0);
-      const waitMs = retryAfter > 0 ? retryAfter * 1000 : 750 * (attempt + 1);
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
-      continue;
-    }
-    throw new Error(`${res.status} ${res.statusText} for ${url}`);
-  }
-  throw new Error(`Failed to fetch after retries: ${url}`);
+  return fetchSupporting(url, (res) => res.text());
 }
 
 function normalizeLookupKey(value) {
