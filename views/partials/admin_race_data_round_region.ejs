@@ -158,7 +158,7 @@ const formatReviewDate = (value) => {
         <% (view.metricOptions || []).forEach((option) => { %>
           <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.activeMetricId ? 'is-active' : '' %>"
              href="/admin/race-data?season=<%= season %>&view=<%= viewMode %><%= roundQuery %>&focus=<%= option.id %>"
-             role="tab" aria-selected="<%= option.id === view.activeMetricId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>"><%= option.label %></a>
+             role="tab" aria-selected="<%= option.id === view.activeMetricId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>" title="<%= option.title || option.label %>"><%= option.label %></a>
         <% }) %>
       </div>
       <form method="get" action="/admin/race-data" class="admin-race-data-metric-select-form" data-race-data-metric-select-form>

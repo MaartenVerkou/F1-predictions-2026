@@ -79,6 +79,8 @@ test("race-data metric registry exposes one shared set of review metrics", () =>
     "metric:damage"
   ]);
   assert.equal(options.find((option) => option.id === "metric:dnfs").label, "DNFs");
+  assert.equal(options.find((option) => option.id === "points").label, "Results");
+  assert.equal(options.find((option) => option.id === "points").title, "Cumulative championship results");
   assert.equal(options.find((option) => option.id === "championship_points_results").label, "Points");
   assert.equal(options.every((option) => option.view === "all"), true);
 });

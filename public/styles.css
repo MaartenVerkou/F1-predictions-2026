@@ -2986,6 +2986,8 @@ button:disabled {
   table-layout: fixed;
   --admin-race-rank-width: 44px;
   --admin-race-entity-width: 150px;
+  --admin-race-round-width: 52px;
+  --admin-race-summary-width: 68px;
   /* Keep audit meaning hue-independent: a neutral, high-contrast matrix. */
   --card: #ffffff;
   --border: #cbd5e1;
@@ -3013,11 +3015,11 @@ button:disabled {
 }
 
 .admin-race-data-matrix .admin-race-data-col-round {
-  width: 52px;
+  width: var(--admin-race-round-width);
 }
 
 .admin-race-data-matrix .admin-race-data-col-summary {
-  width: 68px;
+  width: var(--admin-race-summary-width);
 }
 
 .admin-race-data-matrix th,
@@ -3099,7 +3101,7 @@ button:disabled {
 }
 
 .admin-race-data-round-head {
-  min-width: 52px;
+  min-width: var(--admin-race-round-width);
 }
 
 .admin-race-data-round-head.is-after-cutoff {
@@ -3114,8 +3116,8 @@ button:disabled {
 }
 
 .admin-race-data-cell {
-  width: 52px;
-  min-width: 52px;
+  width: var(--admin-race-round-width);
+  min-width: var(--admin-race-round-width);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
@@ -3170,7 +3172,7 @@ button:disabled {
 }
 
 .admin-race-data-summary {
-  min-width: 68px;
+  min-width: var(--admin-race-summary-width);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -3199,8 +3201,8 @@ button:disabled {
   white-space: nowrap;
 }
 .admin-race-data-footer-cell {
-  width: 52px;
-  min-width: 52px;
+  width: var(--admin-race-round-width);
+  min-width: var(--admin-race-round-width);
   color: var(--text);
   font-variant-numeric: tabular-nums;
   cursor: default;
@@ -3216,7 +3218,7 @@ button:disabled {
   font-weight: 500;
 }
 .admin-race-data-footer-total {
-  min-width: 68px;
+  min-width: var(--admin-race-summary-width);
   font-variant-numeric: tabular-nums;
   text-align: center !important;
 }
@@ -3517,6 +3519,8 @@ button:disabled {
 @media (max-width: 860px) {
   .admin-race-data-matrix {
     --admin-race-entity-width: 110px;
+    --admin-race-round-width: 48px;
+    --admin-race-summary-width: 60px;
   }
 
   /* Constructors already show three-letter team codes at this breakpoint. */
@@ -3541,12 +3545,15 @@ button:disabled {
 @media (max-width: 640px) {
   .admin-race-data-matrix {
     font-size: 12px;
-    --admin-race-entity-width: 72px;
+    --admin-race-rank-width: 36px;
+    --admin-race-entity-width: 64px;
+    --admin-race-round-width: 44px;
+    --admin-race-summary-width: 52px;
   }
 
   .admin-race-data-matrix th,
   .admin-race-data-matrix td {
-    padding: 7px 7px;
+    padding: 6px 5px;
   }
 
   .admin-race-data-entity {
@@ -3563,7 +3570,7 @@ button:disabled {
   }
 
   .admin-race-data-summary {
-    min-width: 60px;
+    min-width: var(--admin-race-summary-width);
   }
 }
 

@@ -508,6 +508,7 @@
     "tab_teams": "Equipos",
     "tab_assignments": "Asignaciones",
     "tab_races": "Carreras",
+    "tab_scoring": "Sistema de puntuación",
     "tab_mappings": "Mapeos",
     "driver_count": "{count} pilotos",
     "team_count": "{count} equipos",

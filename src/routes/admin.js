@@ -2234,7 +2234,7 @@ function registerAdminRoutes(app, deps) {
   app.get("/admin/inputs", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const requestedTab = String(req.query.tab || "").trim().toLowerCase();
-    const tab = ["drivers", "teams", "races", "mappings"].includes(requestedTab)
+    const tab = ["drivers", "teams", "races", "scoring", "mappings"].includes(requestedTab)
       ? requestedTab
       : "teams";
     const seasonContext = resolveAdminSeasonContext(db, {
@@ -3022,7 +3022,7 @@ function registerAdminRoutes(app, deps) {
     const sourceQuestions = getQuestions(locale, {
       includeMeta: true
     });
-    const pointsLabel = "Championship points results";
+    const pointsLabel = "Results";
     const metricOptions = buildRaceDataMetricOptions(t, { pointsLabel });
     const focusOptions = buildRaceDataFocusOptions(sourceQuestions, { pointsLabel, metricOptions });
     const requestedFocusId = String(req.query.focus || "points").trim() || "points";
@@ -3043,7 +3043,7 @@ function registerAdminRoutes(app, deps) {
       metricOptions
     });
     const focusMetricLabels = {
-      points: "Championship points results",
+      points: "Results",
       championship_points_results: "Points",
       podiums: t("admin_race_data.focus_podiums"),
       dnfs: t("admin_race_data.focus_dnfs"),

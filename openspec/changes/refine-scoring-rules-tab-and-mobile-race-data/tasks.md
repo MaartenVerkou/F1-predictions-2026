@@ -1,14 +1,14 @@
 ## 1. Inputs scoring navigation
 
-- [ ] 1.1 Add the season-scoped Scoring system Inputs tab to route validation and navigation.
-- [ ] 1.2 Render the existing scoring-rule overview only for the Scoring system tab, with a clear empty state for seasons without rules.
-- [ ] 1.3 Add focused route/template tests proving scoring rules are hidden on Drivers, Teams, and Races and visible on the scoring tab.
+- [x] 1.1 Add the season-scoped Scoring system Inputs tab to route validation and navigation.
+- [x] 1.2 Render the existing scoring-rule overview only for the Scoring system tab, with a clear empty state for seasons without rules.
+- [x] 1.3 Add focused route/template tests proving scoring rules are hidden on Drivers, Teams, and Races and visible on the scoring tab.
 
 ## 2. Race-data presentation
 
-- [ ] 2.1 Rename the cumulative `points` metric label to Results and preserve its stable key, links, derivation behavior, and accessible explanatory text.
-- [ ] 2.2 Add or update focused model/template tests for Results versus the derived Points metric.
-- [ ] 2.3 Refine shared race-data responsive styles so identity and final summary columns tighten by content at phone widths without page overflow or per-focus hacks.
+- [x] 2.1 Rename the cumulative `points` metric label to Results and preserve its stable key, links, derivation behavior, and accessible explanatory text.
+- [x] 2.2 Add or update focused model/template tests for Results versus the derived Points metric.
+- [x] 2.3 Refine shared race-data responsive styles so identity and final summary columns tighten by content at phone widths without page overflow or per-focus hacks.
 
 ## 3. Verification and preview
 

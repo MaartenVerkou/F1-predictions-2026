@@ -99,6 +99,18 @@ test("all input tables use explicit responsive table variants", () => {
   assert.match(styles, /overflow-wrap:\s*anywhere/);
 });
 
+test("scoring rules live in a dedicated Inputs sub-section", () => {
+  const view = readView("admin_inputs.ejs");
+  const tabs = readView("partials/admin_inputs_tabs.ejs");
+  assert.match(tabs, /\['drivers', 'teams', 'races', 'scoring'\]/);
+  assert.match(view, /tab === 'scoring'/);
+  assert.match(view, /admin-inputs-scoring-overview/);
+  const scoringStart = view.indexOf("tab === 'scoring'");
+  const driversStart = view.indexOf("tab === 'drivers'");
+  assert.ok(scoringStart >= 0 && driversStart > scoringStart);
+  assert.ok(view.slice(scoringStart, driversStart).includes("admin-inputs-scoring-overview"));
+});
+
 test("race data views share one identity column and a common row rhythm", () => {
   const page = readView("admin_race_data.ejs");
   const region = readView("partials/admin_race_data_round_region.ejs");
@@ -237,6 +249,15 @@ test("race data matrix palette follows the active theme", () => {
     styles,
     /:root\[data-theme="dark"\]\s+\.admin-race-data-matrix\s*\{[\s\S]*?--card:\s*#0f1730/
   );
+});
+
+test("race data matrix exposes shared compact width variables", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const matrixRule = styles.match(/\.admin-race-data-matrix\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(matrixRule, /--admin-race-entity-width/);
+  assert.match(matrixRule, /--admin-race-round-width/);
+  assert.match(matrixRule, /--admin-race-summary-width/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?--admin-race-summary-width:\s*52px/);
 });
 
 test("race data variant switches share the bordered segmented shell", () => {

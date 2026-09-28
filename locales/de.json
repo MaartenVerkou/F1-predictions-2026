@@ -508,6 +508,7 @@
     "tab_teams": "Teams",
     "tab_assignments": "Zuordnungen",
     "tab_races": "Rennen",
+    "tab_scoring": "Punktesystem",
     "tab_mappings": "Mappings",
     "driver_count": "{count} Fahrer",
     "team_count": "{count} Teams",

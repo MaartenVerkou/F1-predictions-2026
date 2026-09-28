@@ -508,6 +508,7 @@
     "tab_teams": "Équipes",
     "tab_assignments": "Affectations",
     "tab_races": "Courses",
+    "tab_scoring": "Système de points",
     "tab_mappings": "Correspondances",
     "driver_count": "{count} pilotes",
     "team_count": "{count} équipes",

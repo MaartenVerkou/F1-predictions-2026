@@ -6,7 +6,8 @@ const METRIC_DEFINITIONS = [
     metric: "points",
     matrixMetric: "points",
     labelKey: "admin_race_data.championship_points_results",
-    fallback: "Championship points results"
+    fallback: "Results",
+    description: "Cumulative championship results"
   },
   {
     id: "championship_points_results",
@@ -174,6 +175,7 @@ function buildRaceDataMetricOptions(t, { pointsLabel = null } = {}) {
     questionId: null,
     questionNumber: null,
     group: "metrics",
+    title: definition.description || definition.fallback,
     label: definition.id === "points"
       ? pointsLabel || translatedLabel(t, definition.labelKey, definition.fallback)
       : translatedLabel(t, definition.labelKey, definition.fallback)

@@ -51,6 +51,7 @@
     "tab_teams": "Teams",
     "tab_assignments": "Assignments",
     "tab_races": "Races",
+    "tab_scoring": "Scoring system",
     "tab_mappings": "Mappings",
     "driver_count": "{count} drivers",
     "team_count": "{count} teams",
