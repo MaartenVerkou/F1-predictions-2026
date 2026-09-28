@@ -204,4 +204,6 @@ test("race data variant switches share the bordered segmented shell", () => {
   assert.match(switchRule, /border:\s*1px solid var\(--border\)/);
   assert.match(switchRule, /border-radius:\s*8px/);
   assert.match(styles, /\.admin-race-data-metric-tabs[^}]*overflow-x:\s*auto/);
+  const metricRule = styles.match(/\.admin-race-data-metric-tabs\s*\{([\s\S]*?)\}/)?.[1] || "";
+  assert.doesNotMatch(metricRule, /padding-bottom/);
 });
