@@ -5,9 +5,11 @@ const assert = require("node:assert/strict");
 const {
   RACE_RESULT_COLUMNS,
   actualOverviewViewForQuestion,
+  buildRaceResultColumns,
   buildRaceDataMetricOptions,
   formatActualOverviewValue,
-  formatRaceFinishLabel
+  formatRaceFinishLabel,
+  getRaceSessionRows
 } = require("../src/race-data-review-model");
 
 test("race-result registry keeps facts in a stable review order", () => {
@@ -16,16 +18,49 @@ test("race-result registry keeps facts in a stable review order", () => {
     "driver",
     "constructor",
     "qualifying",
-    "sprint",
     "grid",
     "status",
     "points"
   ]);
-  assert.equal(formatRaceFinishLabel(1), "P1");
-  assert.equal(formatRaceFinishLabel(2), "P2");
-  assert.equal(formatRaceFinishLabel(3), "P3");
+  assert.equal(formatRaceFinishLabel(1), "1");
+  assert.equal(formatRaceFinishLabel(2), "2");
+  assert.equal(formatRaceFinishLabel(3), "3");
   assert.equal(formatRaceFinishLabel(14), "14");
   assert.equal(formatRaceFinishLabel(0), "—");
+});
+
+test("race result columns follow available normal and sprint sessions", () => {
+  const normal = buildRaceResultColumns({
+    payload: {
+      practice: {
+        practice1: { rows: [{ driver: "Alpha", position: 3 }] },
+        practice2: { rows: [{ driver: "Alpha", position: 2 }] },
+        practice3: { rows: [{ driver: "Alpha", position: 1 }] }
+      },
+      qualifying: { rows: [{ driver: "Alpha", position: 1 }] },
+      race: { rows: [{ driver: "Alpha", position: 1 }] }
+    }
+  });
+  assert.deepEqual(normal.map((column) => column.id), [
+    "finish", "driver", "constructor", "practice1", "practice2", "practice3", "qualifying", "grid", "status", "points"
+  ]);
+  assert.equal(normal.find((column) => column.id === "practice1").title, "Practice 1");
+  assert.equal(normal.find((column) => column.id === "qualifying").title, "Grand Prix qualifying");
+
+  const sprint = buildRaceResultColumns({
+    payload: {
+      practice1: { rows: [{ driver: "Alpha", position: 3 }] },
+      sprintQualifying: { rows: [{ driver: "Alpha", position: 2 }] },
+      sprint: { rows: [{ driver: "Alpha", position: 1 }] },
+      qualifying: { rows: [{ driver: "Alpha", position: 4 }] },
+      race: { rows: [{ driver: "Alpha", position: 2 }] }
+    }
+  });
+  assert.deepEqual(sprint.map((column) => column.id), [
+    "finish", "driver", "constructor", "practice1", "sprintQualifying", "sprint", "qualifying", "grid", "status", "points"
+  ]);
+  assert.equal(sprint.find((column) => column.id === "sprintQualifying").label, "Sprint Q");
+  assert.deepEqual(getRaceSessionRows({ practice: [{ session_type: "Practice 2", rows: [{ driver: "Alpha" }] }] }, "practice2"), [{ driver: "Alpha" }]);
 });
 
 test("race-data metric registry exposes one shared set of review metrics", () => {

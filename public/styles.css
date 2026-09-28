@@ -3502,6 +3502,7 @@ button:disabled {
   padding-bottom: 6px;
   line-height: 1.15;
 }
+
 \n@media (max-width: 720px) {
   .account-page,
   .about-page {
@@ -8278,5 +8279,154 @@ button.lang-option.is-active {
     width: 68px;
     min-width: 68px;
     max-width: 68px;
+  }
+}
+
+/* Final order-sensitive overrides for the canonical Race Data presentation. */
+.admin-race-data-detail-table--result {
+  min-width: 900px;
+  table-layout: fixed;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--finish,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--finish {
+  width: 52px;
+  min-width: 52px;
+  border-right: 0 !important;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver {
+  width: 190px;
+  min-width: 190px;
+  max-width: 220px;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+  width: 170px;
+  min-width: 170px;
+  max-width: 210px;
+  border-left: 0 !important;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-full-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-full-label {
+  display: inline;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-compact-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-compact-label {
+  display: none;
+}
+
+.admin-race-data-switch .admin-race-data-tab {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--muted);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.admin-race-data-switch .admin-race-data-tab:last-child {
+  border-right: 0;
+}
+
+.admin-race-data-switch .admin-race-data-tab:hover,
+.admin-race-data-switch .admin-race-data-tab:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 80%, var(--border));
+}
+
+.admin-race-data-switch .admin-race-data-tab.is-active {
+  border-color: var(--accent);
+  color: var(--card);
+  background: var(--accent);
+}
+
+.admin-race-data-metric-select-form {
+  display: none;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-race-data-metric-select-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-race-data-metric-select-form select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 980px) {
+  .admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+    width: 86px;
+    min-width: 86px;
+    max-width: 86px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-full-label {
+    display: none;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-compact-label {
+    display: inline;
+  }
+}
+
+/* Switch the content variants to a select before the segmented strip has to
+   scroll inside the toolbar. The driver/constructor control remains visible. */
+@media (max-width: 1080px) {
+  .admin-race-data-metric-tabs {
+    display: none;
+  }
+
+  .admin-race-data-metric-select-form {
+    display: flex;
+    flex: 1 1 220px;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-detail-table--result {
+    min-width: 700px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver {
+    width: 82px;
+    min-width: 82px;
+    max-width: 82px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-full-label {
+    display: none;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-compact-label {
+    display: inline;
+  }
+
+  .admin-race-data-metric-select-form {
+    flex: 1 1 100%;
+    justify-content: stretch;
+  }
+
+  .admin-race-data-metric-select-form select {
+    flex: 1 1 auto;
+    width: 100%;
   }
 }

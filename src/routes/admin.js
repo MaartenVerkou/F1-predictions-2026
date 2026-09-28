@@ -61,11 +61,12 @@ const {
   defaultRaceDataHighlightMode
 } = require("../race-data-audit");
 const {
-  RACE_RESULT_COLUMNS,
   actualOverviewViewForQuestion,
+  buildRaceResultColumns,
   buildRaceDataMetricOptions,
   formatActualOverviewValue,
-  formatRaceFinishLabel
+  formatRaceFinishLabel,
+  getRaceSessionRows
 } = require("../race-data-review-model");
 const { topDamageEntities } = require("../destructors-damage");
 
@@ -687,17 +688,26 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
 
   const payload = selected?.evidence?.payload || null;
   const raceRows = payload?.race?.rows || [];
-  const qualifyingRows = payload?.qualifying?.rows || [];
-  const sprintRows = payload?.sprint?.rows || [];
+  const sessionRowsByKey = {
+    practice1: getRaceSessionRows(payload, "practice1"),
+    practice2: getRaceSessionRows(payload, "practice2"),
+    practice3: getRaceSessionRows(payload, "practice3"),
+    sprintQualifying: getRaceSessionRows(payload, "sprintQualifying"),
+    sprint: getRaceSessionRows(payload, "sprint"),
+    qualifying: getRaceSessionRows(payload, "qualifying")
+  };
+  const qualifyingRows = sessionRowsByKey.qualifying;
+  const sprintRows = sessionRowsByKey.sprint;
   const raceByDriver = new Map(raceRows.map((row) => [row.driver, row]));
   const qualifyingByDriver = new Map(qualifyingRows.map((row) => [row.driver, row]));
   const sprintByDriver = new Map(sprintRows.map((row) => [row.driver, row]));
+  const sessionDriverNames = Object.values(sessionRowsByKey)
+    .flatMap((rows) => rows.map((row) => row.driver));
   const detailNames = Array.from(
     new Set(
       drivers.concat(
         raceRows.map((row) => row.driver),
-        qualifyingRows.map((row) => row.driver),
-        sprintRows.map((row) => row.driver)
+        sessionDriverNames
       )
     )
   ).filter(Boolean);
@@ -713,17 +723,41 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       entity.code || fallbackEntityCode(entity.name, "team")
     ])
   );
+  const findSessionRow = (rows, driver) => rows.find((row) => String(row.driver || "") === String(driver)) || null;
+  const buildSessionDetail = (row) => row ? {
+    label: auditResultLabel(row),
+    title: [row.status || null, row.position != null ? `position ${row.position}` : null]
+      .filter(Boolean)
+      .join(" · ") || auditResultLabel(row)
+  } : null;
   const detailRows = detailNames.map((driver) => {
     const race = raceByDriver.get(driver) || null;
     const qualifying = qualifyingByDriver.get(driver) || null;
     const sprint = sprintByDriver.get(driver) || null;
+    const allSessionRows = Object.values(sessionRowsByKey).map((rows) => findSessionRow(rows, driver));
+    const driverId = race?.driver_id
+      ?? qualifying?.driver_id
+      ?? sprint?.driver_id
+      ?? allSessionRows.find((row) => row?.driver_id != null)?.driver_id
+      ?? null;
+    const constructor = race?.constructor
+      || qualifying?.constructor
+      || sprint?.constructor
+      || allSessionRows.find((row) => row?.constructor)?.constructor
+      || null;
     return {
       driver,
       driverCode: driverCodeByName.get(driver) || fallbackEntityCode(driver, "driver"),
-      driverId: race?.driver_id ?? qualifying?.driver_id ?? sprint?.driver_id ?? null,
-      constructor: race?.constructor || qualifying?.constructor || sprint?.constructor || null,
-      constructorCode: teamCodeByName.get(race?.constructor || qualifying?.constructor || sprint?.constructor || "")
-        || fallbackEntityCode(race?.constructor || qualifying?.constructor || sprint?.constructor || "", "team"),
+      driverId,
+      constructor,
+      constructorCode: teamCodeByName.get(constructor || "")
+        || fallbackEntityCode(constructor || "", "team"),
+      sessions: Object.fromEntries(
+        Object.entries(sessionRowsByKey).map(([sessionKey, rows]) => [
+          sessionKey,
+          buildSessionDetail(findSessionRow(rows, driver))
+        ])
+      ),
       grid: race?.grid ?? null,
       qualifyingPosition: qualifying?.position ?? null,
       sprintPosition: sprint?.position ?? null,
@@ -733,7 +767,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       // Keep the numeric finish position only for classified finishers so the
       // detail table can use the status label (Ret/DNS/DNQ) for the others.
       racePositionNumber: Number(race?.position) > 0 ? Number(race.position) : null,
-      racePosition: Number(race?.position) > 0 ? (race?.positionText || String(race.position)) : null,
+      racePosition: Number(race?.position) > 0 ? String(race.position) : null,
       finishLabel: formatRaceFinishLabel(race?.position),
       raceLabel: auditResultLabel(race),
       raceStatus: race?.status || null,
@@ -3009,12 +3043,9 @@ function registerAdminRoutes(app, deps) {
       ...round,
       code: raceCodeByName.get(round.raceName) || fallbackRaceCode(round.raceName)
     }));
-    view.raceResultColumns = RACE_RESULT_COLUMNS.map((column) => {
-      const translated = t(column.labelKey);
-      return {
-        ...column,
-        label: translated && translated !== column.labelKey ? translated : column.fallback
-      };
+    view.raceResultColumns = buildRaceResultColumns({
+      payload: view.selectedEvidence?.payload || {},
+      t
     });
     view.evidenceRevisions = view.selectedEvidence
       ? listRaceDataSnapshotRevisions(db, season, view.selectedRoundNumber)

@@ -83,7 +83,7 @@ test("buildRaceDataAuditView marks missing and future evidence without inventing
   assert.equal(view.drivers[1].cells[0].label, "—");
   assert.equal(view.selectedRound.label, "R1 - Monaco Grand Prix");
   assert.equal(view.detailRows[0].racePoints, 25);
-  assert.equal(view.detailRows[0].finishLabel, "P1");
+  assert.equal(view.detailRows[0].finishLabel, "1");
   assert.equal(view.detailRows[0].driverCode, "ANT");
   assert.equal(view.detailRows[0].constructorCode, "MER");
   assert.equal(view.selectedRound.snapshot.id, 10);
@@ -269,6 +269,47 @@ test("race data rows follow selected points and expose pole, fastest lap, and cu
   assert.equal(view.drivers[0].cells[1].afterCutoff, true);
   assert.equal(view.drivers[0].cells[1].state, "future");
   assert.equal(view.drivers.find((row) => row.name === "Driver DNQ").cells[0].label, "DNQ");
+});
+
+test("detail rows expose optional weekend sessions without changing finish order", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster: { drivers: ["Driver Alpha", "Driver Beta"], teams: ["Team A"] },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        practice: {
+          practice1: { rows: [
+            { driver: "Driver Alpha", position: 4 },
+            { driver: "Driver Beta", position: 2 }
+          ] },
+          practice2: { rows: [{ driver: "Driver Alpha", position: 3 }] }
+        },
+        sprintQualifying: { rows: [{ driver: "Driver Alpha", position: 5 }] },
+        race: {
+          rows: [
+            { driver: "Driver Alpha", constructor: "Team A", position: 2, points: 18, status: "Finished" },
+            { driver: "Driver Beta", constructor: "Team A", position: 1, points: 25, status: "Finished" }
+          ]
+        },
+        qualifying: { rows: [{ driver: "Driver Alpha", position: 6 }] },
+        sprint: { rows: [] },
+        standings: { drivers: [], constructors: [] }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+
+  assert.deepEqual(view.detailRows.map((row) => row.driver), ["Driver Beta", "Driver Alpha"]);
+  assert.equal(view.detailRows[0].finishLabel, "1");
+  assert.equal(view.detailRows[0].sessions.practice1.label, "2");
+  assert.equal(view.detailRows[0].sessions.practice2?.label || "—", "—");
+  assert.equal(view.detailRows[1].sessions.sprintQualifying.label, "5");
+  assert.equal(view.detailRows[1].sessions.qualifying.label, "6");
 });
 
 test("constructor detail groups the canonical two-seat lineup and merges team summary data", () => {

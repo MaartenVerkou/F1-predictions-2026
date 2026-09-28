@@ -1,9 +1,8 @@
 <% const resultColumns = view.raceResultColumns || [
-  { id: 'finish', label: 'Finish' },
+  { id: 'finish', label: 'Pos.', title: 'Grand Prix finish position' },
   { id: 'driver', label: 'Driver' },
   { id: 'constructor', label: 'Constructor' },
-  { id: 'qualifying', label: 'Qualifying' },
-  { id: 'sprint', label: 'Sprint' },
+  { id: 'qualifying', sessionKey: 'qualifying', label: 'Qualifying', title: 'Grand Prix qualifying' },
   { id: 'grid', label: 'Grid' },
   { id: 'status', label: 'Status' },
   { id: 'points', label: 'Points' }
@@ -12,11 +11,19 @@ const detailCellValue = (row, column) => {
   if (column.id === 'finish') return row.racePosition ? row.finishLabel : (row.raceLabel || '—');
   if (column.id === 'driver') return row.driver || '—';
   if (column.id === 'constructor') return row.constructor || '—';
-  if (column.id === 'qualifying') return row.qualifyingPosition == null ? '—' : row.qualifyingPosition;
+  if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) {
+    return row.sessions?.[column.sessionKey || column.id]?.label || '—';
+  }
   if (column.id === 'grid') return row.grid == null ? '—' : row.grid;
   if (column.id === 'status') return row.raceStatus || row.sprintStatus || '—';
   if (column.id === 'points') return row.racePoints == null ? '—' : row.racePoints;
   return '—';
+};
+const detailCellTitle = (row, column) => {
+  if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) {
+    return row.sessions?.[column.sessionKey || column.id]?.title || column.title || detailCellValue(row, column);
+  }
+  return column.title || detailCellValue(row, column);
 };
 const selectedSnapshot = view.selectedRound?.snapshot || null;
 const reviewStatus = String(selectedSnapshot?.review_status || '').toLowerCase();
@@ -62,7 +69,7 @@ const formatReviewDate = (value) => {
         <thead>
           <tr>
             <% resultColumns.forEach((column) => { %>
-              <th scope="col" class="admin-race-data-result-col admin-race-data-result-col--<%= column.id %>"><%= column.label %></th>
+              <th scope="col" class="admin-race-data-result-col admin-race-data-result-col--<%= column.id %>" title="<%= column.title || column.label %>"><%= column.label %></th>
             <% }) %>
           </tr>
         </thead>
@@ -78,12 +85,8 @@ const formatReviewDate = (value) => {
                     <th scope="row" class="admin-race-data-result-cell admin-race-data-result-cell--driver" title="<%= detailCellValue(row, column) %>" aria-label="<%= detailCellValue(row, column) %>"><%- include('admin_race_data_entity_label', { fullLabel: detailCellValue(row, column), compactLabel: row.driverCode || '—' }) %></th>
                   <% } else if (column.id === 'constructor') { %>
                     <td class="admin-race-data-result-cell admin-race-data-result-cell--constructor" title="<%= detailCellValue(row, column) %>" aria-label="<%= detailCellValue(row, column) %>"><%- include('admin_race_data_entity_label', { fullLabel: detailCellValue(row, column), compactLabel: row.constructorCode || '—' }) %></td>
-                  <% } else if (column.id === 'sprint') { %>
-                    <td class="admin-race-data-result-cell admin-race-data-result-cell--sprint">
-                      <%= row.sprintPosition == null ? '—' : row.sprintPosition %><% if (row.sprintPoints != null && row.sprintPoints > 0) { %> <small>+<%= row.sprintPoints %></small><% } %>
-                    </td>
                   <% } else { %>
-                    <td class="admin-race-data-result-cell admin-race-data-result-cell--<%= column.id %>"><%= detailCellValue(row, column) %></td>
+                    <td class="admin-race-data-result-cell admin-race-data-result-cell--<%= column.id %> <%= column.sessionKey ? 'admin-race-data-result-cell--session' : '' %>" title="<%= detailCellTitle(row, column) %>"><%= detailCellValue(row, column) %></td>
                   <% } %>
                 <% }) %>
               </tr>
@@ -132,7 +135,7 @@ const formatReviewDate = (value) => {
 
   <section class="admin-race-data-table-section" data-race-data-championship aria-label="<%= t('admin_race_data.table_heading') %>">
     <div class="admin-race-data-table-toolbar">
-      <div class="admin-race-data-tabs admin-race-data-view-tabs" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
+      <div class="admin-race-data-tabs admin-race-data-view-tabs admin-race-data-switch" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
         <% ['drivers', 'constructors'].forEach((tableView) => { %>
           <a class="admin-race-data-tab <%= viewMode === tableView ? 'is-active' : '' %>"
              href="/admin/race-data?season=<%= season %>&view=<%= tableView %>&round=<%= view.selectedRoundNumber %>&focus=<%= view.focusId || 'points' %>"
@@ -141,13 +144,24 @@ const formatReviewDate = (value) => {
           </a>
         <% }) %>
       </div>
-      <div class="admin-race-data-tabs admin-race-data-metric-tabs" role="tablist" aria-label="Race data metric">
+      <div class="admin-race-data-tabs admin-race-data-metric-tabs admin-race-data-switch" role="tablist" aria-label="Race data metric">
         <% (view.metricOptions || []).forEach((option) => { %>
           <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.focusId ? 'is-active' : '' %>"
              href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= view.selectedRoundNumber %>&focus=<%= option.id %>"
              role="tab" aria-selected="<%= option.id === view.focusId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>"><%= option.label %></a>
         <% }) %>
       </div>
+      <form method="get" action="/admin/race-data" class="admin-race-data-metric-select-form" data-race-data-metric-select-form>
+        <input type="hidden" name="season" value="<%= season %>" />
+        <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+        <input type="hidden" name="view" value="<%= viewMode %>" />
+        <label for="admin-race-data-metric-select">Content</label>
+        <select id="admin-race-data-metric-select" name="focus" onchange="this.form.submit()">
+          <% (view.metricOptions || []).forEach((option) => { %>
+            <option value="<%= option.id %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= option.label %></option>
+          <% }) %>
+        </select>
+      </form>
     </div>
     <div class="admin-race-data-table-wrap">
       <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
