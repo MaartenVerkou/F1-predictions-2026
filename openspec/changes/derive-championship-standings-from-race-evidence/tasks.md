@@ -19,7 +19,7 @@
 
 ## 4. Migration and validation
 
-- [ ] 4.1 Run a preview dry-run reconciliation over completed seasons and record any differences or missing evidence for review.
-- [ ] 4.2 Backfill only derived/reconciliation metadata in preview; do not rewrite reviewed/published answer values automatically.
-- [ ] 4.3 Run focused unit/integration tests, OpenSpec strict validation, and Playwright checks for Race Data, Inputs, and Actuals.
-- [ ] 4.4 Review the final diff for dead Jolpica paths, duplicate scoring logic, and accidental production or user-answer changes.
+- [x] 4.1 Run a preview dry-run reconciliation over completed seasons and record any differences or missing evidence for review.
+- [x] 4.2 Backfill only derived/reconciliation metadata in preview; do not rewrite reviewed/published answer values automatically.
+- [x] 4.3 Run focused unit/integration tests, OpenSpec strict validation, and Playwright checks for Race Data, Inputs, and Actuals.
+- [x] 4.4 Review the final diff for dead Jolpica paths, duplicate scoring logic, and accidental production or user-answer changes.

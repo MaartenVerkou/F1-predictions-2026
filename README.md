@@ -272,21 +272,7 @@ npm run actuals:auto-apply
 
 ## Last season references per question
 
-The app can show a clickable "last season" source link and short result text under each question (on both Questions and Responses pages).
-
-Generate/update the references file:
-
-```powershell
-npm run build:last-season-results
-```
-
-Optional custom season:
-
-```powershell
-node scripts/build-last-season-results.js 2025
-```
-
-The generated file is `data/last-season-results.json` by default (or `LAST_SEASON_RESULTS_PATH` if set in `.env`).
+The app can show a clickable "last season" source link and short result text under each question (on both Questions and Responses pages). The checked-in `data/last-season-results.json` file is a read-only historical reference artifact; the active race-data sync does not rebuild it or call a standings provider.
 
 ## Points balance simulation
 

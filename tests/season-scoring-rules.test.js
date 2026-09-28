@@ -55,6 +55,20 @@ test("driver and constructor standings accumulate race and sprint results", () =
   assert.equal(roundTwo.constructors[0].points, 25 + 18 + 8 + 25);
 });
 
+test("derived provider rows keep constructor names when only Constructor is present", () => {
+  const standings = deriveStandingsForRounds([{
+    roundNumber: 1,
+    raceRows: [{
+      Driver: { driverId: "44", givenName: "Lewis", familyName: "Hamilton" },
+      Constructor: { constructorId: "mercedes", name: "Mercedes" },
+      position: 1,
+      status: "Finished"
+    }],
+    sprintRows: []
+  }], DEFAULT_SCORING_RULES);
+  assert.equal(standings.get(1).constructors[0].entity, "Mercedes");
+});
+
 test("reconciliation distinguishes matching, changed, and missing rows", () => {
   const result = reconcileStandings(
     [{ entity_id: 1, entity: "A", points: 25 }, { entity_id: 2, entity: "B", points: 18 }],

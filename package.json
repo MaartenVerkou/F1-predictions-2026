@@ -21,8 +21,7 @@
     "actuals:auto-apply": "node scripts/backfill-actuals-2026.js --apply",
     "destructors:import": "node scripts/import-destructors-reddit.js --dry-run",
     "destructors:import:apply": "node scripts/import-destructors-reddit.js --apply",
-    "analyze:balance": "node scripts/analyze-balance.js",
-    "build:last-season-results": "node scripts/build-last-season-results.js"
+    "analyze:balance": "node scripts/analyze-balance.js"
   },
   "engines": {
     "node": "20.x || 22.x || 23.x || 24.x"

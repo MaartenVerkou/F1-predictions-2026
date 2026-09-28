@@ -98,14 +98,14 @@ function entityKey(row, entityType) {
     ? row?.team_id ?? row?.Constructor?.constructorId
     : row?.driver_id ?? row?.Driver?.driverId;
   const name = entityType === "constructor"
-    ? row?.constructor || row?.Constructor?.name
+    ? (typeof row?.constructor === "string" ? row.constructor : row?.Constructor?.name)
     : row?.driver || [row?.Driver?.givenName, row?.Driver?.familyName].filter(Boolean).join(" ");
   return id != null ? `id:${id}` : `name:${String(name || "").trim()}`;
 }
 
 function entityName(row, entityType) {
   return String(entityType === "constructor"
-    ? row?.constructor || row?.Constructor?.name
+    ? (typeof row?.constructor === "string" ? row.constructor : row?.Constructor?.name)
     : row?.driver || [row?.Driver?.givenName, row?.Driver?.familyName].filter(Boolean).join(" ") || "").trim();
 }
 
