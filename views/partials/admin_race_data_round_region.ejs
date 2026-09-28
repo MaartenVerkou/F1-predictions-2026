@@ -36,7 +36,10 @@ const formatReviewDate = (value) => {
 }; %>
 <div class="admin-race-data-round-region" data-race-data-round-region>
   <section class="admin-race-data-detail admin-race-data-detail-first" aria-labelledby="admin-race-data-detail-heading">
-    <h2 id="admin-race-data-detail-heading" class="sr-only"><%= view.selectedRound?.label || t('admin_race_data.no_round') %></h2>
+    <div class="admin-race-data-section-heading">
+      <h2 id="admin-race-data-detail-heading"><%= t('admin_race_data.race_result') %></h2>
+      <span class="admin-race-data-section-context muted"><%= view.selectedRound?.label || t('admin_race_data.no_round') %></span>
+    </div>
     <div class="admin-race-data-detail-toolbar">
       <div class="admin-race-data-fact-meta muted">
         <%= view.selectedEvidence
@@ -133,7 +136,10 @@ const formatReviewDate = (value) => {
     <% } %>
   </section>
 
-  <section class="admin-race-data-table-section" data-race-data-championship aria-label="<%= t('admin_race_data.table_heading') %>">
+  <section class="admin-race-data-table-section" data-race-data-championship aria-labelledby="admin-race-data-championship-heading">
+    <div class="admin-race-data-section-heading">
+      <h2 id="admin-race-data-championship-heading"><%= t('admin_race_data.championship_standings') %></h2>
+    </div>
     <div class="admin-race-data-table-toolbar">
       <div class="admin-race-data-tabs admin-race-data-view-tabs admin-race-data-switch" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
         <% ['drivers', 'constructors'].forEach((tableView) => { %>
