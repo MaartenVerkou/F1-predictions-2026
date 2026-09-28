@@ -7809,15 +7809,6 @@ button.lang-option.is-active {
 
 .admin-race-data-section-heading h2 {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.25;
-}
-
-.admin-race-data-section-context {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  font-weight: 500;
 }
 
 .admin-race-data-detail-toolbar {

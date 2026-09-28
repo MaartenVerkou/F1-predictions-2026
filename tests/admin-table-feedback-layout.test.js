@@ -100,8 +100,8 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /questions_label/);
   assert.match(region, /data-race-data-round-link/);
   assert.match(region, /class="admin-race-data-table-section"/);
-  assert.match(region, /admin_race_data\.race_result/);
   assert.match(region, /admin_race_data\.championship_standings/);
+  assert.doesNotMatch(region, /admin_race_data\.race_result/);
   assert.match(region, /admin-race-data-section-heading/);
   assert.match(region, /view\.hasSelectedRound/);
   assert.match(region, /roundQuery/);
@@ -131,6 +131,9 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(styles, /\.admin-race-data-table-toolbar\s*\{/);
   assert.match(styles, /\.admin-race-data-section-heading\s*\{/);
   assert.match(styles, /\.admin-race-data-section-heading h2\s*\{/);
+  const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
+  assert.match(app, /data-race-data-round-form\] select\[name="round"\]/);
+  assert.match(app, /roundSelect\.value = round \|\| ''/);
   assert.match(styles, /\.admin-race-data-review-form\s*\{/);
   assert.match(styles, /\.admin-race-data-detail-table--result \.admin-race-data-result-cell--driver \.admin-race-data-compact-label/);
   assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);

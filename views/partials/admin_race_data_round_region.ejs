@@ -41,7 +41,7 @@ const formatReviewDate = (value) => {
     <div class="admin-race-data-detail-toolbar">
       <div class="admin-race-data-section-heading">
         <h2 id="admin-race-data-detail-heading">
-          <%= t('admin_race_data.race_result') %><span class="admin-race-data-section-context muted"> · <%= view.selectedRound?.label || t('admin_race_data.no_round') %></span>
+          <%= view.selectedRound?.label || t('admin_race_data.no_round') %>
         </h2>
       </div>
       <% if (view.selectedEvidence || selectedSnapshot) { %>

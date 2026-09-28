@@ -1217,9 +1217,11 @@ const syncRaceDataSeasonForm = (url) => {
   const focus = url.searchParams.get('focus') || document.querySelector('[data-race-data-focus-form] select[name="focus"]')?.value || 'points';
   const viewInput = form.querySelector('input[name="view"]');
   const roundInput = form.querySelector('input[name="round"]');
+  const roundSelect = document.querySelector('[data-race-data-round-form] select[name="round"]');
   const focusInput = form.querySelector('input[name="focus"]');
   if (viewInput) viewInput.value = view;
   if (roundInput && round) roundInput.value = round;
+  if (roundSelect) roundSelect.value = round || '';
   if (focusInput) focusInput.value = focus;
 };
 
