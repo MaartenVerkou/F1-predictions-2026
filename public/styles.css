@@ -8015,14 +8015,14 @@ button.lang-option.is-active {
   white-space: nowrap;
 }
 
-.admin-race-data-detail-meta,
-.admin-race-data-revision-meta {
-  margin: 4px 0 0;
-  font-size: 12px;
-}
-
 .admin-race-data-detail-table--result {
   min-width: 860px;
+}
+
+.admin-race-data-evidence-meta {
+  justify-content: space-between;
+  margin: 0;
+  row-gap: 4px;
 }
 
 .admin-race-data-detail-table--result .admin-race-data-result-position {
@@ -8081,8 +8081,7 @@ button.lang-option.is-active {
 
 .admin-race-data-table-section[data-race-data-championship] {
   gap: 10px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  padding-top: 0;
 }
 
 .admin-race-data-table-section[data-race-data-championship] .admin-race-data-table-toolbar {

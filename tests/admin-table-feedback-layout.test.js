@@ -105,7 +105,9 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /admin-race-data-section-heading/);
   assert.match(region, /view\.hasSelectedRound/);
   assert.match(region, /roundQuery/);
-  assert.match(region, /admin-race-data-detail-meta/);
+  assert.match(region, /admin-race-data-evidence-meta/);
+  assert.match(region, /admin-race-data-legend/);
+  assert.doesNotMatch(region, /admin-race-data-revision-meta/);
   assert.match(region, /class="admin-race-data-table-toolbar"/);
   assert.doesNotMatch(region, /admin-race-data-toolbar/);
   assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
@@ -131,6 +133,10 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(styles, /\.admin-race-data-table-toolbar\s*\{/);
   assert.match(styles, /\.admin-race-data-section-heading\s*\{/);
   assert.match(styles, /\.admin-race-data-section-heading h2\s*\{/);
+  const championshipStyles = styles.match(/\.admin-race-data-table-section\[data-race-data-championship\]\s*\{([\s\S]*?)\n\}/);
+  assert.ok(championshipStyles, "championship section styles should be explicit");
+  assert.match(championshipStyles[1], /padding-top:\s*0/);
+  assert.doesNotMatch(championshipStyles[1], /border-top/);
   const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
   assert.match(app, /data-race-data-round-form\] select\[name="round"\]/);
   assert.match(app, /roundSelect\.value = round \|\| ''/);

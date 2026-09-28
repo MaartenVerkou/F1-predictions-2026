@@ -99,10 +99,16 @@ const formatReviewDate = (value) => {
       </table>
     </div>
 
-    <div class="admin-race-data-detail-meta admin-race-data-fact-meta muted">
-      <%= view.selectedEvidence
+    <div class="admin-race-data-evidence-meta admin-race-data-legend muted" aria-label="Race evidence metadata">
+      <span><%= view.selectedEvidence
         ? `${view.detailRows.length} drivers · ${view.selectedEvidence.source_type || 'source'} · ${view.selectedEvidence.fetched_at || view.selectedEvidence.payload?.fetchedAt || 'source time unavailable'}`
-        : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %>
+        : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %></span>
+      <% if (view.selectedEvidence) { %>
+        <span>Revision <%= view.selectedEvidence.revision_kind || 'provider' %>
+          · <%= (view.evidenceRevisions || []).length %> stored revision<%= (view.evidenceRevisions || []).length === 1 ? '' : 's' %>
+          <% if (view.selectedEvidence.correction_reason) { %> · <%= view.selectedEvidence.correction_reason %><% } %>
+        </span>
+      <% } %>
     </div>
 
     <% if (view.selectedEvidence) { %>
@@ -131,13 +137,6 @@ const formatReviewDate = (value) => {
       </div>
     <% } %>
 
-    <% if (view.selectedEvidence) { %>
-      <div class="admin-race-data-revision-meta muted">
-        Revision <%= view.selectedEvidence.revision_kind || 'provider' %>
-        · <%= (view.evidenceRevisions || []).length %> stored revision<%= (view.evidenceRevisions || []).length === 1 ? '' : 's' %>
-        <% if (view.selectedEvidence.correction_reason) { %> · <%= view.selectedEvidence.correction_reason %><% } %>
-      </div>
-    <% } %>
   </section>
   <% } %>
 
