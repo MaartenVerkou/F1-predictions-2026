@@ -10,7 +10,8 @@ test("builds one season overview from the latest persisted snapshot per round", 
     races: ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"],
     questions: [
       { id: "points_question", prompt: "Who leads?", race_data_focus: { view: "drivers", metric: "points" } },
-      { id: "team_question", prompt: "Which team?", race_data_focus: { view: "constructors", metric: "dnfs" } }
+      { id: "team_question", prompt: "Which team?", race_data_focus: { view: "constructors", metric: "dnfs" } },
+      { id: "podium_question", prompt: "Who reached the podium?", race_data_focus: { view: "drivers", metric: "podiums" } }
     ],
     snapshots: [
       { id: 101, round_number: 1, review_status: "reviewed", updated_at: "2026-03-10T00:00:00Z" },
@@ -21,7 +22,8 @@ test("builds one season overview from the latest persisted snapshot per round", 
     fetchSnapshotValues: (snapshotId) => snapshotId === 101
       ? {
         points_question: '["Antonelli","Russell","Leclerc"]',
-        team_question: '["Aston Martin","Red Bull Racing","Haas F1 Team"]'
+        team_question: '["Aston Martin","Red Bull Racing","Haas F1 Team"]',
+        podium_question: '["George Russell","Kimi Antonelli","Charles Leclerc","Lewis Hamilton","Oscar Piastri","Lando Norris"]'
       }
       : { team_question: '"Mercedes"' }
   });
@@ -29,6 +31,7 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.deepEqual(overview.targets.map((target) => target.timing), ["past", "current", "future"]);
   assert.deepEqual(overview.targets.map((target) => target.reviewStatus), ["reviewed", "pending", null]);
   assert.deepEqual(overview.targets.map((target) => target.published), [true, false, false]);
+  assert.deepEqual(overview.targets.map((target) => target.raceName), ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"]);
   assert.equal(overview.pendingCount, 1);
   assert.equal(overview.publishedRound, 1);
   assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");
@@ -37,6 +40,9 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.equal(overview.rows[0].focusLabel, "Points");
   assert.equal(overview.rows[1].focusLabel, "DNF");
   assert.deepEqual(overview.rows[1].cells[0].displayLines, ["Aston M.", "RBR", "HFT"]);
+  assert.equal(overview.rows[2].focusLabel, "Podiums");
+  assert.equal(overview.rows[2].cells[0].displayMode, "codes");
+  assert.deepEqual(overview.rows[2].cells[0].displayLines, ["RUS · ANT · LEC", "HAM · PIA · NOR"]);
   assert.match(overview.rows[0].cells[0].href, /round=1/);
   assert.match(overview.rows[0].cells[0].href, /view=drivers/);
   assert.match(overview.rows[1].cells[0].href, /view=constructors/);

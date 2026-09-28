@@ -78,8 +78,37 @@ function compactActualOverviewLine(line, view) {
     .join(", ");
 }
 
+function actualOverviewEntityCode(value, view) {
+  const text = String(value || "").trim();
+  if (!text) return text;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (view === "drivers") {
+    const name = words.at(-1).replace(/[^A-Za-z0-9]/g, "");
+    return name.slice(0, 3).toUpperCase() || text;
+  }
+  if (view === "constructors") {
+    const initials = words
+      .map((word) => word.replace(/[^A-Za-z0-9]/g, "").charAt(0).toUpperCase())
+      .join("");
+    return initials.slice(0, 3) || text;
+  }
+  return text;
+}
+
 function formatActualOverviewDisplayLines(raw, view) {
-  return formatActualOverviewLines(raw).map((line) => compactActualOverviewLine(line, view));
+  const lines = formatActualOverviewLines(raw);
+  const compactLines = lines.map((line) => compactActualOverviewLine(line, view));
+  const canUseCodes = ["drivers", "constructors"].includes(view)
+    && lines.length >= 5
+    && lines.every((line) => !line.includes(" · ") && !/\d/.test(line));
+  if (!canUseCodes) return { lines: compactLines, mode: "normal" };
+
+  const codes = lines.map((line) => actualOverviewEntityCode(line, view));
+  const grouped = [];
+  for (let index = 0; index < codes.length; index += 3) {
+    grouped.push(codes.slice(index, index + 3).join(" · "));
+  }
+  return { lines: grouped, mode: "codes" };
 }
 
 function actualOverviewFocusLabel(question) {
@@ -123,10 +152,11 @@ function buildActualsOverview({
       if (roundNumber < currentRound) timing = "past";
       else if (roundNumber === currentRound) timing = "current";
     }
+    const displayRaceName = String(raceName || `R${roundNumber}`).trim();
     return {
       key: `round:${roundNumber}`,
       roundNumber,
-      raceName,
+      raceName: displayRaceName,
       timing,
       snapshotId: snapshot ? Number(snapshot.id) : null,
       reviewStatus: snapshot?.review_status || null,
@@ -147,10 +177,12 @@ function buildActualsOverview({
         const values = valuesByRound.get(target.roundNumber) || {};
         const rawValue = values[question.id];
         const hasValue = rawValue != null && String(rawValue).trim() !== "";
+        const display = formatActualOverviewDisplayLines(rawValue, baseView);
         return {
           value: formatActualOverviewValue(rawValue),
           lines: formatActualOverviewLines(rawValue),
-          displayLines: formatActualOverviewDisplayLines(rawValue, baseView),
+          displayLines: display.lines,
+          displayMode: display.mode,
           hasValue,
           reviewStatus: target.reviewStatus,
           published: target.published,

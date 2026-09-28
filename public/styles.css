@@ -3278,7 +3278,10 @@ button:disabled {
 .admin-actuals-overview-table .admin-actuals-question-cell {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 2px 8px;
+  align-content: start;
+  align-items: start;
   white-space: normal;
 }
 
@@ -3287,6 +3290,7 @@ button:disabled {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+  line-height: 1.2;
 }
 
 .admin-actuals-question-prompt {
@@ -3294,6 +3298,7 @@ button:disabled {
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
@@ -3304,7 +3309,34 @@ button:disabled {
 }
 
 .admin-actuals-round-column {
-  min-width: 58px;
+  width: 92px;
+  min-width: 92px;
+  max-width: 92px;
+  white-space: normal !important;
+}
+
+.admin-actuals-round-column a {
+  display: block;
+  max-width: 100%;
+  line-height: 1.15;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.admin-actuals-round-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.admin-actuals-round-column small {
+  display: block;
+  line-height: 1.15;
+  white-space: normal;
 }
 
 .admin-actuals-question-view-link {
@@ -3314,6 +3346,7 @@ button:disabled {
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -3374,6 +3407,12 @@ button:disabled {
 
 .admin-actuals-value-line {
   display: block;
+  line-height: 1.2;
+}
+
+.admin-actuals-value-line.is-codes {
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .admin-actuals-value-cell.is-published {
