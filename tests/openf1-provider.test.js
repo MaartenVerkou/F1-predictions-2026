@@ -66,6 +66,27 @@ test("OpenF1 maps a unique meeting to the configured season round", () => {
   assert.equal(resolveMeetingRound({ meeting_name: "Unknown Grand Prix", date_start: "2026-01-01T00:00:00Z" }, []), null);
 });
 
+test("OpenF1 uses configured circuit metadata when provider and display names differ", () => {
+  assert.equal(resolveMeetingRound({
+    meeting_name: "Barcelona Grand Prix",
+    date_start: "2026-06-12T11:30:00Z",
+    circuit_short_name: "Catalunya"
+  }, [
+    {
+      round: 7,
+      name: "Barcelona-Catalunya Grand Prix",
+      start: "2026-06-14T13:00:00Z",
+      circuit: "Circuit de Barcelona-Catalunya"
+    },
+    {
+      round: 14,
+      name: "Spanish Grand Prix",
+      start: "2026-09-13T13:00:00Z",
+      circuit: "Madring"
+    }
+  ]), 7);
+});
+
 test("OpenF1 fetch produces session projections and grid values", async () => {
   const meeting = {
     meeting_key: 1279,

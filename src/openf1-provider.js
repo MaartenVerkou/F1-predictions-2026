@@ -125,18 +125,29 @@ function resolveMeetingRound(meeting, calendar = []) {
   const meetingName = normalizeName(meeting?.meeting_name || meeting?.name);
   const circuitName = normalizeName(meeting?.circuit_short_name || meeting?.location);
   const meetingDate = String(meeting?.date_start || "").slice(0, 10);
-  const nameMatches = (calendar || []).filter((race) => {
+  const candidates = (calendar || []).map((race) => {
     const raceName = normalizeName(race?.name || race?.raceName);
-    return raceName && (raceName === meetingName || raceName.includes(meetingName) || meetingName.includes(raceName));
-  });
-  if (nameMatches.length === 1) return Number(nameMatches[0].round);
-  const candidates = (nameMatches.length ? nameMatches : (calendar || []).filter((race) => {
-    const raceCircuit = normalizeName(race?.circuit);
-    const raceDate = String(race?.start || race?.date || "").slice(0, 10);
-    return (raceCircuit && circuitName && (raceCircuit.includes(circuitName) || circuitName.includes(raceCircuit)))
-      || (meetingDate && raceDate && meetingDate === raceDate);
-  }));
-  return candidates.length === 1 ? Number(candidates[0].round) : null;
+    const raceCircuit = normalizeName(race?.circuit || race?.circuitName);
+    const raceDate = String(race?.start || race?.date || race?.dateStart || "").slice(0, 10);
+    const exactName = Boolean(raceName && meetingName && raceName === meetingName);
+    const looseName = Boolean(
+      raceName && meetingName && (raceName.includes(meetingName) || meetingName.includes(raceName))
+    );
+    const circuitMatch = Boolean(
+      raceCircuit && circuitName && (raceCircuit.includes(circuitName) || circuitName.includes(raceCircuit))
+    );
+    const dateMatch = Boolean(meetingDate && raceDate && meetingDate === raceDate);
+    let score = 0;
+    if (exactName) score += 100;
+    else if (looseName) score += 40;
+    if (circuitMatch) score += 80;
+    if (dateMatch) score += 60;
+    return { race, score, exactName, looseName, circuitMatch, dateMatch };
+  }).filter((candidate) => candidate.score > 0);
+  if (!candidates.length) return null;
+  const bestScore = Math.max(...candidates.map((candidate) => candidate.score));
+  const best = candidates.filter((candidate) => candidate.score === bestScore);
+  return best.length === 1 ? Number(best[0].race.round) : null;
 }
 
 function unwrapArray(payload, label) {

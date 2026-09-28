@@ -701,15 +701,32 @@ async function fetchJolpicaSupportingData({ season, roster, completedRounds, com
   };
 }
 
-function calendarForOpenF1(races) {
+function calendarForOpenF1(races, calendarByName = {}) {
   return (races || []).map((race, index) => {
-    if (race && typeof race === "object") return { ...race, round: Number(race.round || index + 1) };
-    return { round: index + 1, name: String(race || "").trim() };
+    const name = race && typeof race === "object"
+      ? String(race.name || race.raceName || "").trim()
+      : String(race || "").trim();
+    const configured = calendarByName?.[name] && typeof calendarByName[name] === "object"
+      ? calendarByName[name]
+      : {};
+    return {
+      ...configured,
+      ...(race && typeof race === "object" ? race : {}),
+      round: Number(race?.round || index + 1),
+      name,
+      raceName: name
+    };
   });
 }
 
-async function fetchOpenF1CanonicalSeasonData({ season, roster, races, maxRound = null }) {
-  const calendar = calendarForOpenF1(races);
+async function fetchOpenF1CanonicalSeasonData({
+  season,
+  roster,
+  races,
+  calendarByName = {},
+  maxRound = null
+}) {
+  const calendar = calendarForOpenF1(races, calendarByName);
   const sessions = await fetchOpenF1SeasonData({
     season,
     calendar,
@@ -744,6 +761,7 @@ async function fetchSeasonData({
   season,
   roster,
   races = [],
+  calendarByName = {},
   provider = OPENF1_PROVIDER,
   maxRound = null
 }) {
@@ -754,7 +772,7 @@ async function fetchSeasonData({
       "; " + provider + " is not a session provider."
     );
   }
-  return fetchOpenF1CanonicalSeasonData({ season, roster, races, maxRound });
+  return fetchOpenF1CanonicalSeasonData({ season, roster, races, calendarByName, maxRound });
 }
 
 function getRoundName(data, races, roundNumber) {
@@ -974,11 +992,14 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const questions = readJsonFile(QUESTIONS_PATH).questions || [];
   const roster = readJsonFile(ROSTER_PATH);
-  const races = readJsonFile(RACES_PATH).races || [];
+  const raceCatalog = readJsonFile(RACES_PATH);
+  const races = raceCatalog.races || [];
+  const calendarByName = raceCatalog.calendar?.[String(args.season)] || {};
   const data = await fetchSeasonData({
     season: args.season,
     roster,
     races,
+    calendarByName,
     provider: args.provider,
     maxRound: args.maxRound
   });
