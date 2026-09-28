@@ -17,7 +17,7 @@ const OVERVIEW_FOCUS_LABELS = Object.freeze({
   teammate_points: "Teammate points",
   qualifying_h2h: "Qualifying",
   alpine_comparison: "Team comparison",
-  dnf_by_race: "DNF by race",
+  dnf_by_race: "Top 3 DNF races",
   title_decision: "Title decision",
   all_teams_points: "Constructor points",
   race1_champion: "Race 1 champion",
@@ -86,14 +86,43 @@ function normalizeRoundNumber(value) {
     : null;
 }
 
-function formatActualOverviewLines(raw) {
-  if (raw == null || String(raw).trim() === "") return [];
+function parseActualOverviewRaw(raw) {
   let value = raw;
   try {
     value = JSON.parse(raw);
   } catch (err) {
     // Snapshot values may be plain strings as well as JSON.
   }
+  return value;
+}
+
+function limitedDnfOverviewValue(raw, question) {
+  if (question?.type !== "multi_select_limited" || question?.race_data_focus?.metric !== "dnf_by_race") {
+    return null;
+  }
+  const value = parseActualOverviewRaw(raw);
+  if (!value || typeof value !== "object" || !value.dnf_by_race || typeof value.dnf_by_race !== "object") {
+    return null;
+  }
+  const limit = Math.max(1, Math.floor(Number(question.count) || 3));
+  const total = Object.entries(value.dnf_by_race)
+    .map(([race, count]) => ({ race, count: Number(count) }))
+    .filter(({ count }) => Number.isFinite(count) && count >= 0)
+    .sort((left, right) => right.count - left.count || left.race.localeCompare(right.race))
+    .slice(0, limit)
+    .reduce((sum, item) => sum + item.count, 0);
+  return `${total} DNF${total === 1 ? "" : "s"}`;
+}
+
+function formatActualOverviewAnswer(raw, question) {
+  return limitedDnfOverviewValue(raw, question) || formatActualOverviewValue(raw);
+}
+
+function formatActualOverviewLines(raw, question) {
+  if (raw == null || String(raw).trim() === "") return [];
+  const limitedDnfValue = limitedDnfOverviewValue(raw, question);
+  if (limitedDnfValue) return [limitedDnfValue];
+  const value = parseActualOverviewRaw(raw);
   if (Array.isArray(value)) {
     return value.map((item) => String(item)).filter((item) => item.trim() !== "");
   }
@@ -146,8 +175,8 @@ function actualOverviewEntityCode(value, view) {
   return text;
 }
 
-function formatActualOverviewDisplayLines(raw, view) {
-  const lines = formatActualOverviewLines(raw);
+function formatActualOverviewDisplayLines(raw, view, question) {
+  const lines = formatActualOverviewLines(raw, question);
   const compactLines = lines.map((line) => compactActualOverviewLine(line, view));
   const canUseCodes = ["drivers", "constructors"].includes(view)
     && lines.length >= 5
@@ -229,10 +258,10 @@ function buildActualsOverview({
         const values = valuesByRound.get(target.roundNumber) || {};
         const rawValue = values[question.id];
         const hasValue = rawValue != null && String(rawValue).trim() !== "";
-        const display = formatActualOverviewDisplayLines(rawValue, baseView);
+        const display = formatActualOverviewDisplayLines(rawValue, baseView, question);
         return {
-          value: formatActualOverviewValue(rawValue),
-          lines: formatActualOverviewLines(rawValue),
+          value: formatActualOverviewAnswer(rawValue, question),
+          lines: formatActualOverviewLines(rawValue, question),
           displayLines: display.lines,
           displayMode: display.mode,
           hasValue,

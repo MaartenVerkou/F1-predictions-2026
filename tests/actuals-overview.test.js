@@ -11,7 +11,14 @@ test("builds one season overview from the latest persisted snapshot per round", 
     questions: [
       { id: "points_question", prompt: "Who leads?", race_data_focus: { view: "drivers", metric: "points" } },
       { id: "team_question", prompt: "Which team?", race_data_focus: { view: "constructors", metric: "dnfs" } },
-      { id: "podium_question", prompt: "Who reached the podium?", race_data_focus: { view: "drivers", metric: "podiums" } }
+      { id: "podium_question", prompt: "Who reached the podium?", race_data_focus: { view: "drivers", metric: "podiums" } },
+      {
+        id: "select_three_races_dnfs",
+        prompt: "Select 3 races. Earn 2 points per DNF in those races.",
+        type: "multi_select_limited",
+        count: 3,
+        race_data_focus: { view: "drivers", metric: "dnf_by_race" }
+      }
     ],
     snapshots: [
       { id: 101, round_number: 1, review_status: "reviewed", updated_at: "2026-03-10T00:00:00Z" },
@@ -23,7 +30,8 @@ test("builds one season overview from the latest persisted snapshot per round", 
       ? {
         points_question: '["Antonelli","Russell","Leclerc"]',
         team_question: '["Aston Martin","Red Bull Racing","Haas F1 Team"]',
-        podium_question: '["George Russell","Kimi Antonelli","Charles Leclerc","Lewis Hamilton","Oscar Piastri","Lando Norris"]'
+        podium_question: '["George Russell","Kimi Antonelli","Charles Leclerc","Lewis Hamilton","Oscar Piastri","Lando Norris"]',
+        select_three_races_dnfs: JSON.stringify({ dnf_by_race: { R1: 2, R2: 1, R3: 4, R4: 3 } })
       }
       : { team_question: '"Mercedes"' }
   });
@@ -44,6 +52,9 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.equal(overview.rows[2].focusLabel, "Podiums");
   assert.equal(overview.rows[2].cells[0].displayMode, "codes");
   assert.deepEqual(overview.rows[2].cells[0].displayLines, ["RUS · ANT · LEC", "HAM · PIA · NOR"]);
+  assert.equal(overview.rows[3].cells[0].value, "9 DNFs");
+  assert.deepEqual(overview.rows[3].cells[0].displayLines, ["9 DNFs"]);
+  assert.equal(overview.rows[3].focusLabel, "Top 3 DNF races");
   assert.match(overview.rows[0].cells[0].href, /round=1/);
   assert.match(overview.rows[0].cells[0].href, /view=drivers/);
   assert.match(overview.rows[1].cells[0].href, /view=constructors/);
