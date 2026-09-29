@@ -398,6 +398,77 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster,
   };
 }
 
+function expandRaceDataRosterWithHistoricalParticipants({ driverEntities, teamEntities, rounds, cutoffRoundNumber }) {
+  const drivers = (driverEntities || []).map((entity) => ({ ...entity }));
+  const teams = (teamEntities || []).map((entity) => ({ ...entity }));
+  const driverById = new Map(
+    drivers
+      .filter((entity) => entity.id != null)
+      .map((entity) => [Number(entity.id), entity])
+  );
+  const driverByName = new Map(drivers.map((entity) => [String(entity.name || ""), entity]));
+  const teamById = new Map(
+    teams
+      .filter((entity) => entity.id != null)
+      .map((entity) => [Number(entity.id), entity])
+  );
+  const teamByName = new Map(teams.map((entity) => [String(entity.name || ""), entity]));
+  const asPositiveInteger = (value) => {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  for (const round of rounds || []) {
+    if (round.roundNumber > cutoffRoundNumber || !round.evidence) continue;
+    const payload = round.evidence.payload || {};
+    const rows = [
+      ...(payload.race?.rows || []),
+      ...(payload.sprint?.rows || [])
+    ];
+    for (const row of rows) {
+      const name = String(row.driver || row.driver_label || "").trim();
+      if (!name) continue;
+      const driverId = asPositiveInteger(row.driver_id);
+      const teamName = String(row.constructor || row.team_label || "").trim() || null;
+      const teamId = asPositiveInteger(row.team_id);
+      let entity = (driverId != null ? driverById.get(driverId) : null) || driverByName.get(name);
+      if (!entity) {
+        entity = {
+          id: driverId,
+          name,
+          code: fallbackEntityCode(name, "driver"),
+          teamId,
+          teamName,
+          seatNumber: null,
+          historical: true
+        };
+        drivers.push(entity);
+        if (driverId != null) driverById.set(driverId, entity);
+        driverByName.set(name, entity);
+      } else if (entity.historical) {
+        entity.teamId = teamId ?? entity.teamId ?? null;
+        entity.teamName = teamName || entity.teamName || null;
+      }
+
+      if (!teamName) continue;
+      let team = (teamId != null ? teamById.get(teamId) : null) || teamByName.get(teamName);
+      if (!team) {
+        team = {
+          id: teamId,
+          name: teamName,
+          code: fallbackEntityCode(teamName, "team"),
+          powerUnit: null,
+          historical: true
+        };
+        teams.push(team);
+        if (teamId != null) teamById.set(teamId, team);
+        teamByName.set(teamName, team);
+      }
+    }
+  }
+  return { drivers, teams };
+}
+
 function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound, catalogRevision = null, focus = null, showRaceResult = true, scoringRules = DEFAULT_SCORING_RULES }) {
   const activeFocus = {
     id: "points",
@@ -493,12 +564,20 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
 
   const drivers = Array.isArray(roster?.drivers) ? roster.drivers : [];
   const teams = Array.isArray(roster?.teams) ? roster.teams : [];
-  const driverEntities = Array.isArray(roster?.driver_entities)
+  const baseDriverEntities = Array.isArray(roster?.driver_entities)
     ? roster.driver_entities
     : drivers.map((name) => ({ id: null, name }));
-  const teamEntities = Array.isArray(roster?.team_entities)
+  const baseTeamEntities = Array.isArray(roster?.team_entities)
     ? roster.team_entities
     : teams.map((name) => ({ id: null, name }));
+  const expandedRoster = expandRaceDataRosterWithHistoricalParticipants({
+    driverEntities: baseDriverEntities,
+    teamEntities: baseTeamEntities,
+    rounds,
+    cutoffRoundNumber
+  });
+  const driverEntities = expandedRoster.drivers;
+  const teamEntities = expandedRoster.teams;
   const podiumFocus = activeFocus.matrixMetric === "podiums" || ["podiums", "ferrari_podium"].includes(activeFocus.metric);
   const driverRows = sortAuditRows(driverEntities.map((entity) => {
     const driver = entity.name;

@@ -219,6 +219,62 @@ test("buildRaceDataAuditView uses selected cutoff standings and mutes later roun
   assert.equal(view.cutoffRoundNumber, 1);
 });
 
+test("championship standings retain drivers who participated before a lineup change", () => {
+  const evidence = (round, rows) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: { rows },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: { drivers: [], constructors: [] }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Dutch Grand Prix"],
+    roster: {
+      driver_entities: [{
+        id: 15,
+        name: "Liam Lawson",
+        teamId: 10,
+        teamName: "Red Bull Racing",
+        seatNumber: 1
+      }],
+      team_entities: [{ id: 10, name: "Red Bull Racing", code: "RBR" }]
+    },
+    evidenceRows: [
+      evidence(1, [{
+        driver_id: 10,
+        driver: "Isack Hadjar",
+        team_id: 10,
+        constructor: "Red Bull Racing",
+        position: 1,
+        points: 25,
+        status: "Finished"
+      }]),
+      evidence(2, [{
+        driver_id: 15,
+        driver: "Liam Lawson",
+        team_id: 10,
+        constructor: "Red Bull Racing",
+        position: 2,
+        points: 18,
+        status: "Finished"
+      }])
+    ],
+    snapshotRows: [],
+    selectedRound: 2
+  });
+
+  assert.deepEqual(view.drivers.map((row) => row.name), ["Isack Hadjar", "Liam Lawson"]);
+  const hadjar = view.drivers.find((row) => row.name === "Isack Hadjar");
+  assert.equal(hadjar.points, 25);
+  assert.equal(hadjar.championshipPosition, 1);
+  assert.equal(hadjar.cells[1].label, "—");
+});
+
 test("constructor podiums use Grand Prix finishes, not sprint-only results, and respect cutoff", () => {
   const evidence = (round, racePosition, sprintPosition) => ({
     id: round,
