@@ -65,7 +65,10 @@
               <th scope="row" class="admin-actuals-question-cell">
                 <span class="admin-actuals-question-content">
                   <span class="admin-actuals-question-number"><%= String(row.questionNumber).padStart(2, '0') %></span>
-                  <span class="admin-actuals-question-prompt" title="<%= row.question.prompt %>"><%= row.question.prompt %></span>
+                  <span class="admin-actuals-question-prompt" title="<%= row.question.prompt %>" aria-label="<%= row.question.prompt %>">
+                    <span class="admin-actuals-question-prompt-full"><%= row.question.prompt %></span>
+                    <span class="admin-actuals-question-prompt-short" aria-hidden="true"><%= row.shortPrompt %></span>
+                  </span>
                   <a class="admin-actuals-question-view-link"
                      href="/admin/race-data?season=<%= encodeURIComponent(season) %>&view=<%= encodeURIComponent(row.baseView) %>&focus=<%= encodeURIComponent(row.question.id) %>"
                      title="<%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %> · <%= row.focusLabel %>">

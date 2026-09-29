@@ -9,7 +9,7 @@ test("builds one season overview from the latest persisted snapshot per round", 
     season: 2026,
     races: ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"],
     questions: [
-      { id: "points_question", prompt: "Who leads?", race_data_focus: { view: "drivers", metric: "points" } },
+      { id: "drivers_championship_top_3", prompt: "Who leads?", race_data_focus: { view: "drivers", metric: "points" } },
       { id: "team_question", prompt: "Which team?", race_data_focus: { view: "constructors", metric: "dnfs" } },
       { id: "podium_question", prompt: "Who reached the podium?", race_data_focus: { view: "drivers", metric: "podiums" } },
       {
@@ -28,7 +28,7 @@ test("builds one season overview from the latest persisted snapshot per round", 
     publishedActuals: { available: true, snapshot: { round_number: 1 } },
     fetchSnapshotValues: (snapshotId) => snapshotId === 101
       ? {
-        points_question: '["Antonelli","Russell","Leclerc"]',
+        drivers_championship_top_3: '["Antonelli","Russell","Leclerc"]',
         team_question: '["Aston Martin","Red Bull Racing","Haas F1 Team"]',
         podium_question: '["George Russell","Kimi Antonelli","Charles Leclerc","Lewis Hamilton","Oscar Piastri","Lando Norris"]',
         select_three_races_dnfs: JSON.stringify({ dnf_by_race: { R1: 2, R2: 1, R3: 4, R4: 3 } })
@@ -44,6 +44,8 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.equal(overview.pendingCount, 1);
   assert.equal(overview.publishedRound, 1);
   assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");
+  assert.equal(overview.rows[0].shortPrompt, "Championship top 3");
+  assert.equal(overview.rows[3].shortPrompt, "Three races · most DNFs");
   assert.deepEqual(overview.rows[0].cells[0].lines, ["Antonelli", "Russell", "Leclerc"]);
   assert.deepEqual(overview.rows[0].cells[0].displayLines, ["ANT · RUS · LEC"]);
   assert.equal(overview.rows[0].focusLabel, "Points");

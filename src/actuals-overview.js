@@ -4,7 +4,7 @@ const {
   actualOverviewViewForQuestion,
   formatActualOverviewValue
 } = require("./race-data-review-model");
-const { raceDataFocusLabel } = require("./race-data-focus");
+const { compactQuestionLabel, raceDataFocusLabel } = require("./race-data-focus");
 
 // Actuals is a wide, scan-first table. Keep multi-entity answers readable
 // without allowing one answer to set an unbounded row height. The full value
@@ -267,6 +267,7 @@ function buildActualsOverview({
     return {
       question,
       questionNumber: index + 1,
+      shortPrompt: compactQuestionLabel(question, question?.race_data_focus?.metric),
       baseView,
       focusLabel: actualOverviewFocusLabel(question),
       cells: targets.map((target) => {

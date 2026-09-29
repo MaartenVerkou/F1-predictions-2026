@@ -51,7 +51,19 @@ test("season actuals keeps question prompts compact and readable on small screen
   const promptRule = styles.match(/\.admin-actuals-question-prompt\s*\{([\s\S]*?)\n\}/)?.[1] || "";
   assert.match(promptRule, /-webkit-line-clamp:\s*2/);
   assert.match(promptRule, /white-space:\s*normal/);
-  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-column,[\s\S]*?min-width:\s*156px/);
+  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-column,[\s\S]*?min-width:\s*136px/);
+  assert.match(styles, /\.admin-actuals-question-prompt-short\s*\{[\s\S]*?display:\s*none/);
+});
+
+test("season actuals uses shared short question labels on narrow screens", () => {
+  const view = readView("admin_actuals.ejs");
+  assert.match(view, /admin-actuals-question-prompt-full/);
+  assert.match(view, /admin-actuals-question-prompt-short/);
+  assert.match(view, /aria-label="<%= row\.question\.prompt %>"/);
+  assert.match(view, /row\.shortPrompt/);
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-prompt-full\s*\{[\s\S]*?display:\s*none/);
+  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-prompt-short\s*\{[\s\S]*?display:\s*block/);
 });
 
 test("season actuals bounds answer content with a shared compact projection", () => {

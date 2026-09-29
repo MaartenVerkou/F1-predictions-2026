@@ -3391,6 +3391,10 @@ button:disabled {
   max-height: calc(1.2em * 2);
 }
 
+.admin-actuals-question-prompt-short {
+  display: none;
+}
+
 .admin-actuals-round-column small {
   color: var(--muted);
   font-size: 10px;
@@ -3526,13 +3530,30 @@ button:disabled {
 @media (max-width: 480px) {
   .admin-actuals-question-column,
   .admin-actuals-question-cell {
-    width: 156px;
-    min-width: 156px;
+    width: 136px;
+    min-width: 136px;
   }
 
   .admin-actuals-question-content {
     grid-template-columns: 24px minmax(0, 1fr);
     column-gap: 5px;
+  }
+
+  .admin-actuals-question-prompt {
+    display: block;
+    max-height: none;
+    white-space: nowrap;
+  }
+
+  .admin-actuals-question-prompt-full {
+    display: none;
+  }
+
+  .admin-actuals-question-prompt-short {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
