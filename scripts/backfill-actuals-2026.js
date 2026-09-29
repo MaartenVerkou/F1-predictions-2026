@@ -358,7 +358,7 @@ function collapseTiedActuals(questionId, values) {
 function optionalNumber(value) {
   if (value == null || String(value).trim() === "") return null;
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function computeTitleDecidedRacesBeforeEnd(roundStandings, totalRounds, sprintRoundSet) {
