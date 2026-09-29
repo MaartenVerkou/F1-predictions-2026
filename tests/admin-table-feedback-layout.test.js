@@ -54,6 +54,14 @@ test("season actuals keeps question prompts compact and readable on small screen
   assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-column,[\s\S]*?min-width:\s*156px/);
 });
 
+test("season actuals bounds answer content with a shared compact projection", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const tableRule = styles.match(/\.admin-actuals-overview-table\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(tableRule, /--admin-actuals-max-value-lines:\s*2/);
+  assert.match(styles, /\.admin-actuals-value-cell a\s*\{[\s\S]*?max-height:\s*calc\(1\.2em \* var\(--admin-actuals-max-value-lines\)\)/);
+  assert.match(styles, /\.admin-actuals-value-line\.is-codes\s*\{[\s\S]*?font-size:\s*11px/);
+});
+
 test("team lineup overview keeps the toolbar concise", () => {
   const view = readView("admin_inputs.ejs");
   const help = view.indexOf("admin-inputs-lineup-help");

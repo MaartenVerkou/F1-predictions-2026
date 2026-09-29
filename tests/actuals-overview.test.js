@@ -45,10 +45,10 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.equal(overview.publishedRound, 1);
   assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");
   assert.deepEqual(overview.rows[0].cells[0].lines, ["Antonelli", "Russell", "Leclerc"]);
-  assert.deepEqual(overview.rows[0].cells[0].displayLines, ["Antonelli", "Russell", "Leclerc"]);
+  assert.deepEqual(overview.rows[0].cells[0].displayLines, ["ANT · RUS · LEC"]);
   assert.equal(overview.rows[0].focusLabel, "Points");
   assert.equal(overview.rows[1].focusLabel, "DNF");
-  assert.deepEqual(overview.rows[1].cells[0].displayLines, ["Aston M.", "RBR", "HFT"]);
+  assert.deepEqual(overview.rows[1].cells[0].displayLines, ["ASM · RBR · HFT"]);
   assert.equal(overview.rows[2].focusLabel, "Podiums");
   assert.equal(overview.rows[2].cells[0].displayMode, "codes");
   assert.deepEqual(overview.rows[2].cells[0].displayLines, ["RUS · ANT · LEC", "HAM · PIA · NOR"]);
@@ -84,4 +84,59 @@ test("compacts structured driver answers without repeating tied winners", () => 
   assert.deepEqual(overview.rows[0].cells[0].displayLines, ["2 · RUS · ANT · LEC"]);
   assert.equal(overview.rows[0].cells[0].displayMode, "codes");
   assert.equal(overview.rows[0].cells[0].value, "2 · George Russell, Kimi Antonelli, Charles Leclerc");
+});
+
+test("uses one bounded code projection for long entity lists", () => {
+  const overview = buildActualsOverview({
+    season: 2026,
+    races: ["Australian Grand Prix"],
+    questions: [
+      {
+        id: "long_driver_list",
+        prompt: "Which drivers?",
+        race_data_focus: { view: "drivers", metric: "podiums" }
+      },
+      {
+        id: "long_constructor_list",
+        prompt: "Which teams?",
+        race_data_focus: { view: "constructors", metric: "qualifying" }
+      }
+    ],
+    snapshots: [{ id: 1, round_number: 1, review_status: "pending" }],
+    latestRoundNumber: 1,
+    fetchSnapshotValues: () => ({
+      long_driver_list: JSON.stringify([
+        "George Russell",
+        "Kimi Antonelli",
+        "Charles Leclerc",
+        "Lewis Hamilton",
+        "Oscar Piastri",
+        "Lando Norris",
+        "Max Verstappen",
+        "Fernando Alonso"
+      ]),
+      long_constructor_list: JSON.stringify([
+        "Alpine",
+        "Audi",
+        "Cadillac",
+        "Ferrari",
+        "Haas F1 Team",
+        "McLaren",
+        "Mercedes",
+        "Racing Bulls"
+      ])
+    })
+  });
+
+  assert.deepEqual(overview.rows[0].cells[0].displayLines, [
+    "RUS · ANT · LEC",
+    "HAM · PIA · +2"
+  ]);
+  assert.deepEqual(overview.rows[1].cells[0].displayLines, [
+    "ALP · AUD · CAD",
+    "FER · HFT · +2"
+  ]);
+  assert.equal(overview.rows[0].cells[0].displayMode, "codes");
+  assert.equal(overview.rows[1].cells[0].displayMode, "codes");
+  assert.ok(overview.rows.every((row) => row.cells[0].displayLines.length <= 2));
 });

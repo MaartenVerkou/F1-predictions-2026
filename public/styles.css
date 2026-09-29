@@ -3312,6 +3312,7 @@ button:disabled {
   border-collapse: separate;
   border-spacing: 0;
   font-size: 12px;
+  --admin-actuals-max-value-lines: 2;
 }
 
 .admin-actuals-overview-table th,
@@ -3486,6 +3487,7 @@ button:disabled {
 
 .admin-actuals-value-cell a {
   display: block;
+  max-height: calc(1.2em * var(--admin-actuals-max-value-lines));
   overflow: hidden;
   overflow-wrap: anywhere;
   text-overflow: ellipsis;
@@ -3498,6 +3500,7 @@ button:disabled {
 }
 
 .admin-actuals-value-line.is-codes {
+  font-size: 11px;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }

@@ -6,6 +6,14 @@ const {
 } = require("./race-data-review-model");
 const { raceDataFocusLabel } = require("./race-data-focus");
 
+// Actuals is a wide, scan-first table. Keep multi-entity answers readable
+// without allowing one answer to set an unbounded row height. The full value
+// remains available in the cell's title/aria-label; this is only its compact
+// visual projection.
+const ACTUALS_OVERVIEW_MAX_LINES = 2;
+const ACTUALS_OVERVIEW_ITEMS_PER_LINE = 3;
+const ACTUALS_OVERVIEW_MAX_VISIBLE_ITEMS = ACTUALS_OVERVIEW_MAX_LINES * ACTUALS_OVERVIEW_ITEMS_PER_LINE;
+
 // Keep the overview compact without making the visible race labels ambiguous.
 // These are the familiar three-letter F1 calendar codes; the fallback below
 // keeps the formatter useful for future calendars that are not in this list.
@@ -143,6 +151,12 @@ function compactActualOverviewLine(line, view) {
     .join(", ");
 }
 
+function uniqueActualOverviewEntities(values) {
+  return Array.from(new Set((values || [])
+    .map((value) => String(value || "").trim())
+    .filter((value) => value && value !== "—")));
+}
+
 function actualOverviewEntityCode(value, view) {
   const text = String(value || "").trim();
   if (!text) return text;
@@ -152,12 +166,38 @@ function actualOverviewEntityCode(value, view) {
     return name.slice(0, 3).toUpperCase() || text;
   }
   if (view === "constructors") {
-    const initials = words
-      .map((word) => word.replace(/[^A-Za-z0-9]/g, "").charAt(0).toUpperCase())
-      .join("");
-    return initials.slice(0, 3) || text;
+    const cleanedWords = words
+      .map((word) => word.replace(/[^A-Za-z0-9]/g, "").toUpperCase())
+      .filter(Boolean);
+    const initials = cleanedWords.map((word) => word.charAt(0)).join("");
+    if (initials.length >= 3) return initials.slice(0, 3);
+    if (cleanedWords.length > 1) return `${cleanedWords[0].slice(0, 2)}${cleanedWords[1].charAt(0)}`.slice(0, 3);
+    return cleanedWords[0]?.slice(0, 3) || text;
   }
   return text;
+}
+
+function compactActualOverviewCollection(values, view, prefix = "") {
+  const names = uniqueActualOverviewEntities(values);
+  if (!names.length) return { lines: ["—"], mode: "normal" };
+
+  const compactNames = names.map((name) => compactActualOverviewEntity(name, view));
+  if (names.length <= 2) {
+    return { lines: [`${prefix}${compactNames.join(", ")}`.trim() || "—"], mode: "normal" };
+  }
+
+  const codes = names.map((name) => actualOverviewEntityCode(name, view));
+  const overflow = Math.max(0, codes.length - ACTUALS_OVERVIEW_MAX_VISIBLE_ITEMS);
+  const visibleCodes = overflow
+    ? codes.slice(0, ACTUALS_OVERVIEW_MAX_VISIBLE_ITEMS - 1)
+    : codes;
+  const tokens = overflow ? [...visibleCodes, `+${overflow}`] : visibleCodes;
+  const grouped = [];
+  for (let index = 0; index < tokens.length; index += ACTUALS_OVERVIEW_ITEMS_PER_LINE) {
+    const group = tokens.slice(index, index + ACTUALS_OVERVIEW_ITEMS_PER_LINE).join(" · ");
+    grouped.push(index === 0 ? `${prefix}${group}` : group);
+  }
+  return { lines: grouped, mode: "codes" };
 }
 
 function formatActualOverviewDisplayLines(raw, view, question) {
@@ -165,31 +205,12 @@ function formatActualOverviewDisplayLines(raw, view, question) {
   const parsed = parseActualOverviewRaw(raw);
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.driver)) {
     const prefix = parsed.value == null ? "" : `${String(parsed.value)} · `;
-    const names = Array.from(new Set(parsed.driver.map((name) => String(name)).filter((name) => name.trim() !== "")));
-    const compactNames = names.map((name) => compactActualOverviewEntity(name, view));
-    if (compactNames.length <= 2) {
-      return { lines: [`${prefix}${compactNames.join(", ")}`.trim() || "—"], mode: "normal" };
-    }
-    const codes = names.map((name) => actualOverviewEntityCode(name, view));
-    const grouped = [];
-    for (let index = 0; index < codes.length; index += 3) {
-      const group = codes.slice(index, index + 3).join(" · ");
-      grouped.push(index === 0 ? `${prefix}${group}` : group);
-    }
-    return { lines: grouped, mode: "codes" };
+    return compactActualOverviewCollection(parsed.driver, view, prefix);
   }
-  const compactLines = lines.map((line) => compactActualOverviewLine(line, view));
-  const canUseCodes = ["drivers", "constructors"].includes(view)
-    && lines.length >= 5
-    && lines.every((line) => !line.includes(" · ") && !/\d/.test(line));
-  if (!canUseCodes) return { lines: compactLines, mode: "normal" };
-
-  const codes = lines.map((line) => actualOverviewEntityCode(line, view));
-  const grouped = [];
-  for (let index = 0; index < codes.length; index += 3) {
-    grouped.push(codes.slice(index, index + 3).join(" · "));
+  if (Array.isArray(parsed) && ["drivers", "constructors"].includes(view) && parsed.length > 2) {
+    return compactActualOverviewCollection(parsed, view);
   }
-  return { lines: grouped, mode: "codes" };
+  return { lines: lines.map((line) => compactActualOverviewLine(line, view)), mode: "normal" };
 }
 
 function actualOverviewFocusLabel(question) {
