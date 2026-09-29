@@ -1,19 +1,19 @@
 ## 1. Single-round source pipeline
 
-- [ ] 1.1 Add a validated selected-round argument to the canonical backfill runner and pass it through the existing auto-update wrapper.
-- [ ] 1.2 Ensure selected-round runs fetch through the existing OpenF1 pipeline but persist only the requested round, preserve destructor evidence, append a provider revision, and leave its derived actual snapshot pending.
-- [ ] 1.3 Add unit coverage for selected-round filtering, revision preservation, and failed-run no-op behavior.
+- [x] 1.1 Add a validated selected-round argument to the canonical backfill runner and pass it through the existing auto-update wrapper.
+- [x] 1.2 Ensure selected-round runs fetch through the existing OpenF1 pipeline but persist only the requested round, preserve destructor evidence, append a provider revision, and leave its derived actual snapshot pending.
+- [x] 1.3 Add unit coverage for selected-round filtering, revision preservation, and failed-run no-op behavior.
 
 ## 2. Protected admin action
 
-- [ ] 2.1 Add an admin-only `POST /admin/race-data/refresh` route with CSRF/confirmation validation, selected-context redirect, sanitized audit logging, and concise error handling.
-- [ ] 2.2 Add route tests proving the target round is passed to the runner and that missing confirmation/invalid targets do not mutate data.
+- [x] 2.1 Add an admin-only `POST /admin/race-data/refresh` route with CSRF/confirmation validation, selected-context redirect, sanitized audit logging, and concise error handling.
+- [x] 2.2 Add route tests proving the target round is passed to the runner and that missing confirmation/invalid targets do not mutate data.
 
 ## 3. Race Data review UI
 
-- [ ] 3.1 Render a compact `Refresh source` action beside `Edit data` for a selected persisted round, with an explicit confirmation and preserved season/round/view/focus context.
-- [ ] 3.2 Hide or disable refresh while full-table edit mode is active and keep the existing Save/Discard behavior unchanged.
-- [ ] 3.3 Add focused template/style coverage for the refresh control, pending-review state, and responsive toolbar alignment.
+- [x] 3.1 Render a compact `Refresh source` action beside `Edit data` for a selected persisted round, with an explicit confirmation and preserved season/round/view/focus context.
+- [x] 3.2 Hide or disable refresh while full-table edit mode is active and keep the existing Save/Discard behavior unchanged.
+- [x] 3.3 Add focused template/style coverage for the refresh control, pending-review state, and responsive toolbar alignment.
 
 ## 4. Verification and handoff
 
