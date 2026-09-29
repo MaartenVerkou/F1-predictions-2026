@@ -82,7 +82,7 @@ function run(argv = process.argv.slice(2)) {
           preserveReviewIfUnchanged: true,
           catalogRevision: catalog.catalogRevision,
           evidenceRevision: evidence?.payload_revision || evidence?.sync_id || null,
-          derivationVersion: "race-data-derivation-v3"
+          derivationVersion: "race-data-derivation-v4"
         });
         if (upserted?.snapshotId && evidence?.id) {
           linkEvidenceToActualSnapshot(

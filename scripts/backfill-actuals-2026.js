@@ -996,7 +996,7 @@ function writeActualsAndSnapshots(db, {
         preserveReviewIfUnchanged: true,
         catalogRevision: snapshot.evidence?.catalogRevision || null,
         evidenceRevision: snapshot.evidence?.payloadRevision || null,
-        derivationVersion: `${parserVersion}-derivation-v1`
+        derivationVersion: `${parserVersion}-derivation-v2`
       });
       snapshot.id = snapshotResult?.snapshotId || null;
       linkEvidenceToActualSnapshot(db, snapshot.id, snapshot.evidenceId, importId);
