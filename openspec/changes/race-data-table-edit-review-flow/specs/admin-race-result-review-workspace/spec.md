@@ -1,0 +1,85 @@
+## MODIFIED Requirements
+
+### Requirement: Admin can review one selected race result in a focused workspace
+The system SHALL provide an admin-only Season actuals review workspace with a single race selector and one compact selected-snapshot metadata/action line. The round title, review state or review action, and `Edit data` action SHALL be vertically aligned in that line, without a redundant selection hint.
+
+#### Scenario: Admin selects a pending race
+- **GIVEN** an admin selects a race with a pending snapshot
+- **WHEN** the Season actuals workspace renders
+- **THEN** the workspace SHALL show that race as the selected snapshot
+- **AND** it SHALL provide the existing action to mark the selected snapshot reviewed
+- **AND** it SHALL provide one `Edit data` action when persisted evidence exists
+- **AND** it SHALL not show a separate row-selection label
+
+#### Scenario: Admin views a reviewed provider snapshot
+- **GIVEN** an admin selects a reviewed snapshot that has no admin correction revision
+- **WHEN** the workspace renders
+- **THEN** the review state SHALL show the reviewer name and compact review timestamp as `Reviewed by …`
+
+#### Scenario: Admin views an edited snapshot
+- **GIVEN** an admin selects an evidence snapshot created by a protected manual correction
+- **WHEN** the workspace renders
+- **THEN** the review state SHALL show the reviewer name and compact timestamp as `Edited by …`
+
+### Requirement: Review workspace shows answer context with interpreted results
+The system SHALL show the selected race's relevant question context and interpreted actual values together before review, and SHALL allow a correction to be applied to the complete visible evidence table.
+
+#### Scenario: Admin enters full-table edit mode
+- **GIVEN** an admin has selected a race with persisted evidence
+- **WHEN** the admin activates `Edit data`
+- **THEN** the visible result and persisted session cells SHALL switch to editable controls in the same table
+- **AND** the table SHALL preserve finish order, session columns, and stable driver identities
+- **AND** the toolbar SHALL expose Save and Discard actions
+
+#### Scenario: Admin discards a correction
+- **GIVEN** an admin has changed one or more table fields in edit mode
+- **WHEN** the admin chooses Discard
+- **THEN** the table SHALL return to its original read-only values
+- **AND** no evidence revision or actual snapshot SHALL be created
+
+#### Scenario: Admin saves a complete correction
+- **GIVEN** an admin edits the selected evidence table
+- **AND** supplies a correction reason and protected-correction confirmation
+- **WHEN** the admin chooses Save
+- **THEN** the system SHALL validate the complete submitted matrix against stable row identities
+- **AND** it SHALL create one immutable admin-correction evidence revision
+- **AND** it SHALL re-derive actuals from that revision
+- **AND** it SHALL show the resulting snapshot as edited by the saving admin
+
+#### Scenario: Correction validation fails
+- **GIVEN** an admin submits an unknown, duplicate, stale, or invalid row/value
+- **WHEN** the correction is processed
+- **THEN** the system SHALL reject the correction without creating a revision
+- **AND** it SHALL explain the validation error and leave the stored evidence unchanged
+
+### Requirement: Compact identity presentation preserves discoverability
+The primary evidence and championship tables SHALL show full canonical driver and constructor names whenever the available layout width can accommodate them. At responsive width thresholds, the identity columns SHALL switch to stable three-letter codes before the table becomes unusable; the table SHALL retain horizontal scrolling as a final fallback. The full canonical names SHALL remain available through an accessible label or tooltip. Compact presentation MUST NOT change identity, ordering, or correction targets.
+
+#### Scenario: Admin reviews a spacious result table
+- **GIVEN** the Race Data workspace is rendered at a width where the identity columns fit
+- **WHEN** a driver or constructor cell is displayed
+- **THEN** the visible cell SHALL show the full canonical name
+- **AND** the cell SHALL retain the same canonical identity used by corrections and derivations
+
+#### Scenario: Admin reviews a compact result table
+- **GIVEN** the Race Data workspace is rendered at a width where full identity names would crowd the facts
+- **WHEN** a driver or constructor cell is displayed
+- **THEN** the visible identity MAY use its stable three-letter code
+- **AND** the full canonical name SHALL remain discoverable on hover and to assistive technology
+- **AND** selecting and correcting the row SHALL continue to target the canonical driver identity
+
+### Requirement: Selected-round evidence exposes the available session sequence
+The selected round's result table SHALL preserve finish-order rows and SHALL show only persisted session columns that have evidence for that round. The table SHALL use a stable order: race position, driver, constructor, available practice sessions, sprint qualifying and sprint race when applicable, Grand Prix qualifying, grid, status, and points. Finish positions SHALL be displayed as plain numeric positions; session headers MAY use concise labels such as P1, P2, P3, Sprint Q, Sprint, and Qualifying, with an accessible/full title describing the session.
+
+#### Scenario: Admin reviews a normal weekend
+- **GIVEN** the selected round has practice and Grand Prix qualifying evidence but no sprint evidence
+- **WHEN** the result table renders
+- **THEN** it SHALL show available P1/P2/P3 columns followed by Grand Prix qualifying, grid, status, and points
+- **AND** it SHALL not show empty sprint columns
+- **AND** the first position column SHALL show values such as `1`, `2`, and `3`, never `P1`, `P2`, or `P3`
+
+#### Scenario: Admin reviews a sprint weekend
+- **GIVEN** the selected round has sprint-format evidence
+- **WHEN** the result table renders
+- **THEN** it SHALL show the available practice column(s), Sprint Q, Sprint, Grand Prix qualifying, grid, status, and points in that order
+- **AND** missing optional sessions SHALL be omitted rather than filled with invented values
