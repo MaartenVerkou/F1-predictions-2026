@@ -17,6 +17,11 @@ function numeric(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function gridPosition(value) {
+  const parsed = numeric(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed < 100 ? parsed : null;
+}
+
 function entityMatches(row, entity, { idField, nameField }) {
   if (!row || !entity) return false;
   if (entity.id != null && row[idField] != null) {
@@ -294,20 +299,19 @@ function applyDriverMetric(row, rounds, focus, cutoffRoundNumber) {
     if (metric === "grid_wins") {
       const position = numeric(race?.position);
       if (position !== 1) return focusCell(cell, { label: "—", title: "Not a race win", hit: false });
-      const grid = numeric(race?.grid);
-      const gridLabel = grid === 0 ? "PL" : grid == null ? "—" : String(grid);
+      const grid = gridPosition(race?.grid);
+      const gridLabel = grid == null ? "—" : String(grid);
       if (grid != null && inCutoff) {
-        const comparableGrid = grid === 0 ? 23 : grid;
-        if (worstWinningGrid == null || comparableGrid > worstWinningGrid) {
-          worstWinningGrid = comparableGrid;
+        if (worstWinningGrid == null || grid > worstWinningGrid) {
+          worstWinningGrid = grid;
           worstWinningGridLabel = gridLabel;
         }
       }
-      if (inCutoff) count += 1;
+      if (grid != null && inCutoff) count += 1;
       return focusCell(cell, {
         label: gridLabel,
-        hit: highlightCells && inCutoff,
-        title: `${row.name} won from grid ${gridLabel}`
+        hit: highlightCells && inCutoff && grid != null,
+        title: grid == null ? "Race winner grid position unavailable" : `${row.name} won from grid ${gridLabel}`
       });
     }
     if (metric === "driver_of_day") {
@@ -755,9 +759,9 @@ function buildFocusSummary({
     completed.forEach((round) => {
       const race = roundRows(round, "race").find((row) => numeric(row.position) === 1);
       if (!race) return;
-      const grid = numeric(race.grid);
+      const grid = gridPosition(race.grid);
       if (grid == null) return;
-      wins.push({ round, driver: race.driver, grid: grid === 0 ? "Pitlane" : String(grid), comparable: grid === 0 ? 23 : grid });
+      wins.push({ round, driver: race.driver, grid: String(grid), comparable: grid });
     });
     if (!wins.length) return unavailable("No race winner with a known grid position yet.");
     const worst = wins.reduce((best, item) => item.comparable > best.comparable ? item : best, wins[0]);

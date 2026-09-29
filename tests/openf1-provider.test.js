@@ -178,3 +178,36 @@ test("OpenF1 fetch produces session projections and grid values", async () => {
   assert.equal(data.sourceIdentityByRound.get(1), "openf1:2026:meeting-1279");
   assert.equal(data.sourceType, "openf1");
 });
+
+test("OpenF1 does not turn an unavailable starting-grid position into zero", async () => {
+  const meeting = {
+    meeting_key: 1279,
+    meeting_name: "Australian Grand Prix",
+    date_start: "2026-03-06T01:30:00Z",
+    circuit_short_name: "Albert Park"
+  };
+  const sessions = [
+    { session_key: 11234, meeting_key: 1279, session_type: "Race", session_name: "Race", date_start: "2026-03-08T04:00:00Z" }
+  ];
+  const fetchImpl = async (url) => {
+    const parsed = new URL(url);
+    const path = parsed.pathname;
+    if (path.endsWith("/meetings")) return response([meeting]);
+    if (path.endsWith("/sessions")) return response(sessions);
+    if (path.endsWith("/drivers")) return response([{ driver_number: 44, full_name: "Lewis Hamilton", team_name: "Ferrari" }]);
+    if (path.endsWith("/starting_grid")) return response([{ position: 0, driver_number: 44, meeting_key: 1279, session_key: 11234 }]);
+    if (path.endsWith("/session_result")) return response([{ position: 1, driver_number: 44, dnf: false, dns: false, dsq: false, points: 25, session_key: 11234 }]);
+    throw new Error("Unexpected URL: " + url);
+  };
+  const data = await fetchOpenF1SeasonData({
+    season: 2026,
+    calendar: [{ round: 1, name: "Australian Grand Prix", start: "2026-03-08T04:00:00Z", circuit: "Albert Park" }],
+    maxRound: 1,
+    baseUrl: "https://api.example.test",
+    fetchImpl,
+    retries: 0
+  });
+
+  assert.equal(data.sessionsByRound.get(1).race.rows[0].grid, null);
+  assert.equal(data.sessionsByRound.get(1).startingGrid.available, false);
+});

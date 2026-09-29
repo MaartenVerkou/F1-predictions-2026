@@ -951,6 +951,23 @@ test("question focus projections expose DNF and grid-winner facts without changi
   assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").summaryValue, 12);
   assert.equal(gridView.drivers.find((row) => row.name === "Driver Alpha").summaryLabel, "12");
   assert.equal(gridView.focusSummary.value, "12 · Driver Alpha");
+
+  const unavailableGridView = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster,
+    evidenceRows: [{
+      ...evidence,
+      payload: {
+        ...evidence.payload,
+        race: { rows: [{ ...evidence.payload.race.rows[0], grid: 0 }] }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: { id: "lowest_grid_win_position", view: "drivers", metric: "grid_wins", matrixMetric: "grid_wins" }
+  });
+  assert.equal(unavailableGridView.drivers.find((row) => row.name === "Driver Alpha").cells[0].label, "—");
+  assert.equal(unavailableGridView.focusSummary.status, "unavailable");
 });
 
 test("DNF-by-race focus highlights the three highest-DNF race columns", () => {

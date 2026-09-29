@@ -31,6 +31,11 @@ function parseFinite(value, fallback = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeGridPosition(value) {
+  const parsed = parseFinite(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed < 100 ? parsed : null;
+}
+
 function normalizeName(value) {
   return String(value || "")
     .normalize("NFKD")
@@ -337,7 +342,7 @@ async function fetchOpenF1SeasonData({
           try {
             const gridResponse = await request("starting_grid", { session_key: session.session_key });
             const gridRows = unwrapArray(gridResponse.payload, "starting grid for " + session.session_key);
-            const gridByNumber = new Map(gridRows.map((row) => [String(row.driver_number), parseFinite(row.position)]));
+            const gridByNumber = new Map(gridRows.map((row) => [String(row.driver_number), normalizeGridPosition(row.position)]));
             sessionMeta.rows.forEach((row) => {
               row.grid = gridByNumber.get(String(row.number)) ?? null;
             });
@@ -433,6 +438,7 @@ module.exports = {
   createRequester,
   fetchOpenF1SeasonData,
   normalizeBaseUrl,
+  normalizeGridPosition,
   normalizeOpenF1Row,
   resolveMeetingRound,
   statusFor

@@ -114,6 +114,14 @@ test("Formula 1 Dashboard sentinel statuses never become finishing positions", (
   assert.equal(row.positionText, "DNF");
   assert.equal(statusFor({ completion_status_code: "DNS" }), "Did not start");
   assert.equal(statusFor({ completion_status_code: "DSQ" }), "Disqualified");
+  assert.equal(normalizedResultRow({
+    driver_id: 170,
+    driver_name: "Pit Lane Driver",
+    team_name: "Mercedes",
+    position: 1,
+    grid: 0,
+    completion_status_code: "OK"
+  }, "race").grid, null);
 });
 
 test("Formula 1 Dashboard destructors rows calculate component totals", () => {

@@ -38,6 +38,11 @@ function parseNum(value, fallback = null) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function normalizeGridPosition(value) {
+  const parsed = parseNum(value);
+  return Number.isInteger(parsed) && parsed >= 1 && parsed < 100 ? parsed : null;
+}
+
 function normalizeLookupKey(value) {
   return String(value || "")
     .normalize("NFKD")
@@ -97,7 +102,7 @@ function normalizeResultRow(row, roster, kind, canonicalCatalog = null) {
     provider_driver_id: String(row?.Driver?.driverId || "").trim() || null,
     provider_team_id: String(row?.Constructor?.constructorId || "").trim() || null,
     number: String(row?.number || "").trim() || null,
-    grid: parseNum(row?.grid),
+    grid: normalizeGridPosition(row?.grid),
     position,
     positionText: position != null ? String(position) : positionRaw || null,
     status: String(row?.status || "").trim() || null,
@@ -453,6 +458,75 @@ function parseEvidencePayload(raw) {
   }
 }
 
+function gridIdentity(row) {
+  if (row?.driver_id != null) return `id:${row.driver_id}`;
+  if (row?.provider_driver_id != null) return `provider:${row.provider_driver_id}`;
+  if (row?.number != null && String(row.number).trim()) return `number:${row.number}`;
+  const name = String(row?.driver || row?.Driver?.driverId || "").trim().toLowerCase();
+  return name ? `name:${name}` : null;
+}
+
+function mergeKnownGridValues(evidence, previousPayloads = []) {
+  const known = new Map();
+  const remember = (rows) => (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const key = gridIdentity(row);
+    const grid = normalizeGridPosition(row?.grid);
+    if (key && grid != null && !known.has(key)) known.set(key, grid);
+  });
+  previousPayloads.forEach((payload) => {
+    remember(payload?.race?.rows);
+    remember(payload?.sessions?.race?.rows);
+    remember(payload?.sessions?.startingGrid?.rows);
+  });
+
+  let restored = 0;
+  const restore = (rows) => (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const key = gridIdentity(row);
+    const currentGrid = normalizeGridPosition(row?.grid);
+    if (currentGrid != null) {
+      row.grid = currentGrid;
+      return;
+    }
+    row.grid = null;
+    if (!key) return;
+    const grid = known.get(key);
+    if (grid == null) return;
+    row.grid = grid;
+    restored += 1;
+  });
+  restore(evidence?.race?.rows);
+  restore(evidence?.sessions?.race?.rows);
+
+  const raceRows = evidence?.sessions?.race?.rows || evidence?.race?.rows || [];
+  const startingGridRows = raceRows
+    .filter((row) => normalizeGridPosition(row?.grid) != null)
+    .map((row) => ({
+      ...row,
+      position: row.grid,
+      positionText: String(row.grid),
+      status: null
+    }));
+  if (startingGridRows.length && evidence?.sessions?.startingGrid) {
+    evidence.sessions.startingGrid = {
+      ...evidence.sessions.startingGrid,
+      available: true,
+      status: "available",
+      unavailableReason: null,
+      rows: startingGridRows
+    };
+    if (evidence.coverage?.sources?.startingGrid) {
+      evidence.coverage.sources.startingGrid = {
+        ...evidence.coverage.sources.startingGrid,
+        available: true,
+        count: startingGridRows.length,
+        status: "available",
+        unavailableReason: null
+      };
+    }
+  }
+  return restored;
+}
+
 function listColumnNames(db, tableName) {
   return new Set(
     db
@@ -749,6 +823,19 @@ function saveRaceDataSnapshot(db, {
   if (safeSeason == null || safeRound == null || !syncId || !evidence) {
     throw new Error("Race data snapshot requires season, round, sync id, and evidence.");
   }
+  if (String(revisionKind || "provider") === "provider") {
+    const previousPayloads = db
+      .prepare(
+        `SELECT payload_json
+         FROM race_data_snapshots
+         WHERE season = ? AND round_number = ?
+         ORDER BY created_at DESC, id DESC`
+      )
+      .all(safeSeason, safeRound)
+      .map((row) => parseEvidencePayload(row.payload_json))
+      .filter(Boolean);
+    mergeKnownGridValues(evidence, previousPayloads);
+  }
   const payload = JSON.stringify(evidence);
   const now = new Date().toISOString();
   const safeCutoffRound = cutoffRound == null
@@ -992,7 +1079,9 @@ module.exports = {
   listRaceDataSnapshots,
   normalizeCoverage,
   normalizeDamageRow,
+  normalizeGridPosition,
   normalizeLookupKey,
+  mergeKnownGridValues,
   parseEvidencePayload,
   saveDestructorsSourcePost,
   saveCorrectedRaceDataSnapshot,

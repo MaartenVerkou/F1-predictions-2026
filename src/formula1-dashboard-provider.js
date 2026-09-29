@@ -28,7 +28,7 @@ function normalizePosition(value) {
 
 function normalizeGrid(value) {
   const parsed = parseFinite(value);
-  return parsed != null && parsed >= 0 && parsed < 100 ? parsed : null;
+  return Number.isInteger(parsed) && parsed >= 1 && parsed < 100 ? parsed : null;
 }
 
 function splitDriverName(row) {

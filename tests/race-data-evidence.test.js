@@ -12,7 +12,8 @@ const {
   listRaceDataSnapshots,
   saveCorrectedRaceDataSnapshot,
   saveRaceDataSnapshot,
-  summarizeEvidence
+  summarizeEvidence,
+  mergeKnownGridValues
 } = require("../src/race-data-evidence");
 
 const roster = {
@@ -129,6 +130,59 @@ test("evidence keeps an unclassified qualifying result unavailable", () => {
   assert.equal(evidence.qualifying.rows[0].position, null);
   assert.equal(evidence.qualifying.rows[0].positionText, null);
   assert.equal(evidence.qualifying.rows[0].status, null);
+});
+
+test("missing or zero starting-grid positions stay unavailable", () => {
+  const evidence = buildEvidenceBundle({
+    data: {
+      season: 2026,
+      results: [{
+        round: 4,
+        raceName: "Miami Grand Prix",
+        Results: [{
+          position: "1",
+          grid: null,
+          Driver: { givenName: "Kimi", familyName: "Antonelli" },
+          Constructor: { name: "Mercedes" }
+        }]
+      }],
+      qualifying: [],
+      sprints: [],
+      driverStandingsByRound: new Map(),
+      constructorStandingsByRound: new Map(),
+      driverOfTheDayByRound: new Map()
+    },
+    roster: { drivers: ["Kimi Antonelli"], teams: ["Mercedes"] },
+    roundNumber: 4,
+    roundName: "Miami Grand Prix"
+  });
+
+  assert.equal(evidence.race.rows[0].grid, null);
+  evidence.race.rows[0].grid = 0;
+  assert.equal(mergeKnownGridValues(evidence, []), 0);
+  assert.equal(evidence.race.rows[0].grid, null);
+});
+
+test("provider refresh preserves a previously validated grid when the source omits it", () => {
+  const evidence = {
+    race: { rows: [{ driver_id: 11, driver: "Kimi Antonelli", grid: null }] },
+    sessions: {
+      race: { rows: [{ driver_id: 11, driver: "Kimi Antonelli", grid: null }] },
+      startingGrid: { available: false, status: "unavailable", rows: [] }
+    },
+    coverage: { sources: { startingGrid: { available: false, count: 0 } } }
+  };
+  const restored = mergeKnownGridValues(evidence, [{
+    race: { rows: [{ driver_id: 11, driver: "Kimi Antonelli", grid: 1 }] },
+    sessions: { race: { rows: [{ driver_id: 11, driver: "Kimi Antonelli", grid: 1 }] } }
+  }]);
+
+  assert.equal(restored, 2);
+  assert.equal(evidence.race.rows[0].grid, 1);
+  assert.equal(evidence.sessions.race.rows[0].grid, 1);
+  assert.equal(evidence.sessions.startingGrid.available, true);
+  assert.equal(evidence.sessions.startingGrid.rows[0].position, 1);
+  assert.equal(evidence.coverage.sources.startingGrid.count, 1);
 });
 
 test("evidence keeps provider identity and raw session details for future derivations", () => {
