@@ -106,6 +106,15 @@ const reviewStatusTitle = reviewStatusLabel; %>
         <div class="admin-race-data-detail-actions" data-race-data-detail-actions>
           <% if (view.selectedEvidence) { %>
             <button type="button" class="secondary admin-race-data-edit-button" data-race-data-edit>Edit data</button>
+            <form method="post" action="/admin/race-data/refresh" class="admin-race-data-refresh-form" data-race-data-refresh-form onsubmit="return confirm('Fetch this round again from the source? The current revision will remain in history, and the refreshed data will require review.');">
+              <%- csrfField() %>
+              <input type="hidden" name="season" value="<%= season %>" />
+              <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+              <input type="hidden" name="view" value="<%= viewMode %>" />
+              <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
+              <input type="hidden" name="confirmRefresh" value="1" />
+              <button type="submit" class="secondary admin-race-data-refresh-button" data-race-data-refresh title="Fetch this round again from the configured source">Refresh source</button>
+            </form>
             <div class="admin-race-data-edit-actions" data-race-data-edit-actions hidden>
               <button type="submit" form="admin-race-data-correction-form" class="secondary admin-race-data-save-button">Save changes</button>
               <button type="button" class="secondary" data-race-data-editor-close>Discard</button>

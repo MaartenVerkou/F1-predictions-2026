@@ -1043,7 +1043,8 @@ function registerAdminRoutes(app, deps) {
     questionsPath,
     rosterPath,
     racesPath,
-    logEvent
+    logEvent,
+    runActualsAutoUpdate: runAutoUpdate = runActualsAutoUpdate
   } = deps;
   const CURRENT_SEASON = Number(process.env.F1_SEASON || 2026);
   const MULTI_ACTUAL_SINGLE_CHOICE_IDS = new Set([
@@ -3111,6 +3112,60 @@ function registerAdminRoutes(app, deps) {
       });
       return res.redirect(redirectTo);
     } catch (err) {
+      return res.redirect(withQueryParam(redirectTo, "error", err.message));
+    }
+  });
+
+  app.post("/admin/race-data/refresh", requireAdmin, async (req, res) => {
+    const adminUser = getCurrentUser(req);
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const round = Number(req.body.round || 0);
+    const viewMode = String(req.body.view || "drivers").toLowerCase() === "constructors"
+      ? "constructors"
+      : "drivers";
+    const focus = String(req.body.focus || "points").trim() || "points";
+    const redirectTo = `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(round)}&view=${encodeURIComponent(viewMode)}&focus=${encodeURIComponent(focus)}`;
+    try {
+      if (String(req.body.confirmRefresh || "") !== "1") {
+        throw new Error("Confirm the source refresh before continuing.");
+      }
+      if (!Number.isInteger(season) || season < 1900 || !Number.isInteger(round) || round < 1) {
+        throw new Error("Choose a valid season and round.");
+      }
+      const snapshot = findRaceDataSnapshot(db, season, round);
+      if (!snapshot) throw new Error("No persisted race evidence exists for this round.");
+      const result = await runAutoUpdate({
+        season,
+        round,
+        dbPath,
+        databaseUrl,
+        dataDir,
+        questionsPath,
+        rosterPath,
+        racesPath,
+        dryRun: false
+      });
+      const refreshed = Array.isArray(result?.snapshots)
+        && result.snapshots.some((item) => Number(item?.roundNumber) === round);
+      if (!refreshed) throw new Error("The source returned no completed evidence for this round.");
+      logEvent("info", "admin_race_data_source_refreshed", {
+        requestId: req.requestId,
+        userId: adminUser?.id || null,
+        season,
+        round,
+        previousSnapshotId: snapshot.id,
+        refreshedSnapshotId: result.snapshots.find((item) => Number(item?.roundNumber) === round)?.id || null,
+        reviewStatus: result.snapshots.find((item) => Number(item?.roundNumber) === round)?.reviewStatus || "pending"
+      });
+      return res.redirect(withQueryParam(redirectTo, "success", "Source refreshed; review required."));
+    } catch (err) {
+      logEvent("warn", "admin_race_data_source_refresh_failed", {
+        requestId: req.requestId,
+        userId: adminUser?.id || null,
+        season,
+        round,
+        error: { message: err.message }
+      });
       return res.redirect(withQueryParam(redirectTo, "error", err.message));
     }
   });

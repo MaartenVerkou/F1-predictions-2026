@@ -1338,6 +1338,7 @@ const initRaceDataCorrection = () => {
     const region = page.querySelector('[data-race-data-round-region]');
     const form = page.querySelector('[data-race-data-correction-form]');
     const edit = page.querySelector('[data-race-data-edit]');
+    const refresh = page.querySelector('[data-race-data-refresh-form]');
     const actions = page.querySelector('[data-race-data-edit-actions]');
     const details = page.querySelector('[data-race-data-editor-details]');
     if (!region || !form) return;
@@ -1351,6 +1352,10 @@ const initRaceDataCorrection = () => {
     if (edit) {
       edit.hidden = isEditing;
       edit.setAttribute('aria-hidden', isEditing ? 'true' : 'false');
+    }
+    if (refresh) {
+      refresh.hidden = isEditing;
+      refresh.setAttribute('aria-hidden', isEditing ? 'true' : 'false');
     }
     if (actions) actions.hidden = !isEditing;
     if (details) details.hidden = !isEditing;

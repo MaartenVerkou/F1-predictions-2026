@@ -7923,6 +7923,16 @@ button.lang-option.is-active {
   flex: 0 0 auto;
 }
 
+.admin-race-data-refresh-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.admin-race-data-refresh-form[hidden] {
+  display: none;
+}
+
 .admin-race-data-detail-actions button {
   min-width: 72px;
 }

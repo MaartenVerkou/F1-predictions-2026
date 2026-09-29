@@ -17,6 +17,10 @@ const {
   isSafeRaceDataReturnPath,
   registerAdminRoutes
 } = require("../src/routes/admin");
+const {
+  parseArgs,
+  selectCompletedRounds
+} = require("../scripts/backfill-actuals-2026");
 
 test("auditResultLabel preserves classified and non-classified outcomes", () => {
   assert.equal(auditResultLabel({ position: 2, status: "Finished" }), "2");
@@ -132,6 +136,17 @@ test("race-data review return paths stay local to the race-data workspace", () =
   assert.equal(isSafeRaceDataReturnPath("https://example.test/admin/race-data"), false);
   assert.equal(isSafeRaceDataReturnPath("//example.test/admin/race-data"), false);
   assert.equal(isSafeRaceDataReturnPath("/admin/actuals"), false);
+});
+
+test("selected source refresh is limited to one completed round", () => {
+  assert.deepEqual(selectCompletedRounds([1, 2, 2, 4], { round: 2 }), [2]);
+  assert.deepEqual(selectCompletedRounds([1, 2, 4], { maxRound: 2 }), [1, 2]);
+  assert.deepEqual(selectCompletedRounds([4, 1, 4], {}), [1, 4]);
+  assert.equal(parseArgs(["--apply", "--season=2026", "--round=4"]).round, 4);
+  assert.throws(
+    () => parseArgs(["--round=4", "--max-round=4"]),
+    /cannot be combined/i
+  );
 });
 
 test("selected summary reflects partial and cancelled calendar states", () => {
@@ -523,6 +538,77 @@ test("race data exposes a read-only workspace plus a protected correction route"
   assert.equal(routes["POST /admin/race-data"], undefined);
   assert.equal(typeof routes["POST /admin/race-data/correction"][1], "function");
   assert.equal(routes["POST /admin/race-data/correction"][0], requireAdmin);
+  assert.equal(typeof routes["POST /admin/race-data/refresh"][1], "function");
+  assert.equal(routes["POST /admin/race-data/refresh"][0], requireAdmin);
+});
+
+test("source refresh passes the selected round and returns it pending review", async () => {
+  const routes = {};
+  const calls = [];
+  const app = {
+    get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers; }
+  };
+  const db = {
+    prepare() {
+      return {
+        get() {
+          return { id: 12, season: 2026, round_number: 4 };
+        }
+      };
+    }
+  };
+  registerAdminRoutes(app, {
+    db,
+    requireAdmin: () => {},
+    getCurrentUser: () => ({ id: 9 }),
+    logEvent: () => {},
+    runActualsAutoUpdate: async (options) => {
+      calls.push(options);
+      return { snapshots: [{ id: 13, roundNumber: 4, reviewStatus: "pending" }] };
+    }
+  });
+  let redirected = "";
+  await routes["POST /admin/race-data/refresh"][1]({
+    body: {
+      season: "2026",
+      round: "4",
+      view: "constructors",
+      focus: "dnfs",
+      confirmRefresh: "1"
+    },
+    requestId: "test-refresh"
+  }, { redirect(value) { redirected = value; } });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].season, 2026);
+  assert.equal(calls[0].round, 4);
+  assert.match(redirected, /round=4/);
+  assert.match(redirected, /view=constructors/);
+  assert.match(redirected, /focus=dnfs/);
+  assert.match(redirected, /success=/);
+});
+
+test("source refresh rejects missing confirmation before reading evidence", async () => {
+  const routes = {};
+  const app = {
+    get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers; }
+  };
+  let prepareCalled = false;
+  registerAdminRoutes(app, {
+    db: { prepare() { prepareCalled = true; throw new Error("database should not be read"); } },
+    requireAdmin: () => {},
+    getCurrentUser: () => ({ id: 9 }),
+    logEvent: () => {},
+    runActualsAutoUpdate: async () => { throw new Error("runner should not be called"); }
+  });
+  let redirected = "";
+  await routes["POST /admin/race-data/refresh"][1]({
+    body: { season: "2026", round: "4" },
+    requestId: "test-refresh-confirm"
+  }, { redirect(value) { redirected = value; } });
+  assert.equal(prepareCalled, false);
+  assert.match(redirected, /error=/);
 });
 
 test("race-data corrections validate the complete table and update shared session evidence", () => {

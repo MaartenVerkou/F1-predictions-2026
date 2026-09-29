@@ -93,6 +93,7 @@ function parseArgs(argv) {
     databaseUrl: String(process.env.DATABASE_URL || "").trim(),
     season: SEASON,
     maxRound: null,
+    round: null,
     provider: String(process.env.F1_DATA_PROVIDER || OPENF1_PROVIDER).trim().toLowerCase()
   };
 
@@ -111,6 +112,8 @@ function parseArgs(argv) {
       args.season = Number(arg.slice("--season=".length));
     } else if (arg.startsWith("--max-round=")) {
       args.maxRound = Number(arg.slice("--max-round=".length));
+    } else if (arg.startsWith("--round=")) {
+      args.round = Number(arg.slice("--round=".length));
     } else if (arg.startsWith("--provider=")) {
       args.provider = String(arg.slice("--provider=".length)).trim().toLowerCase();
     } else {
@@ -124,12 +127,28 @@ function parseArgs(argv) {
   if (args.maxRound != null && (!Number.isFinite(args.maxRound) || args.maxRound <= 0)) {
     throw new Error("--max-round must be a positive number.");
   }
+  if (args.round != null && (!Number.isInteger(args.round) || args.round <= 0)) {
+    throw new Error("--round must be a positive integer.");
+  }
+  if (args.round != null && args.maxRound != null) {
+    throw new Error("--round cannot be combined with --max-round.");
+  }
   assertStandardEvidenceProvider(args.provider);
   return args;
 }
 
 function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
+}
+
+function selectCompletedRounds(completedRounds, { round = null, maxRound = null } = {}) {
+  const uniqueRounds = Array.from(new Set((completedRounds || [])
+    .map((value) => Number(value))
+    .filter((value) => Number.isInteger(value) && value > 0)))
+    .sort((a, b) => a - b);
+  if (round != null) return uniqueRounds.filter((value) => value === Number(round));
+  if (maxRound == null) return uniqueRounds;
+  return uniqueRounds.filter((value) => value <= Number(maxRound));
 }
 
 const SUPPORTING_FETCH_TIMEOUT_MS = 15_000;
@@ -943,7 +962,8 @@ function writeActualsAndSnapshots(db, {
   deriveContext,
   sourceType = SOURCE_TYPES.OPENF1,
   sourceNote = BACKFILL_SOURCE_NOTE,
-  parserVersion = "evidence-v1"
+  parserVersion = "evidence-v1",
+  preserveReviewIfUnchanged = true
 }) {
   const now = new Date().toISOString();
   let changedSnapshotCount = 0;
@@ -962,6 +982,7 @@ function writeActualsAndSnapshots(db, {
         parserVersion,
         calendarState: snapshot.calendarState || "completed",
         reconstructed: sourceType === SOURCE_TYPES.OPENF1,
+        supersedesSnapshotId: snapshot.supersedesSnapshotId || null,
         evidence: snapshot.evidence
       });
       snapshot.evidenceId = evidenceId;
@@ -994,7 +1015,7 @@ function writeActualsAndSnapshots(db, {
         sourceNote,
         label: `R${snapshot.roundNumber} - ${snapshot.roundName}`,
         reviewStatus: REVIEW_STATUS_PENDING,
-        preserveReviewIfUnchanged: true,
+        preserveReviewIfUnchanged,
         catalogRevision: snapshot.evidence?.catalogRevision || null,
         evidenceRevision: snapshot.evidence?.payloadRevision || null,
         derivationVersion: `${parserVersion}-derivation-v5`
@@ -1045,7 +1066,7 @@ async function main() {
     races,
     calendarByName,
     provider: args.provider,
-    maxRound: args.maxRound,
+    maxRound: args.round ?? args.maxRound,
     scoringRules
   });
   const sourceType = data.sourceType || args.provider;
@@ -1054,9 +1075,7 @@ async function main() {
     ? OPENF1_SCHEMA + "-normalizer-v1"
     : "evidence-v1";
   const totalRounds = races.length;
-  const completedRounds = data.completedRounds.filter((round) =>
-    args.maxRound == null ? true : round <= args.maxRound
-  );
+  const completedRounds = selectCompletedRounds(data.completedRounds, args);
 
   if (completedRounds.length === 0) {
     throw new Error(`No completed ${args.season} rounds found.`);
@@ -1115,6 +1134,9 @@ async function main() {
       }
       ensureActualsSchema(db);
       const existingEvidenceRows = listRaceDataSnapshots(db, args.season);
+      const existingEvidenceByRound = new Map(
+        existingEvidenceRows.map((row) => [Number(row.round_number), row])
+      );
       if (existingEvidenceRows.length) {
         const existingEvidenceData = buildPersistedDataFromEvidence(
           existingEvidenceRows,
@@ -1183,7 +1205,8 @@ async function main() {
         ...snapshot,
         values: undefined,
         syncId,
-        calendarState: "completed"
+        calendarState: "completed",
+        supersedesSnapshotId: existingEvidenceByRound.get(Number(snapshot.roundNumber))?.id || null
       }));
       const derivedContext = { questions, roster, races, totalRounds, scoringRules };
       result = writeActualsAndSnapshots(db, {
@@ -1195,7 +1218,8 @@ async function main() {
         deriveContext: derivedContext,
         sourceType,
         sourceNote,
-        parserVersion
+        parserVersion,
+        preserveReviewIfUnchanged: args.round == null
       });
       const latestDerived = persistedSnapshots.find((snapshot) => snapshot.roundNumber === (completedRounds.at(-1)));
       latestValues = { ...existingActuals, ...(latestDerived?.values || {}) };
@@ -1284,6 +1308,7 @@ module.exports = {
   fetchOpenF1CanonicalSeasonData,
   fetchFormula1SupportingData,
   fetchSeasonData,
+  selectCompletedRounds,
   parseArgs,
   parseDriverOfTheDayByRound,
   computeTitleDecidedRacesBeforeEnd,
