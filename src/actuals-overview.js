@@ -93,7 +93,14 @@ function limitedDnfOverviewValue(raw, question) {
 }
 
 function formatActualOverviewAnswer(raw, question) {
-  return limitedDnfOverviewValue(raw, question) || formatActualOverviewValue(raw);
+  const limited = limitedDnfOverviewValue(raw, question);
+  if (limited) return limited;
+  const value = parseActualOverviewRaw(raw);
+  if (value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.driver)) {
+    const drivers = Array.from(new Set(value.driver.map((driver) => String(driver)).filter(Boolean)));
+    if (value.value != null) return `${String(value.value)} · ${drivers.join(", ")}`;
+  }
+  return formatActualOverviewValue(raw);
 }
 
 function formatActualOverviewLines(raw, question) {
@@ -155,6 +162,22 @@ function actualOverviewEntityCode(value, view) {
 
 function formatActualOverviewDisplayLines(raw, view, question) {
   const lines = formatActualOverviewLines(raw, question);
+  const parsed = parseActualOverviewRaw(raw);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.driver)) {
+    const prefix = parsed.value == null ? "" : `${String(parsed.value)} · `;
+    const names = Array.from(new Set(parsed.driver.map((name) => String(name)).filter((name) => name.trim() !== "")));
+    const compactNames = names.map((name) => compactActualOverviewEntity(name, view));
+    if (compactNames.length <= 2) {
+      return { lines: [`${prefix}${compactNames.join(", ")}`.trim() || "—"], mode: "normal" };
+    }
+    const codes = names.map((name) => actualOverviewEntityCode(name, view));
+    const grouped = [];
+    for (let index = 0; index < codes.length; index += 3) {
+      const group = codes.slice(index, index + 3).join(" · ");
+      grouped.push(index === 0 ? `${prefix}${group}` : group);
+    }
+    return { lines: grouped, mode: "codes" };
+  }
   const compactLines = lines.map((line) => compactActualOverviewLine(line, view));
   const canUseCodes = ["drivers", "constructors"].includes(view)
     && lines.length >= 5

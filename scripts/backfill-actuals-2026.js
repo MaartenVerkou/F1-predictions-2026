@@ -344,14 +344,21 @@ function collapseTiedActuals(questionId, values) {
   const filtered = Array.isArray(values)
     ? values.filter((value) => value != null && value !== "")
     : [];
-  if (filtered.length === 0) return null;
+  const unique = Array.from(new Set(filtered.map((value) => String(value))));
+  if (unique.length === 0) return null;
   if (
     MULTI_ACTUAL_SINGLE_CHOICE_IDS.has(questionId) ||
     MULTI_ACTUAL_DRIVER_FIELD_IDS.has(questionId)
   ) {
-    return filtered.length === 1 ? filtered[0] : filtered;
+    return unique.length === 1 ? unique[0] : unique;
   }
-  return filtered[0];
+  return unique[0];
+}
+
+function optionalNumber(value) {
+  if (value == null || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function computeTitleDecidedRacesBeforeEnd(roundStandings, totalRounds, sprintRoundSet) {
@@ -419,6 +426,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
   const dnfByRace = Object.fromEntries(
     (Array.isArray(races) ? races : []).map((raceName) => [raceName, 0])
   );
+  const raceWinnerRows = [];
   const winnerGridRows = [];
   const qualStats = new Map();
   const sprintPointsByDriver = new Map();
@@ -445,12 +453,17 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
       }
 
       if (position === 1 && driver) {
-        const grid = parseNum(row.grid, 0);
-        winnerGridRows.push({
-          raceName,
-          driver,
-          grid: grid > 22 ? 23 : grid
-        });
+        raceWinnerRows.push({ raceName, driver });
+        // A missing OpenF1 starting-grid value is not grid position 0. Keep
+        // it unavailable so a missing source cannot become a false tie.
+        const grid = optionalNumber(row.grid);
+        if (grid != null) {
+          winnerGridRows.push({
+            raceName,
+            driver,
+            grid: grid > 22 ? 23 : grid
+          });
+        }
       }
     });
 
@@ -515,7 +528,7 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     if (winner) dotdCounts.set(winner, (dotdCounts.get(winner) || 0) + 1);
   });
 
-  const firstRaceWinner = winnerGridRows[0] || null;
+  const firstRaceWinner = raceWinnerRows[0] || null;
   const lowestGridWins = winnerGridRows
     .slice()
     .sort((a, b) => b.grid - a.grid || a.raceName.localeCompare(b.raceName));
@@ -1267,5 +1280,6 @@ module.exports = {
   fetchSeasonData,
   parseArgs,
   parseDriverOfTheDayByRound,
+  serializedActualsForRound,
   shortRaceLabel
 };

@@ -60,3 +60,28 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.match(overview.rows[1].cells[0].href, /view=constructors/);
   assert.equal(overview.rows[0].cells[2].hasValue, false);
 });
+
+test("compacts structured driver answers without repeating tied winners", () => {
+  const overview = buildActualsOverview({
+    season: 2026,
+    races: ["Australian Grand Prix"],
+    questions: [{
+      id: "lowest_grid_win_position",
+      prompt: "Lowest starting position from which a race is won (and who wins)",
+      type: "single_choice_with_driver",
+      race_data_focus: { view: "drivers", metric: "grid_wins" }
+    }],
+    snapshots: [{ id: 1, round_number: 1, review_status: "pending" }],
+    latestRoundNumber: 1,
+    fetchSnapshotValues: () => ({
+      lowest_grid_win_position: JSON.stringify({
+        value: "2",
+        driver: ["George Russell", "Kimi Antonelli", "Kimi Antonelli", "Charles Leclerc"]
+      })
+    })
+  });
+
+  assert.deepEqual(overview.rows[0].cells[0].displayLines, ["2 · RUS · ANT · LEC"]);
+  assert.equal(overview.rows[0].cells[0].displayMode, "codes");
+  assert.equal(overview.rows[0].cells[0].value, "2 · George Russell, Kimi Antonelli, Charles Leclerc");
+});
