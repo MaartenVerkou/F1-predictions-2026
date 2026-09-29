@@ -37,6 +37,8 @@ test("admin actuals is a read-only season overview", () => {
   assert.match(view, /cell\.value/);
   assert.match(view, /target\.raceName/);
   assert.match(view, /target\.raceCode/);
+  assert.match(view, /admin-actuals-review-marker/);
+  assert.doesNotMatch(view, /const statusLabel|admin-actuals-round-column small|is-pending/);
   assert.match(view, /admin-actuals-question-content/);
   assert.match(view, /admin-actuals-value/);
   assert.doesNotMatch(view, /displayLines|displayMode|admin-actuals-value-line/);
@@ -58,6 +60,8 @@ test("season actuals keeps question prompts compact and readable on small screen
   assert.match(styles, /@media \(max-width: 720px\)[\s\S]*?--admin-actuals-value-width:\s*clamp\(64px, 9\.5vw, 68px\)/);
   assert.doesNotMatch(styles, /@media \(max-width: 480px\)/);
   assert.doesNotMatch(styles, /admin-actuals-value-line/);
+  assert.match(styles, /\.admin-actuals-review-marker\s*\{/);
+  assert.doesNotMatch(styles, /admin-actuals-round-column\.is-pending|admin-actuals-value-cell\.is-pending/);
   assert.match(styles, /admin-actuals-value-cell a[\s\S]*?-webkit-line-clamp:\s*var\(--admin-actuals-max-value-lines\)/);
   assert.match(styles, /admin-actuals-value[\s\S]*?overflow-wrap:\s*inherit/);
 });

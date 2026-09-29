@@ -39,22 +39,19 @@
           <tr>
             <th scope="col" class="admin-actuals-question-column">Question</th>
             <% (actualOverviewTargets || []).forEach((target) => { %>
-              <% const statusLabel = target.reviewStatus === 'pending'
-                ? t('admin_actuals.needs_review')
-                : target.reviewStatus === 'reviewed'
-                  ? t('admin_actuals.reviewed')
-                  : target.timing === 'future'
-                    ? t('admin_actuals.timing_future')
-                    : '—'; %>
               <th scope="col"
-                  class="admin-actuals-round-column <%= target.timing === 'future' ? 'is-future' : '' %> <%= target.reviewStatus === 'pending' ? 'is-pending' : '' %>"
+                  class="admin-actuals-round-column <%= target.timing === 'future' ? 'is-future' : '' %>"
                   data-admin-actuals-round="<%= target.roundNumber %>"
                   data-review-status="<%= target.reviewStatus || '' %>">
                 <a href="/admin/race-data?season=<%= season %>&round=<%= target.roundNumber %>&view=drivers&focus=points"
                    title="R<%= target.roundNumber %> · <%= target.raceName %>">
                   <span class="admin-actuals-round-name"><%= target.raceCode %></span>
                 </a>
-                <small title="<%= statusLabel %>"><%= statusLabel %></small>
+                <% if (target.reviewStatus === 'pending') { %>
+                  <span class="admin-actuals-review-marker"
+                        title="<%= t('admin_actuals.needs_review') %>"
+                        aria-label="<%= t('admin_actuals.needs_review') %>">!</span>
+                <% } %>
               </th>
             <% }) %>
           </tr>
@@ -77,7 +74,7 @@
                 </span>
               </th>
               <% row.cells.forEach((cell) => { %>
-                <td class="admin-actuals-value-cell <%= cell.timing === 'future' ? 'is-future' : '' %> <%= cell.reviewStatus === 'pending' ? 'is-pending' : '' %> <%= cell.published ? 'is-published' : '' %>"
+                <td class="admin-actuals-value-cell <%= cell.timing === 'future' ? 'is-future' : '' %> <%= cell.published ? 'is-published' : '' %>"
                     data-admin-actuals-round="<%= cell.roundNumber %>"
                   data-review-status="<%= cell.reviewStatus || '' %>">
                   <% if (cell.hasValue || cell.reviewStatus) { %>

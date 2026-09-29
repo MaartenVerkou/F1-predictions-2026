@@ -157,7 +157,7 @@ test("admin actuals keeps one stable table layout across normal and compact mode
       const round = table?.querySelector(".admin-actuals-round-column");
       const value = table?.querySelector(".admin-actuals-value-cell");
       const values = [...document.querySelectorAll(".admin-actuals-value-cell a")];
-      const reviewStatuses = [...document.querySelectorAll(".admin-actuals-round-column small")];
+      const reviewMarkers = [...document.querySelectorAll(".admin-actuals-review-marker")];
       const rows = [...document.querySelectorAll(".admin-actuals-overview-table tbody tr")];
       const overflows = (elements) => elements.filter((element) => element.scrollWidth > element.clientWidth + 1).length;
       return {
@@ -167,7 +167,9 @@ test("admin actuals keeps one stable table layout across normal and compact mode
         roundWidth: round ? Math.round(round.getBoundingClientRect().width) : 0,
         valueWidth: value ? Math.round(value.getBoundingClientRect().width) : 0,
         valueOverflows: overflows(values),
-        statusOverflows: overflows(reviewStatuses),
+        markerOverflows: overflows(reviewMarkers),
+        reviewMarkerCount: reviewMarkers.length,
+        pendingCellsWithBorderClass: document.querySelectorAll(".admin-actuals-round-column.is-pending, .admin-actuals-value-cell.is-pending").length,
         rowAlignment: rows.every((row) => [...row.children].every((cell) => Math.round(cell.getBoundingClientRect().height) === Math.round(row.getBoundingClientRect().height))),
         fullPromptVisible: question ? getComputedStyle(question.querySelector(".admin-actuals-question-prompt-full")).display !== "none" : false,
         shortPromptVisible: question ? getComputedStyle(question.querySelector(".admin-actuals-question-prompt-short")).display !== "none" : false,
@@ -179,7 +181,8 @@ test("admin actuals keeps one stable table layout across normal and compact mode
     expect(metrics.tableOverflow).toBe(true);
     expect(metrics.valueWidth).toBe(metrics.roundWidth);
     expect(metrics.valueOverflows).toBe(0);
-    expect(metrics.statusOverflows).toBe(0);
+    expect(metrics.markerOverflows).toBe(0);
+    expect(metrics.pendingCellsWithBorderClass).toBe(0);
     expect(metrics.rowAlignment).toBe(true);
     expect(metrics.legacyLineMarkup).toBe(false);
     if (width <= 720) {
