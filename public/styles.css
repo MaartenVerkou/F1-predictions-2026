@@ -3313,6 +3313,7 @@ button:disabled {
   border-spacing: 0;
   font-size: 12px;
   --admin-actuals-max-value-lines: 2;
+  --admin-actuals-round-width: 72px;
 }
 
 .admin-actuals-overview-table th,
@@ -3402,9 +3403,9 @@ button:disabled {
 }
 
 .admin-actuals-round-column {
-  width: 92px;
-  min-width: 92px;
-  max-width: 92px;
+  width: var(--admin-actuals-round-width);
+  min-width: var(--admin-actuals-round-width);
+  max-width: var(--admin-actuals-round-width);
   white-space: normal !important;
 }
 
@@ -3428,6 +3429,7 @@ button:disabled {
 .admin-actuals-round-column small {
   display: block;
   line-height: 1.15;
+  overflow-wrap: anywhere;
   white-space: normal;
 }
 
@@ -3474,9 +3476,9 @@ button:disabled {
 }
 
 .admin-actuals-value-cell {
-  width: 84px;
-  min-width: 64px;
-  max-width: 96px;
+  width: var(--admin-actuals-round-width);
+  min-width: var(--admin-actuals-round-width);
+  max-width: var(--admin-actuals-round-width);
   overflow: hidden;
   text-overflow: ellipsis;
   font-variant-numeric: tabular-nums;
@@ -3514,24 +3516,27 @@ button:disabled {
 }
 
 @media (max-width: 720px) {
-  .admin-actuals-question-column,
-  .admin-actuals-question-cell {
-    width: 180px;
-    min-width: 180px;
+  .admin-actuals-overview-table {
+    --admin-actuals-round-width: 68px;
   }
 
-  .admin-actuals-value-cell {
-    width: 76px;
-    min-width: 60px;
-    max-width: 88px;
+  .admin-actuals-question-column,
+  .admin-actuals-question-cell {
+    width: 160px;
+    min-width: 160px;
   }
+
 }
 
 @media (max-width: 480px) {
+  .admin-actuals-overview-table {
+    --admin-actuals-round-width: 64px;
+  }
+
   .admin-actuals-question-column,
   .admin-actuals-question-cell {
-    width: 136px;
-    min-width: 136px;
+    width: 128px;
+    min-width: 128px;
   }
 
   .admin-actuals-question-content {
@@ -3540,9 +3545,11 @@ button:disabled {
   }
 
   .admin-actuals-question-prompt {
-    display: block;
-    max-height: none;
-    white-space: nowrap;
+    display: -webkit-box;
+    max-height: calc(1.2em * 2);
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .admin-actuals-question-prompt-full {
@@ -3550,10 +3557,13 @@ button:disabled {
   }
 
   .admin-actuals-question-prompt-short {
-    display: block;
+    display: -webkit-box;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    max-height: calc(1.2em * 2);
   }
 }
 
