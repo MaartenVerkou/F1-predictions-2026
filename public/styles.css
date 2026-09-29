@@ -8077,6 +8077,7 @@ button.lang-option.is-active {
 }
 
 .admin-race-data-edit-button,
+.admin-race-data-refresh-button,
 .admin-race-data-edit-actions button {
   min-width: 0 !important;
   min-height: 30px;

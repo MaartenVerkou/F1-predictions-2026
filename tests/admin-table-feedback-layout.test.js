@@ -211,6 +211,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(styles, /\.admin-race-data-review-state\s*\{/);
   assert.match(styles, /\.admin-race-data-review-form\s*\{/);
   assert.match(styles, /\.admin-race-data-review-button\s*\{/);
+  assert.match(styles, /\.admin-race-data-edit-button,\s*\.admin-race-data-refresh-button/);
   assert.match(styles, /\.admin-race-data-detail-table--result \.admin-race-data-result-cell--driver \.admin-race-data-compact-label/);
   assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);
 });
