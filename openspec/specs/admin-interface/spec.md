@@ -4,7 +4,8 @@
 TBD - created by archiving change polish-admin-responsive-locales. Update Purpose after archive.
 ## Requirements
 ### Requirement: Admin pages fit supported viewports
-The system SHALL render admin pages within supported phone and desktop viewports without page-level horizontal overflow.
+
+The system SHALL render admin pages within supported phone and desktop viewports without page-level horizontal overflow. The Season Actuals overview SHALL use one normal presentation mode and one compact presentation mode; both modes SHALL keep value content bounded inside the table's own scroll region.
 
 Feature: Admin interface
 
@@ -15,6 +16,7 @@ Rule: Admin pages SHALL avoid page-level horizontal overflow while preserving de
 - **WHEN** the page renders questions, target controls, review panels, and save controls
 - **THEN** primary inputs and action controls SHALL fit within the viewport
 - **AND** the page SHALL not create document-level horizontal scrolling
+- **AND** the compact question label and all race/value cell content SHALL wrap or truncate within their cells
 - **AND** DNF-per-race controls SHALL remain readable and operable
 
 #### Scenario: Wide admin tables scroll inside their own region
@@ -88,3 +90,4 @@ The system SHALL present the Season actuals review state in one compact workspac
 - **WHEN** the page renders
 - **THEN** it SHALL show one race selector followed by at most one selected-snapshot metadata/action line
 - **AND** it SHALL not show a season-wide pending-count summary or repeat latest-sync metadata
+
