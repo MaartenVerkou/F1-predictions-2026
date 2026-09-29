@@ -671,7 +671,8 @@ function serializedActualsForRound({
         totalRounds,
         sprintRoundSet,
         scoringRules,
-        cutoffRound: roundNumber
+        cutoffRound: roundNumber,
+        effectiveEndRound: roundNumber
       }
     ),
     all_teams_score_points: constructorStandings.every((row) => parseNum(row.points) > 0)
@@ -996,7 +997,7 @@ function writeActualsAndSnapshots(db, {
         preserveReviewIfUnchanged: true,
         catalogRevision: snapshot.evidence?.catalogRevision || null,
         evidenceRevision: snapshot.evidence?.payloadRevision || null,
-        derivationVersion: `${parserVersion}-derivation-v2`
+        derivationVersion: `${parserVersion}-derivation-v5`
       });
       snapshot.id = snapshotResult?.snapshotId || null;
       linkEvidenceToActualSnapshot(db, snapshot.id, snapshot.evidenceId, importId);

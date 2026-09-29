@@ -890,7 +890,7 @@ function rederiveActualSnapshotFromRaceEvidence({
     preserveReviewIfUnchanged: true,
     catalogRevision: catalog?.catalogRevision || null,
     evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.sync_id || null,
-    derivationVersion: "race-data-derivation-v2"
+    derivationVersion: "race-data-derivation-v5"
   });
   if (result?.snapshotId && evidenceSnapshot?.id) {
     linkEvidenceToActualSnapshot(db, result.snapshotId, evidenceSnapshot.id, evidenceSnapshot.import_id || null);

@@ -52,17 +52,18 @@ Each derived actual value SHALL record the derivation version, catalog revision,
 - **AND** an unavailable value SHALL show why it could not be derived
 
 ### Requirement: Title decisions use the selected cutoff and season scoring rules
-The Drivers' title-decision derivation SHALL evaluate every completed round through the selected cutoff, subtract the maximum points still available in each later scheduled race weekend using that season's race, sprint, and eligible fastest-lap rules, and return the number of races before the end for the first round where the leader is mathematically uncatchable.
+The Drivers' title-decision derivation SHALL treat the selected cutoff as the effective end of the observed season. It SHALL evaluate every completed round through that cutoff, subtract the maximum points still available in each later scheduled race weekend up to that cutoff using that season's race, sprint, and eligible fastest-lap rules, and return the number of races before the selected end for the first round where the leader is mathematically uncatchable.
 
-#### Scenario: A title is clinched before the season ends
-- **WHEN** the selected cutoff is R21 of a 22-round season and the leader's points gap exceeds the maximum points available in R22
+#### Scenario: A title is clinched before the selected cutoff
+- **WHEN** the selected cutoff is R9 and the leader's R8 points gap exceeds the maximum points available in R9
 - **THEN** the derived answer SHALL be `1`
 - **AND** the value SHALL be derived from the season scoring rules rather than a hardcoded 25-point weekend
+- **AND** rounds after R9 SHALL not affect the answer
 
 #### Scenario: A title is not yet clinched
 - **WHEN** no leader is mathematically uncatchable through the selected cutoff
 - **THEN** the derived answer SHALL be unavailable rather than `0`
-- **AND** `0` SHALL be reserved for a title clinched after the final round
+- **AND** `0` SHALL be reserved for a title clinched after the selected effective end
 
 #### Scenario: A points tie can be resolved by countback
 - **WHEN** a challenger can only tie the leader on points with the maximum remaining score

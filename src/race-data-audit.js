@@ -840,7 +840,8 @@ function buildFocusSummary({
       totalRounds: rounds.length,
       sprintRoundSet,
       scoringRules,
-      cutoffRound: cutoffRoundNumber
+      cutoffRound: cutoffRoundNumber,
+      effectiveEndRound: cutoffRoundNumber
     });
     if (!decision) {
       return {
@@ -848,7 +849,7 @@ function buildFocusSummary({
         status: "partial",
         value: "Not decided",
         detail: `No clinch by R${cutoffRoundNumber}`,
-        tooltip: "The leader can still be caught on points or countback using the remaining race and sprint scoring opportunities."
+        tooltip: "The leader can still be caught on points or countback before the selected cutoff."
       };
     }
     return {

@@ -1040,7 +1040,12 @@ test("title-decision focus reports the first cutoff where the season is mathemat
         ]
       },
       qualifying: { rows: [] },
-      sprint: { rows: [] },
+      sprint: {
+        rows: round === 1 ? [
+          { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, status: "Finished" },
+          { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 2, status: "Finished" }
+        ] : []
+      },
       standings: { drivers: [], constructors: [] }
     }
   });
@@ -1058,7 +1063,7 @@ test("title-decision focus reports the first cutoff where the season is mathemat
     selectedRound: 2,
     scoringRules: {
       racePoints: { 1: 25, 2: 0 },
-      sprintPoints: {},
+      sprintPoints: { 1: 8, 2: 0 },
       fastestLap: { points: 0, minimumFinish: 1, eligible: false }
     },
     focus: {
@@ -1070,5 +1075,5 @@ test("title-decision focus reports the first cutoff where the season is mathemat
   });
 
   assert.equal(view.focusSummary.value, "1");
-  assert.match(view.focusSummary.detail, /Title clinched after R2/);
+  assert.match(view.focusSummary.detail, /Title clinched after R1/);
 });

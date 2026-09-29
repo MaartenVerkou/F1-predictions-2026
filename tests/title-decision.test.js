@@ -33,15 +33,19 @@ function race(round, leaderPosition = 1, challengerPosition = 2) {
   };
 }
 
-test("returns the number of races remaining once a strict points gap clinches the title", () => {
-  assert.equal(computeTitleDecidedRacesBeforeEnd({
+test("treats the selected round as the effective season end", () => {
+  const result = computeTitleDecision({
     roundStandings: [standing(1, 30, 0), standing(2, 56, 30)],
     raceRowsByRound: [race(1), race(2)],
     totalRounds: 3,
     sprintRoundSet: new Set(),
     scoringRules: defaultRules,
-    cutoffRound: 2
-  }), 1);
+    cutoffRound: 2,
+    effectiveEndRound: 2
+  });
+
+  assert.equal(result.racesBeforeEnd, 1);
+  assert.equal(result.decidedRound, 1);
 });
 
 test("does not return zero before the title is decided, and returns zero when decided at the final race", () => {
@@ -50,7 +54,8 @@ test("does not return zero before the title is decided, and returns zero when de
     raceRowsByRound: [race(1), race(2), race(3)],
     totalRounds: 3,
     sprintRoundSet: new Set(),
-    scoringRules: defaultRules
+    scoringRules: defaultRules,
+    effectiveEndRound: 3
   };
 
   assert.equal(computeTitleDecidedRacesBeforeEnd({ ...input, cutoffRound: 1 }), null);
@@ -64,7 +69,8 @@ test("includes the complete remaining weekend score, including sprint points", (
     totalRounds: 3,
     sprintRoundSet: new Set([2]),
     scoringRules: defaultRules,
-    cutoffRound: 2
+    cutoffRound: 2,
+    effectiveEndRound: 3
   });
 
   assert.equal(result, null);
@@ -82,7 +88,8 @@ test("uses the season scoring tables instead of a fixed 25 point assumption", ()
     totalRounds: 3,
     sprintRoundSet: new Set(),
     scoringRules: rules,
-    cutoffRound: 1
+    cutoffRound: 1,
+    effectiveEndRound: 3
   }), 2);
 });
 
@@ -93,7 +100,8 @@ test("uses countback when a challenger can only tie on points", () => {
     totalRounds: 3,
     sprintRoundSet: new Set(),
     scoringRules: defaultRules,
-    cutoffRound: 2
+    cutoffRound: 2,
+    effectiveEndRound: 3
   });
 
   assert.equal(result.racesBeforeEnd, 1);
@@ -107,7 +115,8 @@ test("keeps the title open when a point-tied challenger can win countback", () =
     totalRounds: 3,
     sprintRoundSet: new Set(),
     scoringRules: defaultRules,
-    cutoffRound: 2
+    cutoffRound: 2,
+    effectiveEndRound: 3
   });
 
   assert.equal(result, null);

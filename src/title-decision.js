@@ -143,10 +143,20 @@ function computeTitleDecision({
   totalRounds,
   sprintRoundSet = new Set(),
   scoringRules,
-  cutoffRound
+  cutoffRound,
+  effectiveEndRound
 } = {}) {
-  const finalRound = positiveInteger(totalRounds)
+  const seasonEndRound = positiveInteger(totalRounds)
     || Math.max(0, ...roundEntries(roundStandings).map((entry) => Number(entry.round) || 0));
+  // A selected cutoff is the effective end of the observed season. This keeps
+  // historical/partial-season actuals meaningful: at R9, only points through
+  // R9 can still be scored, so a title clinched after R8 is reported as 1.
+  const requestedEndRound = positiveInteger(effectiveEndRound)
+    || positiveInteger(cutoffRound)
+    || seasonEndRound;
+  const finalRound = seasonEndRound
+    ? Math.min(seasonEndRound, requestedEndRound)
+    : requestedEndRound;
   const cutoff = Math.min(
     finalRound,
     positiveInteger(cutoffRound) || finalRound
