@@ -114,7 +114,7 @@ test("all input tables use explicit responsive table variants", () => {
   assert.match(view, /admin-inputs-race-table/);
   assert.match(view, /admin-inputs-mapping-table/);
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  assert.match(styles, /\.admin-inputs-data-table-wrap\s*\{[\s\S]*?max-width:\s*100%/);
+  assert.match(styles, /\.admin-inputs-page \.admin-table-scroll\s*\{[\s\S]*?max-width:\s*100%/);
   assert.match(styles, /\.admin-inputs-race-table\s*\{/);
   assert.match(styles, /\.admin-inputs-mapping-table\s*\{/);
   assert.match(styles, /\.admin-inputs-page \.admin-inputs-view-toolbar\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
@@ -140,7 +140,17 @@ test("scoring rules live in a dedicated Inputs sub-section", () => {
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
   assert.match(styles, /\.admin-inputs-scoring-sections\s*\{/);
   assert.match(styles, /\.admin-inputs-scoring-table\s*\{/);
+  assert.match(styles, /\.admin-inputs-scoring-sections\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
   assert.doesNotMatch(styles, /\.admin-inputs-scoring-overview\s*\{/);
+});
+
+test("hidden input helper forms do not create spacing between toolbar and tables", () => {
+  const view = readView("admin_inputs.ejs");
+  assert.match(view, /id="admin-inputs-new-driver-form"[^>]*\bhidden\b/);
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(styles, /form\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important/);
+  assert.match(styles, /\.admin-inputs-page \.admin-table-scroll\s*\{[\s\S]*?margin-top:\s*8px/);
+  assert.match(styles, /\.admin-inputs-page \.admin-inputs-scoring\s*\{[\s\S]*?margin-top:\s*8px/);
 });
 
 test("race data views share one identity column and a common row rhythm", () => {

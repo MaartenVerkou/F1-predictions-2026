@@ -82,7 +82,6 @@
             { id: 'race', label: 'Race', entries: toScoringEntries(scoringRules.racePoints) },
             { id: 'sprint', label: 'Sprint', entries: toScoringEntries(scoringRules.sprintPoints) }
           ]; %>
-          <p class="admin-inputs-scoring-source muted"><%= scoringRules.revision %> · <%= scoringRules.source %></p>
           <div class="admin-inputs-scoring-sections">
             <% scoringTables.forEach((scoringTable) => { %>
               <section class="admin-inputs-scoring-section" aria-labelledby="admin-inputs-scoring-<%= scoringTable.id %>">
@@ -111,6 +110,7 @@
               </dl>
             </section>
           </div>
+          <p class="admin-inputs-scoring-source muted"><%= scoringRules.revision %> · <%= scoringRules.source %></p>
         <% } else { %>
           <p class="muted">No scoring rules configured for this season.</p>
         <% } %>
@@ -124,7 +124,7 @@
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
       </div>
-      <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver" data-season-mutation>
+      <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver" data-season-mutation hidden>
         <%- csrfField() %>
         <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">

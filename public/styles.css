@@ -787,6 +787,10 @@ form {
   gap: 16px;
 }
 
+form[hidden] {
+  display: none !important;
+}
+
 label {
   font-weight: 600;
   display: grid;
@@ -2056,10 +2060,10 @@ button:disabled {
   gap: 6px;
 }
 
-.admin-inputs-scoring {
+.admin-inputs-page .admin-inputs-scoring {
   display: grid;
   gap: 16px;
-  margin: 0;
+  margin: 8px 0 0;
 }
 
 .admin-inputs-scoring-source {
@@ -2069,8 +2073,8 @@ button:disabled {
 
 .admin-inputs-scoring-sections {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px 32px;
+  grid-template-columns: 1fr;
+  gap: 20px;
 }
 
 .admin-inputs-scoring-section {
@@ -2149,12 +2153,6 @@ button:disabled {
   font-weight: 600;
   letter-spacing: .02em;
   text-transform: uppercase;
-}
-
-@media (max-width: 640px) {
-  .admin-inputs-scoring-sections {
-    grid-template-columns: 1fr;
-  }
 }
 
 .admin-season-policy {
@@ -2432,10 +2430,10 @@ button:disabled {
   margin: 0;
 }
 
-.admin-inputs-data-table-wrap {
+.admin-inputs-page .admin-table-scroll {
   min-width: 0;
   max-width: 100%;
-  margin-top: 0;
+  margin-top: 8px;
 }
 
 .admin-inputs-race-start,
