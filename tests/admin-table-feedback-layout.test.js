@@ -289,6 +289,26 @@ test("inputs navigation and actions reuse the race-data controls", () => {
   assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
 });
 
+test("input editing keeps team reordering scoped to the selected row", () => {
+  const view = readView("admin_inputs.ejs");
+  const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+
+  assert.match(view, /data-table-capabilities="edit,remove,reorder"/);
+  assert.match(view, /class="admin-inputs-team-order"/);
+  assert.match(app, /selectedRow\.classList\.add\('is-editing'\)/);
+  assert.match(app, /row\.classList\.remove\('is-editing'\)/);
+  assert.match(styles, /\.admin-inputs-team-order \.admin-order-buttons\s*\{[\s\S]*?display:\s*none/);
+  assert.match(styles, /\.admin-inputs-team-table \[data-selectable-row\]\.is-editing \.admin-order-buttons\s*\{[\s\S]*?display:\s*inline-flex/);
+});
+
+test("driver number column stays compact without changing the table identity columns", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const numberRule = styles.match(/\.admin-inputs-driver-table \.admin-inputs-driver-col-number\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(numberRule, /width:\s*5%/);
+  assert.match(styles, /\.admin-inputs-driver-table th:first-child,[\s\S]*?white-space:\s*nowrap/);
+});
+
 test("race data matrix palette follows the active theme", () => {
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
   const lightMatrixRule = styles.match(/\.admin-race-data-matrix\s*\{([^}]*)\}/)?.[1] || "";

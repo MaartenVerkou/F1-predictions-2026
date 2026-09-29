@@ -2397,7 +2397,12 @@ button:disabled {
 }
 
 .admin-inputs-team-order .admin-order-buttons {
+  display: none;
   align-items: center;
+}
+
+.admin-inputs-team-table [data-selectable-row].is-editing .admin-order-buttons {
+  display: inline-flex;
 }
 
 .admin-inputs-team-order form {
@@ -2742,11 +2747,17 @@ button:disabled {
   table-layout: fixed;
 }
 
-.admin-inputs-driver-table .admin-inputs-driver-col-number { width: 8%; }
+.admin-inputs-driver-table .admin-inputs-driver-col-number { width: 5%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-name { width: 38%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-code { width: 15%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-nationality { width: 21%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-age { width: 18%; }
+
+.admin-inputs-driver-table th:first-child,
+.admin-inputs-driver-table td:first-child {
+  white-space: nowrap;
+  text-align: center;
+}
 
 .admin-inputs-race-table {
   min-width: 680px;

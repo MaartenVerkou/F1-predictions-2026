@@ -1085,6 +1085,9 @@ const initAdminInputTables = () => {
       table.querySelectorAll('[data-row-editor]').forEach((editor) => {
         editor.hidden = true;
       });
+      rows.forEach((row) => {
+        row.classList.remove('is-editing');
+      });
     };
 
     const clearSelection = () => {
@@ -1137,7 +1140,8 @@ const initAdminInputTables = () => {
       if (!editor) return;
       closeEditors();
       editor.hidden = false;
-      editor.querySelector('input, select, textarea')?.focus();
+      selectedRow.classList.add('is-editing');
+      editor.querySelector('input:not([type="hidden"]), select, textarea')?.focus();
     });
 
     removeButton?.addEventListener('click', () => {
