@@ -158,6 +158,12 @@ test("admin actuals keeps one stable table layout across normal and compact mode
       const value = table?.querySelector(".admin-actuals-value-cell");
       const values = [...document.querySelectorAll(".admin-actuals-value-cell a")];
       const reviewMarkers = [...document.querySelectorAll(".admin-actuals-review-marker")];
+      const reviewMarkerSameLine = reviewMarkers.every((marker) => {
+        const markerRect = marker.getBoundingClientRect();
+        const name = marker.closest(".admin-actuals-round-header")?.querySelector(".admin-actuals-round-name");
+        if (!name) return false;
+        return Math.abs(markerRect.top - name.getBoundingClientRect().top) <= 2;
+      });
       const rows = [...document.querySelectorAll(".admin-actuals-overview-table tbody tr")];
       const overflows = (elements) => elements.filter((element) => element.scrollWidth > element.clientWidth + 1).length;
       return {
@@ -169,6 +175,7 @@ test("admin actuals keeps one stable table layout across normal and compact mode
         valueOverflows: overflows(values),
         markerOverflows: overflows(reviewMarkers),
         reviewMarkerCount: reviewMarkers.length,
+        reviewMarkerSameLine,
         pendingCellsWithBorderClass: document.querySelectorAll(".admin-actuals-round-column.is-pending, .admin-actuals-value-cell.is-pending").length,
         rowAlignment: rows.every((row) => [...row.children].every((cell) => Math.round(cell.getBoundingClientRect().height) === Math.round(row.getBoundingClientRect().height))),
         fullPromptVisible: question ? getComputedStyle(question.querySelector(".admin-actuals-question-prompt-full")).display !== "none" : false,
@@ -182,6 +189,7 @@ test("admin actuals keeps one stable table layout across normal and compact mode
     expect(metrics.valueWidth).toBe(metrics.roundWidth);
     expect(metrics.valueOverflows).toBe(0);
     expect(metrics.markerOverflows).toBe(0);
+    expect(metrics.reviewMarkerSameLine).toBe(true);
     expect(metrics.pendingCellsWithBorderClass).toBe(0);
     expect(metrics.rowAlignment).toBe(true);
     expect(metrics.legacyLineMarkup).toBe(false);

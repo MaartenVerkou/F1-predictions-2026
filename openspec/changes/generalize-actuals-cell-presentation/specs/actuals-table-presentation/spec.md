@@ -37,6 +37,7 @@ All visible Actuals values, including full names, compact codes, numbers, and ov
 - **WHEN** a race column has a pending review status
 - **THEN** the column header SHALL show one compact warning marker
 - **AND** the marker SHALL expose the full review meaning through its title and accessible label
+- **AND** the marker SHALL remain on the same header line as the race code
 - **AND** the race header and value cells SHALL retain the same plain border treatment as reviewed columns
 
 ### Requirement: Actuals uses two responsive presentation modes

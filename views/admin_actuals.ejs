@@ -43,15 +43,17 @@
                   class="admin-actuals-round-column <%= target.timing === 'future' ? 'is-future' : '' %>"
                   data-admin-actuals-round="<%= target.roundNumber %>"
                   data-review-status="<%= target.reviewStatus || '' %>">
-                <a href="/admin/race-data?season=<%= season %>&round=<%= target.roundNumber %>&view=drivers&focus=points"
-                   title="R<%= target.roundNumber %> · <%= target.raceName %>">
-                  <span class="admin-actuals-round-name"><%= target.raceCode %></span>
-                </a>
-                <% if (target.reviewStatus === 'pending') { %>
-                  <span class="admin-actuals-review-marker"
-                        title="<%= t('admin_actuals.needs_review') %>"
-                        aria-label="<%= t('admin_actuals.needs_review') %>">!</span>
-                <% } %>
+                <span class="admin-actuals-round-header">
+                  <a href="/admin/race-data?season=<%= season %>&round=<%= target.roundNumber %>&view=drivers&focus=points"
+                     title="R<%= target.roundNumber %> · <%= target.raceName %>">
+                    <span class="admin-actuals-round-name"><%= target.raceCode %></span>
+                  </a>
+                  <% if (target.reviewStatus === 'pending') { %>
+                    <span class="admin-actuals-review-marker"
+                          title="<%= t('admin_actuals.needs_review') %>"
+                          aria-label="<%= t('admin_actuals.needs_review') %>">!</span>
+                  <% } %>
+                </span>
               </th>
             <% }) %>
           </tr>

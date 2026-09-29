@@ -35,7 +35,7 @@ An alternative was to keep an array of pre-wrapped display lines. That was rejec
 
 ### 2. One value block and one wrapping policy
 
-The template renders `displayText` in one value block. The block uses normal whitespace, `overflow-wrap:anywhere`, and a two-line clamp. Code styling may adjust typography only; it must not change wrapping. Pending review is represented by one compact marker in the race header, with the full meaning in its title and ARIA label; pending and reviewed cells retain the same plain border treatment.
+The template renders `displayText` in one value block. The block uses normal whitespace, `overflow-wrap:anywhere`, and a two-line clamp. Code styling may adjust typography only; it must not change wrapping. Pending review is represented by one compact marker on the same header line as the race code, with the full meaning in its title and ARIA label; pending and reviewed cells retain the same plain border treatment.
 
 The full value remains in `title` and `aria-label`. The visible projection may therefore be compact without losing inspectability or accessibility.
 

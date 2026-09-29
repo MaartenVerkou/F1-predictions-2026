@@ -3405,13 +3405,23 @@ button:disabled {
 }
 
 .admin-actuals-round-column a {
-  display: block;
+  display: inline-flex;
+  min-width: 0;
   max-width: 100%;
   line-height: 1.15;
   overflow: hidden;
   overflow-wrap: anywhere;
   text-overflow: ellipsis;
   white-space: normal;
+}
+
+.admin-actuals-round-header {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .admin-actuals-round-name {
@@ -3423,12 +3433,11 @@ button:disabled {
 
 .admin-actuals-review-marker {
   display: inline-block;
-  margin-inline-start: 3px;
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
-  vertical-align: top;
 }
 
 .admin-actuals-question-view-link {

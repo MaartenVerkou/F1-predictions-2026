@@ -11,6 +11,7 @@
 - [x] 2.3 Replace competing Actuals width and whitespace rules with shared normal/compact variables, fluid compact widths, and one common wrapping/clamping policy.
 - [x] 2.4 Remove obsolete line-array and `nowrap` presentation paths after the new projection is green.
 - [x] 2.5 Represent pending review with an accessible compact marker and keep reviewed/pending cell borders visually identical.
+- [x] 2.6 Keep the compact review marker inline with the race code so it does not add a second header line.
 
 ## 3. Cross-viewport verification and cleanup
 
