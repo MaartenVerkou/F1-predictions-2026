@@ -151,12 +151,12 @@ function projectActualOverviewEntities(values, view, prefix = "") {
     return { fullText: text, displayText: text, kind: "scalar", overflowCount: 0 };
   }
 
-  const compactNames = names.map((name) => compactActualOverviewEntity(name, view));
+  const compactNames = names.map((name) => actualOverviewEntityCode(name, view));
   const fullText = `${prefix}${names.join(", ")}`.trim() || "—";
   if (names.length <= 2) {
     return {
       fullText,
-      displayText: `${prefix}${compactNames.join(", ")}`.trim() || "—",
+      displayText: `${prefix}${compactNames.join(" · ")}`.trim() || "—",
       kind: "entities",
       overflowCount: 0
     };
@@ -193,6 +193,36 @@ function projectActualsCell(raw, { view = "drivers", question = null } = {}) {
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.driver)) {
     const prefix = parsed.value == null ? "" : `${String(parsed.value)} · `;
     return projectActualOverviewEntities(parsed.driver, view, prefix);
+  }
+
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    if (parsed.winner != null && parsed.diff != null) {
+      const fullText = formatActualOverviewValue(raw);
+      return {
+        fullText,
+        displayText: `${actualOverviewEntityCode(parsed.winner, view)} · ${parsed.diff} pts`,
+        kind: "entities",
+        overflowCount: 0
+      };
+    }
+    if (parsed.choice != null && parsed.driver != null) {
+      const fullText = formatActualOverviewValue(raw);
+      return {
+        fullText,
+        displayText: `${String(parsed.choice)} · ${actualOverviewEntityCode(parsed.driver, view)}`,
+        kind: "entities",
+        overflowCount: 0
+      };
+    }
+    if (parsed.value != null && parsed.driver != null && !Array.isArray(parsed.driver)) {
+      const fullText = formatActualOverviewValue(raw);
+      return {
+        fullText,
+        displayText: `${String(parsed.value)} · ${actualOverviewEntityCode(parsed.driver, view)}`,
+        kind: "entities",
+        overflowCount: 0
+      };
+    }
   }
 
   const fullText = formatActualOverviewValue(raw);
