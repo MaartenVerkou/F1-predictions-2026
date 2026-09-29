@@ -316,10 +316,14 @@ test("input editing keeps team reordering scoped to the selected row", () => {
 
   assert.match(view, /data-table-capabilities="edit,remove,reorder"/);
   assert.match(view, /class="admin-inputs-team-order"/);
+  assert.match(view, /class="admin-inputs-team-position"><%= index \+ 1 %><\/span>/);
+  assert.match(view, /<th scope="col"><abbr title="<%= t\('admin_inputs.display_order'\) %>">#<\/abbr><\/th>/);
   assert.match(app, /selectedRow\.classList\.add\('is-editing'\)/);
   assert.match(app, /row\.classList\.remove\('is-editing'\)/);
   assert.match(styles, /\.admin-inputs-team-order \.admin-order-buttons\s*\{[\s\S]*?display:\s*none/);
   assert.match(styles, /\.admin-inputs-team-table \[data-selectable-row\]\.is-editing \.admin-order-buttons\s*\{[\s\S]*?display:\s*inline-flex/);
+  assert.match(styles, /\.admin-inputs-team-order-inner\s*\{[\s\S]*?display:\s*inline-flex/);
+  assert.match(styles, /\.admin-inputs-team-position\s*\{[\s\S]*?font-variant-numeric:\s*tabular-nums/);
 });
 
 test("driver number column stays compact without changing the table identity columns", () => {

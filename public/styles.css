@@ -2416,6 +2416,21 @@ button:disabled {
   text-align: center !important;
 }
 
+.admin-inputs-team-order-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+}
+
+.admin-inputs-team-position {
+  min-width: 2ch;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .admin-inputs-team-order .admin-order-buttons {
   display: none;
   align-items: center;
