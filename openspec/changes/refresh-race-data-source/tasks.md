@@ -17,6 +17,6 @@
 
 ## 4. Verification and handoff
 
-- [ ] 4.1 Run targeted unit tests, lint, and build; verify no existing correction/review behavior regresses.
-- [ ] 4.2 Run Playwright against preview for refresh success/failure and confirm that prior revisions and published scoring remain intact until review.
-- [ ] 4.3 Run strict OpenSpec validation and record the preview URL, commit, and any remaining provider/network risk.
+- [x] 4.1 Run targeted unit tests, lint, and build; verify no existing correction/review behavior regresses.
+- [x] 4.2 Run Playwright against preview for refresh success/failure and confirm that prior revisions and published scoring remain intact until review.
+- [x] 4.3 Run strict OpenSpec validation and record the preview URL, commit, and any remaining provider/network risk.
