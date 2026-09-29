@@ -122,13 +122,15 @@ function defaultRaceDataHighlightMode(metric) {
 }
 
 function inferFocusFooterMode(focus, metric) {
+  const focusMetric = String(focus?.metric || "").trim().toLowerCase();
+  const matrixMetric = String(metric || "").trim().toLowerCase();
+  if (["podiums", "driver_of_day", "sprint_points", "ferrari_podium"].includes(focusMetric)
+    || ["podiums", "driver_of_day", "sprint_points"].includes(matrixMetric)) return null;
   const declared = String(focus?.footerMode || "").trim().toLowerCase();
   if (["count", "sum", "none"].includes(declared)) return declared === "none" ? null : declared;
-  if (["podiums", "dnfs", "driver_of_day", "dnf_by_race", "ferrari_podium"].includes(String(focus?.metric || "").toLowerCase())) return "count";
-  if (String(focus?.metric || "").toLowerCase() === "damage") return "sum";
-  if (["podiums", "dnfs", "driver_of_day", "sprint_points"].includes(metric)) {
-    return metric === "sprint_points" ? "sum" : "count";
-  }
+  if (["dnfs", "dnf_by_race"].includes(focusMetric)
+    || ["dnfs", "dnf_by_race"].includes(matrixMetric)) return "count";
+  if (focusMetric === "damage" || matrixMetric === "damage") return "sum";
   return null;
 }
 

@@ -136,7 +136,7 @@
         "scope": "through_cutoff",
         "requiredEvidence": ["race"],
         "cellMode": "count",
-        "footerMode": "count"
+        "footerMode": "none"
       }
     },
     {
@@ -178,7 +178,7 @@
         "requiredEvidence": ["external.driverOfTheDay"],
         "matrixMetric": "driver_of_day",
         "cellMode": "count",
-        "footerMode": "count"
+        "footerMode": "none"
       }
     },
     {
@@ -421,7 +421,7 @@
         "scope": "season",
         "requiredEvidence": ["race"],
         "cellMode": "count",
-        "footerMode": "count"
+        "footerMode": "none"
       }
     },
     {
@@ -438,7 +438,7 @@
         "scope": "season",
         "requiredEvidence": ["sprint", "driverStandings"],
         "cellMode": "points",
-        "footerMode": "sum"
+        "footerMode": "none"
       }
     },
     {

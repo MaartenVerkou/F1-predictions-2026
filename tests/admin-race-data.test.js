@@ -885,6 +885,7 @@ test("podium focus projects binary results, counts podiums, and preserves cutoff
   assert.equal(view.focusSummary.detail, "3 podium finishes through R2");
   assert.match(view.focusSummary.tooltip, /Driver Alpha: 2/);
   assert.match(view.focusSummary.tooltip, /Driver Beta: 1/);
+  assert.equal(view.focusFooter, null);
 });
 
 test("question focus projections expose DNF and grid-winner facts without changing evidence", () => {
@@ -1059,7 +1060,7 @@ test("qualifying focus compares constructor teammates in the shared matrix", () 
   assert.equal(view.focusSummary.value, "Team A · 1");
 });
 
-test("count and sprint focus projections expose cutoff-aware additive footers", () => {
+test("DNF focus keeps its total while compact focus views omit footers", () => {
   const evidence = (round, raceRows, sprintRows = []) => ({
     id: round,
     round_number: round,
@@ -1110,8 +1111,7 @@ test("count and sprint focus projections expose cutoff-aware additive footers", 
     selectedRound: 2,
     focus: { id: "mini_q4_sprint_champion_same", view: "drivers", metric: "sprint_points", matrixMetric: "sprint_points", footerMode: "sum" }
   });
-  assert.deepEqual(sprintView.focusFooter.cells.map((cell) => cell.label), ["3", "4"]);
-  assert.equal(sprintView.focusFooter.total, 7);
+  assert.equal(sprintView.focusFooter, null);
 });
 
 test("teammate points focus renders per-round championship points without a footer", () => {
