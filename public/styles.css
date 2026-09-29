@@ -2010,13 +2010,13 @@ button:disabled {
 }
 
 
-.admin-race-data-page {
-  gap: 18px;
+.admin-page-card.admin-race-data-page {
+  gap: 24px;
 }
 
 .admin-race-data-round-region {
   display: grid;
-  gap: 24px;
+  gap: 28px;
 }
 
 /* Let the page controls shrink to the card; the matrix owns horizontal scroll. */
@@ -7891,7 +7891,7 @@ button.lang-option.is-active {
 
 .admin-race-data-section-heading {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
   gap: 4px 10px;
   min-width: 0;
@@ -7903,7 +7903,7 @@ button.lang-option.is-active {
 
 .admin-race-data-detail-toolbar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
@@ -7998,7 +7998,7 @@ button.lang-option.is-active {
   }
 
   .admin-race-data-section-heading {
-    align-items: center;
+    align-items: flex-end;
     flex-direction: row;
     gap: 4px 8px;
   }
