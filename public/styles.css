@@ -2987,7 +2987,7 @@ button:disabled {
   --admin-race-rank-width: 44px;
   --admin-race-entity-width: 150px;
   --admin-race-round-width: 52px;
-  --admin-race-summary-width: 68px;
+  --admin-race-summary-width: 60px;
   /* Keep audit meaning hue-independent: a neutral, high-contrast matrix. */
   --card: #ffffff;
   --border: #cbd5e1;
@@ -3518,14 +3518,14 @@ button:disabled {
 
 @media (max-width: 860px) {
   .admin-race-data-matrix {
-    --admin-race-entity-width: 110px;
-    --admin-race-round-width: 48px;
-    --admin-race-summary-width: 60px;
+    --admin-race-entity-width: 96px;
+    --admin-race-round-width: 46px;
+    --admin-race-summary-width: 54px;
   }
 
   /* Constructors already show three-letter team codes at this breakpoint. */
   .admin-race-data-matrix--constructors {
-    --admin-race-entity-width: 72px;
+    --admin-race-entity-width: 64px;
   }
 
   .admin-race-data-entity {
@@ -3546,9 +3546,9 @@ button:disabled {
   .admin-race-data-matrix {
     font-size: 12px;
     --admin-race-rank-width: 36px;
-    --admin-race-entity-width: 64px;
-    --admin-race-round-width: 44px;
-    --admin-race-summary-width: 52px;
+    --admin-race-entity-width: 60px;
+    --admin-race-round-width: 42px;
+    --admin-race-summary-width: 50px;
   }
 
   .admin-race-data-matrix th,

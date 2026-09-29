@@ -576,6 +576,7 @@ test("race data metrics are available independently of question focus", () => {
     "sprint_points",
     "damage"
   ]);
+  assert.equal(options.find((option) => option.id === "points").label, "Results");
 });
 
 test("question focus keeps its underlying content variant selected", () => {

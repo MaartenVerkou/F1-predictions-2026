@@ -3043,7 +3043,7 @@ function registerAdminRoutes(app, deps) {
       metricOptions
     });
     const focusMetricLabels = {
-      points: "Results",
+      points: "Points",
       championship_points_results: "Points",
       podiums: t("admin_race_data.focus_podiums"),
       dnfs: t("admin_race_data.focus_dnfs"),

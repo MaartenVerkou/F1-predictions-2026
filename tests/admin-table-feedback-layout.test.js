@@ -257,7 +257,7 @@ test("race data matrix exposes shared compact width variables", () => {
   assert.match(matrixRule, /--admin-race-entity-width/);
   assert.match(matrixRule, /--admin-race-round-width/);
   assert.match(matrixRule, /--admin-race-summary-width/);
-  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?--admin-race-summary-width:\s*52px/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?--admin-race-summary-width:\s*50px/);
 });
 
 test("race data variant switches share the bordered segmented shell", () => {
