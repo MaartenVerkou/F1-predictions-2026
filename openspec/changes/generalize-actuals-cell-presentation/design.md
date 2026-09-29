@@ -9,7 +9,7 @@ The current Actuals read model creates separate full-value, line-array, and disp
 - Give the Actuals table one shared cell-display contract for scalar values, structured values, and entity collections.
 - Keep complete values available through title and ARIA metadata while bounding visible content to two lines.
 - Use one compact responsive mode rather than a chain of 400/500/720px exceptions.
-- Make race headers, statuses, and answer cells use the same width and wrapping primitives.
+- Make race headers, review markers, and answer cells use the same plain border and wrapping primitives.
 - Remove redundant formatters and CSS rules after behavior parity is proven.
 
 **Non-Goals:**
@@ -35,7 +35,7 @@ An alternative was to keep an array of pre-wrapped display lines. That was rejec
 
 ### 2. One value block and one wrapping policy
 
-The template renders `displayText` in one value block. The block uses normal whitespace, `overflow-wrap:anywhere`, and a two-line clamp. Code styling may adjust typography only; it must not change wrapping. Review statuses use the same block-level wrapping behavior.
+The template renders `displayText` in one value block. The block uses normal whitespace, `overflow-wrap:anywhere`, and a two-line clamp. Code styling may adjust typography only; it must not change wrapping. Pending review is represented by one compact marker in the race header, with the full meaning in its title and ARIA label; pending and reviewed cells retain the same plain border treatment.
 
 The full value remains in `title` and `aria-label`. The visible projection may therefore be compact without losing inspectability or accessibility.
 

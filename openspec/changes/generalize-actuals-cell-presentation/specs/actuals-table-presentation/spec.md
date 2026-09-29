@@ -26,17 +26,18 @@ The Season Actuals overview SHALL present every stored answer through one shared
 
 ### Requirement: Actuals values use common wrapping and truncation
 
-All visible Actuals values, including full names, compact codes, numbers, statuses, and overflow indicators, SHALL use the same wrapping, overflow, and bounded-line policy. A narrow cell SHALL wrap content instead of clipping an unbreakable presentation line, while the full value remains available on hover and to assistive technology.
+All visible Actuals values, including full names, compact codes, numbers, and overflow indicators, SHALL use the same wrapping, overflow, and bounded-line policy. A narrow cell SHALL wrap content instead of clipping an unbreakable presentation line, while the full value remains available on hover and to assistive technology. Review state SHALL use a compact marker rather than a status label or status-specific cell border.
 
 #### Scenario: A compact code value is wider than its cell
 - **WHEN** a compact code sequence does not fit on one line
 - **THEN** the sequence SHALL wrap within the cell according to the shared policy
 - **AND** it SHALL not create horizontal overflow inside the cell or at page level
 
-#### Scenario: A review status is longer than the available width
-- **WHEN** a race column contains a status such as “needs review”
-- **THEN** the status SHALL wrap using the same value rules as answer content
-- **AND** the race column SHALL remain within its configured width
+#### Scenario: A race snapshot needs review
+- **WHEN** a race column has a pending review status
+- **THEN** the column header SHALL show one compact warning marker
+- **AND** the marker SHALL expose the full review meaning through its title and accessible label
+- **AND** the race header and value cells SHALL retain the same plain border treatment as reviewed columns
 
 ### Requirement: Actuals uses two responsive presentation modes
 
