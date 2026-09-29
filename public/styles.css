@@ -8061,6 +8061,11 @@ button.lang-option.is-active {
   gap: 6px;
 }
 
+.admin-race-data-edit-actions[hidden],
+.admin-race-data-edit-button[hidden] {
+  display: none;
+}
+
 .admin-race-data-edit-button,
 .admin-race-data-edit-actions button {
   min-width: 0 !important;

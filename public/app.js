@@ -1341,15 +1341,20 @@ const initRaceDataCorrection = () => {
     const actions = page.querySelector('[data-race-data-edit-actions]');
     const details = page.querySelector('[data-race-data-editor-details]');
     if (!region || !form) return;
-    region.dataset.raceDataEditing = editing ? 'true' : 'false';
-    form.dataset.raceDataEditor = editing ? 'true' : 'false';
+    const isEditing = Boolean(editing);
+    region.dataset.raceDataEditing = isEditing ? 'true' : 'false';
+    form.dataset.raceDataEditor = isEditing ? 'true' : 'false';
+    form.setAttribute('aria-busy', isEditing ? 'true' : 'false');
     form.querySelectorAll('[data-race-data-edit-input]').forEach((input) => {
-      input.disabled = !editing;
+      input.disabled = !isEditing;
     });
-    if (edit) edit.hidden = editing;
-    if (actions) actions.hidden = !editing;
-    if (details) details.hidden = !editing;
-    if (editing) form.querySelector('[data-race-data-edit-input]')?.focus();
+    if (edit) {
+      edit.hidden = isEditing;
+      edit.setAttribute('aria-hidden', isEditing ? 'true' : 'false');
+    }
+    if (actions) actions.hidden = !isEditing;
+    if (details) details.hidden = !isEditing;
+    if (isEditing) form.querySelector('[data-race-data-edit-input]')?.focus();
   };
 
   page.addEventListener('click', (event) => {
