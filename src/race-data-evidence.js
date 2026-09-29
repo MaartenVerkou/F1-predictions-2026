@@ -85,8 +85,8 @@ function normalizeResultRow(row, roster, kind, canonicalCatalog = null) {
   const driver = driverNameFromApi(row?.Driver, roster?.drivers || []);
   const constructor = teamNameFromApi(row?.Constructor, roster?.teams || []);
   if (!driver && !constructor) return null;
-  const positionRaw = String(row?.position || "").trim();
-  const position = parseNum(positionRaw);
+  const positionRaw = String(row?.position == null ? "" : row.position).trim();
+  const position = positionRaw === "" ? null : parseNum(positionRaw);
   return {
     driver,
     constructor,

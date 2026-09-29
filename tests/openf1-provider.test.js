@@ -55,6 +55,55 @@ test("OpenF1 normalizes session rows and preserves non-finish statuses", () => {
   assert.equal(row.sessionKey, "11230");
 });
 
+test("OpenF1 does not invent Finished for unclassified non-race sessions", () => {
+  const row = normalizeOpenF1Row({
+    position: null,
+    driver_number: 14,
+    number_of_laps: 6,
+    dnf: false,
+    dns: false,
+    dsq: false,
+    duration: [101.311, null, null],
+    points: 0,
+    meeting_key: 1279,
+    session_key: 11271
+  }, {
+    driver_number: 14,
+    full_name: "Fernando Alonso",
+    first_name: "Fernando",
+    last_name: "Alonso",
+    team_name: "Aston Martin"
+  }, "sprintQualifying", { sessionKey: 11271, meetingKey: 1279 });
+
+  assert.equal(row.status, null);
+  assert.equal(row.position, null);
+  assert.equal(row.positionText, null);
+});
+
+test("OpenF1 keeps Finished as the default for classified race results", () => {
+  const row = normalizeOpenF1Row({
+    position: 1,
+    driver_number: 63,
+    number_of_laps: 57,
+    dnf: false,
+    dns: false,
+    dsq: false,
+    points: 25,
+    meeting_key: 1279,
+    session_key: 11234
+  }, {
+    driver_number: 63,
+    full_name: "George Russell",
+    first_name: "George",
+    last_name: "Russell",
+    team_name: "Mercedes"
+  }, "race", { sessionKey: 11234, meetingKey: 1279 });
+
+  assert.equal(row.status, "Finished");
+  assert.equal(row.position, 1);
+  assert.equal(row.positionText, "1");
+});
+
 test("OpenF1 maps a unique meeting to the configured season round", () => {
   assert.equal(resolveMeetingRound({
     meeting_name: "Australian Grand Prix",

@@ -101,6 +101,36 @@ test("buildEvidenceBundle normalizes race, qualifying, and standings evidence", 
   assert.equal(evidence.sourceUrls.race, "https://example.test/race");
 });
 
+test("evidence keeps an unclassified qualifying result unavailable", () => {
+  const evidence = buildEvidenceBundle({
+    data: {
+      season: 2026,
+      results: [],
+      qualifying: [{
+        round: 4,
+        QualifyingResults: [{
+          position: null,
+          positionText: null,
+          status: null,
+          Driver: { givenName: "Fernando", familyName: "Alonso" },
+          Constructor: { name: "Aston Martin" }
+        }]
+      }],
+      sprints: [],
+      driverStandingsByRound: new Map(),
+      constructorStandingsByRound: new Map(),
+      driverOfTheDayByRound: new Map()
+    },
+    roster: { drivers: ["Fernando Alonso"], teams: ["Aston Martin"] },
+    roundNumber: 4,
+    roundName: "Miami Grand Prix"
+  });
+
+  assert.equal(evidence.qualifying.rows[0].position, null);
+  assert.equal(evidence.qualifying.rows[0].positionText, null);
+  assert.equal(evidence.qualifying.rows[0].status, null);
+});
+
 test("evidence keeps provider identity and raw session details for future derivations", () => {
   const evidence = buildEvidenceBundle({
     data: {

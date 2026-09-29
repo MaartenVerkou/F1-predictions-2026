@@ -53,11 +53,11 @@ function classifySession(session) {
   return null;
 }
 
-function statusFor(row) {
+function statusFor(row, kind) {
   if (row?.dns) return "DNS";
   if (row?.dsq) return "DSQ";
   if (row?.dnf) return "DNF";
-  return "Finished";
+  return kind === "race" || kind === "sprint" ? "Finished" : null;
 }
 
 function timingValue(value) {
@@ -82,9 +82,13 @@ function normalizeOpenF1Row(row, driver = null, kind, {
   sessionKey = row?.session_key,
   meetingKey = row?.meeting_key
 } = {}) {
-  const status = statusFor(row);
+  const status = statusFor(row, kind);
   const numericPosition = parseFinite(row?.position);
-  const position = status === "Finished" ? numericPosition : null;
+  const classifiedPosition = numericPosition != null && numericPosition > 0 ? numericPosition : null;
+  const isRaceResult = kind === "race" || kind === "sprint";
+  const position = isRaceResult
+    ? (status === "Finished" ? classifiedPosition : null)
+    : (status == null ? classifiedPosition : null);
   const names = driverName(driver);
   const driverId = row?.driver_number ?? driver?.driver_number;
   const constructorName = String(driver?.team_name || "").trim();
