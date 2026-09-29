@@ -7891,7 +7891,7 @@ button.lang-option.is-active {
 
 .admin-race-data-section-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
   gap: 4px 10px;
   min-width: 0;
@@ -8056,9 +8056,9 @@ button.lang-option.is-active {
   }
 
   .admin-race-data-section-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    flex-direction: row;
+    gap: 4px 8px;
   }
 
   .admin-race-data-detail-actions {
@@ -8270,21 +8270,47 @@ button.lang-option.is-active {
 /* The primary facts table is a compact review surface. Keep canonical names
    discoverable through title/ARIA while using stable codes when the table
    would otherwise force the facts off-screen. */
+.admin-race-data-review-state {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
 .admin-race-data-review-form {
   display: inline-flex;
   align-items: center;
   margin: 0;
 }
 
-.admin-race-data-review-form button {
+.admin-race-data-review-form button,
+.admin-race-data-review-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .admin-race-data-review-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.2;
   white-space: nowrap;
+}
+
+.admin-race-data-review-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .admin-race-data-detail-table--result {

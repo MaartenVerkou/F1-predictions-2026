@@ -142,6 +142,8 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /<tbody data-race-data-body="<%= viewMode %>">/);
   assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
   assert.match(page, /admin-race-data-selector-stack/);
+  assert.doesNotMatch(page, /availableSeason\.label %> ·/);
+  assert.doesNotMatch(readView("admin_actuals.ejs"), /availableSeason\.label %> ·/);
   assert.match(page, /admin_race_data\.season_overview/);
   assert.match(page, /raceDataError \|\| raceDataSuccess/);
   assert.match(page, /class="admin-race-data-selector-form admin-race-data-round-form" data-race-data-round-form/);
@@ -166,6 +168,9 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /data-race-data-edit disabled/);
   assert.match(region, /action="\/admin\/race-data\/review"/);
   assert.match(region, /name="returnTo"/);
+  assert.match(region, /admin-race-data-review-state/);
+  assert.match(region, /admin-race-data-review-button/);
+  assert.match(region, /admin-race-data-review-icon/);
   assert.match(region, /data-race-data-review-status/);
   assert.match(region, /admin_race_data_entity_label/);
   assert.match(region, /round\.code/);
@@ -198,7 +203,9 @@ test("race data views share one identity column and a common row rhythm", () => 
   const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
   assert.match(app, /data-race-data-round-form\] select\[name="round"\]/);
   assert.match(app, /roundSelect\.value = round \|\| ''/);
+  assert.match(styles, /\.admin-race-data-review-state\s*\{/);
   assert.match(styles, /\.admin-race-data-review-form\s*\{/);
+  assert.match(styles, /\.admin-race-data-review-button\s*\{/);
   assert.match(styles, /\.admin-race-data-detail-table--result \.admin-race-data-result-cell--driver \.admin-race-data-compact-label/);
   assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);
 });

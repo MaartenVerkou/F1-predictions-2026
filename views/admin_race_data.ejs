@@ -12,7 +12,7 @@
         <label for="admin-race-data-season"><%= t('admin_inputs.season') %></label>
         <select id="admin-race-data-season" name="season" onchange="this.form.submit()">
           <% (availableSeasons || []).forEach((availableSeason) => { %>
-            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %> · <%= availableSeason.statusLabel %></option>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.label %></option>
           <% }) %>
         </select>
         <input type="hidden" name="view" value="<%= viewMode %>" />

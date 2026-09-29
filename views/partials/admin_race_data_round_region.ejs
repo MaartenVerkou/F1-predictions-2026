@@ -34,7 +34,10 @@ const formatReviewDate = (value) => {
   if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}; %>
+};
+const reviewStatusTitle = selectedSnapshot?.reviewed_at
+  ? "Reviewed " + formatReviewDate(selectedSnapshot.reviewed_at)
+  : "Reviewed"; %>
 <div class="admin-race-data-round-region" data-race-data-round-region>
   <% if (view.hasSelectedRound) { %>
   <section class="admin-race-data-detail admin-race-data-detail-first" aria-labelledby="admin-race-data-detail-heading">
@@ -43,24 +46,34 @@ const formatReviewDate = (value) => {
         <h2 id="admin-race-data-detail-heading">
           <%= view.selectedRound?.label || t('admin_race_data.no_round') %>
         </h2>
+        <% if (view.selectedEvidence || selectedSnapshot) { %>
+          <div class="admin-race-data-review-state" data-race-data-review-state>
+            <% if (reviewStatus === 'pending' && selectedSnapshot?.id) { %>
+              <form method="post" action="/admin/race-data/review" class="admin-race-data-review-form" data-race-data-review-form>
+                <%- csrfField() %>
+                <input type="hidden" name="season" value="<%= season %>" />
+                <input type="hidden" name="snapshotId" value="<%= selectedSnapshot.id %>" />
+                <input type="hidden" name="target" value="round:<%= view.selectedRoundNumber %>" />
+                <input type="hidden" name="returnTo" value="<%= reviewReturnTo %>" />
+                <% if (view.selectedRound?.state !== 'future') { %><input type="hidden" name="unlockPast" value="1" /><% } %>
+                <button type="submit" class="secondary admin-race-data-review-button" title="Mark this round reviewed">
+                  <span class="admin-race-data-review-icon" aria-hidden="true">!</span>
+                  <span>Mark reviewed</span>
+                </button>
+              </form>
+            <% } else if (reviewStatus === 'reviewed') { %>
+              <span class="admin-race-data-review-status" data-race-data-review-status title="<%= reviewStatusTitle %>" aria-label="<%= reviewStatusTitle %>">
+                <span class="admin-race-data-review-icon" aria-hidden="true">✓</span>
+                <span>Reviewed</span>
+              </span>
+            <% } %>
+          </div>
+        <% } %>
       </div>
       <% if (view.selectedEvidence || selectedSnapshot) { %>
         <div class="admin-race-data-detail-actions" data-race-data-detail-actions>
           <span class="admin-race-data-selection-label muted" data-race-data-selection-label aria-live="polite">Select a result row</span>
           <% if (view.selectedEvidence) { %><button type="button" class="secondary" data-race-data-edit disabled>Edit</button><% } %>
-          <% if (reviewStatus === 'pending' && selectedSnapshot?.id) { %>
-            <form method="post" action="/admin/race-data/review" class="admin-race-data-review-form" data-race-data-review-form>
-              <%- csrfField() %>
-              <input type="hidden" name="season" value="<%= season %>" />
-              <input type="hidden" name="snapshotId" value="<%= selectedSnapshot.id %>" />
-              <input type="hidden" name="target" value="round:<%= view.selectedRoundNumber %>" />
-              <input type="hidden" name="returnTo" value="<%= reviewReturnTo %>" />
-              <% if (view.selectedRound?.state !== 'future') { %><input type="hidden" name="unlockPast" value="1" /><% } %>
-              <button type="submit" class="secondary">Mark reviewed</button>
-            </form>
-          <% } else if (reviewStatus === 'reviewed') { %>
-            <span class="admin-race-data-review-status" data-race-data-review-status>Reviewed<% if (selectedSnapshot.reviewed_at) { %> · <%= formatReviewDate(selectedSnapshot.reviewed_at) %><% } %></span>
-          <% } %>
         </div>
       <% } %>
     </div>
