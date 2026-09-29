@@ -54,6 +54,7 @@
 - [x] 6.2e Add shared metric render modes for per-round count/points/comparison cells and a cutoff-aware additive footer, with metadata-driven focus profiles and tests for future-round exclusion.
 - [x] 6.2f Add Formula 1 Dashboard destructors component-cost evidence to the shared driver/constructor matrix and derive both destructors Actuals from the same normalized evidence path.
 - [ ] 6.3 Update Actuals, leaderboard, and analysis to consume shared services and remove duplicated semantic transformations.
+- [x] 6.3a Add one shared bounded Actuals answer projection with entity codes, stable grouping, overflow counts, and full accessible values for long future question answers.
 - [ ] 6.4 Keep loading, empty, error, permission, responsive, and accessibility states coherent across the four admin/public workflows.
 
 ## 7. Preview, release, and cleanup
