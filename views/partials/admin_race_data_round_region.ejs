@@ -31,13 +31,24 @@ const reviewReturnTo = `/admin/race-data?season=${encodeURIComponent(season)}&ro
 const roundQuery = view.hasSelectedRound ? `&round=${encodeURIComponent(view.selectedRoundNumber)}` : '';
 const formatReviewDate = (value) => {
   if (!value) return '';
-  if (typeof formatAdminDateTime === 'function') return formatAdminDateTime(value);
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(',', ' ·');
 };
-const reviewStatusTitle = selectedSnapshot?.reviewed_at
-  ? "Reviewed " + formatReviewDate(selectedSnapshot.reviewed_at)
-  : "Reviewed"; %>
+const reviewerLabel = selectedSnapshot?.reviewed_by_name || 'admin';
+const reviewStatusLabel = selectedSnapshot?.reviewed_at
+  ? `Reviewed by ${reviewerLabel} · ${formatReviewDate(selectedSnapshot.reviewed_at)}`
+  : selectedSnapshot?.reviewed_by_name
+    ? `Reviewed by ${reviewerLabel}`
+    : 'Reviewed';
+const reviewStatusTitle = reviewStatusLabel; %>
 <div class="admin-race-data-round-region" data-race-data-round-region>
   <% if (view.hasSelectedRound) { %>
   <section class="admin-race-data-detail admin-race-data-detail-first" aria-labelledby="admin-race-data-detail-heading">
@@ -64,7 +75,7 @@ const reviewStatusTitle = selectedSnapshot?.reviewed_at
             <% } else if (reviewStatus === 'reviewed') { %>
               <span class="admin-race-data-review-status" data-race-data-review-status title="<%= reviewStatusTitle %>" aria-label="<%= reviewStatusTitle %>">
                 <span class="admin-race-data-review-icon" aria-hidden="true">✓</span>
-                <span>Reviewed</span>
+                <span><%= reviewStatusLabel %></span>
               </span>
             <% } %>
           </div>

@@ -69,7 +69,9 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   const reviewForm = page.locator("[data-race-data-review-form]");
   await expect(reviewForm).toBeVisible();
   await reviewForm.getByRole("button", { name: /Mark reviewed/i }).click();
-  await expect(page.getByText(/marked as reviewed/i)).toBeVisible();
+  await expect(page.getByText(/marked as reviewed/i)).toHaveCount(0);
+  await expect(page.locator("[data-race-data-review-status]")).toContainText(/Reviewed by/);
+  await expect(page.locator("[data-race-data-review-status]")).toContainText(/2026/);
 
   await page.goto("/admin/actuals?season=2026");
   await expect(page.locator('[data-admin-actuals-round="6"][data-review-status="reviewed"]').first()).toBeVisible();

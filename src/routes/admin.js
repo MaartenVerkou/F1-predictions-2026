@@ -318,6 +318,26 @@ function attachSeasonCatalogToQuestions(questions, seasonCatalog) {
   });
 }
 
+function attachSnapshotReviewerNames(db, snapshots = []) {
+  const reviewerIds = Array.from(new Set(
+    (snapshots || [])
+      .map((snapshot) => Number(snapshot?.reviewed_by_user_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  ));
+  if (!reviewerIds.length) return snapshots || [];
+  const placeholders = reviewerIds.map(() => "?").join(", ");
+  const reviewers = db.prepare(
+    `SELECT id, name FROM users WHERE id IN (${placeholders})`
+  ).all(...reviewerIds);
+  const namesById = new Map(
+    reviewers.map((reviewer) => [Number(reviewer.id), String(reviewer.name || "").trim() || null])
+  );
+  return (snapshots || []).map((snapshot) => ({
+    ...snapshot,
+    reviewed_by_name: namesById.get(Number(snapshot.reviewed_by_user_id)) || null
+  }));
+}
+
 function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster, seasonCatalog }) {
   const base = fallbackRoster || { drivers: [], teams: [], races: races || [] };
   const catalog = seasonCatalog || listSeasonInputs(db, season);
@@ -3031,9 +3051,10 @@ function registerAdminRoutes(app, deps) {
       : DEFAULT_SCORING_RULES;
     const races = catalog?.races?.map((race) => race.display_name) || [];
     const evidenceRows = listRaceDataSnapshots(db, season);
-    const snapshotRows = listLatestSnapshotsForSeason(db, season, {
+    let snapshotRows = listLatestSnapshotsForSeason(db, season, {
       maxRoundNumber: races.length
     });
+    snapshotRows = attachSnapshotReviewerNames(db, snapshotRows);
     const requestedRoundValue = String(req.query.round == null ? "" : req.query.round).trim();
     const requestedRound = Number(requestedRoundValue || 0);
     const hasSelectedRound = requestedRound > 0;
@@ -3264,10 +3285,7 @@ function registerAdminRoutes(app, deps) {
     } catch (err) {
       return redirectReview("error", err.message);
     }
-    const label = snapshot.round_number
-      ? `R${snapshot.round_number} - ${String(snapshot.round_name || "").trim() || `Round ${snapshot.round_number}`}`
-      : `Snapshot #${snapshot.id}`;
-    return redirectReview("success", `${label} marked as reviewed.`);
+    return res.redirect(returnTo || fallbackPath);
   });
 
 

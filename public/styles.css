@@ -8299,8 +8299,11 @@ button.lang-option.is-active {
   align-items: center;
   gap: 5px;
   color: var(--muted);
-  font-size: 12px;
+  max-width: min(100%, 330px);
+  overflow: hidden;
+  font-size: 11px;
   line-height: 1.2;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
