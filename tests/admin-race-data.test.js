@@ -1025,3 +1025,50 @@ test("teammate points focus renders per-round championship points without a foot
   assert.equal(beta.focusRow, true);
   assert.equal(view.focusFooter, null);
 });
+
+test("title-decision focus reports the first cutoff where the season is mathematically clinched", () => {
+  const evidence = (round) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: {
+        rows: [
+          { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, status: "Finished" },
+          { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 2, status: "Finished" }
+        ]
+      },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: { drivers: [], constructors: [] }
+    }
+  });
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix", "Chinese Grand Prix", "Japanese Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [evidence(1), evidence(2)],
+    snapshotRows: [],
+    selectedRound: 2,
+    scoringRules: {
+      racePoints: { 1: 25, 2: 0 },
+      sprintPoints: {},
+      fastestLap: { points: 0, minimumFinish: 1, eligible: false }
+    },
+    focus: {
+      id: "races_before_title_decided",
+      view: "drivers",
+      metric: "title_decision",
+      matrixMetric: "points"
+    }
+  });
+
+  assert.equal(view.focusSummary.value, "1");
+  assert.match(view.focusSummary.detail, /Title clinched after R2/);
+});

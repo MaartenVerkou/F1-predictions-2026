@@ -7,6 +7,7 @@ const {
   formatDamageCostExact
 } = require("./destructors-damage");
 const { DEFAULT_SCORING_RULES, pointsForResult } = require("./season-scoring-rules");
+const { computeTitleDecision } = require("./title-decision");
 
 const CLASSIFIED_STATUS_RE = /^(finished|lapped|lap\s+down|\+\d+\s+lap|\+\d+\.\d+s?)$/i;
 const NON_DNF_STATUS_RE = /^(dns|dnq|did not start|did not qualify|dsq|disqualified|nc|not classified|wd|withdrew)$/i;
@@ -631,7 +632,16 @@ function formatNames(names) {
   return `${values.slice(0, 3).join(", ")} +${values.length - 3}`;
 }
 
-function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNumber, roster }) {
+function buildFocusSummary({
+  focus,
+  rounds,
+  drivers,
+  constructors,
+  cutoffRoundNumber,
+  roster,
+  standingsByRound,
+  scoringRules = DEFAULT_SCORING_RULES
+}) {
   const metric = String(focus.metric || "points");
   const completed = completedRounds(rounds);
   const base = {
@@ -811,12 +821,43 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
   }
 
   if (metric === "title_decision") {
-    const selected = rounds.find((round) => round.roundNumber === cutoffRoundNumber);
-    const leader = selected?.evidence?.payload?.standings?.drivers?.[0];
-    const runnerUp = selected?.evidence?.payload?.standings?.drivers?.[1];
-    if (!leader) return unavailable("Driver standings are not available for this cutoff.");
-    const gap = runnerUp ? Number(leader.points || 0) - Number(runnerUp.points || 0) : null;
-    return { ...base, status: cutoffRoundNumber < (rounds.length || cutoffRoundNumber) ? "partial" : "ready", value: leader.entity, detail: `Leader after R${cutoffRoundNumber}${gap == null ? "" : ` · gap ${gap}`}`, tooltip: "A title decision is only final once all required completed rounds are available." };
+    const roundStandings = Array.from(standingsByRound?.entries?.() || []).map(([round, standings]) => ({
+      round,
+      standings: standings?.drivers || []
+    }));
+    const raceRowsByRound = (rounds || []).map((round) => ({
+      round: round.roundNumber,
+      rows: roundRows(round, "race")
+    }));
+    const sprintRoundSet = new Set(
+      (rounds || [])
+        .filter((round) => roundRows(round, "sprint").length > 0)
+        .map((round) => round.roundNumber)
+    );
+    const decision = computeTitleDecision({
+      roundStandings,
+      raceRowsByRound,
+      totalRounds: rounds.length,
+      sprintRoundSet,
+      scoringRules,
+      cutoffRound: cutoffRoundNumber
+    });
+    if (!decision) {
+      return {
+        ...base,
+        status: "partial",
+        value: "Not decided",
+        detail: `No clinch by R${cutoffRoundNumber}`,
+        tooltip: "The leader can still be caught on points or countback using the remaining race and sprint scoring opportunities."
+      };
+    }
+    return {
+      ...base,
+      status: "ready",
+      value: String(decision.racesBeforeEnd),
+      detail: `Title clinched after R${decision.decidedRound} · ${decision.leader}`,
+      tooltip: `Leader gap ${decision.pointsGap} points; at most ${decision.remainingPoints} points remained after R${decision.decidedRound}. Countback is included.`
+    };
   }
 
   if (metric === "all_teams_points") {
@@ -860,7 +901,15 @@ function buildFocusSummary({ focus, rounds, drivers, constructors, cutoffRoundNu
   return unavailable("This focus has no projection yet.");
 }
 
-function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoffRoundNumber }) {
+function applyRaceDataFocus({
+  focus,
+  rounds,
+  driverRows,
+  constructorRows,
+  cutoffRoundNumber,
+  standingsByRound,
+  scoringRules = DEFAULT_SCORING_RULES
+}) {
   const metric = String(focus?.matrixMetric || focus?.metric || "points");
   const lastStandingFocus = String(focus?.metric || "").toLowerCase() === "last_standing";
   const focusMetric = String(focus?.metric || "").toLowerCase();
@@ -906,7 +955,15 @@ function applyRaceDataFocus({ focus, rounds, driverRows, constructorRows, cutoff
   return {
     drivers: sortedDrivers,
     constructors: sortedConstructors,
-    summary: buildFocusSummary({ focus: resolvedFocus, rounds, drivers: sortedDrivers, constructors: sortedConstructors, cutoffRoundNumber }),
+    summary: buildFocusSummary({
+      focus: resolvedFocus,
+      rounds,
+      drivers: sortedDrivers,
+      constructors: sortedConstructors,
+      cutoffRoundNumber,
+      standingsByRound,
+      scoringRules
+    }),
     footer: buildFocusFooter({
       focus: resolvedFocus,
       rounds,

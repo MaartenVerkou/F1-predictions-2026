@@ -40,6 +40,9 @@ const {
   assertStandardEvidenceProvider
 } = require("../src/evidence-provider-policy");
 const { topDamageEntities } = require("../src/destructors-damage");
+const {
+  computeTitleDecidedRacesBeforeEnd
+} = require("../src/title-decision");
 
 const ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
@@ -361,31 +364,6 @@ function optionalNumber(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function computeTitleDecidedRacesBeforeEnd(roundStandings, totalRounds, sprintRoundSet) {
-  const ordered = Array.isArray(roundStandings) ? roundStandings.slice() : [];
-  if (ordered.length === 0) return null;
-  const maxWeekendPoints = (roundNumber) =>
-    26 + (sprintRoundSet.has(Number(roundNumber)) ? 8 : 0);
-
-  for (let index = 0; index < ordered.length; index += 1) {
-    const entry = ordered[index];
-    const standings = Array.isArray(entry?.standings) ? entry.standings : [];
-    if (standings.length < 2) continue;
-
-    const leaderPoints = parseNum(standings[0]?.points);
-    const secondPoints = parseNum(standings[1]?.points);
-    let maxRemainingPoints = 0;
-    for (let round = Number(entry.round) + 1; round <= totalRounds; round += 1) {
-      maxRemainingPoints += maxWeekendPoints(round);
-    }
-
-    if (leaderPoints - secondPoints > maxRemainingPoints) {
-      return totalRounds - Number(entry.round);
-    }
-  }
-  return 0;
-}
-
 function serializeAnswerForStorage(question, answerValue) {
   if (answerValue == null || answerValue === "") return null;
   const type = question.type || "text";
@@ -405,7 +383,15 @@ function serializeAnswerForStorage(question, answerValue) {
   return String(answerValue);
 }
 
-function serializedActualsForRound({ questions, roster, races, data, roundNumber, totalRounds }) {
+function serializedActualsForRound({
+  questions,
+  roster,
+  races,
+  data,
+  roundNumber,
+  totalRounds,
+  scoringRules = DEFAULT_SCORING_RULES
+}) {
   const questionsById = Object.fromEntries((questions || []).map((question) => [question.id, question]));
   const driverStandings = data.driverStandingsByRound.get(roundNumber) || [];
   const constructorStandings = data.constructorStandingsByRound.get(roundNumber) || [];
@@ -430,7 +416,14 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
   const winnerGridRows = [];
   const qualStats = new Map();
   const sprintPointsByDriver = new Map();
-  const sprintRoundSet = new Set();
+  // Use the full persisted calendar for sprint weekends. The selected cutoff
+  // limits observed results, but must not erase known future sprint slots from
+  // the maximum points still available calculation.
+  const sprintRoundSet = new Set(
+    (data.sprints || [])
+      .filter((race) => Array.isArray(race.SprintResults) && race.SprintResults.length > 0)
+      .map((race) => Number(race.round))
+  );
 
   completedRaces.forEach((race) => {
     const raceName =
@@ -571,6 +564,10 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
     round,
     standings: data.driverStandingsByRound.get(round) || []
   }));
+  const raceRowsByRound = completedRaces.map((race) => ({
+    round: Number(race.round),
+    rows: Array.isArray(race.Results) ? race.Results : []
+  }));
   const damageDriverLeaders = data.destructorsByRound
     ? topDamageEntities(data.destructorsByRound, { maxRound: roundNumber, entityType: "driver" })
     : [];
@@ -668,9 +665,14 @@ function serializedActualsForRound({ questions, roster, races, data, roundNumber
         : "Less",
     select_three_races_dnfs: { dnf_by_race: dnfByRace },
     races_before_title_decided: computeTitleDecidedRacesBeforeEnd(
-      roundStandings,
-      totalRounds,
-      sprintRoundSet
+      {
+        roundStandings,
+        raceRowsByRound,
+        totalRounds,
+        sprintRoundSet,
+        scoringRules,
+        cutoffRound: roundNumber
+      }
     ),
     all_teams_score_points: constructorStandings.every((row) => parseNum(row.points) > 0)
       ? "yes"
@@ -841,7 +843,8 @@ function deriveSnapshotsFromPersistedEvidence(db, {
       races,
       data,
       roundNumber,
-      totalRounds
+      totalRounds,
+      scoringRules
     })
   }));
 }
@@ -1069,7 +1072,8 @@ async function main() {
         races,
         data,
         roundNumber,
-        totalRounds
+        totalRounds,
+        scoringRules
       }),
       evidence: buildEvidenceBundle({
         data,
@@ -1127,7 +1131,8 @@ async function main() {
             races,
             data,
             roundNumber: snapshot.roundNumber,
-            totalRounds
+            totalRounds,
+            scoringRules
           });
         });
       }
@@ -1280,6 +1285,7 @@ module.exports = {
   fetchSeasonData,
   parseArgs,
   parseDriverOfTheDayByRound,
+  computeTitleDecidedRacesBeforeEnd,
   serializedActualsForRound,
   shortRaceLabel
 };

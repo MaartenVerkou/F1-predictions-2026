@@ -50,3 +50,21 @@ Each derived actual value SHALL record the derivation version, catalog revision,
 - **WHEN** an actual value is shown in the review workspace
 - **THEN** the admin SHALL be able to identify the source evidence and derivation/catalog revisions used
 - **AND** an unavailable value SHALL show why it could not be derived
+
+### Requirement: Title decisions use the selected cutoff and season scoring rules
+The Drivers' title-decision derivation SHALL evaluate every completed round through the selected cutoff, subtract the maximum points still available in each later scheduled race weekend using that season's race, sprint, and eligible fastest-lap rules, and return the number of races before the end for the first round where the leader is mathematically uncatchable.
+
+#### Scenario: A title is clinched before the season ends
+- **WHEN** the selected cutoff is R21 of a 22-round season and the leader's points gap exceeds the maximum points available in R22
+- **THEN** the derived answer SHALL be `1`
+- **AND** the value SHALL be derived from the season scoring rules rather than a hardcoded 25-point weekend
+
+#### Scenario: A title is not yet clinched
+- **WHEN** no leader is mathematically uncatchable through the selected cutoff
+- **THEN** the derived answer SHALL be unavailable rather than `0`
+- **AND** `0` SHALL be reserved for a title clinched after the final round
+
+#### Scenario: A points tie can be resolved by countback
+- **WHEN** a challenger can only tie the leader on points with the maximum remaining score
+- **THEN** the derivation SHALL compare the complete finishing-position counts through the cutoff and the challenger's best possible future race finishes
+- **AND** it SHALL leave the title open when the challenger can still win countback

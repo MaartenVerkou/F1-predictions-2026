@@ -617,7 +617,9 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     rounds,
     driverRows,
     constructorRows,
-    cutoffRoundNumber
+    cutoffRoundNumber,
+    standingsByRound: derivedStandingsByRound,
+    scoringRules
   });
   driverRows.splice(0, driverRows.length, ...focusProjection.drivers);
   constructorRows.splice(0, constructorRows.length, ...focusProjection.constructors);

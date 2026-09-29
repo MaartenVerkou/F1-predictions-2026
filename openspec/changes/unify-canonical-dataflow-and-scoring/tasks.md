@@ -29,6 +29,7 @@
 - [ ] 3.2 Replace hardcoded 2026 roster/engine/team-pair constants with catalog/assignment/season metadata or explicit versioned strategy configuration.
 - [ ] 3.3 Make admin sync and the backfill command thin callers of the same derivation service; keep an old-vs-new comparison report until parity is proven.
 - [ ] 3.4 Add tests for driver/team changes, constructor standings, teammate questions, sprint/qualifying data, cancelled rounds, unresolved inputs, and round cutoffs.
+- [x] 3.5 Derive the Drivers' title-decision answer from the selected cutoff, season scoring rules, future sprint opportunities, and countback tiebreak possibilities.
 
 ## 4. Season-scoped actual lifecycle
 
