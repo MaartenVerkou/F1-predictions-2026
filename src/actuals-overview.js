@@ -153,7 +153,7 @@ function compactActualOverviewLine(line, view) {
 
 function uniqueActualOverviewEntities(values) {
   return Array.from(new Set((values || [])
-    .map((value) => String(value || "").trim())
+    .map((value) => value == null ? "" : String(value).trim())
     .filter((value) => value && value !== "—")));
 }
 
