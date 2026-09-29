@@ -25,6 +25,23 @@ const detailCellTitle = (row, column) => {
   }
   return column.title || detailCellValue(row, column);
 };
+const detailEditValue = (row, column) => {
+  if (column.id === 'finish') return row.racePositionNumber == null ? '' : row.racePositionNumber;
+  if (column.id === 'grid') return row.grid == null ? '' : row.grid;
+  if (column.id === 'status') return row.raceStatus || '';
+  if (column.id === 'points') return row.racePoints == null ? '' : row.racePoints;
+  if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) {
+    const session = row.sessionValues?.[column.sessionKey || column.id];
+    if (!session) return '';
+    return session.position != null && Number(session.position) > 0
+      ? session.position
+      : (session.status || session.positionText || '');
+  }
+  return '';
+};
+const detailEditInputType = (column) => ['finish', 'grid', 'points'].includes(column.id) ? 'number' : 'text';
+const detailEditStep = (column) => column.id === 'points' ? '0.1' : '1';
+const selectedEvidence = view.selectedEvidence || null;
 const selectedSnapshot = view.selectedRound?.snapshot || null;
 const reviewStatus = String(selectedSnapshot?.review_status || '').toLowerCase();
 const reviewReturnTo = `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(view.selectedRoundNumber)}&view=${encodeURIComponent(viewMode)}&focus=${encodeURIComponent(view.focusId || 'points')}`;
@@ -43,10 +60,14 @@ const formatReviewDate = (value) => {
   }).replace(',', ' ·');
 };
 const reviewerLabel = selectedSnapshot?.reviewed_by_name || 'admin';
+const editedSnapshot = selectedEvidence?.revision_kind === 'admin_correction'
+  || selectedEvidence?.source_type === 'admin_correction'
+  || Boolean(selectedEvidence?.correction_reason);
+const reviewStatusPrefix = editedSnapshot ? 'Edited by' : 'Reviewed by';
 const reviewStatusLabel = selectedSnapshot?.reviewed_at
-  ? `Reviewed by ${reviewerLabel} · ${formatReviewDate(selectedSnapshot.reviewed_at)}`
+  ? `${reviewStatusPrefix} ${reviewerLabel} · ${formatReviewDate(selectedSnapshot.reviewed_at)}`
   : selectedSnapshot?.reviewed_by_name
-    ? `Reviewed by ${reviewerLabel}`
+    ? `${reviewStatusPrefix} ${reviewerLabel}`
     : 'Reviewed';
 const reviewStatusTitle = reviewStatusLabel; %>
 <div class="admin-race-data-round-region" data-race-data-round-region>
@@ -83,12 +104,26 @@ const reviewStatusTitle = reviewStatusLabel; %>
       </div>
       <% if (view.selectedEvidence || selectedSnapshot) { %>
         <div class="admin-race-data-detail-actions" data-race-data-detail-actions>
-          <span class="admin-race-data-selection-label muted" data-race-data-selection-label aria-live="polite">Select a result row</span>
-          <% if (view.selectedEvidence) { %><button type="button" class="secondary" data-race-data-edit disabled>Edit</button><% } %>
+          <% if (view.selectedEvidence) { %>
+            <button type="button" class="secondary admin-race-data-edit-button" data-race-data-edit>Edit data</button>
+            <div class="admin-race-data-edit-actions" data-race-data-edit-actions hidden>
+              <button type="submit" form="admin-race-data-correction-form" class="secondary admin-race-data-save-button">Save changes</button>
+              <button type="button" class="secondary" data-race-data-editor-close>Discard</button>
+            </div>
+          <% } %>
         </div>
       <% } %>
     </div>
 
+    <% if (view.selectedEvidence) { %>
+      <form id="admin-race-data-correction-form" method="post" action="/admin/race-data/correction" class="admin-race-data-correction-form" data-race-data-correction-form data-race-data-editor="false">
+        <%- csrfField() %>
+        <input type="hidden" name="season" value="<%= season %>" />
+        <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+        <input type="hidden" name="view" value="<%= viewMode %>" />
+        <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
+        <input type="hidden" name="snapshotId" value="<%= view.selectedEvidence.id %>" />
+    <% } %>
     <div class="admin-race-data-detail-table-wrap">
       <table class="admin-race-data-detail-table admin-race-data-detail-table--result">
         <thead>
@@ -100,18 +135,32 @@ const reviewStatusTitle = reviewStatusLabel; %>
         </thead>
         <tbody>
           <% if (view.detailRows.length) { %>
-            <% view.detailRows.forEach((row) => { %>
-              <tr class="admin-race-data-result-row" data-race-data-result-row tabindex="0" aria-selected="false"
-                  data-driver-id="<%= row.driverId || '' %>" data-driver-name="<%= row.driver || '' %>"
-                  data-race-position="<%= row.racePositionNumber || '' %>" data-grid="<%= row.grid || '' %>"
-                  data-status="<%= row.raceStatus || '' %>" data-points="<%= row.racePoints == null ? '' : row.racePoints %>">
+            <% view.detailRows.forEach((row, rowIndex) => { %>
+              <tr class="admin-race-data-result-row" data-race-data-result-row
+                  data-driver-id="<%= row.driverId || '' %>" data-driver-name="<%= row.driver || '' %>">
                 <% resultColumns.forEach((column) => { %>
                   <% if (column.id === 'driver') { %>
-                    <th scope="row" class="admin-race-data-result-cell admin-race-data-result-cell--driver" title="<%= detailCellValue(row, column) %>" aria-label="<%= detailCellValue(row, column) %>"><%- include('admin_race_data_entity_label', { fullLabel: detailCellValue(row, column), compactLabel: row.driverCode || '—' }) %></th>
+                    <th scope="row" class="admin-race-data-result-cell admin-race-data-result-cell--driver" title="<%= detailCellValue(row, column) %>" aria-label="<%= detailCellValue(row, column) %>">
+                      <% if (view.selectedEvidence && row.hasEvidence) { %>
+                        <input type="hidden" name="rows[<%= rowIndex %>][driverId]" value="<%= row.driverId || '' %>" />
+                        <input type="hidden" name="rows[<%= rowIndex %>][driver]" value="<%= row.driver || '' %>" />
+                      <% } %>
+                      <%- include('admin_race_data_entity_label', { fullLabel: detailCellValue(row, column), compactLabel: row.driverCode || '—' }) %>
+                    </th>
                   <% } else if (column.id === 'constructor') { %>
                     <td class="admin-race-data-result-cell admin-race-data-result-cell--constructor" title="<%= detailCellValue(row, column) %>" aria-label="<%= detailCellValue(row, column) %>"><%- include('admin_race_data_entity_label', { fullLabel: detailCellValue(row, column), compactLabel: row.constructorCode || '—' }) %></td>
                   <% } else { %>
-                    <td class="admin-race-data-result-cell admin-race-data-result-cell--<%= column.id %> <%= column.sessionKey ? 'admin-race-data-result-cell--session' : '' %>" title="<%= detailCellTitle(row, column) %>"><%= detailCellValue(row, column) %></td>
+                    <% const editKey = column.sessionKey || column.id; %>
+                    <td class="admin-race-data-result-cell admin-race-data-result-cell--<%= column.id %> <%= column.sessionKey ? 'admin-race-data-result-cell--session' : '' %>" title="<%= detailCellTitle(row, column) %>">
+                      <span data-race-data-edit-display><%= detailCellValue(row, column) %></span>
+                      <% if (view.selectedEvidence && row.hasEvidence) { %>
+                        <% if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) { %>
+                          <input class="admin-race-data-edit-input" data-race-data-edit-input disabled name="rows[<%= rowIndex %>][sessions][<%= editKey %>]" type="text" value="<%= detailEditValue(row, column) %>" aria-label="<%= column.title || column.label %> for <%= row.driver || 'driver' %>" />
+                        <% } else { %>
+                          <input class="admin-race-data-edit-input" data-race-data-edit-input disabled name="rows[<%= rowIndex %>][<%= editKey %>]" type="<%= detailEditInputType(column) %>" value="<%= detailEditValue(row, column) %>" <%= column.id === 'finish' || column.id === 'grid' ? 'min="1" max="99"' : '' %> <%= column.id === 'points' ? 'min="0" max="200" step="0.1"' : '' %> aria-label="<%= column.title || column.label %> for <%= row.driver || 'driver' %>" />
+                        <% } %>
+                      <% } %>
+                    </td>
                   <% } %>
                 <% }) %>
               </tr>
@@ -122,6 +171,19 @@ const reviewStatusTitle = reviewStatusLabel; %>
         </tbody>
       </table>
     </div>
+
+    <% if (view.selectedEvidence) { %>
+        <div class="admin-race-data-editor-details" data-race-data-editor-details hidden>
+          <label class="admin-race-data-correction-reason">Reason for correction
+            <textarea name="correctionReason" rows="2" required disabled data-race-data-edit-input></textarea>
+          </label>
+          <label class="admin-race-data-correction-confirm">
+            <input type="checkbox" name="confirmCorrection" value="1" required disabled data-race-data-edit-input />
+            Confirm protected correction
+          </label>
+        </div>
+      </form>
+    <% } %>
 
     <div class="admin-race-data-evidence-meta admin-race-data-legend muted" aria-label="Race evidence metadata">
       <span><%= view.selectedEvidence
@@ -134,32 +196,6 @@ const reviewStatusTitle = reviewStatusLabel; %>
         </span>
       <% } %>
     </div>
-
-    <% if (view.selectedEvidence) { %>
-      <div class="admin-race-data-correction-editor" data-race-data-editor hidden>
-        <div class="admin-race-data-correction-editor-heading">
-          <strong data-race-data-editor-title>Edit result</strong>
-          <button type="button" class="link-button" data-race-data-editor-close>Cancel</button>
-        </div>
-        <form method="post" action="/admin/race-data/correction" class="admin-race-data-correction-form" data-race-data-correction-form>
-          <%- csrfField() %>
-          <input type="hidden" name="season" value="<%= season %>" />
-          <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
-          <input type="hidden" name="view" value="<%= viewMode %>" />
-          <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
-          <input type="hidden" name="snapshotId" value="<%= view.selectedEvidence.id %>" />
-          <input type="hidden" name="driverId" data-race-data-editor-driver-id />
-          <input type="hidden" name="driver" data-race-data-editor-driver />
-          <label>Finish <input name="position" type="number" min="1" max="99" data-race-data-editor-position /></label>
-          <label>Grid <input name="grid" type="number" min="1" max="99" data-race-data-editor-grid /></label>
-          <label>Status <input name="status" maxlength="120" data-race-data-editor-status /></label>
-          <label>Points <input name="points" type="number" min="0" max="200" step="0.1" data-race-data-editor-points /></label>
-          <label class="admin-race-data-correction-reason">Reason <textarea name="correctionReason" rows="2" required></textarea></label>
-          <label class="admin-race-data-correction-confirm"><input type="checkbox" name="confirmCorrection" value="1" required /> Confirm protected correction</label>
-          <button type="submit" class="secondary">Save revision</button>
-        </form>
-      </div>
-    <% } %>
 
   </section>
   <% } %>

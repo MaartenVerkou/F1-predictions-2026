@@ -525,42 +525,43 @@ test("race data exposes a read-only workspace plus a protected correction route"
   assert.equal(routes["POST /admin/race-data/correction"][0], requireAdmin);
 });
 
-test("race-data corrections validate the selected canonical row and never accept an invalid position", () => {
+test("race-data corrections validate the complete table and update shared session evidence", () => {
   const baseSnapshot = {
     payload: {
       race: {
         rows: [{ driver_id: 101, driver: "Driver Alpha", position: 2, positionText: "2", grid: 4, points: 18, status: "Finished" }]
+      },
+      qualifying: {
+        rows: [{ driver_id: 101, driver: "Driver Alpha", position: 3, positionText: "3", status: "Finished" }]
       }
     }
   };
   assert.throws(
     () => buildCorrectedRaceEvidence(baseSnapshot, {
-      driverId: "999",
-      position: "1",
-      grid: "1",
-      points: "25",
-      status: "Finished"
+      rows: [{ driverId: "999", driver: "Unknown Driver", position: "1", grid: "1", points: "25", status: "Finished" }]
     }),
-    /not present in this race evidence/
+    /does not match a persisted driver identity/
   );
   assert.throws(
     () => buildCorrectedRaceEvidence(baseSnapshot, {
-      driverId: "101",
-      position: "0",
-      grid: "4",
-      points: "18",
-      status: "Retired"
+      rows: [{ driverId: "101", driver: "Driver Alpha", position: "0", grid: "4", points: "18", status: "Retired" }]
     }),
-    /Finish position must be empty or a valid value/
+    /finish position must be empty or a valid value/i
   );
   const corrected = buildCorrectedRaceEvidence(baseSnapshot, {
-    driverId: "101",
-    position: "1",
-    grid: "4",
-    points: "25",
-    status: "Finished"
+    rows: [{
+      driverId: "101",
+      driver: "Driver Alpha",
+      position: "1",
+      grid: "4",
+      points: "25",
+      status: "Finished",
+      sessions: { qualifying: "1" }
+    }]
   });
   assert.equal(corrected.race.rows[0].position, 1);
+  assert.equal(corrected.race.rows[0].points, 25);
+  assert.equal(corrected.qualifying.rows[0].position, 1);
   assert.equal(baseSnapshot.payload.race.rows[0].position, 2);
 });
 

@@ -753,6 +753,14 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       .filter(Boolean)
       .join(" · ") || auditResultLabel(row)
   } : null;
+  const buildSessionEditorValue = (row) => row ? {
+    driverId: row.driver_id == null ? null : Number(row.driver_id),
+    driver: row.driver || null,
+    constructor: row.constructor || null,
+    position: row.position == null ? null : Number(row.position),
+    positionText: row.positionText || null,
+    status: row.status || null
+  } : null;
   const detailRows = detailNames.map((driver) => {
     const race = raceByDriver.get(driver) || null;
     const qualifying = qualifyingByDriver.get(driver) || null;
@@ -772,6 +780,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       driver,
       driverCode: driverCodeByName.get(driver) || fallbackEntityCode(driver, "driver"),
       driverId,
+      hasEvidence: Boolean(race || qualifying || sprint || allSessionRows.some(Boolean)),
       constructor,
       constructorCode: teamCodeByName.get(constructor || "")
         || fallbackEntityCode(constructor || "", "team"),
@@ -779,6 +788,12 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
         Object.entries(sessionRowsByKey).map(([sessionKey, rows]) => [
           sessionKey,
           buildSessionDetail(findSessionRow(rows, driver))
+        ])
+      ),
+      sessionValues: Object.fromEntries(
+        Object.entries(sessionRowsByKey).map(([sessionKey, rows]) => [
+          sessionKey,
+          buildSessionEditorValue(findSessionRow(rows, driver))
         ])
       ),
       grid: race?.grid ?? null,
@@ -843,38 +858,133 @@ function parseCorrectionNumber(raw, label, { integer = true, min = 0, max = 1000
   return value;
 }
 
+function correctionRowsInput(rawRows) {
+  if (Array.isArray(rawRows)) return rawRows;
+  if (!rawRows || typeof rawRows !== "object") return [];
+  return Object.keys(rawRows)
+    .sort((left, right) => Number(left) - Number(right))
+    .map((key) => rawRows[key]);
+}
+
+function correctionLookupKey(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[^\x00-\x7F]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function correctionIdentity(row) {
+  const driverId = Number(row?.driverId || row?.driver_id || 0);
+  if (Number.isInteger(driverId) && driverId > 0) return `id:${driverId}`;
+  const driver = correctionLookupKey(row?.driver || row?.driver_name || "");
+  return driver ? `name:${driver}` : null;
+}
+
+function evidenceRowIdentity(row) {
+  const driverId = Number(row?.driver_id || 0);
+  if (Number.isInteger(driverId) && driverId > 0) return `id:${driverId}`;
+  const driver = correctionLookupKey(row?.driver || row?.driver_name || "");
+  return driver ? `name:${driver}` : null;
+}
+
+function correctedSessionValue(raw, label) {
+  const text = String(raw == null ? "" : raw).trim();
+  if (!text) return { position: null, positionText: null, status: null };
+  const numeric = Number(text);
+  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 99) {
+    return { position: numeric, positionText: String(numeric), status: "Finished" };
+  }
+  if (text.length > 120) throw new Error(`${label} is too long.`);
+  return { position: null, positionText: text, status: text };
+}
+
+function evidenceRowCollections(payload) {
+  return [
+    ["race", payload?.race?.rows],
+    ["sessions.race", payload?.sessions?.race?.rows],
+    ["qualifying", payload?.qualifying?.rows],
+    ["sessions.qualifying", payload?.sessions?.qualifying?.rows],
+    ["sprint", payload?.sprint?.rows],
+    ["sessions.sprint", payload?.sessions?.sprint?.rows],
+    ["practice1", payload?.practice?.practice1?.rows],
+    ["sessions.practice1", payload?.sessions?.practice1?.rows],
+    ["practice2", payload?.practice?.practice2?.rows],
+    ["sessions.practice2", payload?.sessions?.practice2?.rows],
+    ["practice3", payload?.practice?.practice3?.rows],
+    ["sessions.practice3", payload?.sessions?.practice3?.rows],
+    ["sprintQualifying", payload?.sprintQualifying?.rows],
+    ["sessions.sprintQualifying", payload?.sessions?.sprintQualifying?.rows]
+  ].filter(([, rows]) => Array.isArray(rows));
+}
+
 function buildCorrectedRaceEvidence(baseSnapshot, input) {
   const payload = baseSnapshot?.payload;
   if (!payload || !Array.isArray(payload.race?.rows)) {
     throw new Error("The selected race evidence cannot be edited.");
   }
-  const driverId = parseCorrectionNumber(input.driverId, "Driver id", { min: 1, max: 100000000 });
-  const driverName = String(input.driver || "").trim();
-  const row = payload.race.rows.find((candidate) => (
-    driverId != null
-      ? Number(candidate.driver_id) === driverId
-      : driverName && String(candidate.driver || "").trim() === driverName
-  ));
-  if (!row) throw new Error("The selected driver is not present in this race evidence.");
+  const submittedRows = correctionRowsInput(input.rows);
+  if (!submittedRows.length) throw new Error("The complete race table is required.");
 
   const nextPayload = JSON.parse(JSON.stringify(payload));
-  const nextRow = nextPayload.race.rows.find((candidate) => (
-    driverId != null
-      ? Number(candidate.driver_id) === driverId
-      : driverName && String(candidate.driver || "").trim() === driverName
-  ));
-  const position = parseCorrectionNumber(input.position, "Finish position", { min: 1, max: 99 });
-  const grid = parseCorrectionNumber(input.grid, "Grid position", { min: 1, max: 99 });
-  const points = parseCorrectionNumber(input.points, "Points", { integer: false, min: 0, max: 200 });
-  const status = String(input.status == null ? "" : input.status).trim();
-  if (status.length > 120) throw new Error("Status is too long.");
+  const collections = evidenceRowCollections(nextPayload);
+  const knownIdentities = new Set(
+    collections.flatMap(([, rows]) => rows.map(evidenceRowIdentity).filter(Boolean))
+  );
+  const seenIdentities = new Set();
+  const normalizedRows = submittedRows.map((submitted, index) => {
+    const identity = correctionIdentity(submitted);
+    if (!identity || !knownIdentities.has(identity)) {
+      throw new Error(`Row ${index + 1} does not match a persisted driver identity.`);
+    }
+    if (seenIdentities.has(identity)) {
+      throw new Error(`Driver row ${index + 1} is duplicated in the correction.`);
+    }
+    seenIdentities.add(identity);
+    return { submitted, identity, index };
+  });
+  if (seenIdentities.size !== knownIdentities.size) {
+    throw new Error("The complete race table must include every persisted driver row.");
+  }
 
-  nextRow.position = position;
-  nextRow.positionText = position == null ? null : String(position);
-  nextRow.grid = grid;
-  nextRow.points = points == null ? Number(nextRow.points || 0) : points;
-  if (status) nextRow.status = status;
-  else if (position != null) nextRow.status = "Finished";
+  const updateRows = (rows, identity, updater) => {
+    const target = rows.find((candidate) => evidenceRowIdentity(candidate) === identity);
+    if (target) updater(target);
+  };
+  const sessionKeys = ["practice1", "practice2", "practice3", "sprintQualifying", "sprint", "qualifying"];
+  normalizedRows.forEach(({ submitted, identity, index }) => {
+    const position = parseCorrectionNumber(submitted.position, `Row ${index + 1} finish position`, { min: 1, max: 99 });
+    const grid = parseCorrectionNumber(submitted.grid, `Row ${index + 1} grid position`, { min: 1, max: 99 });
+    const points = parseCorrectionNumber(submitted.points, `Row ${index + 1} points`, { integer: false, min: 0, max: 200 });
+    const status = String(submitted.status == null ? "" : submitted.status).trim();
+    if (status.length > 120) throw new Error(`Row ${index + 1} status is too long.`);
+    collections.forEach(([collection, rows]) => {
+      if (collection === "race" || collection === "sessions.race") {
+        updateRows(rows, identity, (target) => {
+          target.position = position;
+          target.positionText = position == null ? (status || null) : String(position);
+          target.grid = grid;
+          target.points = points == null ? 0 : points;
+          target.calculatedPoints = points == null ? 0 : points;
+          target.status = status || (position != null ? "Finished" : null);
+        });
+      }
+    });
+    const sessionInput = submitted.sessions || {};
+    sessionKeys.forEach((sessionKey) => {
+      if (!Object.prototype.hasOwnProperty.call(sessionInput, sessionKey)) return;
+      const corrected = correctedSessionValue(sessionInput[sessionKey], `Row ${index + 1} ${sessionKey}`);
+      collections.forEach(([collection, rows]) => {
+        if (collection === sessionKey || collection === `sessions.${sessionKey}`) {
+          updateRows(rows, identity, (target) => {
+            target.position = corrected.position;
+            target.positionText = corrected.positionText;
+            target.status = corrected.status;
+          });
+        }
+      });
+    });
+  });
   return nextPayload;
 }
 
@@ -2977,6 +3087,17 @@ function registerAdminRoutes(app, deps) {
         catalog,
         evidenceSnapshot: correctionSnapshot
       });
+      if (derivation?.snapshotId) {
+        markSnapshotReviewed(db, {
+          snapshotId: derivation.snapshotId,
+          reviewedByUserId: adminUser?.id
+        });
+        publishActualSnapshot(db, {
+          season,
+          snapshotId: derivation.snapshotId,
+          publishedByUserId: adminUser?.id
+        });
+      }
       logEvent("info", "admin_race_data_correction_created", {
         userId: adminUser?.id || null,
         season,
@@ -2988,7 +3109,7 @@ function registerAdminRoutes(app, deps) {
         driverId: req.body.driverId || null,
         reason: String(req.body.correctionReason || "").trim()
       });
-      return res.redirect(withQueryParam(redirectTo, "success", "Race evidence correction saved and actuals re-derived for review."));
+      return res.redirect(redirectTo);
     } catch (err) {
       return res.redirect(withQueryParam(redirectTo, "error", err.message));
     }

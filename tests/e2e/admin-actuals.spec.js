@@ -3,6 +3,7 @@
 const path = require("path");
 const Database = require("better-sqlite3");
 const { expect, test } = require("@playwright/test");
+const { ensureRaceDataSchema, saveRaceDataSnapshot } = require("../../src/race-data-evidence");
 
 const DB_PATH = path.join(__dirname, "..", "..", ".tmp", "playwright-state", "app.db");
 
@@ -10,6 +11,8 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await page.goto("/");
 
   const db = new Database(DB_PATH);
+  db.dialect = "sqlite";
+  ensureRaceDataSchema(db);
   const now = new Date().toISOString();
   db.exec(`
     DELETE FROM actual_snapshot_values;
@@ -47,6 +50,38 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
     "pending"
   );
   const snapshotId = Number(snapshotResult.lastInsertRowid);
+  const evidenceId = saveRaceDataSnapshot(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    syncId: "playwright-evidence-r6",
+    fetchedAt: now,
+    sourceType: "playwright",
+    sourceNote: "playwright seed",
+    evidence: {
+      season: 2026,
+      roundNumber: 6,
+      roundName: "Monaco Grand Prix",
+      fetchedAt: now,
+      cutoffRound: 6,
+      coverage: { status: "complete", sources: { race: { count: 1 } } },
+      race: {
+        rows: [{
+          driver_id: 1,
+          driver: "Alexander Albon",
+          constructor: "Williams",
+          position: 1,
+          positionText: "1",
+          grid: 1,
+          status: "Finished",
+          points: 25
+        }]
+      },
+      qualifying: { rows: [] },
+      sprint: { rows: [] }
+    }
+  });
+  db.prepare("UPDATE actual_snapshots SET source_data_snapshot_id = ? WHERE id = ?").run(evidenceId, snapshotId);
   db.prepare(
     `
     INSERT INTO actual_snapshot_values (snapshot_id, question_id, value)
@@ -72,6 +107,19 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await expect(page.getByText(/marked as reviewed/i)).toHaveCount(0);
   await expect(page.locator("[data-race-data-review-status]")).toContainText(/Reviewed by/);
   await expect(page.locator("[data-race-data-review-status]")).toContainText(/2026/);
+
+  const editButton = page.locator("[data-race-data-edit]");
+  await expect(editButton).toBeVisible();
+  await editButton.click();
+  await expect(page.locator("[data-race-data-edit-input]").first()).toBeEnabled();
+  await page.getByRole("button", { name: /Discard/i }).click();
+  await expect(page.locator("[data-race-data-edit-input]").first()).toBeDisabled();
+
+  await editButton.click();
+  await page.locator("[data-race-data-editor-details] textarea[name=correctionReason]").fill("Correct a verified result row in the review workspace.");
+  await page.locator("[data-race-data-editor-details] input[name=confirmCorrection]").check();
+  await page.getByRole("button", { name: /Save changes/i }).click();
+  await expect(page.locator("[data-race-data-review-status]")).toContainText(/Edited by/);
 
   await page.goto("/admin/actuals?season=2026");
   await expect(page.locator('[data-admin-actuals-round="6"][data-review-status="reviewed"]').first()).toBeVisible();

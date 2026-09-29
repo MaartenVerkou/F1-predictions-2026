@@ -165,7 +165,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.doesNotMatch(region, /admin-race-data-toolbar/);
   assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
   assert.match(region, /data-race-data-result-row/);
-  assert.match(region, /data-race-data-edit disabled/);
+  assert.match(region, /data-race-data-edit>Edit data/);
   assert.match(region, /action="\/admin\/race-data\/review"/);
   assert.match(region, /name="returnTo"/);
   assert.match(region, /admin-race-data-review-state/);
@@ -176,7 +176,9 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /round\.code/);
   assert.match(region, /option\.shortLabel/);
   assert.doesNotMatch(region, /admin-race-data-edit-column/);
-  assert.match(region, /data-race-data-editor/);
+  assert.match(region, /data-race-data-editor-details/);
+  assert.match(region, /data-race-data-edit-input/);
+  assert.doesNotMatch(region, /data-race-data-selection-label/);
   assert.match(region, /resultColumns\.forEach/);
   assert.match(region, /column\.id === 'finish'/);
   assert.match(row, /rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail"/);

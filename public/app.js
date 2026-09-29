@@ -1334,58 +1334,36 @@ const initRaceDataCorrection = () => {
   if (!page || raceDataCorrectionBound) return;
   raceDataCorrectionBound = true;
 
-  const selectRow = (row) => {
-    page.querySelectorAll('[data-race-data-result-row]').forEach((candidate) => {
-      const selected = candidate === row;
-      candidate.classList.toggle('is-selected', selected);
-      candidate.setAttribute('aria-selected', selected ? 'true' : 'false');
-    });
+  const setEditing = (editing) => {
+    const region = page.querySelector('[data-race-data-round-region]');
+    const form = page.querySelector('[data-race-data-correction-form]');
     const edit = page.querySelector('[data-race-data-edit]');
-    if (edit) edit.disabled = !row;
-    const label = page.querySelector('[data-race-data-selection-label]');
-    if (label) label.textContent = row ? `${row.dataset.driverName || 'Result'} selected` : 'Select a result row';
-    const editor = page.querySelector('[data-race-data-editor]');
-    if (!row || !editor) return;
-    const setValue = (selector, value) => {
-      const input = editor.querySelector(selector);
-      if (input) input.value = value == null ? '' : value;
-    };
-    setValue('[data-race-data-editor-driver-id]', row.dataset.driverId);
-    setValue('[data-race-data-editor-driver]', row.dataset.driverName);
-    setValue('[data-race-data-editor-position]', row.dataset.racePosition);
-    setValue('[data-race-data-editor-grid]', row.dataset.grid);
-    setValue('[data-race-data-editor-status]', row.dataset.status);
-    setValue('[data-race-data-editor-points]', row.dataset.points);
-    const title = editor.querySelector('[data-race-data-editor-title]');
-    if (title) title.textContent = `Edit ${row.dataset.driverName || 'result'}`;
+    const actions = page.querySelector('[data-race-data-edit-actions]');
+    const details = page.querySelector('[data-race-data-editor-details]');
+    if (!region || !form) return;
+    region.dataset.raceDataEditing = editing ? 'true' : 'false';
+    form.dataset.raceDataEditor = editing ? 'true' : 'false';
+    form.querySelectorAll('[data-race-data-edit-input]').forEach((input) => {
+      input.disabled = !editing;
+    });
+    if (edit) edit.hidden = editing;
+    if (actions) actions.hidden = !editing;
+    if (details) details.hidden = !editing;
+    if (editing) form.querySelector('[data-race-data-edit-input]')?.focus();
   };
 
   page.addEventListener('click', (event) => {
-    const row = event.target.closest('[data-race-data-result-row]');
-    if (row && page.contains(row) && !event.target.closest('a, button, input, select, textarea')) {
-      selectRow(row);
-      return;
-    }
     const edit = event.target.closest('[data-race-data-edit]');
-    if (edit && page.contains(edit) && !edit.disabled) {
-      const editor = page.querySelector('[data-race-data-editor]');
-      if (!editor) return;
-      editor.hidden = false;
-      editor.querySelector('input, textarea')?.focus();
+    if (edit && page.contains(edit)) {
+      setEditing(true);
       return;
     }
     const close = event.target.closest('[data-race-data-editor-close]');
     if (close && page.contains(close)) {
-      const editor = page.querySelector('[data-race-data-editor]');
-      if (editor) editor.hidden = true;
+      const form = page.querySelector('[data-race-data-correction-form]');
+      form?.reset();
+      setEditing(false);
     }
-  });
-
-  page.addEventListener('keydown', (event) => {
-    const row = event.target.closest('[data-race-data-result-row]');
-    if (!row || !page.contains(row) || (event.key !== 'Enter' && event.key !== ' ')) return;
-    event.preventDefault();
-    selectRow(row);
   });
 };
 
