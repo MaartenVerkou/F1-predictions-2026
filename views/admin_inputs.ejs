@@ -75,22 +75,46 @@
     <% } %>
     <% if (tab === 'scoring') { %>
       <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-      <section class="admin-inputs-scoring-overview" aria-labelledby="admin-inputs-scoring-heading">
-        <div class="admin-inputs-scoring-heading">
-          <h2 id="admin-inputs-scoring-heading">Scoring rules</h2>
-          <% if (scoringRules) { %><span class="muted"><%= scoringRules.revision %> · <%= scoringRules.source %></span><% } %>
-        </div>
+      <div class="admin-inputs-scoring">
         <% if (scoringRules) { %>
-          <div class="admin-inputs-scoring-grid">
-            <div><strong>Race</strong><span><%= Object.entries(scoringRules.racePoints).map(([position, points]) => `${position}:${points}`).join(' · ') %></span></div>
-            <div><strong>Sprint</strong><span><%= Object.entries(scoringRules.sprintPoints).map(([position, points]) => `${position}:${points}`).join(' · ') %></span></div>
-            <div><strong>Fastest lap</strong><span><%= scoringRules.fastestLap.eligible ? `${scoringRules.fastestLap.points} pts from P${scoringRules.fastestLap.minimumFinish}` : 'No bonus' %></span></div>
-            <div><strong>Constructors</strong><span><%= scoringRules.constructorAggregation === 'sum-driver-points' ? 'Sum of driver points' : scoringRules.constructorAggregation %></span></div>
+          <% const toScoringEntries = (values) => Object.entries(values || {}).sort(([left], [right]) => Number(left) - Number(right)); %>
+          <% const scoringTables = [
+            { id: 'race', label: 'Race', entries: toScoringEntries(scoringRules.racePoints) },
+            { id: 'sprint', label: 'Sprint', entries: toScoringEntries(scoringRules.sprintPoints) }
+          ]; %>
+          <p class="admin-inputs-scoring-source muted"><%= scoringRules.revision %> · <%= scoringRules.source %></p>
+          <div class="admin-inputs-scoring-sections">
+            <% scoringTables.forEach((scoringTable) => { %>
+              <section class="admin-inputs-scoring-section" aria-labelledby="admin-inputs-scoring-<%= scoringTable.id %>">
+                <h2 id="admin-inputs-scoring-<%= scoringTable.id %>"><%= scoringTable.label %></h2>
+                <div class="admin-inputs-scoring-table-wrap">
+                  <table class="table compact admin-inputs-scoring-table">
+                    <tbody>
+                      <tr><th scope="row">Position</th><% scoringTable.entries.forEach(([position]) => { %><td>P<%= position %></td><% }) %></tr>
+                      <tr><th scope="row">Points</th><% scoringTable.entries.forEach(([, points]) => { %><td><%= points %></td><% }) %></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            <% }) %>
+            <section class="admin-inputs-scoring-section" aria-labelledby="admin-inputs-scoring-fastest-lap">
+              <h2 id="admin-inputs-scoring-fastest-lap">Fastest lap</h2>
+              <dl class="admin-inputs-scoring-details">
+                <div><dt>Bonus</dt><dd><%= scoringRules.fastestLap.eligible ? `${scoringRules.fastestLap.points} point${scoringRules.fastestLap.points === 1 ? '' : 's'}` : 'No bonus' %></dd></div>
+                <% if (scoringRules.fastestLap.eligible) { %><div><dt>Eligibility</dt><dd>Finishes P<%= scoringRules.fastestLap.minimumFinish %> or higher</dd></div><% } %>
+              </dl>
+            </section>
+            <section class="admin-inputs-scoring-section" aria-labelledby="admin-inputs-scoring-constructors">
+              <h2 id="admin-inputs-scoring-constructors">Constructors</h2>
+              <dl class="admin-inputs-scoring-details">
+                <div><dt>Aggregation</dt><dd><%= scoringRules.constructorAggregation === 'sum-driver-points' ? 'Sum of driver points' : scoringRules.constructorAggregation %></dd></div>
+              </dl>
+            </section>
           </div>
         <% } else { %>
           <p class="muted">No scoring rules configured for this season.</p>
         <% } %>
-      </section>
+      </div>
     <% } else if (tab === 'drivers') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="drivers" data-table-capabilities="edit,add,remove">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>

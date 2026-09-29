@@ -2056,61 +2056,89 @@ button:disabled {
   gap: 6px;
 }
 
-.admin-inputs-scoring-overview {
+.admin-inputs-scoring {
   display: grid;
-  gap: 8px;
-  margin: 0 0 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--card) 94%, var(--accent) 6%);
-}
-
-.admin-inputs-scoring-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  min-width: 0;
-}
-
-.admin-inputs-scoring-heading h2 {
+  gap: 16px;
   margin: 0;
-  font-size: 14px;
 }
 
-.admin-inputs-scoring-heading .muted {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-inputs-scoring-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 18px;
-  color: var(--muted);
+.admin-inputs-scoring-source {
+  margin: 0;
   font-size: 12px;
 }
 
-.admin-inputs-scoring-grid > div {
+.admin-inputs-scoring-sections {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 32px;
+}
+
+.admin-inputs-scoring-section {
+  display: grid;
+  align-content: start;
   gap: 8px;
   min-width: 0;
 }
 
-.admin-inputs-scoring-grid strong {
-  color: var(--text);
+.admin-inputs-scoring-section h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.admin-inputs-scoring-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.admin-inputs-scoring-table {
+  width: max-content;
+  min-width: 100%;
+  border: 1px solid var(--border);
+}
+
+.admin-inputs-scoring-table th,
+.admin-inputs-scoring-table td {
+  padding: 8px 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-inputs-scoring-table th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-inputs-scoring-table th[scope="row"] {
+  text-align: left;
+}
+
+.admin-inputs-scoring-details {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-inputs-scoring-details > div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-inputs-scoring-details dt {
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 700;
 }
 
-.admin-inputs-scoring-grid span {
-  min-width: 0;
+.admin-inputs-scoring-details dd {
+  margin: 0;
   overflow-wrap: anywhere;
+  font-size: 13px;
 }
 
 .admin-race-data-summary-reconciliation {
@@ -2124,14 +2152,8 @@ button:disabled {
 }
 
 @media (max-width: 640px) {
-  .admin-inputs-scoring-grid {
+  .admin-inputs-scoring-sections {
     grid-template-columns: 1fr;
-  }
-
-  .admin-inputs-scoring-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 2px;
   }
 }
 

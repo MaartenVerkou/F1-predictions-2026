@@ -126,11 +126,21 @@ test("scoring rules live in a dedicated Inputs sub-section", () => {
   const tabs = readView("partials/admin_inputs_tabs.ejs");
   assert.match(tabs, /\['drivers', 'teams', 'races', 'scoring'\]/);
   assert.match(view, /tab === 'scoring'/);
-  assert.match(view, /admin-inputs-scoring-overview/);
+  assert.match(view, /admin-inputs-scoring-section/);
+  assert.match(view, /admin-inputs-scoring-table/);
+  assert.match(view, /label: 'Race'/);
+  assert.match(view, /label: 'Sprint'/);
+  assert.match(view, /admin-inputs-scoring-source/);
+  assert.doesNotMatch(view, /Scoring rules/);
+  assert.doesNotMatch(view, /admin-inputs-scoring-overview/);
   const scoringStart = view.indexOf("tab === 'scoring'");
   const driversStart = view.indexOf("tab === 'drivers'");
   assert.ok(scoringStart >= 0 && driversStart > scoringStart);
-  assert.ok(view.slice(scoringStart, driversStart).includes("admin-inputs-scoring-overview"));
+  assert.ok(view.slice(scoringStart, driversStart).includes("admin-inputs-scoring-section"));
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(styles, /\.admin-inputs-scoring-sections\s*\{/);
+  assert.match(styles, /\.admin-inputs-scoring-table\s*\{/);
+  assert.doesNotMatch(styles, /\.admin-inputs-scoring-overview\s*\{/);
 });
 
 test("race data views share one identity column and a common row rhythm", () => {
