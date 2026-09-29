@@ -2302,7 +2302,8 @@ button:disabled {
 }
 
 .admin-inputs-toolbar-start,
-.admin-inputs-toolbar-end {
+.admin-inputs-toolbar-end,
+.admin-toolbar-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2313,13 +2314,12 @@ button:disabled {
   min-height: 32px;
 }
 
-.admin-inputs-view-toolbar .admin-inputs-toolbar-end > button,
-.admin-inputs-view-toolbar .admin-inputs-toolbar-end > .admin-inputs-advanced-link {
-  min-height: 34px;
-  padding: 6px 11px;
-  border-radius: 999px;
-  font-size: 13px;
-  line-height: 1.2;
+.admin-toolbar-actions > button,
+.admin-toolbar-actions > form > button,
+.admin-toolbar-actions .admin-race-data-edit-actions > button {
+  min-width: 0 !important;
+  min-height: 30px;
+  padding: 4px 10px;
 }
 
 .admin-inputs-selection {
@@ -7916,10 +7916,6 @@ button.lang-option.is-active {
 }
 
 .admin-race-data-detail-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
   flex: 0 0 auto;
 }
 
@@ -7931,10 +7927,6 @@ button.lang-option.is-active {
 
 .admin-race-data-refresh-form[hidden] {
   display: none;
-}
-
-.admin-race-data-detail-actions button {
-  min-width: 72px;
 }
 
 .admin-race-data-result-row {
@@ -8074,14 +8066,6 @@ button.lang-option.is-active {
 .admin-race-data-edit-actions[hidden],
 .admin-race-data-edit-button[hidden] {
   display: none;
-}
-
-.admin-race-data-edit-button,
-.admin-race-data-refresh-button,
-.admin-race-data-edit-actions button {
-  min-width: 0 !important;
-  min-height: 30px;
-  padding: 4px 10px;
 }
 
 .admin-race-data-edit-input {
@@ -8427,6 +8411,12 @@ button.lang-option.is-active {
 }
 
 .admin-race-data-switch.admin-race-data-metric-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.admin-race-data-switch.admin-inputs-tabs {
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;

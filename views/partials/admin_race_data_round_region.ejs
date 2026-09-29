@@ -103,7 +103,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
         <% } %>
       </div>
       <% if (view.selectedEvidence || selectedSnapshot) { %>
-        <div class="admin-race-data-detail-actions" data-race-data-detail-actions>
+        <div class="admin-race-data-detail-actions admin-toolbar-actions" data-race-data-detail-actions>
           <% if (view.selectedEvidence) { %>
             <button type="button" class="secondary admin-race-data-edit-button" data-race-data-edit>Edit data</button>
             <form method="post" action="/admin/race-data/refresh" class="admin-race-data-refresh-form" data-race-data-refresh-form onsubmit="return confirm('Fetch this round again from the source? The current revision will remain in history, and the refreshed data will require review.');">

@@ -94,8 +94,8 @@
     <% } else if (tab === 'drivers') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="drivers" data-table-capabilities="edit,add,remove">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-        <div class="admin-inputs-toolbar-end">
-          <button type="button" data-add-driver-row>+ <%= t('admin_inputs.add_driver') %></button>
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
+          <button class="secondary" type="button" data-add-driver-row>+ <%= t('admin_inputs.add_driver') %></button>
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
@@ -128,7 +128,7 @@
     <% } else if (tab === 'teams') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="teams" data-table-capabilities="edit,remove,reorder">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-        <div class="admin-inputs-toolbar-end">
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
@@ -210,7 +210,7 @@
     <% } else if (tab === 'races') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="races" data-table-capabilities="edit">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-        <div class="admin-inputs-toolbar-end">
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
         </div>
       </div>

@@ -211,7 +211,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(styles, /\.admin-race-data-review-state\s*\{/);
   assert.match(styles, /\.admin-race-data-review-form\s*\{/);
   assert.match(styles, /\.admin-race-data-review-button\s*\{/);
-  assert.match(styles, /\.admin-race-data-edit-button,\s*\.admin-race-data-refresh-button/);
+  assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
   assert.match(styles, /\.admin-race-data-detail-table--result \.admin-race-data-result-cell--driver \.admin-race-data-compact-label/);
   assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);
 });
@@ -268,12 +268,25 @@ test("lineup period metadata stays adjacent to the driver name", () => {
   assert.match(styles, /admin-inputs-team-col-driver/);
 });
 
-test("inputs toolbar actions use the same compact rhythm as the tabs", () => {
+test("inputs toolbar actions use the shared compact rhythm", () => {
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  assert.match(styles, /\.admin-inputs-view-toolbar \.admin-inputs-toolbar-end > button/);
-  assert.match(styles, /\.admin-inputs-view-toolbar \.admin-inputs-toolbar-end > \.admin-inputs-advanced-link/);
-  assert.match(styles, /min-height:\s*34px/);
-  assert.match(styles, /border-radius:\s*999px/);
+  assert.match(styles, /\.admin-toolbar-actions\s*\{/);
+  assert.match(styles, /\.admin-toolbar-actions\s*>\s*button/);
+  assert.match(styles, /min-height:\s*30px/);
+});
+
+test("inputs navigation and actions reuse the race-data controls", () => {
+  const view = readView("admin_inputs.ejs");
+  const tabs = readView("partials/admin_inputs_tabs.ejs");
+  const raceData = readView("partials/admin_race_data_round_region.ejs");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+
+  assert.match(tabs, /admin-race-data-tabs admin-inputs-tabs admin-race-data-switch/);
+  assert.match(tabs, /admin-race-data-tab <%= tab === name \? 'is-active' : '' %>/);
+  assert.match(view, /admin-inputs-toolbar-end admin-toolbar-actions/);
+  assert.match(raceData, /admin-race-data-detail-actions admin-toolbar-actions/);
+  assert.match(styles, /\.admin-toolbar-actions\s*\{/);
+  assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
 });
 
 test("race data matrix palette follows the active theme", () => {
