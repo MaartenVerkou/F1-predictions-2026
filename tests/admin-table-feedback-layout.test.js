@@ -33,12 +33,13 @@ test("admin actuals is a read-only season overview", () => {
   assert.match(view, /admin-actuals-question-view-link/);
   assert.match(view, /encodeURIComponent\(row\.question\.id\)/);
   assert.match(view, /row\.focusLabel/);
-  assert.match(view, /cell\.displayLines/);
-  assert.match(view, /cell\.displayMode/);
+  assert.match(view, /cell\.displayText/);
+  assert.match(view, /cell\.value/);
   assert.match(view, /target\.raceName/);
   assert.match(view, /target\.raceCode/);
   assert.match(view, /admin-actuals-question-content/);
-  assert.match(view, /admin-actuals-value-line/);
+  assert.match(view, /admin-actuals-value/);
+  assert.doesNotMatch(view, /displayLines|displayMode|admin-actuals-value-line/);
   assert.doesNotMatch(view, /data-admin-actuals-target-form/);
   assert.doesNotMatch(view, /name="target"/);
   assert.doesNotMatch(view, /admin\/actuals\/review/);
@@ -51,33 +52,14 @@ test("season actuals keeps question prompts compact and readable on small screen
   const promptRule = styles.match(/\.admin-actuals-question-prompt\s*\{([\s\S]*?)\n\}/)?.[1] || "";
   assert.match(promptRule, /-webkit-line-clamp:\s*2/);
   assert.match(promptRule, /white-space:\s*normal/);
-  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-column,[\s\S]*?min-width:\s*128px/);
-  assert.match(styles, /--admin-actuals-round-width:\s*72px/);
-  assert.match(styles, /\.admin-actuals-round-column\s*\{[\s\S]*?width:\s*var\(--admin-actuals-round-width\)/);
-  assert.match(styles, /\.admin-actuals-value-cell\s*\{[\s\S]*?width:\s*var\(--admin-actuals-round-width\)/);
-  assert.match(styles, /\.admin-actuals-round-column small\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);
-  assert.match(styles, /\.admin-actuals-question-prompt-short\s*\{[\s\S]*?display:\s*none/);
-});
-
-test("season actuals uses shared short question labels on narrow screens", () => {
-  const view = readView("admin_actuals.ejs");
-  assert.match(view, /admin-actuals-question-prompt-full/);
-  assert.match(view, /admin-actuals-question-prompt-short/);
-  assert.match(view, /aria-label="<%= row\.question\.prompt %>"/);
-  assert.match(view, /row\.shortPrompt/);
-  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-prompt-full\s*\{[\s\S]*?display:\s*none/);
-  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-prompt-short\s*\{[\s\S]*?display:\s*block/);
-  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-prompt-short\s*\{[\s\S]*?white-space:\s*normal/);
-  assert.match(styles, /@media \(max-width: 480px\)[\s\S]*?\.admin-actuals-question-prompt-short\s*\{[\s\S]*?-webkit-line-clamp:\s*2/);
-});
-
-test("season actuals bounds answer content with a shared compact projection", () => {
-  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  const tableRule = styles.match(/\.admin-actuals-overview-table\s*\{([\s\S]*?)\n\}/)?.[1] || "";
-  assert.match(tableRule, /--admin-actuals-max-value-lines:\s*2/);
-  assert.match(styles, /\.admin-actuals-value-cell a\s*\{[\s\S]*?max-height:\s*calc\(1\.2em \* var\(--admin-actuals-max-value-lines\)\)/);
-  assert.match(styles, /\.admin-actuals-value-line\.is-codes\s*\{[\s\S]*?font-size:\s*11px/);
+  assert.match(styles, /--admin-actuals-question-width:\s*min\(280px, 31vw\)/);
+  assert.match(styles, /--admin-actuals-value-width:\s*72px/);
+  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*?--admin-actuals-question-width:\s*clamp\(128px, 34vw, 160px\)/);
+  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*?--admin-actuals-value-width:\s*clamp\(64px, 9\.5vw, 68px\)/);
+  assert.doesNotMatch(styles, /@media \(max-width: 480px\)/);
+  assert.doesNotMatch(styles, /admin-actuals-value-line/);
+  assert.match(styles, /admin-actuals-value-cell a[\s\S]*?-webkit-line-clamp:\s*var\(--admin-actuals-max-value-lines\)/);
+  assert.match(styles, /admin-actuals-value[\s\S]*?overflow-wrap:\s*inherit/);
 });
 
 test("team lineup overview keeps the toolbar concise", () => {

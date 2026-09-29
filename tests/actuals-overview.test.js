@@ -2,7 +2,50 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { buildActualsOverview } = require("../src/actuals-overview");
+const { buildActualsOverview, projectActualsCell } = require("../src/actuals-overview");
+
+test("projects every Actuals answer through one bounded display contract", () => {
+  assert.deepEqual(projectActualsCell('"12"', { view: "drivers" }), {
+    fullText: "12",
+    displayText: "12",
+    kind: "scalar",
+    overflowCount: 0
+  });
+
+  assert.deepEqual(projectActualsCell(
+    JSON.stringify({
+      value: "2",
+      driver: ["George Russell", "Kimi Antonelli", "Kimi Antonelli", "Charles Leclerc"]
+    }),
+    { view: "drivers" }
+  ), {
+    fullText: "2 · George Russell, Kimi Antonelli, Charles Leclerc",
+    displayText: "2 · RUS · ANT · LEC",
+    kind: "entities",
+    overflowCount: 0
+  });
+
+  assert.deepEqual(projectActualsCell(JSON.stringify([
+    "George Russell",
+    "Kimi Antonelli",
+    "Charles Leclerc",
+    "Lewis Hamilton",
+    "Oscar Piastri",
+    "Lando Norris",
+    "Max Verstappen",
+    "Fernando Alonso"
+  ]), { view: "drivers" }), {
+    fullText: "George Russell, Kimi Antonelli, Charles Leclerc, Lewis Hamilton, Oscar Piastri, Lando Norris, Max Verstappen, Fernando Alonso",
+    displayText: "RUS · ANT · LEC · HAM · PIA · +2",
+    kind: "entities",
+    overflowCount: 2
+  });
+
+  const fallback = projectActualsCell(JSON.stringify({ unknown: "value" }), { view: "drivers" });
+  assert.equal(fallback.kind, "scalar");
+  assert.equal(fallback.fullText, '{"unknown":"value"}');
+  assert.equal(fallback.displayText, fallback.fullText);
+});
 
 test("builds one season overview from the latest persisted snapshot per round", () => {
   const overview = buildActualsOverview({
@@ -46,16 +89,15 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");
   assert.equal(overview.rows[0].shortPrompt, "Championship top 3");
   assert.equal(overview.rows[3].shortPrompt, "Three races · most DNFs");
-  assert.deepEqual(overview.rows[0].cells[0].lines, ["Antonelli", "Russell", "Leclerc"]);
-  assert.deepEqual(overview.rows[0].cells[0].displayLines, ["ANT · RUS · LEC"]);
+  assert.equal(overview.rows[0].cells[0].displayText, "ANT · RUS · LEC");
   assert.equal(overview.rows[0].focusLabel, "Points");
   assert.equal(overview.rows[1].focusLabel, "DNF");
-  assert.deepEqual(overview.rows[1].cells[0].displayLines, ["ASM · RBR · HFT"]);
+  assert.equal(overview.rows[1].cells[0].displayText, "ASM · RBR · HFT");
   assert.equal(overview.rows[2].focusLabel, "Podiums");
-  assert.equal(overview.rows[2].cells[0].displayMode, "codes");
-  assert.deepEqual(overview.rows[2].cells[0].displayLines, ["RUS · ANT · LEC", "HAM · PIA · NOR"]);
+  assert.equal(overview.rows[2].cells[0].kind, "entities");
+  assert.equal(overview.rows[2].cells[0].displayText, "RUS · ANT · LEC · HAM · PIA · NOR");
   assert.equal(overview.rows[3].cells[0].value, "9 DNFs");
-  assert.deepEqual(overview.rows[3].cells[0].displayLines, ["9 DNFs"]);
+  assert.equal(overview.rows[3].cells[0].displayText, "9 DNFs");
   assert.equal(overview.rows[3].focusLabel, "Top 3 DNF races");
   assert.match(overview.rows[0].cells[0].href, /round=1/);
   assert.match(overview.rows[0].cells[0].href, /view=drivers/);
@@ -83,8 +125,8 @@ test("compacts structured driver answers without repeating tied winners", () => 
     })
   });
 
-  assert.deepEqual(overview.rows[0].cells[0].displayLines, ["2 · RUS · ANT · LEC"]);
-  assert.equal(overview.rows[0].cells[0].displayMode, "codes");
+  assert.equal(overview.rows[0].cells[0].displayText, "2 · RUS · ANT · LEC");
+  assert.equal(overview.rows[0].cells[0].kind, "entities");
   assert.equal(overview.rows[0].cells[0].value, "2 · George Russell, Kimi Antonelli, Charles Leclerc");
 });
 
@@ -130,15 +172,10 @@ test("uses one bounded code projection for long entity lists", () => {
     })
   });
 
-  assert.deepEqual(overview.rows[0].cells[0].displayLines, [
-    "RUS · ANT · LEC",
-    "HAM · PIA · +2"
-  ]);
-  assert.deepEqual(overview.rows[1].cells[0].displayLines, [
-    "ALP · AUD · CAD",
-    "FER · HFT · +2"
-  ]);
-  assert.equal(overview.rows[0].cells[0].displayMode, "codes");
-  assert.equal(overview.rows[1].cells[0].displayMode, "codes");
-  assert.ok(overview.rows.every((row) => row.cells[0].displayLines.length <= 2));
+  assert.equal(overview.rows[0].cells[0].displayText, "RUS · ANT · LEC · HAM · PIA · +2");
+  assert.equal(overview.rows[1].cells[0].displayText, "ALP · AUD · CAD · FER · HFT · +2");
+  assert.equal(overview.rows[0].cells[0].kind, "entities");
+  assert.equal(overview.rows[1].cells[0].kind, "entities");
+  assert.equal(overview.rows[0].cells[0].overflowCount, 2);
+  assert.equal(overview.rows[1].cells[0].overflowCount, 2);
 });

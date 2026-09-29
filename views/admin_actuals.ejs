@@ -82,9 +82,7 @@
                   data-review-status="<%= cell.reviewStatus || '' %>">
                   <% if (cell.hasValue || cell.reviewStatus) { %>
                     <a href="<%= cell.href %>" title="<%= cell.value %>" aria-label="<%= cell.value %>">
-                      <% (cell.displayLines && cell.displayLines.length ? cell.displayLines : [cell.value]).forEach((line) => { %>
-                        <span class="admin-actuals-value-line <%= cell.displayMode === 'codes' ? 'is-codes' : '' %>"><%= line %></span>
-                      <% }) %>
+                      <span class="admin-actuals-value"><%= cell.displayText || cell.value %></span>
                     </a>
                   <% } else { %>
                     <span class="muted">—</span>

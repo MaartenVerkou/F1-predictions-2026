@@ -11,8 +11,7 @@ const { compactQuestionLabel, raceDataFocusLabel } = require("./race-data-focus"
 // remains available in the cell's title/aria-label; this is only its compact
 // visual projection.
 const ACTUALS_OVERVIEW_MAX_LINES = 2;
-const ACTUALS_OVERVIEW_ITEMS_PER_LINE = 3;
-const ACTUALS_OVERVIEW_MAX_VISIBLE_ITEMS = ACTUALS_OVERVIEW_MAX_LINES * ACTUALS_OVERVIEW_ITEMS_PER_LINE;
+const ACTUALS_OVERVIEW_MAX_VISIBLE_ITEMS = ACTUALS_OVERVIEW_MAX_LINES * 3;
 
 // Keep the overview compact without making the visible race labels ambiguous.
 // These are the familiar three-letter F1 calendar codes; the fallback below
@@ -100,28 +99,6 @@ function limitedDnfOverviewValue(raw, question) {
   return `${total} DNF${total === 1 ? "" : "s"}`;
 }
 
-function formatActualOverviewAnswer(raw, question) {
-  const limited = limitedDnfOverviewValue(raw, question);
-  if (limited) return limited;
-  const value = parseActualOverviewRaw(raw);
-  if (value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.driver)) {
-    const drivers = Array.from(new Set(value.driver.map((driver) => String(driver)).filter(Boolean)));
-    if (value.value != null) return `${String(value.value)} · ${drivers.join(", ")}`;
-  }
-  return formatActualOverviewValue(raw);
-}
-
-function formatActualOverviewLines(raw, question) {
-  if (raw == null || String(raw).trim() === "") return [];
-  const limitedDnfValue = limitedDnfOverviewValue(raw, question);
-  if (limitedDnfValue) return [limitedDnfValue];
-  const value = parseActualOverviewRaw(raw);
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item)).filter((item) => item.trim() !== "");
-  }
-  return [formatActualOverviewValue(raw)];
-}
-
 function compactActualOverviewEntity(value, view) {
   const text = String(value || "").trim();
   if (!text || text === "—") return text;
@@ -139,16 +116,6 @@ function compactActualOverviewEntity(value, view) {
       .join("") || text;
   }
   return text;
-}
-
-function compactActualOverviewLine(line, view) {
-  return String(line || "")
-    .split(/,\s*/)
-    .map((segment) => segment
-      .split(" · ")
-      .map((part) => compactActualOverviewEntity(part, view))
-      .join(" · "))
-    .join(", ");
 }
 
 function uniqueActualOverviewEntities(values) {
@@ -177,13 +144,22 @@ function actualOverviewEntityCode(value, view) {
   return text;
 }
 
-function compactActualOverviewCollection(values, view, prefix = "") {
+function projectActualOverviewEntities(values, view, prefix = "") {
   const names = uniqueActualOverviewEntities(values);
-  if (!names.length) return { lines: ["—"], mode: "normal" };
+  if (!names.length) {
+    const text = prefix.trim() || "—";
+    return { fullText: text, displayText: text, kind: "scalar", overflowCount: 0 };
+  }
 
   const compactNames = names.map((name) => compactActualOverviewEntity(name, view));
+  const fullText = `${prefix}${names.join(", ")}`.trim() || "—";
   if (names.length <= 2) {
-    return { lines: [`${prefix}${compactNames.join(", ")}`.trim() || "—"], mode: "normal" };
+    return {
+      fullText,
+      displayText: `${prefix}${compactNames.join(", ")}`.trim() || "—",
+      kind: "entities",
+      overflowCount: 0
+    };
   }
 
   const codes = names.map((name) => actualOverviewEntityCode(name, view));
@@ -192,25 +168,40 @@ function compactActualOverviewCollection(values, view, prefix = "") {
     ? codes.slice(0, ACTUALS_OVERVIEW_MAX_VISIBLE_ITEMS - 1)
     : codes;
   const tokens = overflow ? [...visibleCodes, `+${overflow}`] : visibleCodes;
-  const grouped = [];
-  for (let index = 0; index < tokens.length; index += ACTUALS_OVERVIEW_ITEMS_PER_LINE) {
-    const group = tokens.slice(index, index + ACTUALS_OVERVIEW_ITEMS_PER_LINE).join(" · ");
-    grouped.push(index === 0 ? `${prefix}${group}` : group);
-  }
-  return { lines: grouped, mode: "codes" };
+  return {
+    fullText,
+    displayText: `${prefix}${tokens.join(" · ")}`.trim() || "—",
+    kind: "entities",
+    overflowCount: overflow
+  };
 }
 
-function formatActualOverviewDisplayLines(raw, view, question) {
-  const lines = formatActualOverviewLines(raw, question);
+function projectActualsCell(raw, { view = "drivers", question = null } = {}) {
+  const limited = limitedDnfOverviewValue(raw, question);
+  if (limited) {
+    return { fullText: limited, displayText: limited, kind: "scalar", overflowCount: 0 };
+  }
+
+  if (raw == null || String(raw).trim() === "") {
+    return { fullText: "—", displayText: "—", kind: "scalar", overflowCount: 0 };
+  }
+
   const parsed = parseActualOverviewRaw(raw);
+  if (Array.isArray(parsed) && ["drivers", "constructors"].includes(view)) {
+    return projectActualOverviewEntities(parsed, view);
+  }
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Array.isArray(parsed.driver)) {
     const prefix = parsed.value == null ? "" : `${String(parsed.value)} · `;
-    return compactActualOverviewCollection(parsed.driver, view, prefix);
+    return projectActualOverviewEntities(parsed.driver, view, prefix);
   }
-  if (Array.isArray(parsed) && ["drivers", "constructors"].includes(view) && parsed.length > 2) {
-    return compactActualOverviewCollection(parsed, view);
-  }
-  return { lines: lines.map((line) => compactActualOverviewLine(line, view)), mode: "normal" };
+
+  const fullText = formatActualOverviewValue(raw);
+  return {
+    fullText,
+    displayText: fullText,
+    kind: "scalar",
+    overflowCount: 0
+  };
 }
 
 function actualOverviewFocusLabel(question) {
@@ -274,12 +265,12 @@ function buildActualsOverview({
         const values = valuesByRound.get(target.roundNumber) || {};
         const rawValue = values[question.id];
         const hasValue = rawValue != null && String(rawValue).trim() !== "";
-        const display = formatActualOverviewDisplayLines(rawValue, baseView, question);
+        const projection = projectActualsCell(rawValue, { view: baseView, question });
         return {
-          value: formatActualOverviewAnswer(rawValue, question),
-          lines: formatActualOverviewLines(rawValue, question),
-          displayLines: display.lines,
-          displayMode: display.mode,
+          value: projection.fullText,
+          displayText: projection.displayText,
+          kind: projection.kind,
+          overflowCount: projection.overflowCount,
           hasValue,
           reviewStatus: target.reviewStatus,
           published: target.published,
@@ -300,4 +291,4 @@ function buildActualsOverview({
   };
 }
 
-module.exports = { buildActualsOverview };
+module.exports = { buildActualsOverview, projectActualsCell };
