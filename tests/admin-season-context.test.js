@@ -43,6 +43,7 @@ test("season catalog exposes lifecycle, counts, and capabilities", () => {
   const db = buildDb();
   const seasons = listAdminSeasons(db);
   assert.deepEqual(seasons.map((season) => season.year), [2027, 2026, 2025]);
+  assert.deepEqual(seasons.map((season) => season.displayLabel), ["2027 planned", "2026 active", "2025 archived"]);
   assert.equal(seasons.find((season) => season.year === 2026).syncable, true);
   assert.equal(seasons.find((season) => season.year === 2026).counts.evidenceSnapshots, 1);
   assert.equal(seasons.find((season) => season.year === 2025).editable, false);
