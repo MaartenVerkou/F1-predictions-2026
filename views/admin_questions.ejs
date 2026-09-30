@@ -39,7 +39,7 @@
   <form id="admin-question-edit-form" method="post" action="/admin/questions" class="admin-question-edit-form">
     <%- csrfField() %>
     <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Questions input table" tabindex="0">
-      <table class="table compact admin-question-table <%= editing ? 'admin-question-table--editing' : '' %>">
+      <table class="table compact admin-question-table <%= editing ? 'admin-question-table--editing' : '' %>" <%= editing ? 'data-question-order-table' : '' %>>
         <thead>
           <tr>
             <th scope="col">#</th>
@@ -51,11 +51,17 @@
         </thead>
         <tbody>
           <% rows.forEach((row) => { %>
-            <tr>
+            <tr data-question-order-row>
               <td class="admin-question-order-number">
                 <% if (editing) { %>
-                  <label class="sr-only" for="question-<%= row.id %>-order">Order for <%= row.prompt %></label>
-                  <input id="question-<%= row.id %>-order" class="admin-question-order-input" type="number" name="<%= row.id %>__order" value="<%= row.number %>" min="1" max="<%= rows.length %>" required>
+                  <div class="admin-question-order-controls">
+                    <label class="sr-only" for="question-<%= row.id %>-order">Order for <%= row.prompt %></label>
+                    <input id="question-<%= row.id %>-order" class="admin-question-order-input" data-question-order-input type="number" name="<%= row.id %>__order" value="<%= row.number %>" min="1" max="<%= rows.length %>" required>
+                    <div class="admin-question-order-buttons" role="group" aria-label="Reorder <%= row.prompt %>">
+                      <button type="button" class="secondary admin-question-order-btn" data-question-order-move="up" aria-label="Move <%= row.prompt %> up" title="Move up">&#8593;</button>
+                      <button type="button" class="secondary admin-question-order-btn" data-question-order-move="down" aria-label="Move <%= row.prompt %> down" title="Move down">&#8595;</button>
+                    </div>
+                  </div>
                 <% } else { %>
                   <%= String(row.number).padStart(2, '0') %>
                 <% } %>

@@ -23,6 +23,19 @@ test("admin feedback uses the shared context wrapper", () => {
   }
 });
 
+test("Questions edit mode exposes in-place order controls", () => {
+  const view = readView("admin_questions.ejs");
+  const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
+  assert.match(view, /data-question-order-table/);
+  assert.match(view, /data-question-order-row/);
+  assert.match(view, /data-question-order-move="up"/);
+  assert.match(view, /data-question-order-move="down"/);
+  assert.match(view, /type="button"/);
+  assert.match(app, /const initQuestionOrderControls/);
+  assert.match(app, /body\.insertBefore\(row, nextRow\)/);
+  assert.match(app, /body\.insertBefore\(nextRow, row\)/);
+});
+
 test("admin actuals is a read-only season overview", () => {
   const view = readView("admin_actuals.ejs");
   assert.doesNotMatch(view, /autofill-current-season/);

@@ -1208,6 +1208,47 @@ const initAdminLineupHistoryEditors = () => {
   });
 };
 
+const initQuestionOrderControls = () => {
+  document.querySelectorAll('[data-question-order-table]').forEach((table) => {
+    const body = table.tBodies[0];
+    if (!body) return;
+
+    const rows = () => Array.from(body.querySelectorAll('[data-question-order-row]'));
+    const syncOrder = () => {
+      const currentRows = rows();
+      currentRows.forEach((row, index) => {
+        const input = row.querySelector('[data-question-order-input]');
+        const up = row.querySelector('[data-question-order-move="up"]');
+        const down = row.querySelector('[data-question-order-move="down"]');
+        if (input) input.value = String(index + 1);
+        if (up) up.disabled = index === 0;
+        if (down) down.disabled = index === currentRows.length - 1;
+      });
+    };
+
+    table.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-question-order-move]');
+      if (!button || !table.contains(button) || button.disabled) return;
+      event.preventDefault();
+      const row = button.closest('[data-question-order-row]');
+      if (!row) return;
+      const currentRows = rows();
+      const index = currentRows.indexOf(row);
+      const direction = button.dataset.questionOrderMove;
+      const nextIndex = direction === 'up' ? index - 1 : index + 1;
+      const nextRow = currentRows[nextIndex];
+      if (!nextRow) return;
+
+      if (direction === 'up') body.insertBefore(row, nextRow);
+      else body.insertBefore(nextRow, row);
+      syncOrder();
+      row.querySelector(`[data-question-order-move="${direction}"]`)?.focus();
+    });
+
+    syncOrder();
+  });
+};
+
 let raceDataRegionController = null;
 let raceDataHistoryBound = false;
 let raceDataCorrectionBound = false;
@@ -1404,6 +1445,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAdminActualsUnsavedState();
   initAdminSeasonMutationConfirmation();
   initAdminInputTables();
+  initQuestionOrderControls();
   initAdminLineupHistoryEditors();
   initRaceDataViewToggle();
   initRaceDataCorrection();
