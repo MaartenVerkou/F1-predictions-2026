@@ -94,10 +94,12 @@ Each imported round carries `source_type = formula1_dashboard`, the exact endpoi
 
 The adapter is used by the preview and by explicit admin sync configuration first. Production keeps its existing provider until a separately approved comparison and deployment; both environments still derive actuals and scoring solely from persisted reviewed evidence.
 
-### 10. Keep Questions as a contract read model
+### 10. Keep Questions focused on input configuration
 
-The Questions admin page remains a read model over data/questions.json, localized metadata, question_settings, and the selected season catalog. It may persist only operational settings that are already supported by question_settings: inclusion, validated points overrides, and display order. It SHALL NOT write prompts, question types, option sources, derivation focus, or evidence requirements directly from the UI.
+The Questions admin page remains a read model over `data/questions.json`, localized metadata, and `question_settings`. It is a global input-management page, not an Actuals or evidence dashboard: Actual lifecycle, catalog readiness, and Race Data/Actuals links belong on those downstream pages and are not repeated here.
 
-The page shows compact contract metadata and lifecycle links for each question. Actual state is resolved by stable question_id against the selected season's persisted snapshots; Race Data links use that same ID as the focus. A question with missing catalog options or unsupported evidence is explicitly unavailable rather than presented as ready.
+Read mode shows only input-adjacent fields: stable order, prompt, answer basis/type, derivation label, points, and inclusion. The stable question ID remains visible as compact secondary text so operators can identify a definition without exposing downstream status columns.
 
-Settings and order are separate page-level edit modes with Save/Cancel actions. This matches the other admin workflows, keeps read mode scan-friendly, and prevents an individual row action from silently persisting unrelated fields. A future definition editor would require versioned question definitions and snapshot references before it can be introduced.
+A single page-level Edit button on the right opens the same table in inline edit mode. The edit mode allows order, prompt override, validated points override, and inclusion to be changed together, with Save and Cancel actions in the same toolbar. Basis/type/derivation metadata remain read-only because changing them would alter the definition contract and requires a versioned migration. Prompt overrides are stored in `question_settings.prompt_override`; stable IDs, participant answers, derivation metadata, and historical snapshots are never rewritten.
+
+The save operation validates non-empty prompts, unique one-based order values, and the existing question-specific points shape before one transaction updates all rows. The change is recorded in the admin audit log without copying downstream Actuals state into the Questions model.

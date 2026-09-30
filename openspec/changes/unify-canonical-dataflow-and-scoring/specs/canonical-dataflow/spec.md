@@ -53,31 +53,30 @@ The system SHALL read legacy display-value answers and provider labels only thro
 - **THEN** the answer SHALL remain unchanged for auditability
 - **AND** scoring SHALL mark it unavailable rather than awarding a guessed result
 
-### Requirement: Questions administration exposes the canonical contract
-The Questions administration view SHALL render each question from its stable definition and the selected season catalog. It SHALL show the answer basis, derivation/evidence profile, scoring summary, inclusion state, catalog readiness, and links to the related Race Data and Actuals read models without duplicating question definitions in another editable store.
+### Requirement: Questions administration stays focused on question inputs
+The Questions administration view SHALL render the global question inputs from the stable definition, localized metadata, and `question_settings`. It SHALL show only order, prompt, answer basis/type, derivation label, points, inclusion, and stable question identity; Actual lifecycle, catalog readiness, and downstream navigation SHALL not be duplicated here.
 
-#### Scenario: A question uses season-backed options
-- **WHEN** an administrator selects a season on the Questions page
-- **THEN** driver, constructor, and race option counts SHALL come from that season's catalog revision
-- **AND** unresolved or missing options SHALL be shown as a data-quality state
-- **AND** the question SHALL not silently fall back to another season's catalog
+#### Scenario: An administrator opens Questions
+- **WHEN** the Questions page is opened
+- **THEN** it SHALL show one input table without a season selector or downstream-status columns
+- **AND** the table SHALL preserve stable question IDs and the current persisted order
 
-#### Scenario: A question has a persisted actual
-- **WHEN** the selected season has a pending, reviewed, or published snapshot value for the question ID
-- **THEN** the Questions row SHALL show that lifecycle state
-- **AND** its Race Data link SHALL preserve the same question ID as the derivation focus
+#### Scenario: An administrator edits question inputs
+- **WHEN** the administrator presses the single Edit button
+- **THEN** the same table SHALL switch to inline editing for order, prompt, points, and inclusion
+- **AND** basis, type, and derivation metadata SHALL remain read-only
 
-#### Scenario: An administrator edits question settings
-- **WHEN** settings edit mode is saved
-- **THEN** only inclusion and validated points overrides SHALL be changed
-- **AND** the stable question ID, definition, derivation metadata, and existing participant answers SHALL remain unchanged
+#### Scenario: An administrator saves question inputs
+- **WHEN** Save is submitted
+- **THEN** the system SHALL reject empty prompts, duplicate/out-of-range order values, and points overrides with the wrong shape
+- **AND** one transaction SHALL persist the validated order, prompt override, points override, and inclusion values
+- **AND** stable question IDs, derivation metadata, historical snapshots, and participant answers SHALL remain unchanged
 
-#### Scenario: An administrator reorders questions
-- **WHEN** order edit mode is saved
-- **THEN** only the persisted order index SHALL change
-- **AND** the new order SHALL be used consistently by prediction forms, Actuals, and the Questions view
+#### Scenario: A prompt is customized
+- **WHEN** a non-empty prompt override is saved for a question ID
+- **THEN** the override SHALL be stored in `question_settings.prompt_override`
+- **AND** all later question views SHALL use that prompt while continuing to resolve responses and scoring by the stable question ID
 
-#### Scenario: Definition metadata is inspected
-- **WHEN** an administrator views a question's type, options source, or derivation profile
-- **THEN** those contract fields SHALL be read-only and SHALL expose full detail through accessible text or a tooltip
-- **AND** changing them SHALL require a versioned definition migration rather than an ad hoc settings write
+#### Scenario: Editing is cancelled
+- **WHEN** the administrator presses Cancel before saving
+- **THEN** no question setting SHALL be changed
