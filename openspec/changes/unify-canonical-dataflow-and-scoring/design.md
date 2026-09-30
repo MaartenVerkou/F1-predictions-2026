@@ -93,3 +93,11 @@ The adapter fetches the season calendar, race classifications, starting grids, q
 Each imported round carries `source_type = formula1_dashboard`, the exact endpoint URLs, provider schema revision, fetch timestamp, normalized payload revision, and a compact provenance record. Formula 1 Dashboard data may be compared with another provider, but neither provider silently overwrites the other. A conflicting fact is recorded as an unresolved/conflict state and blocks affected derivations until an administrator reviews it. A provider outage, malformed response, or partial session does not become zeroes and does not trigger a synthetic fallback.
 
 The adapter is used by the preview and by explicit admin sync configuration first. Production keeps its existing provider until a separately approved comparison and deployment; both environments still derive actuals and scoring solely from persisted reviewed evidence.
+
+### 10. Keep Questions as a contract read model
+
+The Questions admin page remains a read model over data/questions.json, localized metadata, question_settings, and the selected season catalog. It may persist only operational settings that are already supported by question_settings: inclusion, validated points overrides, and display order. It SHALL NOT write prompts, question types, option sources, derivation focus, or evidence requirements directly from the UI.
+
+The page shows compact contract metadata and lifecycle links for each question. Actual state is resolved by stable question_id against the selected season's persisted snapshots; Race Data links use that same ID as the focus. A question with missing catalog options or unsupported evidence is explicitly unavailable rather than presented as ready.
+
+Settings and order are separate page-level edit modes with Save/Cancel actions. This matches the other admin workflows, keeps read mode scan-friendly, and prevents an individual row action from silently persisting unrelated fields. A future definition editor would require versioned question definitions and snapshot references before it can be introduced.

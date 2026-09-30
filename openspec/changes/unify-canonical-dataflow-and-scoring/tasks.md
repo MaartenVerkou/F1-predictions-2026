@@ -47,6 +47,9 @@
 ## 6. Read-model and UI integration
 
 - [ ] 6.1 Update Questions to resolve options from the selected catalog revision and show unresolved options as a data-quality state.
+- [ ] 6.1a Add a shared Questions contract read model for basis, derivation/evidence, scoring summary, catalog readiness, and actual lifecycle links.
+- [ ] 6.1b Replace per-row question settings/reorder submits with consistent page-level settings and order edit modes, preserving stable question IDs and answers.
+- [ ] 6.1c Add focused route/model tests for season isolation, unresolved options, actual lifecycle links, validated settings, and persisted order.
 - [ ] 6.2 Update Race data to display normalized evidence/provenance and the same selected cutoff used by Actuals.
 - [x] 6.2a Add shared constructor podium metadata to the Race data matrix, including cutoff-aware position badges and accessible legend text; keep the merged constructor total points-only until a dedicated aggregate summary is designed.
 - [x] 6.2b Add the in-place Drivers/Constructors view switch with grouped constructor seat rows, merged constructor totals, canonical round lineup ordering, and shared matrix row/cell partials.

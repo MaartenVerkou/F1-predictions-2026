@@ -52,3 +52,32 @@ The system SHALL read legacy display-value answers and provider labels only thro
 - **WHEN** a stored answer cannot be resolved
 - **THEN** the answer SHALL remain unchanged for auditability
 - **AND** scoring SHALL mark it unavailable rather than awarding a guessed result
+
+### Requirement: Questions administration exposes the canonical contract
+The Questions administration view SHALL render each question from its stable definition and the selected season catalog. It SHALL show the answer basis, derivation/evidence profile, scoring summary, inclusion state, catalog readiness, and links to the related Race Data and Actuals read models without duplicating question definitions in another editable store.
+
+#### Scenario: A question uses season-backed options
+- **WHEN** an administrator selects a season on the Questions page
+- **THEN** driver, constructor, and race option counts SHALL come from that season's catalog revision
+- **AND** unresolved or missing options SHALL be shown as a data-quality state
+- **AND** the question SHALL not silently fall back to another season's catalog
+
+#### Scenario: A question has a persisted actual
+- **WHEN** the selected season has a pending, reviewed, or published snapshot value for the question ID
+- **THEN** the Questions row SHALL show that lifecycle state
+- **AND** its Race Data link SHALL preserve the same question ID as the derivation focus
+
+#### Scenario: An administrator edits question settings
+- **WHEN** settings edit mode is saved
+- **THEN** only inclusion and validated points overrides SHALL be changed
+- **AND** the stable question ID, definition, derivation metadata, and existing participant answers SHALL remain unchanged
+
+#### Scenario: An administrator reorders questions
+- **WHEN** order edit mode is saved
+- **THEN** only the persisted order index SHALL change
+- **AND** the new order SHALL be used consistently by prediction forms, Actuals, and the Questions view
+
+#### Scenario: Definition metadata is inspected
+- **WHEN** an administrator views a question's type, options source, or derivation profile
+- **THEN** those contract fields SHALL be read-only and SHALL expose full detail through accessible text or a tooltip
+- **AND** changing them SHALL require a versioned definition migration rather than an ad hoc settings write
