@@ -12,14 +12,6 @@
         Manage question wording, order, scoring and inclusion. Stable question IDs keep answers and derivations connected.
       </p>
     </div>
-    <div class="admin-question-actions">
-      <% if (editing) { %>
-        <button type="submit" form="admin-question-edit-form">Save</button>
-        <a class="secondary" href="/admin/questions">Cancel</a>
-      <% } else { %>
-        <a class="secondary" href="/admin/questions?mode=edit">Edit</a>
-      <% } %>
-    </div>
   </div>
 
   <% if (saveError || saveSuccess) { %>
@@ -28,6 +20,21 @@
       <% if (saveSuccess) { %><p class="muted" role="status"><%= saveSuccess %></p><% } %>
     </div>
   <% } %>
+
+  <div class="admin-question-table-toolbar admin-race-data-detail-toolbar">
+    <div class="admin-race-data-section-heading">
+      <h2>Question inputs</h2>
+      <span class="muted admin-question-table-help">Wording, order, scoring and inclusion</span>
+    </div>
+    <div class="admin-race-data-detail-actions admin-toolbar-actions admin-question-actions">
+      <% if (editing) { %>
+        <button type="submit" form="admin-question-edit-form" class="secondary admin-question-save-button">Save changes</button>
+        <a class="button-link secondary admin-question-cancel" href="/admin/questions">Cancel</a>
+      <% } else { %>
+        <a class="button-link secondary admin-race-data-edit-button admin-question-edit-button" href="/admin/questions?mode=edit">Edit data</a>
+      <% } %>
+    </div>
+  </div>
 
   <form id="admin-question-edit-form" method="post" action="/admin/questions" class="admin-question-edit-form">
     <%- csrfField() %>
@@ -68,13 +75,16 @@
                 <span class="admin-question-meta"><%= row.typeLabel %></span>
               </td>
               <td>
-                <strong><%= row.derivationLabel %></strong>
-                <span class="admin-question-meta"><%= row.evidenceLabel %> · <%= row.scopeLabel %></span>
+                <strong title="<%= row.derivationMeta %>"><%= row.derivationLabel %></strong>
+                <span class="admin-question-meta"><%= row.derivationMeta %></span>
               </td>
               <td class="admin-question-override">
                 <% if (editing) { %>
                   <label class="sr-only" for="question-<%= row.id %>-points">Points for <%= row.prompt %></label>
-                  <input id="question-<%= row.id %>-points" type="text" name="<%= row.id %>__points" value="<%= row.pointsOverride %>" placeholder="Default" title="<%= row.scoringDetail %>">
+                  <span class="admin-question-points-current">Current: <code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.pointsCurrentLabel %></code></span>
+                  <% if (row.hasPointsOverride) { %><span class="admin-question-meta">Default: <%= row.pointsDefaultLabel %></span><% } %>
+                  <input id="question-<%= row.id %>-points" type="<%= row.pointsInputType %>" name="<%= row.id %>__points" value="<%= row.pointsOverride %>" placeholder="<%= row.pointsInputPlaceholder %>" title="Leave blank to use the default: <%= row.scoringDetail %>" <%= row.pointsInputType === 'number' ? 'step="any"' : '' %>>
+                  <span class="admin-question-meta">Blank = default</span>
                 <% } else { %>
                   <code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.scoringLabel %></code>
                 <% } %>

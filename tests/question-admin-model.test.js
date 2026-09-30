@@ -24,6 +24,7 @@ test("question input rows expose only input-adjacent fields", () => {
     },
     _included: true,
     _orderIndex: 3,
+    _basePoints: { "1st": 50, "2nd": 25, "3rd": 15 },
     _pointsOverrideRaw: "10",
     _promptOverrideRaw: "Who has the most retirements?"
   };
@@ -35,7 +36,12 @@ test("question input rows expose only input-adjacent fields", () => {
   assert.equal(rows[0].evidenceLabel, "Race");
   assert.equal(rows[0].promptOverride, "Who has the most retirements?");
   assert.equal(rows[0].pointsOverride, "10");
+  assert.equal(rows[0].pointsCurrentLabel, "10 pts");
+  assert.equal(rows[0].pointsDefaultLabel, "1st 50 · 2nd 25 · 3rd 15");
   assert.equal(rows[0].orderIndex, 3);
+  assert.equal(rows[0].derivationMeta, "Evidence: Race · Scope: season");
+  assert.equal(rows[0].pointsInputPlaceholder, '{"1st":50,"2nd":25,"3rd":15}');
+  assert.equal(rows[0].pointsInputType, "text");
 });
 
 test("question input edits normalize order and preserve stable question IDs", () => {

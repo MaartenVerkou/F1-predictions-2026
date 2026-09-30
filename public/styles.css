@@ -5277,6 +5277,14 @@ button:disabled {
   align-items: flex-end;
 }
 
+.admin-question-table-toolbar {
+  margin-top: 2px;
+}
+
+.admin-question-table-help {
+  font-size: 12px;
+}
+
 .admin-question-actions {
   display: inline-flex;
   align-items: center;
@@ -5337,7 +5345,8 @@ button:disabled {
 
 .admin-question-order-input,
 .admin-question-table textarea,
-.admin-question-table input[type="text"] {
+.admin-question-table input[type="text"],
+.admin-question-table input[type="number"] {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -5358,6 +5367,22 @@ button:disabled {
 
 .admin-question-table input[type="text"] {
   max-width: 150px;
+}
+
+.admin-question-points-current {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.admin-question-points-current code {
+  color: var(--text);
+}
+
+.admin-question-override input[type="number"] {
+  max-width: 100px;
 }
 
 .admin-question-included-value {

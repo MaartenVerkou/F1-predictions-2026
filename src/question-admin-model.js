@@ -57,6 +57,7 @@ function scoringSummary(question) {
   const override = normalizeText(question?._pointsOverrideRaw);
   return {
     label: override ? `Override · ${summary}` : summary,
+    currentLabel: summary,
     detail: normalizeText(question?.points_display) || summary,
     hasOverride: Boolean(override)
   };
@@ -81,10 +82,21 @@ function questionEvidence(question) {
   return evidence.length ? evidence.join(" · ") : "Definition";
 }
 
+function pointsInputPlaceholder(question) {
+  const points = question?._basePoints ?? question?.points;
+  if (typeof points === "number" && Number.isFinite(points)) return String(points);
+  if (points && typeof points === "object" && !Array.isArray(points)) {
+    return JSON.stringify(points);
+  }
+  return "";
+}
+
 function buildQuestionInputRows(questions = []) {
   return (questions || []).map((question, index) => {
     const focus = question?.race_data_focus || {};
     const scoring = scoringSummary(question);
+    const evidence = questionEvidence(question);
+    const scope = normalizeText(focus.scope).replace(/[_-]+/g, " ") || "—";
     return {
       question,
       id: normalizeText(question?.id),
@@ -95,11 +107,17 @@ function buildQuestionInputRows(questions = []) {
       basis: sourceBasis(question),
       basisLabel: basisLabel(question),
       derivationLabel: focus.metric ? raceDataFocusLabel(question) : "No race projection",
-      evidenceLabel: questionEvidence(question),
-      scopeLabel: normalizeText(focus.scope).replace(/[_-]+/g, " ") || "—",
+      evidenceLabel: evidence,
+      scopeLabel: scope,
+      derivationMeta: `Evidence: ${evidence} · Scope: ${scope}`,
       scoringLabel: scoring.label,
+      pointsCurrentLabel: scoring.currentLabel,
+      pointsDefaultLabel: compactPoints(question?._basePoints ?? question?.points),
       scoringDetail: scoring.detail,
       hasPointsOverride: scoring.hasOverride,
+      pointsInputPlaceholder: pointsInputPlaceholder(question),
+      pointsInputType:
+        typeof (question?._basePoints ?? question?.points) === "number" ? "number" : "text",
       included: question?._included !== false,
       promptOverride: normalizeText(question?._promptOverrideRaw),
       pointsOverride: normalizeText(question?._pointsOverrideRaw),
