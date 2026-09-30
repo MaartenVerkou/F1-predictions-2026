@@ -130,6 +130,8 @@ function buildQuestionInputRows(questions = []) {
     const focus = question?.race_data_focus || {};
     const scoring = scoringSummary(question);
     const evidence = questionEvidence(question);
+    const basis = basisLabel(question);
+    const derivation = focus.metric ? raceDataFocusLabel(question) : "No race projection";
     return {
       question,
       id: normalizeText(question?.id),
@@ -138,8 +140,9 @@ function buildQuestionInputRows(questions = []) {
       shortLabel: compactQuestionLabel(question, focus.metric),
       typeLabel: normalizeText(question?.type) || "text",
       basis: sourceBasis(question),
-      basisLabel: basisLabel(question),
-      derivationLabel: focus.metric ? raceDataFocusLabel(question) : "No race projection",
+      basisLabel: basis,
+      derivationLabel: derivation,
+      calculationLabel: [basis, derivation].filter(Boolean).join(" · "),
       evidenceLabel: evidence,
       derivationMeta: "Calculation basis: " + evidence,
       scoringLabel: scoring.label,

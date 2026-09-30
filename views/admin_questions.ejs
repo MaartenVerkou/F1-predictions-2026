@@ -44,8 +44,7 @@
           <tr>
             <th scope="col">#</th>
             <th scope="col">Question</th>
-            <th scope="col">Basis</th>
-            <th scope="col">Derivation</th>
+            <th scope="col">Calculation</th>
             <th scope="col">Points</th>
             <th scope="col">Included</th>
           </tr>
@@ -71,12 +70,8 @@
                 <div class="muted admin-question-id"><code class="admin-question-code"><%= row.id %></code></div>
               </td>
               <td>
-                <strong><%= row.basisLabel %></strong>
-                <span class="admin-question-meta"><%= row.typeLabel %></span>
-              </td>
-              <td>
-                <strong title="<%= row.derivationMeta %>"><%= row.derivationLabel %></strong>
-                <span class="admin-question-meta"><%= row.derivationMeta %></span>
+                <strong title="<%= row.derivationMeta %>"><%= row.calculationLabel %></strong>
+                <span class="admin-question-meta"><%= row.typeLabel %> · <%= row.evidenceLabel %></span>
               </td>
               <td class="admin-question-override">
                 <% if (editing) { %>

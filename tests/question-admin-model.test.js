@@ -33,6 +33,7 @@ test("question input rows expose only input-adjacent fields", () => {
 
   assert.equal(rows[0].basisLabel, "Drivers");
   assert.equal(rows[0].derivationLabel, "DNF");
+  assert.equal(rows[0].calculationLabel, "Drivers · DNF");
   assert.equal(rows[0].evidenceLabel, "Race classifications");
   assert.equal(rows[0].promptOverride, "Who has the most retirements?");
   assert.equal(rows[0].pointsOverride, "10");
@@ -51,8 +52,10 @@ test("question evidence names the actual standings source when no explicit list 
   ]);
 
   assert.equal(rows[0].evidenceLabel, "Driver championship points");
+  assert.equal(rows[0].calculationLabel, "Drivers · Top 3");
   assert.equal(rows[0].derivationMeta, "Calculation basis: Driver championship points");
   assert.equal(rows[1].evidenceLabel, "Constructor championship points");
+  assert.equal(rows[1].calculationLabel, "Constructors · Top 3");
   assert.equal(rows[1].derivationMeta, "Calculation basis: Constructor championship points");
 });
 
