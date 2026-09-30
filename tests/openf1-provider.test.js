@@ -104,6 +104,30 @@ test("OpenF1 keeps Finished as the default for classified race results", () => {
   assert.equal(row.positionText, "1");
 });
 
+test("OpenF1 marks an unclassified race row as NC when the provider has no finish position", () => {
+  const row = normalizeOpenF1Row({
+    position: null,
+    driver_number: 18,
+    number_of_laps: 43,
+    dnf: false,
+    dns: false,
+    dsq: false,
+    points: 0,
+    meeting_key: 1279,
+    session_key: 11234
+  }, {
+    driver_number: 18,
+    full_name: "Lance Stroll",
+    first_name: "Lance",
+    last_name: "Stroll",
+    team_name: "Aston Martin"
+  }, "race", { sessionKey: 11234, meetingKey: 1279 });
+
+  assert.equal(row.status, "NC");
+  assert.equal(row.position, null);
+  assert.equal(row.positionText, "NC");
+});
+
 test("OpenF1 maps a unique meeting to the configured season round", () => {
   assert.equal(resolveMeetingRound({
     meeting_name: "Australian Grand Prix",

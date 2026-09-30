@@ -1072,7 +1072,7 @@ async function main() {
   const sourceType = data.sourceType || args.provider;
   const sourceNote = data.sourceNote || BACKFILL_SOURCE_NOTE;
   const parserVersion = sourceType === SOURCE_TYPES.OPENF1
-    ? OPENF1_SCHEMA + "-normalizer-v1"
+    ? OPENF1_SCHEMA + "-normalizer-v2"
     : "evidence-v1";
   const totalRounds = races.length;
   const completedRounds = selectCompletedRounds(data.completedRounds, args);

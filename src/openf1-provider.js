@@ -62,7 +62,14 @@ function statusFor(row, kind) {
   if (row?.dns) return "DNS";
   if (row?.dsq) return "DSQ";
   if (row?.dnf) return "DNF";
-  return kind === "race" || kind === "sprint" ? "Finished" : null;
+  const isRaceResult = kind === "race" || kind === "sprint";
+  if (!isRaceResult) return null;
+
+  // OpenF1 can return a race row with all boolean status flags false while
+  // leaving position null for a driver who was not officially classified.
+  // A missing finish position must not be presented as a classified finish.
+  const position = parseFinite(row?.position);
+  return position != null && position > 0 ? "Finished" : "NC";
 }
 
 function timingValue(value) {
