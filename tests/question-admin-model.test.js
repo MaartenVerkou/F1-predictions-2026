@@ -39,7 +39,7 @@ test("question input rows expose only input-adjacent fields", () => {
   assert.equal(rows[0].pointsCurrentLabel, "10 pts");
   assert.equal(rows[0].pointsDefaultLabel, "1st 50 · 2nd 25 · 3rd 15");
   assert.equal(rows[0].orderIndex, 3);
-  assert.equal(rows[0].derivationMeta, "Evidence: Race · Season derivation");
+  assert.equal(rows[0].derivationMeta, "Evidence: Race");
   assert.equal(rows[0].pointsInputPlaceholder, '{"1st":50,"2nd":25,"3rd":15}');
   assert.equal(rows[0].pointsInputType, "text");
 });
