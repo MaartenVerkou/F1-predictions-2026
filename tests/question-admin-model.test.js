@@ -33,13 +33,13 @@ test("question input rows expose only input-adjacent fields", () => {
 
   assert.equal(rows[0].basisLabel, "Drivers");
   assert.equal(rows[0].derivationLabel, "DNF");
-  assert.equal(rows[0].evidenceLabel, "Race results");
+  assert.equal(rows[0].evidenceLabel, "Race classifications");
   assert.equal(rows[0].promptOverride, "Who has the most retirements?");
   assert.equal(rows[0].pointsOverride, "10");
   assert.equal(rows[0].pointsCurrentLabel, "10 pts");
   assert.equal(rows[0].pointsDefaultLabel, "1st 50 · 2nd 25 · 3rd 15");
   assert.equal(rows[0].orderIndex, 3);
-  assert.equal(rows[0].derivationMeta, "Source: Race results");
+  assert.equal(rows[0].derivationMeta, "Calculation basis: Race classifications");
   assert.equal(rows[0].pointsInputPlaceholder, '{"1st":50,"2nd":25,"3rd":15}');
   assert.equal(rows[0].pointsInputType, "text");
 });
@@ -50,10 +50,10 @@ test("question evidence names the actual standings source when no explicit list 
     { id: "constructors", race_data_focus: { view: "constructors", metric: "championship_top3" } }
   ]);
 
-  assert.equal(rows[0].evidenceLabel, "Driver standings");
-  assert.equal(rows[0].derivationMeta, "Source: Driver standings");
-  assert.equal(rows[1].evidenceLabel, "Constructor standings");
-  assert.equal(rows[1].derivationMeta, "Source: Constructor standings");
+  assert.equal(rows[0].evidenceLabel, "Driver championship points");
+  assert.equal(rows[0].derivationMeta, "Calculation basis: Driver championship points");
+  assert.equal(rows[1].evidenceLabel, "Constructor championship points");
+  assert.equal(rows[1].derivationMeta, "Calculation basis: Constructor championship points");
 });
 
 test("question input edits normalize order and preserve stable question IDs", () => {
