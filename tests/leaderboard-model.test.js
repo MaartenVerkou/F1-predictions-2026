@@ -209,3 +209,24 @@ test("selected participant insights and breakdown use scored question data", () 
   assert.equal(allBreakdown.rows.length, 3);
   assert.equal(allBreakdown.rows[0].isScored, false);
 });
+
+test("historical scoring stays on canonical snapshot values after a rename", () => {
+  const question = {
+    id: "driver_question",
+    type: "single_choice",
+    points: 10,
+    _canonicalCatalog: {
+      driver: [{ id: 7, value: "driver:7", label: "Renamed Driver" }]
+    }
+  };
+  const rows = buildLeaderboardRows({
+    members: [member(1, "Alice")],
+    responses: [response(1, "driver_question", "driver:7")],
+    questions: [question],
+    actualsByQuestion: { driver_question: "driver:7" },
+    includeDetails: true
+  });
+
+  assert.equal(rows[0].total, 10);
+  assert.equal(rows[0].byQuestion.driver_question, 10);
+});
