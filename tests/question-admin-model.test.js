@@ -86,6 +86,30 @@ test("question input edits reject duplicate order and empty prompts", () => {
   );
 });
 
+test("question input edits accept structured scoring fields without raw JSON", () => {
+  const questions = [{
+    id: "top_three",
+    _basePoints: { "1st": 50, "2nd": 25, "3rd": 15 }
+  }];
+  const edits = normalizeQuestionInputEdits(questions, {
+    top_three__order: "1",
+    top_three__prompt: "Pick the top three",
+    top_three__points__1st: "60",
+    top_three__points__2nd: "30",
+    top_three__points__3rd: "20"
+  });
+  assert.deepEqual(edits[0].pointsOverride, { "1st": 60, "2nd": 30, "3rd": 20 });
+  assert.throws(
+    () => normalizeQuestionInputEdits(questions, {
+      top_three__order: "1",
+      top_three__prompt: "Pick the top three",
+      top_three__points__1st: "60",
+      top_three__points__2nd: ""
+    }),
+    /complete every scoring field/
+  );
+});
+
 test("scoring summary is compact while retaining the detailed rule", () => {
   const summary = scoringSummary({
     points: { "1st": 50, "2nd": 25, "3rd": 15 },

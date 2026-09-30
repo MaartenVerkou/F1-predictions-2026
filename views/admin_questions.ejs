@@ -83,7 +83,18 @@
                   <label class="sr-only" for="question-<%= row.id %>-points">Points for <%= row.prompt %></label>
                   <span class="admin-question-points-current">Current: <code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.pointsCurrentLabel %></code></span>
                   <% if (row.hasPointsOverride) { %><span class="admin-question-meta">Default: <%= row.pointsDefaultLabel %></span><% } %>
-                  <input id="question-<%= row.id %>-points" type="<%= row.pointsInputType %>" name="<%= row.id %>__points" value="<%= row.pointsOverride %>" placeholder="<%= row.pointsInputPlaceholder %>" title="Leave blank to use the default: <%= row.scoringDetail %>" <%= row.pointsInputType === 'number' ? 'step="any"' : '' %>>
+                  <% if (row.pointsFields.length) { %>
+                    <div class="admin-question-points-fields" aria-label="Scoring override fields">
+                      <% row.pointsFields.forEach((field) => { %>
+                        <label>
+                          <span><%= field.label %></span>
+                          <input id="question-<%= row.id %>-points-<%= field.key %>" type="number" name="<%= row.id %>__points__<%= field.key %>" value="<%= field.value %>" placeholder="<%= field.placeholder %>" step="any" title="Leave blank in every scoring field to use the default">
+                        </label>
+                      <% }) %>
+                    </div>
+                  <% } else { %>
+                    <input id="question-<%= row.id %>-points" type="<%= row.pointsInputType %>" name="<%= row.id %>__points" value="<%= row.pointsOverride %>" placeholder="<%= row.pointsInputPlaceholder %>" title="Leave blank to use the default: <%= row.scoringDetail %>" <%= row.pointsInputType === 'number' ? 'step="any"' : '' %>>
+                  <% } %>
                   <span class="admin-question-meta">Blank = default</span>
                 <% } else { %>
                   <code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.scoringLabel %></code>

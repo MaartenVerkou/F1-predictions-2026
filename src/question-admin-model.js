@@ -91,6 +91,27 @@ function pointsInputPlaceholder(question) {
   return "";
 }
 
+function numericPointsFields(question) {
+  const defaults = question?._basePoints ?? question?.points;
+  if (!defaults || typeof defaults !== "object" || Array.isArray(defaults)) return [];
+  const entries = Object.entries(defaults);
+  if (!entries.length || entries.some(([, value]) => typeof value !== "number" || !Number.isFinite(value))) {
+    return [];
+  }
+  const effective = question?._effectivePoints ?? defaults;
+  const hasOverride = Boolean(normalizeText(question?._pointsOverrideRaw));
+  return entries.map(([key, defaultValue]) => ({
+    key,
+    label: key,
+    value:
+      hasOverride && effective && typeof effective === "object" && !Array.isArray(effective)
+        && Number.isFinite(Number(effective[key]))
+        ? String(effective[key])
+        : "",
+    placeholder: String(defaultValue)
+  }));
+}
+
 function buildQuestionInputRows(questions = []) {
   return (questions || []).map((question, index) => {
     const focus = question?.race_data_focus || {};
@@ -115,6 +136,7 @@ function buildQuestionInputRows(questions = []) {
       pointsDefaultLabel: compactPoints(question?._basePoints ?? question?.points),
       scoringDetail: scoring.detail,
       hasPointsOverride: scoring.hasOverride,
+      pointsFields: numericPointsFields(question),
       pointsInputPlaceholder: pointsInputPlaceholder(question),
       pointsInputType:
         typeof (question?._basePoints ?? question?.points) === "number" ? "number" : "text",
@@ -150,13 +172,44 @@ function normalizeQuestionInputEdits(questions = [], body = {}, {
     if (!prompt) throw new Error(`Question "${id}": prompt cannot be empty.`);
     if (prompt.length > 500) throw new Error(`Question "${id}": prompt cannot exceed 500 characters.`);
 
-    const rawPoints = normalizeText(body[`${id}__points`]);
     let pointsOverride = null;
-    if (rawPoints) {
-      pointsOverride = parsePointsOverride
-        ? parsePointsOverride(rawPoints, id)
-        : JSON.parse(rawPoints);
-      if (validatePointsOverrideType) validatePointsOverrideType(question, pointsOverride);
+    const basePoints = question?._basePoints;
+    const structuredPoints =
+      basePoints && typeof basePoints === "object" && !Array.isArray(basePoints)
+      && Object.keys(basePoints).length > 0
+      && Object.values(basePoints).every((value) => typeof value === "number" && Number.isFinite(value));
+    if (structuredPoints) {
+      const fieldNames = Object.keys(basePoints);
+      const rawFields = fieldNames.map((key) => normalizeText(body[`${id}__points__${key}`]));
+      if (rawFields.some(Boolean)) {
+        if (rawFields.some((value) => !value)) {
+          throw new Error(`Question "${id}": complete every scoring field or leave them all blank.`);
+        }
+        pointsOverride = Object.fromEntries(fieldNames.map((key, fieldIndex) => {
+          const value = Number(rawFields[fieldIndex]);
+          if (!Number.isFinite(value)) {
+            throw new Error(`Question "${id}": scoring value for ${key} must be a finite number.`);
+          }
+          return [key, value];
+        }));
+      } else {
+        const rawPoints = normalizeText(body[`${id}__points`]);
+        if (rawPoints) {
+          pointsOverride = parsePointsOverride
+            ? parsePointsOverride(rawPoints, id)
+            : JSON.parse(rawPoints);
+        }
+      }
+    } else {
+      const rawPoints = normalizeText(body[`${id}__points`]);
+      if (rawPoints) {
+        pointsOverride = parsePointsOverride
+          ? parsePointsOverride(rawPoints, id)
+          : JSON.parse(rawPoints);
+      }
+    }
+    if (pointsOverride != null && validatePointsOverrideType) {
+      validatePointsOverrideType(question, pointsOverride);
     }
 
     return {
