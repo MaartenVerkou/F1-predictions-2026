@@ -66,6 +66,10 @@ const { buildActualsOverview } = require("../actuals-overview");
 const { topDamageEntities } = require("../destructors-damage");
 const { compactQuestionLabel, raceDataFocusLabel } = require("../race-data-focus");
 const {
+  buildQuestionActualStatusMap,
+  buildQuestionContractRows
+} = require("../question-admin-model");
+const {
   DEFAULT_SCORING_RULES,
   deriveStandingsForRounds,
   reconcileStandings,
@@ -3027,9 +3031,33 @@ function registerAdminRoutes(app, deps) {
       ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
       : null;
     const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
+    const latestSnapshots = seasonContext.selected
+      ? listLatestSnapshotsForSeason(db, season, {
+        maxRoundNumber: catalog?.races?.length || getRaces().length
+      })
+      : [];
+    const publishedActuals = seasonContext.selected
+      ? loadPublishedActuals(db, season)
+      : { snapshot: null };
+    const actualStatusByQuestion = buildQuestionActualStatusMap({
+      snapshots: latestSnapshots,
+      publishedSnapshot: publishedActuals.snapshot,
+      fetchSnapshotValues
+    });
+    const questionRows = buildQuestionContractRows(questions, {
+      catalog,
+      actualStatusByQuestion,
+      selectedSeason: season
+    });
+    const requestedMode = String(req.query.mode || "").trim().toLowerCase();
+    const mode = ["settings", "order"].includes(requestedMode)
+      ? requestedMode
+      : "view";
     res.render("admin_questions", {
       user,
       questions,
+      questionRows,
+      mode,
       season,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
@@ -3080,17 +3108,25 @@ function registerAdminRoutes(app, deps) {
       });
       tx();
     } catch (err) {
+      const season = String(req.body.season || "").trim();
+      const suffix = season ? `?season=${encodeURIComponent(season)}&mode=settings` : "?mode=settings";
       return res.redirect(
-        `/admin/questions?error=${encodeURIComponent(err.message)}`
+        `/admin/questions${suffix}&error=${encodeURIComponent(err.message)}`
       );
     }
 
+    const season = String(req.body.season || "").trim();
+    const suffix = season ? `?season=${encodeURIComponent(season)}&` : "?";
     return res.redirect(
-      `/admin/questions?success=${encodeURIComponent("Question settings saved.")}`
+      `/admin/questions${suffix}success=${encodeURIComponent("Question settings saved.")}`
     );
   });
 
   app.post("/admin/questions/reorder", requireAdmin, (req, res) => {
+    const season = String(req.body.season || "").trim();
+    const orderPath = season
+      ? `/admin/questions?season=${encodeURIComponent(season)}&mode=order`
+      : "/admin/questions?mode=order";
     const questions = getQuestions("en", {
       includeExcluded: true,
       includeMeta: true
@@ -3107,19 +3143,19 @@ function registerAdminRoutes(app, deps) {
     }
     if (!questionId || (direction !== "up" && direction !== "down")) {
       return res.redirect(
-        `/admin/questions?error=${encodeURIComponent("Invalid reorder request.")}`
+        `${orderPath}&error=${encodeURIComponent("Invalid reorder request.")}`
       );
     }
 
     const index = questions.findIndex((q) => q.id === questionId);
     if (index < 0) {
       return res.redirect(
-        `/admin/questions?error=${encodeURIComponent("Question not found.")}`
+        `${orderPath}&error=${encodeURIComponent("Question not found.")}`
       );
     }
     const swapIndex = direction === "up" ? index - 1 : index + 1;
     if (swapIndex < 0 || swapIndex >= questions.length) {
-      return res.redirect("/admin/questions");
+      return res.redirect(orderPath);
     }
 
     const reordered = questions.slice();
@@ -3150,7 +3186,7 @@ function registerAdminRoutes(app, deps) {
     tx();
 
     return res.redirect(
-      `/admin/questions?success=${encodeURIComponent("Question order updated.")}`
+      `${orderPath}&success=${encodeURIComponent("Question order updated.")}`
     );
   });
 

@@ -60,7 +60,7 @@
         </thead>
         <tbody>
           <% (actualOverviewRows || []).forEach((row) => { %>
-            <tr>
+            <tr id="question-<%= encodeURIComponent(row.question.id) %>">
               <th scope="row" class="admin-actuals-question-cell">
                 <span class="admin-actuals-question-content">
                   <span class="admin-actuals-question-number"><%= String(row.questionNumber).padStart(2, '0') %></span>
