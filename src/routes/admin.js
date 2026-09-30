@@ -1177,6 +1177,19 @@ function registerAdminRoutes(app, deps) {
     runActualsAutoUpdate: runAutoUpdate = runActualsAutoUpdate
   } = deps;
   const CURRENT_SEASON = Number(process.env.F1_SEASON || 2026);
+  const logAdminEvent = (level, event, fields = {}) => {
+    const season = Number(fields.season);
+    if (!Number.isInteger(season) || season < 1900 || fields.catalogRevision != null) {
+      return logEvent(level, event, fields);
+    }
+    try {
+      const questions = getQuestions("en", { includeExcluded: true, includeMeta: true });
+      const catalog = buildSeasonCatalog(db, season, { questions });
+      return logEvent(level, event, { ...fields, catalogRevision: catalog.catalogRevision || null });
+    } catch (err) {
+      return logEvent(level, event, { ...fields, catalogRevision: null });
+    }
+  };
   const MULTI_ACTUAL_SINGLE_CHOICE_IDS = new Set([
     "most_driver_of_the_day",
     "most_dnfs_driver",
@@ -2462,7 +2475,7 @@ function registerAdminRoutes(app, deps) {
       } else {
         throw new Error("Unsupported entity type.");
       }
-      logEvent("info", "admin_inputs_entity_updated", {
+      logAdminEvent("info", "admin_inputs_entity_updated", {
         userId: adminUser?.id || null,
         season,
         entityType,
@@ -2510,7 +2523,7 @@ function registerAdminRoutes(app, deps) {
         });
       });
       tx();
-      logEvent("info", "admin_inputs_team_reordered", {
+      logAdminEvent("info", "admin_inputs_team_reordered", {
         userId: adminUser?.id || null,
         season,
         teamId,
@@ -2547,7 +2560,7 @@ function registerAdminRoutes(app, deps) {
       } else {
         throw new Error("This input cannot be removed here.");
       }
-      logEvent("info", "admin_inputs_entity_removed", {
+      logAdminEvent("info", "admin_inputs_entity_removed", {
         userId: adminUser?.id || null,
         season,
         entityType,
@@ -2586,7 +2599,7 @@ function registerAdminRoutes(app, deps) {
         driverId,
         driverNumber
       });
-      logEvent("info", "admin_inputs_driver_created", {
+      logAdminEvent("info", "admin_inputs_driver_created", {
         userId: adminUser?.id || null,
         season,
         driverId,
@@ -2627,7 +2640,7 @@ function registerAdminRoutes(app, deps) {
         evidenceRounds: reviewState.evidenceRounds,
         historicalCorrectionConfirmed
       });
-      logEvent("info", "admin_inputs_lineup_updated", {
+      logAdminEvent("info", "admin_inputs_lineup_updated", {
         userId: adminUser?.id || null,
         season,
         roundNumber,
@@ -2688,7 +2701,7 @@ function registerAdminRoutes(app, deps) {
         evidenceRounds: reviewState.evidenceRounds,
         historicalCorrectionConfirmed
       });
-      logEvent("info", "admin_inputs_team_history_updated", {
+      logAdminEvent("info", "admin_inputs_team_history_updated", {
         userId: adminUser?.id || null,
         season,
         teamId,
@@ -2736,7 +2749,7 @@ function registerAdminRoutes(app, deps) {
         toRound,
         source
       });
-      logEvent("info", "admin_inputs_assignment_updated", {
+      logAdminEvent("info", "admin_inputs_assignment_updated", {
         userId: adminUser?.id || null,
         season,
         assignmentId,
@@ -2776,7 +2789,7 @@ function registerAdminRoutes(app, deps) {
         alias: req.body.alias,
         source: "admin"
       });
-      logEvent("info", "admin_inputs_alias_added", { userId: adminUser?.id || null, season, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
+      logAdminEvent("info", "admin_inputs_alias_added", { userId: adminUser?.id || null, season, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, tab, "success", "Alias saved.");
     } catch (err) {
       return redirectInputs(res, season, tab, "error", err.message);
@@ -2801,7 +2814,7 @@ function registerAdminRoutes(app, deps) {
         throw new Error("The canonical entity is not part of this season.");
       }
       addProviderReference(db, { entityType, entityId, provider, providerKey, providerLabel: req.body.provider_label || null });
-      logEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
+      logAdminEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, "mappings", "success", "Provider mapping saved.");
     } catch (err) {
       return redirectInputs(res, season, "mappings", "error", err.message);
@@ -2831,7 +2844,7 @@ function registerAdminRoutes(app, deps) {
       const table = mappingType === "alias" ? "entity_aliases" : "entity_provider_refs";
       const result = db.prepare(`UPDATE ${table} SET entity_type = ?, entity_id = ? WHERE id = ?`).run(entityType, entityId, mappingId);
       if (Number(result.changes || 0) !== 1) throw new Error("Mapping was not found.");
-      logEvent("info", "admin_inputs_mapping_resolved", { userId: adminUser?.id || null, season, mappingType, mappingId, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
+      logAdminEvent("info", "admin_inputs_mapping_resolved", { userId: adminUser?.id || null, season, mappingType, mappingId, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, "mappings", "success", "Mapping resolved.");
     } catch (err) {
       return redirectInputs(res, season, "mappings", "error", err.message);
@@ -3085,7 +3098,7 @@ function registerAdminRoutes(app, deps) {
           publishedByUserId: adminUser?.id
         });
       }
-      logEvent("info", "admin_race_data_correction_created", {
+      logAdminEvent("info", "admin_race_data_correction_created", {
         userId: adminUser?.id || null,
         season,
         round,
@@ -3134,7 +3147,7 @@ function registerAdminRoutes(app, deps) {
       const refreshed = Array.isArray(result?.snapshots)
         && result.snapshots.some((item) => Number(item?.roundNumber) === round);
       if (!refreshed) throw new Error("The source returned no completed evidence for this round.");
-      logEvent("info", "admin_race_data_source_refreshed", {
+      logAdminEvent("info", "admin_race_data_source_refreshed", {
         requestId: req.requestId,
         userId: adminUser?.id || null,
         season,
@@ -3145,7 +3158,7 @@ function registerAdminRoutes(app, deps) {
       });
       return res.redirect(withQueryParam(redirectTo, "success", "Source refreshed; review required."));
     } catch (err) {
-      logEvent("warn", "admin_race_data_source_refresh_failed", {
+      logAdminEvent("warn", "admin_race_data_source_refresh_failed", {
         requestId: req.requestId,
         userId: adminUser?.id || null,
         season,
@@ -3378,7 +3391,7 @@ function registerAdminRoutes(app, deps) {
       summary.push("latest synced round is left pending review until an admin confirms it");
 
       if (typeof logEvent === "function") {
-        logEvent("info", "admin_actuals_auto_update_run", {
+        logAdminEvent("info", "admin_actuals_auto_update_run", {
           requestId: req.requestId,
           adminUserId: adminUser?.id || null,
           season: CURRENT_SEASON,
@@ -3390,7 +3403,7 @@ function registerAdminRoutes(app, deps) {
       return res.redirect(`/admin/actuals?season=${encodeURIComponent(requestedSeason)}&success=${encodeURIComponent(summary.join(" | "))}`);
     } catch (err) {
       if (typeof logEvent === "function") {
-        logEvent("warn", "admin_actuals_auto_update_failed", {
+        logAdminEvent("warn", "admin_actuals_auto_update_failed", {
           requestId: req.requestId,
           adminUserId: adminUser?.id || null,
           season: CURRENT_SEASON,
