@@ -152,7 +152,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
         state: "future",
         afterCutoff: true,
         focusColumn: false,
-        title: "After selected round"
+        title: "Not included in selected season-end view"
       };
     }
     if (!round.evidence || round.state === "cancelled") {
@@ -207,7 +207,7 @@ function applyDamageMetric(row, rounds, focus, entityType) {
   const cells = row.cells.map((cell, index) => {
     const round = rounds[index];
     if (cell.afterCutoff) {
-      return focusCell(cell, { label: "—", title: "After selected round", hit: false, state: "future" });
+      return focusCell(cell, { label: "—", title: "Not included in selected season-end view", hit: false, state: "future" });
     }
     if (!round?.evidence) {
       return focusCell(cell, { label: "—", title: "Damage evidence unavailable", hit: false, state: "incomplete" });
@@ -406,7 +406,7 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     let observed = false;
     row.cells = row.cells.map((cell, index) => {
       if (cell.afterCutoff) {
-        return focusCell(cell, { label: "—", title: "After selected round", hit: false, state: "future" });
+        return focusCell(cell, { label: "—", title: "Not included in selected season-end view", hit: false, state: "future" });
       }
       const values = teamDrivers
         .map((driver) => driver.cells?.[index])
@@ -436,7 +436,7 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     let observed = false;
     row.cells = row.cells.map((cell, index) => {
       if (cell.afterCutoff) {
-        return focusCell(cell, { label: "—", title: "After selected round", hit: false, state: "future" });
+        return focusCell(cell, { label: "—", title: "Not included in selected season-end view", hit: false, state: "future" });
       }
       const wins = teamDrivers
         .map((driver) => driver.cells?.[index])
@@ -674,7 +674,7 @@ function buildFocusSummary({
     return {
       ...base,
       value: rows.map((row) => row.name).join(" · "),
-      detail: `Top 3 through R${cutoffRoundNumber}`,
+      detail: `Top 3 at selected season end · R${cutoffRoundNumber}`,
       tooltip: rows.map((row) => `P${row.championshipPosition} ${row.name}: ${row.points ?? "—"} points`).join(" · ")
     };
   }
@@ -686,7 +686,7 @@ function buildFocusSummary({
     return {
       ...base,
       value: `${last.name} · P${last.championshipPosition}`,
-      detail: `Last classified standing through R${cutoffRoundNumber}`,
+      detail: `Last classified standing at selected season end · R${cutoffRoundNumber}`,
       tooltip: `${last.name}: ${last.points ?? "—"} points`
     };
   }
@@ -704,7 +704,7 @@ function buildFocusSummary({
       ...base,
       status: partial ? "partial" : "ready",
       value: `${formatNames(leaders.map((row) => row.name))} · ${formatDamageCost(topValue)}`,
-      detail: `Damage costs through R${cutoffRoundNumber}`,
+      detail: `Damage costs at selected season end · R${cutoffRoundNumber}`,
       tooltip: leaders.map((row) => `${row.name}: ${formatDamageCostExact(row.summaryValue)}`).join(" · ")
     };
   }
@@ -728,7 +728,7 @@ function buildFocusSummary({
     return {
       ...base,
       value: `${podiumRows.length} ${entityLabel}`,
-      detail: `${totalPodiums} podium finishes through R${cutoffRoundNumber}`,
+      detail: `${totalPodiums} podium finishes at selected season end · R${cutoffRoundNumber}`,
       tooltip: podiumRows.map((row) => `${row.name}: ${row.summaryValue}`).join(" · ")
     };
   }
@@ -749,7 +749,7 @@ function buildFocusSummary({
       ...base,
       status: partial ? "partial" : "ready",
       value: `${formatNames(leaders.map((row) => row.name))} · ${topValue}`,
-      detail: `${label} through R${cutoffRoundNumber}`,
+      detail: `${label} at selected season end · R${cutoffRoundNumber}`,
       tooltip: `${leaders.map((row) => `${row.name}: ${row.summaryValue}`).join(" · ")}`
     };
   }
