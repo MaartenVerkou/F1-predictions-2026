@@ -1,41 +1,26 @@
 <%- include('partials/header', { title: 'Questions', user }) %>
-<%- include('partials/admin_nav', { active: 'questions', season }) %>
+<%- include('partials/admin_nav', { active: 'questions' }) %>
 
 <% const rows = Array.isArray(questionRows) ? questionRows : []; %>
-<% const selectedSeason = Number(season); %>
-<% const seasonQuery = `season=${encodeURIComponent(selectedSeason)}`; %>
-<% const statusLabels = { none: 'No actual', pending: 'Pending review', reviewed: 'Reviewed', published: 'Published' }; %>
-<% const optionLabels = { ready: 'Options ready', unresolved: 'Options unresolved', select_season: 'Select a season', not_applicable: 'No option list' }; %>
+<% const editing = mode === 'edit'; %>
 
 <div class="card admin-page-card admin-questions-page">
-  <div class="admin-race-data-heading">
+  <div class="admin-race-data-heading admin-questions-heading">
     <div>
       <h1>Questions</h1>
       <p class="muted admin-page-intro">
-        Review the question contract, catalog readiness, derived actuals, and scoring settings in one place.
-      </p>
-      <p class="muted admin-question-scope-note">
-        <strong>Global settings</strong> · inclusion, scoring overrides, and order apply to every season.
-        The selected season only controls catalog readiness and actual links.
+        Manage question wording, order, scoring and inclusion. Stable question IDs keep answers and derivations connected.
       </p>
     </div>
-    <div class="admin-race-data-selector-stack">
-      <form method="get" action="/admin/questions" class="admin-race-data-selector-form">
-        <label for="admin-questions-season">Season</label>
-        <select id="admin-questions-season" name="season" onchange="this.form.submit()">
-          <% (availableSeasons || []).forEach((availableSeason) => { %>
-            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === selectedSeason ? 'selected' : '' %>><%= availableSeason.displayLabel %></option>
-          <% }) %>
-        </select>
-      </form>
+    <div class="admin-question-actions">
+      <% if (editing) { %>
+        <button type="submit" form="admin-question-edit-form">Save</button>
+        <a class="secondary" href="/admin/questions">Cancel</a>
+      <% } else { %>
+        <a class="secondary" href="/admin/questions?mode=edit">Edit</a>
+      <% } %>
     </div>
   </div>
-
-  <% if (seasonContext?.invalidRequestedSeason) { %>
-    <div class="admin-feedback-context">
-      <div class="alert" role="alert">The selected season is not available.</div>
-    </div>
-  <% } %>
 
   <% if (saveError || saveSuccess) { %>
     <div class="admin-feedback-context">
@@ -44,135 +29,38 @@
     </div>
   <% } %>
 
-  <div class="admin-question-toolbar" aria-label="Question administration modes">
-    <div class="admin-race-data-switch" role="tablist" aria-label="Question view">
-      <a class="admin-race-data-tab <%= mode === 'view' ? 'is-active' : '' %>"
-         role="tab" aria-selected="<%= mode === 'view' ? 'true' : 'false' %>"
-         href="/admin/questions?<%= seasonQuery %>">Questions</a>
-      <a class="admin-race-data-tab <%= mode === 'settings' ? 'is-active' : '' %>"
-         role="tab" aria-selected="<%= mode === 'settings' ? 'true' : 'false' %>"
-         href="/admin/questions?<%= seasonQuery %>&mode=settings">Edit settings</a>
-      <a class="admin-race-data-tab <%= mode === 'order' ? 'is-active' : '' %>"
-         role="tab" aria-selected="<%= mode === 'order' ? 'true' : 'false' %>"
-         href="/admin/questions?<%= seasonQuery %>&mode=order">Edit order</a>
-    </div>
-    <% if (mode !== 'view') { %>
-      <a class="secondary admin-question-cancel" href="/admin/questions?<%= seasonQuery %>">Cancel</a>
-    <% } %>
-  </div>
-
-  <% if (mode === 'settings') { %>
-    <form method="post" action="/admin/questions" class="admin-question-edit-form">
-      <%- csrfField() %>
-      <input type="hidden" name="season" value="<%= selectedSeason %>">
-      <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Question settings table" tabindex="0">
-        <table class="table compact admin-question-table admin-question-table--settings">
-          <thead>
-            <tr>
-              <th scope="col">#</th>
-              <th scope="col">Question</th>
-              <th scope="col">Basis</th>
-              <th scope="col">Included</th>
-              <th scope="col">Default</th>
-              <th scope="col">Override</th>
-              <th scope="col">Effective</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% rows.forEach((row) => { %>
-              <tr>
-                <td class="admin-question-order-number"><%= String(row.number).padStart(2, '0') %></td>
-                <td class="admin-question-cell">
-                  <div class="admin-question-title" title="<%= row.question.prompt %>"><%= row.shortLabel %></div>
-                  <div class="muted admin-question-id"><code class="admin-question-code"><%= row.id %></code></div>
-                </td>
-                <td>
-                  <strong><%= row.basisLabel %></strong>
-                  <span class="admin-question-meta"><%= row.typeLabel %></span>
-                </td>
-                <td class="admin-question-included">
-                  <label>
-                    <input type="checkbox" name="<%= row.id %>__included" value="1" <%= row.included ? 'checked' : '' %>>
-                    <span>Included</span>
-                  </label>
-                </td>
-                <td><code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.question._basePoints == null ? '—' : JSON.stringify(row.question._basePoints) %></code></td>
-                <td class="admin-question-override">
-                  <input type="text" name="<%= row.id %>__points" value="<%= row.question._pointsOverrideRaw || '' %>" placeholder="Default">
-                </td>
-                <td><code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.scoringLabel %></code></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      </div>
-      <div class="admin-question-form-actions">
-        <button type="submit">Save settings</button>
-        <a class="secondary" href="/admin/questions?<%= seasonQuery %>">Cancel</a>
-      </div>
-    </form>
-  <% } else if (mode === 'order') { %>
-    <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Question order table" tabindex="0">
-      <table class="table compact admin-question-table admin-question-table--order">
+  <form id="admin-question-edit-form" method="post" action="/admin/questions" class="admin-question-edit-form">
+    <%- csrfField() %>
+    <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Questions input table" tabindex="0">
+      <table class="table compact admin-question-table <%= editing ? 'admin-question-table--editing' : '' %>">
         <thead>
           <tr>
             <th scope="col">#</th>
             <th scope="col">Question</th>
             <th scope="col">Basis</th>
             <th scope="col">Derivation</th>
-            <th scope="col">Scoring</th>
-            <th scope="col">Move</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% rows.forEach((row, index) => { %>
-            <tr>
-              <td class="admin-question-order-number"><%= String(row.number).padStart(2, '0') %></td>
-              <td class="admin-question-cell">
-                <div class="admin-question-title" title="<%= row.question.prompt %>"><%= row.shortLabel %></div>
-                <div class="muted admin-question-id"><code class="admin-question-code"><%= row.id %></code></div>
-              </td>
-              <td><strong><%= row.basisLabel %></strong><span class="admin-question-meta"><%= row.typeLabel %></span></td>
-              <td><strong><%= row.derivationLabel %></strong><span class="admin-question-meta"><%= row.evidenceLabel %></span></td>
-              <td><code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.scoringLabel %></code></td>
-              <td class="admin-order-actions">
-                <form method="post" action="/admin/questions/reorder">
-                  <%- csrfField() %>
-                  <input type="hidden" name="season" value="<%= selectedSeason %>">
-                  <button type="submit" class="secondary admin-order-btn" name="move" value="<%= row.id %>:up" <%= index === 0 ? 'disabled' : '' %> aria-label="Move <%= row.shortLabel %> up" title="Move up">&#8593;</button>
-                </form>
-                <form method="post" action="/admin/questions/reorder">
-                  <%- csrfField() %>
-                  <input type="hidden" name="season" value="<%= selectedSeason %>">
-                  <button type="submit" class="secondary admin-order-btn" name="move" value="<%= row.id %>:down" <%= index === rows.length - 1 ? 'disabled' : '' %> aria-label="Move <%= row.shortLabel %> down" title="Move down">&#8595;</button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
-  <% } else { %>
-    <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Questions contract table" tabindex="0">
-      <table class="table compact admin-question-table admin-question-table--contract">
-        <thead>
-          <tr>
-            <th scope="col">#</th>
-            <th scope="col">Question</th>
-            <th scope="col">Basis</th>
-            <th scope="col">Derivation</th>
-            <th scope="col">Scoring</th>
-            <th scope="col">Actual</th>
-            <th scope="col">Readiness</th>
-            <th scope="col">Links</th>
+            <th scope="col">Points</th>
+            <th scope="col">Included</th>
           </tr>
         </thead>
         <tbody>
           <% rows.forEach((row) => { %>
             <tr>
-              <td class="admin-question-order-number"><%= String(row.number).padStart(2, '0') %></td>
+              <td class="admin-question-order-number">
+                <% if (editing) { %>
+                  <label class="sr-only" for="question-<%= row.id %>-order">Order for <%= row.prompt %></label>
+                  <input id="question-<%= row.id %>-order" class="admin-question-order-input" type="number" name="<%= row.id %>__order" value="<%= row.number %>" min="1" max="<%= rows.length %>" required>
+                <% } else { %>
+                  <%= String(row.number).padStart(2, '0') %>
+                <% } %>
+              </td>
               <td class="admin-question-cell">
-                <div class="admin-question-title" title="<%= row.question.prompt %>"><%= row.shortLabel %></div>
+                <% if (editing) { %>
+                  <label class="sr-only" for="question-<%= row.id %>-prompt">Question wording for <%= row.prompt %></label>
+                  <textarea id="question-<%= row.id %>-prompt" name="<%= row.id %>__prompt" rows="2" maxlength="500" required><%= row.prompt %></textarea>
+                <% } else { %>
+                  <div class="admin-question-title" title="<%= row.prompt %>"><%= row.prompt %></div>
+                <% } %>
                 <div class="muted admin-question-id"><code class="admin-question-code"><%= row.id %></code></div>
               </td>
               <td>
@@ -183,28 +71,34 @@
                 <strong><%= row.derivationLabel %></strong>
                 <span class="admin-question-meta"><%= row.evidenceLabel %> · <%= row.scopeLabel %></span>
               </td>
-              <td><code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.scoringLabel %></code></td>
-              <td>
-                <span class="admin-question-status admin-question-status--<%= row.actualStatus %>"><%= statusLabels[row.actualStatus] || statusLabels.none %></span>
-                <% if (row.actualRoundNumber) { %><span class="admin-question-meta">R<%= row.actualRoundNumber %></span><% } %>
+              <td class="admin-question-override">
+                <% if (editing) { %>
+                  <label class="sr-only" for="question-<%= row.id %>-points">Points for <%= row.prompt %></label>
+                  <input id="question-<%= row.id %>-points" type="text" name="<%= row.id %>__points" value="<%= row.pointsOverride %>" placeholder="Default" title="<%= row.scoringDetail %>">
+                <% } else { %>
+                  <code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.scoringLabel %></code>
+                <% } %>
               </td>
-              <td>
-                <span class="admin-question-status admin-question-status--<%= row.optionState %>"><%= optionLabels[row.optionState] || row.optionState %></span>
-                <% if (row.optionCount != null) { %><span class="admin-question-meta"><%= row.optionCount %> options</span><% } %>
-              </td>
-              <td class="admin-question-links">
-                <% if (row.raceDataHref) { %><a href="<%= row.raceDataHref %>" title="<%= row.derivationLabel %>">Race data · <%= row.derivationLabel %></a><% } %>
-                <a href="<%= row.actualsHref %>" title="Open this question in Season Actuals">Actuals</a>
+              <td class="admin-question-included">
+                <% if (editing) { %>
+                  <label>
+                    <input type="checkbox" name="<%= row.id %>__included" value="1" <%= row.included ? 'checked' : '' %>>
+                    <span class="sr-only">Include <%= row.prompt %></span>
+                    <span aria-hidden="true"><%= row.included ? 'Yes' : 'No' %></span>
+                  </label>
+                <% } else { %>
+                  <span class="admin-question-included-value"><%= row.included ? 'Yes' : 'No' %></span>
+                <% } %>
               </td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
-  <% } %>
+  </form>
 
   <p class="muted admin-question-contract-note">
-    Definition, type, option source, derivation, and evidence fields are read-only here. Changes to those fields require a versioned question-definition migration.
+    Basis, type and derivation are contract metadata and stay read-only here. Editing wording does not change the stable question ID or existing answers.
   </p>
 </div>
 

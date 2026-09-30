@@ -67,8 +67,8 @@ const leaderboardModel = require("../leaderboard-model");
 const { topDamageEntities } = require("../destructors-damage");
 const { compactQuestionLabel, raceDataFocusLabel } = require("../race-data-focus");
 const {
-  buildQuestionActualStatusMap,
-  buildQuestionContractRows
+  buildQuestionInputRows,
+  normalizeQuestionInputEdits
 } = require("../question-admin-model");
 const {
   DEFAULT_SCORING_RULES,
@@ -2858,51 +2858,18 @@ function registerAdminRoutes(app, deps) {
     const locale = res.locals.locale || "en";
     const saveError = req.query.error ? String(req.query.error) : null;
     const saveSuccess = req.query.success ? String(req.query.success) : null;
-    const seasonContext = resolveAdminSeasonContext(db, {
-      requestedSeason: req.query.season,
-      currentSeason: CURRENT_SEASON
-    });
-    const season = Number(seasonContext.year || CURRENT_SEASON);
-    const sourceQuestions = getQuestions(locale, {
+    const questions = getQuestions(locale, {
       includeExcluded: true,
       includeMeta: true
     });
-    const catalog = seasonContext.selected
-      ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
-      : null;
-    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
-    const latestSnapshots = seasonContext.selected
-      ? listLatestSnapshotsForSeason(db, season, {
-        maxRoundNumber: catalog?.races?.length || getRaces().length
-      })
-      : [];
-    const publishedActuals = seasonContext.selected
-      ? loadPublishedActuals(db, season)
-      : { snapshot: null };
-    const actualStatusByQuestion = buildQuestionActualStatusMap({
-      snapshots: latestSnapshots,
-      publishedSnapshot: publishedActuals.snapshot,
-      fetchSnapshotValues
-    });
-    const questionRows = buildQuestionContractRows(questions, {
-      catalog,
-      actualStatusByQuestion,
-      selectedSeason: season
-    });
+    const questionRows = buildQuestionInputRows(questions);
     const requestedMode = String(req.query.mode || "").trim().toLowerCase();
-    const mode = ["settings", "order"].includes(requestedMode)
-      ? requestedMode
-      : "view";
+    const mode = requestedMode === "edit" ? "edit" : "view";
     res.render("admin_questions", {
       user,
       questions,
       questionRows,
       mode,
-      season,
-      seasonContext,
-      availableSeasons: seasonContext.availableSeasons,
-      catalogRevision: catalog?.catalogRevision || null,
-      catalogReadiness: catalog?.readiness || null,
       saveError,
       saveSuccess
     });
@@ -2913,121 +2880,52 @@ function registerAdminRoutes(app, deps) {
       includeExcluded: true,
       includeMeta: true
     });
-    const now = new Date().toISOString();
-    const upsert = db.prepare(
-      `
-      INSERT INTO question_settings (question_id, included, points_override, order_index, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(question_id)
-      DO UPDATE SET
-        included = excluded.included,
-        points_override = excluded.points_override,
-        order_index = excluded.order_index,
-        updated_at = excluded.updated_at
-      `
-    );
-
+    const adminUser = getCurrentUser(req);
     try {
+      const edits = normalizeQuestionInputEdits(questions, req.body, {
+        parsePointsOverride: parsePointsOverrideInput,
+        validatePointsOverrideType
+      });
+      const now = new Date().toISOString();
+      const upsert = db.prepare(
+        `
+        INSERT INTO question_settings (question_id, included, points_override, order_index, prompt_override, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(question_id)
+        DO UPDATE SET
+          included = excluded.included,
+          points_override = excluded.points_override,
+          order_index = excluded.order_index,
+          prompt_override = excluded.prompt_override,
+          updated_at = excluded.updated_at
+        `
+      );
       const tx = db.transaction(() => {
-        for (const [index, question] of questions.entries()) {
-          const includeKey = `${question.id}__included`;
-          const pointsKey = `${question.id}__points`;
-          const included = req.body[includeKey] ? 1 : 0;
-          const rawOverride = String(req.body[pointsKey] || "").trim();
-          let storedOverride = null;
-          if (rawOverride) {
-            const parsedOverride = parsePointsOverrideInput(
-              rawOverride,
-              question.id
-            );
-            validatePointsOverrideType(question, parsedOverride);
-            storedOverride = JSON.stringify(parsedOverride);
-          }
-          upsert.run(question.id, included, storedOverride, index, now);
+        for (const edit of edits) {
+          upsert.run(
+            edit.questionId,
+            edit.included ? 1 : 0,
+            edit.pointsOverride == null ? null : JSON.stringify(edit.pointsOverride),
+            edit.orderIndex,
+            edit.promptOverride,
+            now
+          );
         }
       });
       tx();
+      logAdminEvent("info", "admin_questions_updated", {
+        userId: adminUser?.id || null,
+        questionIds: edits.map((edit) => edit.questionId),
+        changedCount: edits.length
+      });
+      return res.redirect(
+        `/admin/questions?success=${encodeURIComponent("Questions updated.")}`
+      );
     } catch (err) {
-      const season = String(req.body.season || "").trim();
-      const suffix = season ? `?season=${encodeURIComponent(season)}&mode=settings` : "?mode=settings";
       return res.redirect(
-        `/admin/questions${suffix}&error=${encodeURIComponent(err.message)}`
+        `/admin/questions?mode=edit&error=${encodeURIComponent(err.message)}`
       );
     }
-
-    const season = String(req.body.season || "").trim();
-    const suffix = season ? `?season=${encodeURIComponent(season)}&` : "?";
-    return res.redirect(
-      `/admin/questions${suffix}success=${encodeURIComponent("Question settings saved.")}`
-    );
-  });
-
-  app.post("/admin/questions/reorder", requireAdmin, (req, res) => {
-    const season = String(req.body.season || "").trim();
-    const orderPath = season
-      ? `/admin/questions?season=${encodeURIComponent(season)}&mode=order`
-      : "/admin/questions?mode=order";
-    const questions = getQuestions("en", {
-      includeExcluded: true,
-      includeMeta: true
-    });
-    let questionId = String(req.body.questionId || "").trim();
-    let direction = String(req.body.direction || "").trim().toLowerCase();
-    if (!questionId || !direction) {
-      const move = String(req.body.move || "").trim();
-      if (move.includes(":")) {
-        const [idPart, dirPart] = move.split(":", 2);
-        questionId = String(idPart || "").trim();
-        direction = String(dirPart || "").trim().toLowerCase();
-      }
-    }
-    if (!questionId || (direction !== "up" && direction !== "down")) {
-      return res.redirect(
-        `${orderPath}&error=${encodeURIComponent("Invalid reorder request.")}`
-      );
-    }
-
-    const index = questions.findIndex((q) => q.id === questionId);
-    if (index < 0) {
-      return res.redirect(
-        `${orderPath}&error=${encodeURIComponent("Question not found.")}`
-      );
-    }
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= questions.length) {
-      return res.redirect(orderPath);
-    }
-
-    const reordered = questions.slice();
-    const current = reordered[index];
-    reordered[index] = reordered[swapIndex];
-    reordered[swapIndex] = current;
-
-    const now = new Date().toISOString();
-    const upsertOrder = db.prepare(
-      `
-      INSERT INTO question_settings (question_id, included, points_override, order_index, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(question_id)
-      DO UPDATE SET
-        order_index = excluded.order_index,
-        updated_at = excluded.updated_at
-      `
-    );
-
-    const tx = db.transaction(() => {
-      for (const [orderIndex, question] of reordered.entries()) {
-        const included = question._included ? 1 : 0;
-        const rawOverride = String(question._pointsOverrideRaw || "").trim();
-        const storedOverride = rawOverride ? rawOverride : null;
-        upsertOrder.run(question.id, included, storedOverride, orderIndex, now);
-      }
-    });
-    tx();
-
-    return res.redirect(
-      `${orderPath}&success=${encodeURIComponent("Question order updated.")}`
-    );
   });
 
   app.post("/admin/race-data/correction", requireAdmin, (req, res) => {

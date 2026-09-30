@@ -671,6 +671,7 @@ if (db.dialect === "sqlite") {
     included INTEGER NOT NULL DEFAULT 1,
     points_override TEXT,
     order_index INTEGER,
+    prompt_override TEXT,
     updated_at TEXT NOT NULL
   );
 
@@ -837,6 +838,9 @@ function ensureQuestionSettingsColumns() {
   const names = new Set(columns.map((col) => col.name));
   if (!names.has("order_index")) {
     db.exec("ALTER TABLE question_settings ADD COLUMN order_index INTEGER;");
+  }
+  if (!names.has("prompt_override")) {
+    db.exec("ALTER TABLE question_settings ADD COLUMN prompt_override TEXT;");
   }
 }
 
@@ -1542,7 +1546,7 @@ function readJsonFile(filePath) {
 function getQuestionSettingsMap() {
   const rows = db
     .prepare(
-      "SELECT question_id, included, points_override, order_index FROM question_settings"
+      "SELECT question_id, included, points_override, order_index, prompt_override FROM question_settings"
     )
     .all();
   const map = new Map();
@@ -1568,12 +1572,15 @@ function getQuestionSettingsMap() {
       orderIndexRaw == null || !Number.isFinite(Number(orderIndexRaw))
         ? null
         : Number(orderIndexRaw);
+    const promptOverride =
+      row.prompt_override == null ? "" : String(row.prompt_override).trim();
     map.set(row.question_id, {
       included,
       rawOverride,
       parsedOverride,
       hasValidOverride,
-      orderIndex
+      orderIndex,
+      promptOverride
     });
   }
   return map;
@@ -1592,6 +1599,10 @@ function applyQuestionSettings(
 
     const question = { ...original };
     const basePoints = question.points;
+    if (setting?.promptOverride) {
+      question.prompt = setting.promptOverride;
+      question._promptOverrideRaw = setting.promptOverride;
+    }
     if (setting?.hasValidOverride) {
       question.points = setting.parsedOverride;
       // points_display in questions.json can become stale if points are overridden.
@@ -1604,6 +1615,7 @@ function applyQuestionSettings(
       question._effectivePoints = question.points;
       question._pointsOverrideRaw = setting?.rawOverride || "";
       question._hasValidPointsOverride = Boolean(setting?.hasValidOverride);
+      question._promptOverrideRaw = setting?.promptOverride || "";
       question._orderIndex =
         setting && Number.isFinite(Number(setting.orderIndex))
           ? Number(setting.orderIndex)
@@ -1707,6 +1719,9 @@ function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
     }
     if (translation.option_labels && typeof translation.option_labels === "object") {
       localized.option_labels = translation.option_labels;
+    }
+    if (typeof question._promptOverrideRaw === "string" && question._promptOverrideRaw.trim()) {
+      localized.prompt = question._promptOverrideRaw.trim();
     }
     return localized;
   });

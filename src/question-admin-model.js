@@ -13,12 +13,6 @@ const BASIS_LABELS = Object.freeze({
   external: "External"
 });
 
-const SNAPSHOT_STATUS_RANK = Object.freeze({
-  pending: 3,
-  reviewed: 2,
-  published: 1
-});
-
 function normalizeText(value) {
   return String(value == null ? "" : value).trim();
 }
@@ -87,90 +81,15 @@ function questionEvidence(question) {
   return evidence.length ? evidence.join(" · ") : "Definition";
 }
 
-function buildQuestionActualStatusMap({
-  snapshots = [],
-  publishedSnapshot = null,
-  fetchSnapshotValues = () => ({})
-} = {}) {
-  const map = new Map();
-  const publishedId = Number(publishedSnapshot?.id);
-
-  for (const snapshot of snapshots || []) {
-    const snapshotId = Number(snapshot?.id);
-    if (!Number.isInteger(snapshotId)) continue;
-    const roundNumber = Number(snapshot?.round_number);
-    const status = snapshotId === publishedId
-      ? "published"
-      : normalizeText(snapshot?.review_status).toLowerCase() === "pending"
-        ? "pending"
-        : "reviewed";
-    const values = fetchSnapshotValues(snapshotId) || {};
-    for (const questionId of Object.keys(values)) {
-      const current = map.get(questionId);
-      const candidate = {
-        status,
-        roundNumber: Number.isFinite(roundNumber) ? roundNumber : null,
-        snapshotId
-      };
-      if (
-        !current
-        || (candidate.roundNumber || 0) > (current.roundNumber || 0)
-        || (
-          candidate.roundNumber === current.roundNumber
-          && SNAPSHOT_STATUS_RANK[candidate.status] > SNAPSHOT_STATUS_RANK[current.status]
-        )
-      ) {
-        map.set(questionId, candidate);
-      }
-    }
-  }
-  return map;
-}
-
-function buildQuestionContractRows(
-  questions = [],
-  {
-    catalog = null,
-    actualStatusByQuestion = new Map(),
-    selectedSeason = null,
-    raceDataBasePath = "/admin/race-data",
-    actualsBasePath = "/admin/actuals"
-  } = {}
-) {
-  const readinessByQuestion = new Map(
-    (catalog?.readiness?.checks?.questions || [])
-      .map((check) => [String(check.id), check])
-  );
-  const hasCatalog = Boolean(catalog?.season);
-
+function buildQuestionInputRows(questions = []) {
   return (questions || []).map((question, index) => {
-    const id = normalizeText(question?.id);
     const focus = question?.race_data_focus || {};
-    const check = readinessByQuestion.get(id) || null;
-    const hasOptionSource = Boolean(normalizeText(question?.options_source));
-    const optionState = !hasOptionSource
-      ? "not_applicable"
-      : !hasCatalog
-        ? "select_season"
-        : check?.ready
-          ? "ready"
-          : "unresolved";
-    const lifecycle = actualStatusByQuestion instanceof Map
-      ? actualStatusByQuestion.get(id) || null
-      : actualStatusByQuestion?.[id] || null;
-    const focusView = focus.view === "constructors" ? "constructors" : "drivers";
-    const raceDataHref = id && focus.metric
-      ? `${raceDataBasePath}?season=${encodeURIComponent(selectedSeason || "")}&view=${encodeURIComponent(focusView)}&focus=${encodeURIComponent(id)}`
-      : null;
-    const actualsHref = id
-      ? `${actualsBasePath}?season=${encodeURIComponent(selectedSeason || "")}#question-${encodeURIComponent(id)}`
-      : null;
     const scoring = scoringSummary(question);
-
     return {
       question,
-      id,
+      id: normalizeText(question?.id),
       number: index + 1,
+      prompt: normalizeText(question?.prompt),
       shortLabel: compactQuestionLabel(question, focus.metric),
       typeLabel: normalizeText(question?.type) || "text",
       basis: sourceBasis(question),
@@ -182,14 +101,8 @@ function buildQuestionContractRows(
       scoringDetail: scoring.detail,
       hasPointsOverride: scoring.hasOverride,
       included: question?._included !== false,
-      optionState,
-      optionCount: check?.optionCount == null ? null : Number(check.optionCount),
-      catalogRevision: catalog?.catalogRevision || null,
-      actualStatus: lifecycle?.status || "none",
-      actualRoundNumber: lifecycle?.roundNumber || null,
-      actualSnapshotId: lifecycle?.snapshotId || null,
-      raceDataHref,
-      actualsHref,
+      promptOverride: normalizeText(question?._promptOverrideRaw),
+      pointsOverride: normalizeText(question?._pointsOverrideRaw),
       orderIndex: Number.isFinite(Number(question?._orderIndex))
         ? Number(question._orderIndex)
         : index
@@ -197,11 +110,55 @@ function buildQuestionContractRows(
   });
 }
 
+function normalizeQuestionInputEdits(questions = [], body = {}, {
+  parsePointsOverride = null,
+  validatePointsOverrideType = null
+} = {}) {
+  const sourceRows = (questions || []).map((question, index) => ({ question, index }));
+  const seenOrders = new Set();
+  const edits = sourceRows.map(({ question, index }) => {
+    const id = normalizeText(question?.id);
+    const orderRaw = normalizeText(body[`${id}__order`]);
+    const order = Number(orderRaw);
+    if (!Number.isInteger(order) || order < 1 || order > sourceRows.length) {
+      throw new Error(`Question "${id}": order must be a unique number between 1 and ${sourceRows.length}.`);
+    }
+    if (seenOrders.has(order)) {
+      throw new Error(`Question "${id}": order ${order} is already used.`);
+    }
+    seenOrders.add(order);
+
+    const prompt = normalizeText(body[`${id}__prompt`]);
+    if (!prompt) throw new Error(`Question "${id}": prompt cannot be empty.`);
+    if (prompt.length > 500) throw new Error(`Question "${id}": prompt cannot exceed 500 characters.`);
+
+    const rawPoints = normalizeText(body[`${id}__points`]);
+    let pointsOverride = null;
+    if (rawPoints) {
+      pointsOverride = parsePointsOverride
+        ? parsePointsOverride(rawPoints, id)
+        : JSON.parse(rawPoints);
+      if (validatePointsOverrideType) validatePointsOverrideType(question, pointsOverride);
+    }
+
+    return {
+      questionId: id,
+      orderIndex: order - 1,
+      promptOverride: prompt,
+      pointsOverride,
+      included: Boolean(body[`${id}__included`]),
+      sourceIndex: index
+    };
+  });
+
+  return edits.sort((a, b) => a.orderIndex - b.orderIndex || a.sourceIndex - b.sourceIndex);
+}
+
 module.exports = {
   BASIS_LABELS,
-  buildQuestionActualStatusMap,
-  buildQuestionContractRows,
+  buildQuestionInputRows,
   compactPoints,
+  normalizeQuestionInputEdits,
   questionEvidence,
   scoringSummary,
   sourceBasis

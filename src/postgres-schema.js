@@ -419,6 +419,7 @@ CREATE TABLE IF NOT EXISTS question_settings (
   included INTEGER NOT NULL DEFAULT 1,
   points_override TEXT,
   order_index INTEGER,
+  prompt_override TEXT,
   updated_at TEXT NOT NULL
 );
 
@@ -509,6 +510,7 @@ function ensurePostgresSchema(db) {
   db.exec("ALTER TABLE races ADD COLUMN IF NOT EXISTS race_code TEXT");
   db.exec("ALTER TABLE races ADD COLUMN IF NOT EXISTS country_code TEXT");
   db.exec("ALTER TABLE races ADD COLUMN IF NOT EXISTS circuit_name TEXT");
+  db.exec("ALTER TABLE question_settings ADD COLUMN IF NOT EXISTS prompt_override TEXT");
 }
 
 module.exports = {

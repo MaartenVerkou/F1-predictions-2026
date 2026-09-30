@@ -3,13 +3,13 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  buildQuestionActualStatusMap,
-  buildQuestionContractRows,
+  buildQuestionInputRows,
+  normalizeQuestionInputEdits,
   scoringSummary
 } = require("../src/question-admin-model");
 const { registerAdminRoutes } = require("../src/routes/admin");
 
-test("question contract rows expose catalog basis, derivation and stable links", () => {
+test("question input rows expose only input-adjacent fields", () => {
   const question = {
     id: "most_dnfs_driver",
     prompt: "Which driver has the most DNFs?",
@@ -23,61 +23,61 @@ test("question contract rows expose catalog basis, derivation and stable links",
       scope: "season"
     },
     _included: true,
-    _orderIndex: 3
+    _orderIndex: 3,
+    _pointsOverrideRaw: "10",
+    _promptOverrideRaw: "Who has the most retirements?"
   };
-  const rows = buildQuestionContractRows([question], {
-    selectedSeason: 2026,
-    catalog: {
-      season: { year: 2026 },
-      catalogRevision: "catalog-1",
-      readiness: {
-        checks: {
-          questions: [{ id: question.id, source: "drivers", optionCount: 22, ready: true }]
-        }
-      }
-    }
-  });
+
+  const rows = buildQuestionInputRows([question]);
 
   assert.equal(rows[0].basisLabel, "Drivers");
   assert.equal(rows[0].derivationLabel, "DNF");
   assert.equal(rows[0].evidenceLabel, "Race");
-  assert.equal(rows[0].optionState, "ready");
-  assert.equal(rows[0].optionCount, 22);
-  assert.match(rows[0].raceDataHref, /focus=most_dnfs_driver/);
-  assert.match(rows[0].actualsHref, /#question-most_dnfs_driver$/);
+  assert.equal(rows[0].promptOverride, "Who has the most retirements?");
+  assert.equal(rows[0].pointsOverride, "10");
+  assert.equal(rows[0].orderIndex, 3);
 });
 
-test("question contract rows never fall back to another season when options are unresolved", () => {
-  const rows = buildQuestionContractRows([{
-    id: "select_three_races_dnfs",
-    type: "multi_select_limited",
-    options_source: "races",
-    race_data_focus: { view: "drivers", metric: "dnf_by_race" }
-  }], {
-    selectedSeason: 2027,
-    catalog: {
-      season: { year: 2027 },
-      readiness: { checks: { questions: [{ id: "select_three_races_dnfs", source: "races", optionCount: 0, ready: false }] } }
-    }
+test("question input edits normalize order and preserve stable question IDs", () => {
+  const questions = [
+    { id: "first", _basePoints: 10 },
+    { id: "second", _basePoints: 5 }
+  ];
+  const edits = normalizeQuestionInputEdits(questions, {
+    first__order: "2",
+    first__prompt: "Second wording",
+    first__points: "10",
+    first__included: "1",
+    second__order: "1",
+    second__prompt: "First wording",
+    second__points: "5"
   });
-  assert.equal(rows[0].optionState, "unresolved");
-  assert.equal(rows[0].optionCount, 0);
+  assert.deepEqual(edits.map((row) => row.questionId), ["second", "first"]);
+  assert.deepEqual(edits.map((row) => row.orderIndex), [0, 1]);
+  assert.equal(edits[1].promptOverride, "Second wording");
+  assert.equal(edits[0].included, false);
 });
 
-test("question actual status prefers the latest round and keeps pending revisions visible", () => {
-  const status = buildQuestionActualStatusMap({
-    snapshots: [
-      { id: 1, round_number: 4, review_status: "reviewed" },
-      { id: 2, round_number: 5, review_status: "pending" }
-    ],
-    publishedSnapshot: { id: 1 },
-    fetchSnapshotValues: (id) => ({ points: JSON.stringify(id) })
-  });
-  assert.deepEqual(status.get("points"), {
-    status: "pending",
-    roundNumber: 5,
-    snapshotId: 2
-  });
+test("question input edits reject duplicate order and empty prompts", () => {
+  const questions = [{ id: "first" }, { id: "second" }];
+  assert.throws(
+    () => normalizeQuestionInputEdits(questions, {
+      first__order: "1",
+      first__prompt: "First",
+      second__order: "1",
+      second__prompt: "Second"
+    }),
+    /already used/
+  );
+  assert.throws(
+    () => normalizeQuestionInputEdits(questions, {
+      first__order: "1",
+      first__prompt: "",
+      second__order: "2",
+      second__prompt: "Second"
+    }),
+    /cannot be empty/
+  );
 });
 
 test("scoring summary is compact while retaining the detailed rule", () => {
@@ -89,25 +89,12 @@ test("scoring summary is compact while retaining the detailed rule", () => {
   assert.equal(summary.detail, "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts");
 });
 
-test("Questions route preserves the selected mode and exposes a safe unresolved state", () => {
-  const seasons = [{
-    id: 1,
-    year: 2026,
-    label: "2026 active",
-    status: "active",
-    created_at: "now",
-    updated_at: "now"
-  }];
+test("Questions route renders one global input table and one edit mode", () => {
   const db = {
-    prepare(sql) {
+    prepare() {
       return {
-        all() {
-          if (/FROM seasons/i.test(sql)) return seasons;
-          return [];
-        },
-        get() {
-          return { count: 0 };
-        }
+        all() { return []; },
+        get() { return { count: 0 }; }
       };
     }
   };
@@ -133,7 +120,7 @@ test("Questions route preserves the selected mode and exposes a safe unresolved 
 
   let rendered;
   routes["GET /admin/questions"](
-    { query: { season: "2099", mode: "order" }, user: { id: 7 } },
+    { query: { season: "2099", mode: "edit" }, user: { id: 7 } },
     {
       locals: { locale: "en" },
       render(view, model) { rendered = { view, model }; }
@@ -141,7 +128,61 @@ test("Questions route preserves the selected mode and exposes a safe unresolved 
   );
 
   assert.equal(rendered.view, "admin_questions");
-  assert.equal(rendered.model.mode, "order");
-  assert.equal(rendered.model.questionRows[0].optionState, "select_season");
-  assert.match(rendered.model.questionRows[0].actualsHref, /season=2099/);
+  assert.equal(rendered.model.mode, "edit");
+  assert.equal(rendered.model.season, undefined);
+  assert.equal(rendered.model.questionRows[0].prompt, "Select three races with the most DNFs");
+});
+
+test("Questions edit save persists prompt, points, inclusion and order together", () => {
+  const writes = [];
+  const questions = [
+    { id: "first", prompt: "First", type: "single_choice", points: 10, _included: true, _basePoints: 10 },
+    { id: "second", prompt: "Second", type: "single_choice", points: 5, _included: true, _basePoints: 5 }
+  ];
+  const db = {
+    prepare() {
+      return {
+        all() { return []; },
+        get() { return { count: 0 }; },
+        run(...args) { writes.push(args); return { changes: 1 }; }
+      };
+    },
+    transaction(fn) { return () => fn(); }
+  };
+  const routes = {};
+  const app = {
+    get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers.at(-1); }
+  };
+  registerAdminRoutes(app, {
+    db,
+    requireAdmin: () => {},
+    getCurrentUser: () => ({ id: 7 }),
+    getQuestions: () => questions,
+    getRaces: () => [],
+    logEvent() {}
+  });
+
+  let redirected;
+  routes["POST /admin/questions"](
+    {
+      body: {
+        first__order: "2",
+        first__prompt: "Rewritten first",
+        first__points: "12",
+        first__included: "1",
+        second__order: "1",
+        second__prompt: "Rewritten second",
+        second__points: "5"
+      },
+      user: { id: 7 }
+    },
+    { redirect(path) { redirected = path; } }
+  );
+
+  assert.match(redirected, /Questions%20updated/);
+  assert.deepEqual(writes.map((args) => args.slice(0, 5)), [
+    ["second", 0, "5", 0, "Rewritten second"],
+    ["first", 1, "12", 1, "Rewritten first"]
+  ]);
 });
