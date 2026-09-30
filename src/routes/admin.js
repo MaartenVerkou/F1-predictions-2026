@@ -108,9 +108,7 @@ function formatRaceStatusLabel(row) {
     .trim()
     .replace(/\s+/g, " ")
     .replace(/\bLAPS?\b/i, "laps");
-  if (gap) return `${label} · ${gap}`;
-  const laps = Number(row.laps);
-  if (Number.isFinite(laps) && laps > 0) return `${label} · ${laps} lap${laps === 1 ? "" : "s"}`;
+  if (label === "NC" && gap) return gap;
   return label;
 }
 

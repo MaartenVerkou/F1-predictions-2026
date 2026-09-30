@@ -453,10 +453,11 @@ test("detail rows keep the source order for unclassified results and explain the
   const stroll = view.detailRows.find((row) => row.driver === "Lance Stroll");
   assert.equal(stroll.raceLaps, 43);
   assert.equal(stroll.raceGap, "+15 LAPS");
-  assert.equal(stroll.raceStatusLabel, "NC · +15 laps");
+  assert.equal(stroll.raceStatusLabel, "+15 laps");
   assert.equal(view.detailRows.find((row) => row.driver === "Fernando Alonso").raceLabel, "NC");
-  assert.equal(view.detailRows.find((row) => row.driver === "Fernando Alonso").raceStatusLabel, "DNF · 21 laps");
+  assert.equal(view.detailRows.find((row) => row.driver === "Fernando Alonso").raceStatusLabel, "DNF");
   assert.equal(view.detailRows.find((row) => row.driver === "Oscar Piastri").raceLabel, "NC");
+  assert.equal(view.detailRows.find((row) => row.driver === "Oscar Piastri").raceStatusLabel, "DNS");
 });
 
 test("constructor detail groups the canonical two-seat lineup and merges team summary data", () => {
