@@ -982,7 +982,7 @@ test("podium focus projects binary results, counts podiums, and preserves cutoff
   assert.equal(view.drivers[1].cells[0].markerGlyph, "");
   assert.equal(view.drivers[1].cells[2].afterCutoff, true);
   assert.equal(view.focusSummary.value, "2 drivers");
-  assert.equal(view.focusSummary.detail, "3 podium finishes through R2");
+  assert.equal(view.focusSummary.detail, "3 podium finishes at selected season end · R2");
   assert.match(view.focusSummary.tooltip, /Driver Alpha: 2/);
   assert.match(view.focusSummary.tooltip, /Driver Beta: 1/);
   assert.equal(view.focusFooter, null);
