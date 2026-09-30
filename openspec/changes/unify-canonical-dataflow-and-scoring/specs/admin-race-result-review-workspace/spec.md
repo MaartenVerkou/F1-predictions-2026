@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
-### Requirement: Race data and Actuals share one evidence and cutoff view
-The admin Race data and Actuals workspaces SHALL use the same selected season, round cutoff, normalized evidence revision, catalog revision, coverage state, and derived snapshot identity for a review operation.
+### Requirement: Race data and Actuals share one evidence and effective season-end view
+The admin Race data and Actuals workspaces SHALL use the same selected season, effective end round, normalized evidence revision, catalog revision, coverage state, and derived snapshot identity for a review operation.
 
 #### Scenario: An admin selects a round in Race data
 - **WHEN** the admin opens the corresponding Actuals review for that round
-- **THEN** the Actuals workspace SHALL show the same cutoff and source evidence identity
+- **THEN** the Actuals workspace SHALL show the same effective season end and source evidence identity
 - **AND** it SHALL not re-fetch or independently reinterpret the provider payload
 
 #### Scenario: Evidence is not ready for a selected round
@@ -31,7 +31,7 @@ The constructor race-data matrix SHALL derive podium indicators from the same no
 
 #### Scenario: A constructor has a podium driver
 - **GIVEN** persisted race evidence contains a driver finish in positions 1 through 3 for a constructor
-- **WHEN** the constructor matrix is rendered for a cutoff that includes that round
+- **WHEN** the constructor matrix is rendered for an effective season end that includes that round
 - **THEN** the points cell SHALL retain the constructor's race and sprint points
 - **AND** it SHALL show a compact, position-specific podium indicator with an accessible explanation of the driver finish
 
@@ -65,7 +65,7 @@ The Race data workspace SHALL use one shared matrix and reusable row/cell partia
 
 #### Scenario: The round selector refreshes the same region
 - **WHEN** the administrator selects another race round or follows a round header link
-- **THEN** the page SHALL replace only the race-data region with the selected round's server-rendered cutoff, matrix, legend, and detail state
+- **THEN** the page SHALL replace only the race-data region with the selected round's server-rendered effective season end, matrix, legend, and detail state
 - **AND** the selected round and view SHALL remain represented in the URL for refresh and sharing
 - **AND** a normal GET navigation SHALL remain available when client-side enhancement is unavailable
 
@@ -76,34 +76,34 @@ The Race data workspace SHALL use one shared matrix and reusable row/cell partia
 - **AND** an empty seat SHALL remain visibly unavailable without borrowing a driver from another round
 
 ### Requirement: Race data exposes question-linked audit projections
-The Race data workspace SHALL offer a neutral championship-points projection and question-linked read-only projections declared by question metadata. Every projection SHALL use the same normalized evidence, selected cutoff, catalog revision, and reusable matrix rows/cells; selecting a projection SHALL never write evidence or Actuals.
+The Race data workspace SHALL offer a neutral championship-points projection and question-linked read-only projections declared by question metadata. Every projection SHALL use the same normalized evidence, selected effective season end, catalog revision, and reusable matrix rows/cells; selecting a projection SHALL never write evidence or Actuals.
 
 #### Scenario: Default points focus
 - **GIVEN** no question focus is selected
-- **WHEN** the administrator opens Race data for a cutoff
+- **WHEN** the administrator opens Race data for an effective season end
 - **THEN** the active matrix SHALL show the existing cumulative championship points view
 - **AND** rows SHALL remain ordered by the selected standings totals
 
 #### Scenario: Podium question focus
 - **GIVEN** a question declares a driver podium projection
 - **WHEN** the administrator selects that question in the Race data focus control
-- **THEN** the driver matrix cells SHALL show `1` for a podium finish, `0` for a reported non-podium result, and `—` for unavailable or post-cutoff rounds
-- **AND** the total column SHALL count podiums through the selected cutoff and order rows by that count
+- **THEN** the driver matrix cells SHALL show `1` for a podium finish, `0` for a reported non-podium result, and `—` for unavailable or rounds after the selected season end
+- **AND** the total column SHALL count podiums through the selected season end and order rows by that count
 - **AND** the projection SHALL not show unrelated pole, fastest-lap, or constructor markers
 
 #### Scenario: Question focus selects its relevant table
 - **GIVEN** a question declares a constructor points projection
 - **WHEN** the administrator selects that question
 - **THEN** the workspace SHALL switch to the constructor grouping while retaining the same round, evidence, and matrix structure
-- **AND** the selected focus, view, and cutoff SHALL remain represented in the URL for refresh and sharing
+- **AND** the selected focus, view, and effective season end SHALL remain represented in the URL for refresh and sharing
 
 #### Scenario: Projection leaves source evidence unchanged
-- **WHEN** an administrator changes focus or cutoff
+- **WHEN** an administrator changes focus or the effective season end
 - **THEN** the source detail and persisted evidence identity SHALL remain unchanged
 - **AND** no Actuals snapshot or review state SHALL be created, updated, or published
 
 ### Requirement: Question audit focuses expose the smallest useful fact projection
-The Race data workspace SHALL resolve each question's audit profile from question metadata and SHALL use a shared matrix or compact summary projection rather than rendering a separate question-specific table. A projection SHALL expose the observed facts needed to verify the candidate actual, its cutoff, and its evidence readiness without duplicating the source detail.
+The Race data workspace SHALL resolve each question's audit profile from question metadata and SHALL use a shared matrix or compact summary projection rather than rendering a separate question-specific table. A projection SHALL expose the observed facts needed to verify the candidate actual, its effective season end, and its evidence readiness without duplicating the source detail.
 
 #### Scenario: An administrator opens a question focus
 - **WHEN** a question declares a points, podium, DNF, grid-winner, sprint, qualifying, or comparison projection
@@ -116,14 +116,14 @@ The Race data workspace SHALL resolve each question's audit profile from questio
 - **THEN** the workspace SHALL show an explicit unavailable state and reason
 - **AND** it SHALL not infer the value from a related metric such as DNF or championship points
 
-#### Scenario: A question focus is reviewed at an earlier cutoff
+#### Scenario: A question focus is reviewed at an earlier effective season end
 - **WHEN** the administrator changes the selected round while a question focus is active
-- **THEN** all cells, totals, summary values, and readiness state SHALL use the same cutoff
+- **THEN** all cells, totals, summary values, and readiness state SHALL use the same effective season end
 - **AND** future rounds SHALL remain muted and excluded from the candidate result
 
 #### Scenario: Additive audit focuses expose round contributions without a second table
 - **GIVEN** a question declares a count or points-per-round projection
 - **WHEN** the administrator selects that focus
 - **THEN** the shared matrix SHALL render the declared per-round value and an additive Round total footer
-- **AND** the footer SHALL include only evidence through the selected cutoff, label its total as through-cutoff, and mute later rounds
+- **AND** the footer SHALL include only evidence through the selected season end, label its total as through the selected season end, and mute later rounds
 - **AND** comparison or ordinal projections SHALL omit the footer and keep their own compact cell representation

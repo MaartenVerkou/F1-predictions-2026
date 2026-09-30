@@ -28,8 +28,9 @@
 - [x] 3.1 Extract question derivation into a season-aware service with strategy metadata, canonical outputs, unavailable reasons, and provenance.
 - [x] 3.2 Replace hardcoded 2026 roster/engine/team-pair constants with catalog/assignment/season metadata or explicit versioned strategy configuration.
 - [x] 3.3 Make admin sync and the backfill command thin callers of the same derivation service; keep an old-vs-new comparison report until parity is proven.
-- [x] 3.4 Add tests for driver/team changes, constructor standings, teammate questions, sprint/qualifying data, cancelled rounds, unresolved inputs, and round cutoffs.
-- [x] 3.5 Derive the Drivers' title-decision answer from the selected cutoff, season scoring rules, future sprint opportunities, and countback tiebreak possibilities.
+- [x] 3.4 Add tests for driver/team changes, constructor standings, teammate questions, sprint/qualifying data, cancelled rounds, unresolved inputs, and effective season-end boundaries.
+- [x] 3.5 Derive the Drivers' title-decision answer from the selected effective season end, season scoring rules, future sprint opportunities, and countback tiebreak possibilities.
+- [x] 3.6 Make the selected round a virtual season end across every question derivation, remove user-facing cutoff terminology, and add regression coverage for full-season and earlier-round projections.
 
 ## 4. Season-scoped actual lifecycle
 

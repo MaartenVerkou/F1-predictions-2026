@@ -761,8 +761,8 @@
     "legend_wd": "WD = teruggetrokken",
     "legend_pole": "P = poleposition",
     "legend_fastest_lap": "FL = snelste ronde",
-    "legend_constructor_summary": "W/P = overwinningen/podia t/m cutoff",
-    "constructor_summary_title": "{wins} overwinningen · {podiums} podia t/m geselecteerde cutoff",
+    "legend_constructor_summary": "W/P = overwinningen/podia in het geselecteerde seizoen",
+    "constructor_summary_title": "{wins} overwinningen · {podiums} podia in het geselecteerde seizoen",
     "future_round": "Toekomstige race; brondata wordt nog niet verwacht.",
     "cancelled_round": "Afgelaste race; er wordt geen brondata verwacht.",
     "partial_round": "Gedeeltelijke brondekking; ontbrekende velden blijven onbekend.",
@@ -785,8 +785,10 @@
     "focus_group_external": "Externe evidence",
     "focus_group_other": "Overig",
     "focus_audit": "Vraagcontrole",
+    "derivation_selected_round_note": "De geselecteerde ronde geldt voor deze afleiding als het seizoenseinde; latere rondes blijven opgeslagen maar worden niet meegenomen.",
+    "derivation_latest_round_note": "Zonder geselecteerde ronde geldt de laatst beschikbare ronde als seizoenseinde voor deze afleiding.",
     "focus_round_total": "Rondetotaal",
-    "focus_through_cutoff": "T/m cutoff",
+    "focus_total": "Totaal",
     "focus_ready": "Gereed voor controle",
     "focus_partial": "Meer evidence nodig",
     "focus_unavailable": "Niet beschikbaar",
@@ -796,6 +798,6 @@
     "legend_driver_of_day_focus": "1 = Driver of the Day · 0 = andere coureur · — = bron ontbreekt",
     "legend_sprint_focus": "Alleen sprintpunten; — = geen sprintresultaat of niet beschikbaar",
     "legend_qualifying_focus": "Cel toont kwalificatieposities; totaal is het winverschil",
-    "legend_damage_focus": "Schadekosten per ronde; totaal is cumulatief t/m cutoff · — = bewijs ontbreekt"
+    "legend_damage_focus": "Schadekosten per ronde; totaal is cumulatief in het geselecteerde seizoen · — = bewijs ontbreekt"
   }
 }

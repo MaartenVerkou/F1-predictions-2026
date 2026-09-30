@@ -291,7 +291,12 @@ const reviewStatusTitle = reviewStatusLabel; %>
     <div class="admin-race-data-derivation-heading">
       <div>
         <h2 id="admin-race-data-derivation-heading">Derivation review</h2>
-        <p class="muted">Inspect the evidence interpretation used for one question.</p>
+        <p class="muted">
+          Inspect the evidence interpretation used for one question.
+          <%= view.hasSelectedRound
+            ? t('admin_race_data.derivation_selected_round_note')
+            : t('admin_race_data.derivation_latest_round_note') %>
+        </p>
       </div>
       <form method="get" action="/admin/race-data" class="admin-race-data-question-form" data-race-data-focus-form>
         <input type="hidden" name="season" value="<%= season %>" />

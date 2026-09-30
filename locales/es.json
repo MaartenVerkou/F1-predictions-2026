@@ -761,8 +761,8 @@
     "legend_wd": "WD = retirado",
     "legend_pole": "P = pole position",
     "legend_fastest_lap": "FL = vuelta rápida",
-    "legend_constructor_summary": "W/P = victorias/podios hasta el corte",
-    "constructor_summary_title": "{wins} victorias · {podiums} podios hasta el corte seleccionado",
+    "legend_constructor_summary": "W/P = victorias/podios en la temporada seleccionada",
+    "constructor_summary_title": "{wins} victorias · {podiums} podios en la temporada seleccionada",
     "future_round": "Carrera futura; todavía no se esperan datos de origen.",
     "cancelled_round": "Carrera cancelada; no se esperan datos de origen.",
     "partial_round": "Cobertura parcial; los campos faltantes siguen no disponibles.",
@@ -785,8 +785,10 @@
     "focus_group_external": "Datos externos",
     "focus_group_other": "Otros",
     "focus_audit": "Auditoría de pregunta",
+    "derivation_selected_round_note": "La ronda seleccionada se trata como el final de la temporada para esta derivación; las rondas posteriores siguen guardadas pero no se incluyen.",
+    "derivation_latest_round_note": "Sin una ronda seleccionada, la última ronda disponible se trata como el final de la temporada para esta derivación.",
     "focus_round_total": "Total de ronda",
-    "focus_through_cutoff": "Hasta el corte",
+    "focus_total": "Total",
     "focus_ready": "Lista para revisar",
     "focus_partial": "Faltan datos",
     "focus_unavailable": "No disponible",
@@ -796,6 +798,6 @@
     "legend_driver_of_day_focus": "1 = piloto del día · 0 = otro piloto · — = falta la fuente",
     "legend_sprint_focus": "Solo puntos de sprint; — = sin sprint o no disponible",
     "legend_qualifying_focus": "La celda muestra posiciones; el total es la diferencia de victorias",
-    "legend_damage_focus": "Coste de daños por carrera; total acumulado hasta el corte · — = evidencia no disponible"
+    "legend_damage_focus": "Coste de daños por carrera; total acumulado en la temporada seleccionada · — = evidencia no disponible"
   }
 }

@@ -770,8 +770,8 @@
     "legend_wd": "WD = withdrawn",
     "legend_pole": "P = pole position",
     "legend_fastest_lap": "FL = fastest lap",
-    "legend_constructor_summary": "W/P = wins/podiums through cutoff",
-    "constructor_summary_title": "{wins} wins · {podiums} podiums through selected cutoff",
+    "legend_constructor_summary": "W/P = wins/podiums in the selected season",
+    "constructor_summary_title": "{wins} wins · {podiums} podiums in the selected season",
     "future_round": "Future round; source data is not expected yet.",
     "cancelled_round": "Cancelled round; no source data is expected.",
     "partial_round": "Partial source coverage; missing fields remain unavailable.",
@@ -794,8 +794,10 @@
     "focus_group_external": "External evidence",
     "focus_group_other": "Other",
     "focus_audit": "Question audit",
+    "derivation_selected_round_note": "The selected round is treated as the season end for this derivation; later rounds remain stored but are not included.",
+    "derivation_latest_round_note": "With no round selected, the latest available round is treated as the season end for this derivation.",
     "focus_round_total": "Round total",
-    "focus_through_cutoff": "Through cutoff",
+    "focus_total": "Total",
     "focus_ready": "Ready to review",
     "focus_partial": "Needs more evidence",
     "focus_unavailable": "Not available",
@@ -805,6 +807,6 @@
     "legend_driver_of_day_focus": "1 = Driver of the Day · 0 = another driver · — = source missing",
     "legend_sprint_focus": "Sprint points only; — = no sprint result or unavailable",
     "legend_qualifying_focus": "Cell shows qualifying positions; total is the win-gap",
-    "legend_damage_focus": "Damage cost per round; total is cumulative through cutoff · — = evidence unavailable"
+    "legend_damage_focus": "Damage cost per round; total is cumulative in the selected season · — = evidence unavailable"
   }
 }

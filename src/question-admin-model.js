@@ -117,7 +117,6 @@ function buildQuestionInputRows(questions = []) {
     const focus = question?.race_data_focus || {};
     const scoring = scoringSummary(question);
     const evidence = questionEvidence(question);
-    const scope = normalizeText(focus.scope).replace(/[_-]+/g, " ") || "—";
     return {
       question,
       id: normalizeText(question?.id),
@@ -129,8 +128,8 @@ function buildQuestionInputRows(questions = []) {
       basisLabel: basisLabel(question),
       derivationLabel: focus.metric ? raceDataFocusLabel(question) : "No race projection",
       evidenceLabel: evidence,
-      scopeLabel: scope,
-      derivationMeta: `Evidence: ${evidence} · Scope: ${scope}`,
+      scopeLabel: "season",
+      derivationMeta: "Evidence: " + evidence + " · Season derivation",
       scoringLabel: scoring.label,
       pointsCurrentLabel: scoring.currentLabel,
       pointsDefaultLabel: compactPoints(question?._basePoints ?? question?.points),

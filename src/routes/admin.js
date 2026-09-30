@@ -245,7 +245,7 @@ function buildAuditMatrixCell({
     markerGlyph,
     markerTitle,
     focusHit: afterCutoff ? false : focusHit,
-    title: afterCutoff ? ["After selected cutoff", title].filter(Boolean).join(" · ") : title
+    title: afterCutoff ? ["After selected round", title].filter(Boolean).join(" · ") : title
   };
 }
 
@@ -297,7 +297,10 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       footerMode: String(projection?.footerMode || "").trim().toLowerCase() || null,
       sort: String(projection?.sort || "desc").trim().toLowerCase(),
       kind: String(projection?.kind || "matrix").trim().toLowerCase(),
-      scope: String(projection?.scope || "through_cutoff").trim().toLowerCase(),
+      // Every question is a season derivation. A selected round is only a
+      // temporary effective season end in the audit workspace, not a
+      // question-specific scope or a truncated source dataset.
+      scope: "season",
       group,
       options: Array.isArray(question.options) ? question.options.slice() : [],
       compareDrivers: Array.isArray(projection?.compareDrivers) ? projection.compareDrivers.slice() : [],
@@ -958,6 +961,9 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
     constructorGroups,
     selectedRound: selected,
     selectedRoundNumber: selected?.roundNumber || cutoffRoundNumber,
+    // This is the semantic name used by the UI: the selected round is the
+    // temporary end of the observed season, not a destructive data cutoff.
+    effectiveEndRound: cutoffRoundNumber,
     hasSelectedRound: showRaceResult !== false,
     cutoffRoundNumber,
     selectedEvidence: selected?.evidence || null,
@@ -3117,7 +3123,7 @@ function registerAdminRoutes(app, deps) {
     };
     focus.metricLabel = focusMetricLabels[focus.matrixMetric || focus.metric] || t("admin_race_data.points");
     focus.footerRoundLabel = t("admin_race_data.focus_round_total");
-    focus.footerTotalLabel = t("admin_race_data.focus_through_cutoff");
+    focus.footerTotalLabel = t("admin_race_data.focus_total");
     const catalog = seasonContext.selected
       ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
       : null;

@@ -33,11 +33,11 @@ The catalog owns identity and configuration; it does not own observed race facts
 
 Extend evidence import identity and payload metadata so each effective bundle is keyed by season, round, source identity, payload revision, and parser version. Normalized rows carry canonical IDs where resolution is unique, preserve provider labels, and retain unresolved reasons. The importer is idempotent for equivalent normalized bundles and creates a new evidence revision when facts or parser behavior change.
 
-Race data and Actuals use the same persisted evidence row and cutoff resolver. A missing or partial bundle is a visible coverage state, not an implicit zero.
+Race data and Actuals use the same persisted evidence row and effective season-end resolver. A missing or partial bundle is a visible coverage state, not an implicit zero.
 
 ### 3. Use one derivation engine with strategy modules
 
-Move question-specific derivation out of `src/routes/admin.js` and `scripts/backfill-actuals-2026.js` into a shared season-aware service. Strategies receive a catalog, a cutoff, normalized evidence, and the question definition; they return a canonical value plus provenance or an explicit unavailable reason. Question IDs and 2026-only constants belong in data/configuration or strategy metadata, not route control flow. The admin sync route and backfill command become thin callers of the same service.
+Move question-specific derivation out of `src/routes/admin.js` and `scripts/backfill-actuals-2026.js` into a shared season-aware service. Strategies receive a catalog, an effective end round, normalized evidence, and the question definition; they return a canonical value plus provenance or an explicit unavailable reason. Question IDs and 2026-only constants belong in data/configuration or strategy metadata, not route control flow. The admin sync route and backfill command become thin callers of the same service.
 
 ### 4. Make actual snapshots a review/publish lifecycle
 
@@ -51,7 +51,7 @@ Make `leaderboard-model` (or a single adjacent score service) the only scoring i
 
 - Inputs: canonical identities, memberships, assignments, calendar, mappings, and readiness.
 - Questions: question definitions with options resolved from the selected catalog revision.
-- Race data: immutable evidence, coverage, cutoff totals, source links, and read-only question-linked audit projections. Projection metadata selects a reusable metric/view over the same evidence; it is not a second source-of-truth table and never mutates Actuals.
+- Race data: immutable evidence, coverage, effective season-end totals, source links, and read-only question-linked audit projections. Projection metadata selects a reusable metric/view over the same evidence; it is not a second source-of-truth table and never mutates Actuals.
 - Actuals: derived values, provenance, review/correction state, and publishability.
 - Leaderboard/analysis: scoring output for the selected published snapshot.
 
@@ -74,7 +74,7 @@ Add columns/tables and dual-read compatibility first. Backfill or report resolva
 
 1. Close the remaining tests/release checks for the current Inputs, race-data audit, and historical-confirmation changes; do not archive them with unchecked behavior.
 2. Add catalog readiness/revision and integration tests without changing production tables' meaning.
-3. Add evidence identity/cutoff metadata and compare shared derivation output to the current route/script output on sanitized preview data.
+3. Add evidence identity/effective-end metadata and compare shared derivation output to the current route/script output on sanitized preview data.
 4. Introduce the season-scoped actual publication read/write path with dual reads and an explicit rollback switch.
 5. Route admin sync, backfill, Actuals, Race data, and scoring through shared services; keep legacy label reads until migration reports are clean.
 6. Refresh the preview from the feature commit, run health, targeted, full, build, and critical Playwright checks, and wait for explicit preview approval.

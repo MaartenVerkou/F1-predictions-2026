@@ -8,7 +8,7 @@ This change makes Inputs the upstream contract and gives every later stage a sin
 
 - Treat the canonical season catalog as the only semantic source for drivers, teams, races, assignments, aliases, provider references, and season-specific metadata.
 - Add a readiness/read-model contract so Questions, Race data, Actuals, and scoring consume the same resolved catalog and report unresolved mappings instead of guessing.
-- Persist normalized race evidence before derivation, with canonical entity references, cutoff context, provenance, and an idempotent import identity.
+- Persist normalized race evidence before derivation, with canonical entity references, effective season-end context, provenance, and an idempotent import identity.
 - Add a versioned Formula 1 Dashboard evidence adapter for constructor, race, qualifying, starting-grid, sprint, and standings data without making the external provider a runtime scoring dependency.
 - Keep the public preview isolated from production while bootstrapping it with validated provider evidence; deterministic synthetic fixtures remain test-only and are never used as the audit dataset.
 - Replace route/script-specific actuals logic with one season-aware derivation engine that reads Inputs and persisted evidence.

@@ -143,7 +143,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
   const mode = inferFocusFooterMode(focus, metric);
   if (!mode) return null;
   const roundLabel = String(focus?.footerRoundLabel || "Round total");
-  const totalLabel = String(focus?.footerTotalLabel || "Through cutoff");
+  const totalLabel = String(focus?.footerTotalLabel || "Total");
   const cells = (rounds || []).map((round, index) => {
     if (round.afterCutoff) {
       return {
@@ -152,7 +152,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
         state: "future",
         afterCutoff: true,
         focusColumn: false,
-        title: "After selected cutoff"
+        title: "After selected round"
       };
     }
     if (!round.evidence || round.state === "cancelled") {
@@ -207,7 +207,7 @@ function applyDamageMetric(row, rounds, focus, entityType) {
   const cells = row.cells.map((cell, index) => {
     const round = rounds[index];
     if (cell.afterCutoff) {
-      return focusCell(cell, { label: "—", title: "After selected cutoff", hit: false, state: "future" });
+      return focusCell(cell, { label: "—", title: "After selected round", hit: false, state: "future" });
     }
     if (!round?.evidence) {
       return focusCell(cell, { label: "—", title: "Damage evidence unavailable", hit: false, state: "incomplete" });
@@ -406,7 +406,7 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     let observed = false;
     row.cells = row.cells.map((cell, index) => {
       if (cell.afterCutoff) {
-        return focusCell(cell, { label: "—", title: "After selected cutoff", hit: false, state: "future" });
+        return focusCell(cell, { label: "—", title: "After selected round", hit: false, state: "future" });
       }
       const values = teamDrivers
         .map((driver) => driver.cells?.[index])
@@ -436,7 +436,7 @@ function applyConstructorMetric(row, rounds, focus, cutoffRoundNumber, driverRow
     let observed = false;
     row.cells = row.cells.map((cell, index) => {
       if (cell.afterCutoff) {
-        return focusCell(cell, { label: "—", title: "After selected cutoff", hit: false, state: "future" });
+        return focusCell(cell, { label: "—", title: "After selected round", hit: false, state: "future" });
       }
       const wins = teamDrivers
         .map((driver) => driver.cells?.[index])
@@ -670,7 +670,7 @@ function buildFocusSummary({
       .filter((row) => Number.isFinite(Number(row.championshipPosition)))
       .sort((left, right) => Number(left.championshipPosition) - Number(right.championshipPosition))
       .slice(0, 3);
-    if (!rows.length) return unavailable("Standings are not available for this cutoff.");
+    if (!rows.length) return unavailable("Standings are not available for the selected season end.");
     return {
       ...base,
       value: rows.map((row) => row.name).join(" · "),
@@ -682,7 +682,7 @@ function buildFocusSummary({
     const rows = [...(focus.view === "constructors" ? constructors : drivers)]
       .filter((row) => Number.isFinite(Number(row.championshipPosition)));
     const last = sortLastStandingRows(rows)[0];
-    if (!last) return unavailable("Standings are not available for this cutoff.");
+    if (!last) return unavailable("Standings are not available for the selected season end.");
     return {
       ...base,
       value: `${last.name} · P${last.championshipPosition}`,
@@ -693,7 +693,7 @@ function buildFocusSummary({
   if (metric === "damage") {
     const rows = (focus.view === "constructors" ? constructors : drivers)
       .filter((row) => Number.isFinite(Number(row.summaryValue)));
-    if (!rows.length) return unavailable("Damage evidence is unavailable for this cutoff.");
+    if (!rows.length) return unavailable("Damage evidence is unavailable for the selected season end.");
     const topValue = Math.max(...rows.map((row) => Number(row.summaryValue)));
     const leaders = rows.filter((row) => Number(row.summaryValue) === topValue);
     const partial = completed.some((round) => {
@@ -801,7 +801,7 @@ function buildFocusSummary({
     if (!left || !right || left.points == null || right.points == null) return unavailable("Both teammate standings are required.");
     const difference = Math.abs(Number(left.points) - Number(right.points));
     const winner = Number(left.points) === Number(right.points) ? "Tie" : Number(left.points) > Number(right.points) ? left.name : right.name;
-    return { ...base, value: `${winner} · Δ ${difference}`, detail: `${left.name} ${left.points} · ${right.name} ${right.points} points`, tooltip: "Difference uses the selected round cutoff." };
+    return { ...base, value: `${winner} · Δ ${difference}`, detail: `${left.name} ${left.points} · ${right.name} ${right.points} points`, tooltip: "Difference uses the selected round as the season end." };
   }
 
   if (metric === "alpine_comparison") {
@@ -855,7 +855,7 @@ function buildFocusSummary({
         status: "partial",
         value: "Not decided",
         detail: `No clinch by R${cutoffRoundNumber}`,
-        tooltip: "The leader can still be caught on points or countback before the selected cutoff."
+        tooltip: "The leader can still be caught on points or countback before the selected season end."
       };
     }
     return {
@@ -878,7 +878,7 @@ function buildFocusSummary({
     const winner = roundRows(firstRound, "race").find((row) => numeric(row.position) === 1)?.driver || null;
     const champion = drivers.find((row) => Number(row.championshipPosition) === 1)?.name || null;
     if (!winner || !champion) return unavailable("Race winner and championship leader are required.");
-    return { ...base, value: winner === champion ? "Yes" : "No", detail: `R1 ${winner} · leader ${champion}`, tooltip: "Compares the first Grand Prix winner with the selected-cutoff championship leader." };
+    return { ...base, value: winner === champion ? "Yes" : "No", detail: `R1 ${winner} · leader ${champion}`, tooltip: "Compares the first Grand Prix winner with the championship leader at the selected season end." };
   }
 
   if (metric === "engine_top5") {
@@ -905,7 +905,7 @@ function buildFocusSummary({
     const sprintChampion = [...sprintTotals.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
     const normalChampion = drivers.find((row) => Number(row.championshipPosition) === 1)?.name || null;
     if (!sprintChampion || !normalChampion) return unavailable("Sprint points and championship standings are required.");
-    return { ...base, value: sprintChampion === normalChampion ? "Yes" : "No", detail: `Sprint ${sprintChampion} · championship ${normalChampion}`, tooltip: "Sprint-only points are compared with the selected-cutoff championship leader." };
+    return { ...base, value: sprintChampion === normalChampion ? "Yes" : "No", detail: `Sprint ${sprintChampion} · championship ${normalChampion}`, tooltip: "Sprint-only points are compared with the championship leader at the selected season end." };
   }
 
   return unavailable("This focus has no projection yet.");

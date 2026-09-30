@@ -761,8 +761,8 @@
     "legend_wd": "WD = retiré",
     "legend_pole": "P = pole position",
     "legend_fastest_lap": "FL = meilleur tour",
-    "legend_constructor_summary": "W/P = victoires/podiums jusqu'à la coupure",
-    "constructor_summary_title": "{wins} victoires · {podiums} podiums jusqu'à la coupure sélectionnée",
+    "legend_constructor_summary": "W/P = victoires/podiums dans la saison sélectionnée",
+    "constructor_summary_title": "{wins} victoires · {podiums} podiums dans la saison sélectionnée",
     "future_round": "Course future ; les données sources ne sont pas encore attendues.",
     "cancelled_round": "Course annulée ; aucune donnée source n’est attendue.",
     "partial_round": "Couverture partielle; les champs manquants restent indisponibles.",
@@ -785,8 +785,10 @@
     "focus_group_external": "Données externes",
     "focus_group_other": "Autre",
     "focus_audit": "Audit de la question",
+    "derivation_selected_round_note": "La manche sélectionnée est traitée comme la fin de la saison pour cette dérivation ; les manches suivantes restent enregistrées mais ne sont pas incluses.",
+    "derivation_latest_round_note": "Sans manche sélectionnée, la dernière manche disponible est traitée comme la fin de la saison pour cette dérivation.",
     "focus_round_total": "Total du tour",
-    "focus_through_cutoff": "Jusqu’au cutoff",
+    "focus_total": "Total",
     "focus_ready": "Prêt à vérifier",
     "focus_partial": "Données supplémentaires nécessaires",
     "focus_unavailable": "Indisponible",
@@ -796,6 +798,6 @@
     "legend_driver_of_day_focus": "1 = pilote du jour · 0 = autre pilote · — = source manquante",
     "legend_sprint_focus": "Points de sprint uniquement ; — = pas de sprint ou indisponible",
     "legend_qualifying_focus": "La cellule affiche les positions ; le total est l’écart de victoires",
-    "legend_damage_focus": "Coût des dommages par course ; total cumulé jusqu’à la limite · — = preuve indisponible"
+    "legend_damage_focus": "Coût des dommages par course ; total cumulé dans la saison sélectionnée · — = preuve indisponible"
   }
 }

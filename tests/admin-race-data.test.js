@@ -219,6 +219,53 @@ test("buildRaceDataAuditView uses selected cutoff standings and mutes later roun
   assert.equal(view.cutoffRoundNumber, 1);
 });
 
+
+test("selected round is a virtual season end while the full season catalog remains available", () => {
+  const evidence = (round, points) => ({
+    id: round,
+    round_number: round,
+    coverage_status: "complete",
+    payload: {
+      coverage: { status: "complete", sources: {} },
+      race: {
+        rows: [{
+          driver: "Driver Alpha",
+          constructor: "Team A",
+          position: 1,
+          points,
+          status: "Finished"
+        }]
+      },
+      qualifying: { rows: [] },
+      sprint: { rows: [] },
+      standings: {
+        drivers: [{ entity: "Driver Alpha", position: 1, points }],
+        constructors: [{ entity: "Team A", position: 1, points }]
+      }
+    }
+  });
+  const input = {
+    races: ["Australian Grand Prix", "Chinese Grand Prix"],
+    roster: {
+      drivers: ["Driver Alpha"],
+      teams: ["Team A"]
+    },
+    evidenceRows: [evidence(1, 25), evidence(2, 50)],
+    snapshotRows: [],
+    focus: { id: "points", view: "drivers", metric: "points" }
+  };
+  const earlier = buildRaceDataAuditView({ ...input, selectedRound: 1 });
+  const full = buildRaceDataAuditView({ ...input, selectedRound: 2 });
+
+  assert.equal(earlier.effectiveEndRound, 1);
+  assert.equal(earlier.rounds.length, 2);
+  assert.equal(earlier.rounds[1].afterCutoff, true);
+  assert.equal(earlier.drivers[0].points, 25);
+  assert.equal(full.effectiveEndRound, 2);
+  assert.equal(full.rounds[1].afterCutoff, false);
+  assert.equal(full.drivers[0].points, 50);
+});
+
 test("championship standings retain drivers who participated before a lineup change", () => {
   const evidence = (round, rows) => ({
     id: round,
@@ -1168,7 +1215,8 @@ test("DNF focus keeps its total while compact focus views omit footers", () => {
   assert.equal(dnfView.focusFooter.mode, "count");
   assert.deepEqual(dnfView.focusFooter.cells.map((cell) => cell.label), ["1", "—"]);
   assert.equal(dnfView.focusFooter.total, 1);
-  assert.equal(dnfView.focusFooter.totalLabel, "Through cutoff");
+  assert.equal(dnfView.effectiveEndRound, 1);
+  assert.equal(dnfView.focusFooter.totalLabel, "Total");
 
   const sprintView = buildRaceDataAuditView({
     races: ["Australian Grand Prix", "Chinese Grand Prix"],
