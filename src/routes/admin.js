@@ -96,19 +96,26 @@ function auditNonClassifiedLabel(row) {
 
 function formatRaceStatusLabel(row) {
   if (!row) return "—";
-  const position = Number(row.position);
-  if (Number.isFinite(position) && position > 0) return "Finished";
   const rawStatus = String(row.status || "").trim().toLowerCase();
   const auditLabel = auditResultLabel(row);
-  const label = rawStatus === "dnf"
-    ? "DNF"
-    : auditLabel === "—" ? "NC" : auditLabel;
+  const explicitLabel = {
+    dnf: "DNF",
+    dns: "DNS",
+    dsq: "DSQ",
+    dnq: "DNQ",
+    nc: "NC",
+    wd: "WD"
+  }[rawStatus] || null;
+  const label = explicitLabel || (auditLabel === "—" ? "NC" : auditLabel);
   const rawGap = Array.isArray(row.sessionGap) ? row.sessionGap.find(Boolean) : row.sessionGap;
   const gap = String(rawGap || row.gap_to_leader || "")
     .trim()
     .replace(/\s+/g, " ")
     .replace(/\bLAPS?\b/i, "laps");
   if (label === "NC" && gap) return gap;
+  if (explicitLabel) return explicitLabel;
+  const position = Number(row.position);
+  if (Number.isFinite(position) && position > 0) return "Finished";
   return label;
 }
 

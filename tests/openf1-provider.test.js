@@ -104,6 +104,30 @@ test("OpenF1 keeps Finished as the default for classified race results", () => {
   assert.equal(row.positionText, "1");
 });
 
+test("OpenF1 preserves an official race position when a classified driver retires", () => {
+  const row = normalizeOpenF1Row({
+    position: 15,
+    driver_number: 16,
+    number_of_laps: 62,
+    dnf: true,
+    dns: false,
+    dsq: false,
+    points: 0,
+    meeting_key: 1287,
+    session_key: 11307
+  }, {
+    driver_number: 16,
+    full_name: "Charles Leclerc",
+    first_name: "Charles",
+    last_name: "Leclerc",
+    team_name: "Ferrari"
+  }, "race", { sessionKey: 11307, meetingKey: 1287 });
+
+  assert.equal(row.status, "DNF");
+  assert.equal(row.position, 15);
+  assert.equal(row.positionText, "15");
+});
+
 test("OpenF1 marks an unclassified race row as NC when the provider has no finish position", () => {
   const row = normalizeOpenF1Row({
     position: null,

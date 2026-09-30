@@ -428,6 +428,7 @@ test("detail rows keep the source order for unclassified results and explain the
         race: {
           rows: [
             { driver: "George Russell", constructor: "Mercedes", position: 1, laps: 58, status: "Finished", points: 25 },
+            { driver: "Charles Leclerc", constructor: "Ferrari", position: 15, laps: 62, status: "DNF", points: 0 },
             { driver: "Lance Stroll", constructor: "Aston Martin", position: null, laps: 43, sessionGap: "+15 LAPS", status: "NC", points: 0 },
             { driver: "Fernando Alonso", constructor: "Aston Martin", position: null, laps: 21, status: "DNF", points: 0 },
             { driver: "Valtteri Bottas", constructor: "Cadillac", position: null, laps: 15, status: "DNF", points: 0 },
@@ -445,11 +446,15 @@ test("detail rows keep the source order for unclassified results and explain the
 
   assert.deepEqual(view.detailRows.map((row) => row.driver), [
     "George Russell",
+    "Charles Leclerc",
     "Lance Stroll",
     "Fernando Alonso",
     "Valtteri Bottas",
     "Oscar Piastri"
   ]);
+  const leclerc = view.detailRows.find((row) => row.driver === "Charles Leclerc");
+  assert.equal(leclerc.raceLabel, "15");
+  assert.equal(leclerc.raceStatusLabel, "DNF");
   const stroll = view.detailRows.find((row) => row.driver === "Lance Stroll");
   assert.equal(stroll.raceLaps, 43);
   assert.equal(stroll.raceGap, "+15 LAPS");

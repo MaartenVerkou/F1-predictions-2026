@@ -99,7 +99,7 @@ function normalizeOpenF1Row(row, driver = null, kind, {
   const classifiedPosition = numericPosition != null && numericPosition > 0 ? numericPosition : null;
   const isRaceResult = kind === "race" || kind === "sprint";
   const position = isRaceResult
-    ? (status === "Finished" ? classifiedPosition : null)
+    ? classifiedPosition
     : (status == null ? classifiedPosition : null);
   const names = driverName(driver);
   const driverId = row?.driver_number ?? driver?.driver_number;
