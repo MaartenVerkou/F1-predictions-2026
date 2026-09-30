@@ -806,11 +806,11 @@ function buildFocusSummary({
 
   if (metric === "alpine_comparison") {
     const teamMap = new Map(constructors.map((row) => [row.name, row]));
-    const alpine = teamMap.get("Alpine");
-    const comparisonNames = ["Cadillac", "Audi", "Aston Martin"];
-    const comparison = comparisonNames.map((name) => teamMap.get(name)).filter(Boolean);
-    if (!alpine || !comparison.length) return unavailable("The comparison teams are not resolved for this season.");
-    const combined = comparison.reduce((sum, row) => sum + Number(row.points || 0), 0);
+    const comparisonNames = Array.isArray(focus.compareTeams) ? focus.compareTeams : [];
+    const alpine = teamMap.get(comparisonNames[0]);
+    const comparison = comparisonNames.slice(1).map((name) => teamMap.get(name)).filter(Boolean);
+    if (!alpine || comparison.length < 2) return unavailable("The comparison teams are not resolved for this season.");
+    const combined = comparison.slice(1).reduce((sum, row) => sum + Number(row.points || 0), 0);
     const delta = Number(alpine.points || 0) - combined;
     return { ...base, value: delta >= 0 ? "More" : "Less", detail: `Alpine ${alpine.points} · combined ${combined} · Δ ${Math.abs(delta)}`, tooltip: comparison.map((row) => `${row.name}: ${row.points}`).join(" · ") };
   }
@@ -883,15 +883,18 @@ function buildFocusSummary({
 
   if (metric === "engine_top5") {
     const topFive = constructors.filter((row) => Number(row.championshipPosition) >= 1 && Number(row.championshipPosition) <= 5);
-    const mercedes = topFive.filter((row) => String(row.powerUnit || "").toLowerCase() === "mercedes").length;
+    const targetEngine = String(focus.targetEngine || "").trim().toLowerCase();
+    if (!targetEngine) return unavailable("The target engine is not configured for this question.");
+    const mercedes = topFive.filter((row) => String(row.powerUnit || "").trim().toLowerCase() === targetEngine).length;
     return { ...base, value: `${mercedes}/${topFive.length}`, detail: "Mercedes power units in top five", tooltip: topFive.map((row) => `${row.name}: ${row.powerUnit || "PU unknown"}`).join(" · ") };
   }
 
   if (metric === "ferrari_podium") {
-    const ferrariDrivers = drivers.filter((row) => String(row.constructor || "") === "Ferrari");
-    if (!ferrariDrivers.length) return unavailable("Ferrari drivers are not resolved for this round.");
-    const both = ferrariDrivers.length >= 2 && ferrariDrivers.every((row) => Number(row.summaryValue || 0) > 0);
-    return { ...base, value: both ? "Yes" : "No", detail: ferrariDrivers.map((row) => `${row.name}: ${row.summaryValue || 0}`).join(" · "), tooltip: "Both Ferrari seats must have at least one Grand Prix podium." };
+    const targetTeam = String(focus.targetTeam || "").trim();
+    const targetDrivers = drivers.filter((row) => String(row.constructor || "") === targetTeam);
+    if (!targetTeam || !targetDrivers.length) return unavailable("The target team is not resolved for this round.");
+    const both = targetDrivers.length >= 2 && targetDrivers.every((row) => Number(row.summaryValue || 0) > 0);
+    return { ...base, value: both ? "Yes" : "No", detail: targetDrivers.map((row) => `${row.name}: ${row.summaryValue || 0}`).join(" · "), tooltip: `Both ${targetTeam} seats must have at least one Grand Prix podium.` };
   }
 
   if (metric === "sprint_champion_same") {

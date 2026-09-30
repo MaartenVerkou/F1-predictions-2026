@@ -404,7 +404,8 @@
         "scope": "season",
         "requiredEvidence": ["constructorStandings"],
         "cellMode": "points",
-        "footerMode": "none"
+        "footerMode": "none",
+        "targetEngine": "Mercedes"
       }
     },
     {
@@ -421,7 +422,8 @@
         "scope": "season",
         "requiredEvidence": ["race"],
         "cellMode": "count",
-        "footerMode": "none"
+        "footerMode": "none",
+        "targetTeam": "Ferrari"
       }
     },
     {

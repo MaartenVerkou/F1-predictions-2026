@@ -302,6 +302,8 @@ function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship
       options: Array.isArray(question.options) ? question.options.slice() : [],
       compareDrivers: Array.isArray(projection?.compareDrivers) ? projection.compareDrivers.slice() : [],
       compareTeams: Array.isArray(projection?.compareTeams) ? projection.compareTeams.slice() : [],
+      targetTeam: String(projection?.targetTeam || "").trim() || null,
+      targetEngine: String(projection?.targetEngine || "").trim() || null,
       requiredEvidence: Array.isArray(projection?.requiredEvidence) ? projection.requiredEvidence.slice() : [],
       questionId: id,
       questionNumber,
