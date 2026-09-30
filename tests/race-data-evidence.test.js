@@ -102,6 +102,37 @@ test("buildEvidenceBundle normalizes race, qualifying, and standings evidence", 
   assert.equal(evidence.sourceUrls.race, "https://example.test/race");
 });
 
+test("race evidence preserves the provider gap for unclassified results", () => {
+  const evidence = buildEvidenceBundle({
+    data: {
+      season: 2026,
+      results: [{
+        round: 1,
+        raceName: "Australian Grand Prix",
+        Results: [{
+          position: null,
+          status: "NC",
+          laps: 43,
+          sessionGap: "+15 LAPS",
+          Driver: { givenName: "Lance", familyName: "Stroll" },
+          Constructor: { name: "Aston Martin" }
+        }]
+      }],
+      qualifying: [],
+      sprints: [],
+      driverStandingsByRound: new Map(),
+      constructorStandingsByRound: new Map(),
+      driverOfTheDayByRound: new Map()
+    },
+    roster: { drivers: ["Lance Stroll"], teams: ["Aston Martin"] },
+    roundNumber: 1,
+    roundName: "Australian Grand Prix"
+  });
+
+  assert.equal(evidence.race.rows[0].laps, 43);
+  assert.equal(evidence.race.rows[0].sessionGap, "+15 LAPS");
+});
+
 test("evidence keeps an unclassified qualifying result unavailable", () => {
   const evidence = buildEvidenceBundle({
     data: {

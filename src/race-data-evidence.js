@@ -109,6 +109,11 @@ function normalizeResultRow(row, roster, kind, canonicalCatalog = null) {
     points: parseNum(row?.points, 0),
     laps: parseNum(row?.laps),
     raceTime: String(row?.Time?.time || "").trim() || null,
+    sessionGap: row?.sessionGap == null
+      ? String(row?.gap_to_leader || "").trim() || null
+      : Array.isArray(row.sessionGap)
+        ? row.sessionGap.map((value) => String(value == null ? "" : value).trim()).filter(Boolean)
+        : String(row.sessionGap).trim() || null,
     fastestLap: String(row?.FastestLap?.rank || "").trim() === "1",
     fastestLapTime: String(row?.FastestLap?.Time?.time || "").trim() || null,
     fastestLapAverageSpeed: parseNum(row?.FastestLap?.AverageSpeed?.speed),

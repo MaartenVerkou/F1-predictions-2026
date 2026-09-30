@@ -15,7 +15,7 @@ const detailCellValue = (row, column) => {
     return row.sessions?.[column.sessionKey || column.id]?.label || '—';
   }
   if (column.id === 'grid') return row.grid == null ? '—' : row.grid;
-  if (column.id === 'status') return row.raceStatus || row.sprintStatus || '—';
+  if (column.id === 'status') return row.raceStatusLabel || row.raceStatus || row.sprintStatus || '—';
   if (column.id === 'points') return row.racePoints == null ? '—' : row.racePoints;
   return '—';
 };

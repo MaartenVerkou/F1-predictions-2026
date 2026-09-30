@@ -412,6 +412,53 @@ test("detail rows expose optional weekend sessions without changing finish order
   assert.equal(view.detailRows[1].sessions.qualifying.label, "6");
 });
 
+test("detail rows keep the source order for unclassified results and explain their race status", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster: {
+      drivers: ["George Russell", "Lance Stroll", "Fernando Alonso", "Valtteri Bottas", "Oscar Piastri"],
+      teams: ["Mercedes", "Aston Martin", "Cadillac", "McLaren"]
+    },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        race: {
+          rows: [
+            { driver: "George Russell", constructor: "Mercedes", position: 1, laps: 58, status: "Finished", points: 25 },
+            { driver: "Lance Stroll", constructor: "Aston Martin", position: null, laps: 43, sessionGap: "+15 LAPS", status: "NC", points: 0 },
+            { driver: "Fernando Alonso", constructor: "Aston Martin", position: null, laps: 21, status: "DNF", points: 0 },
+            { driver: "Valtteri Bottas", constructor: "Cadillac", position: null, laps: 15, status: "DNF", points: 0 },
+            { driver: "Oscar Piastri", constructor: "McLaren", position: null, laps: 0, status: "DNS", points: 0 }
+          ]
+        },
+        qualifying: { rows: [] },
+        sprint: { rows: [] },
+        standings: { drivers: [], constructors: [] }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1
+  });
+
+  assert.deepEqual(view.detailRows.map((row) => row.driver), [
+    "George Russell",
+    "Lance Stroll",
+    "Fernando Alonso",
+    "Valtteri Bottas",
+    "Oscar Piastri"
+  ]);
+  const stroll = view.detailRows.find((row) => row.driver === "Lance Stroll");
+  assert.equal(stroll.raceLaps, 43);
+  assert.equal(stroll.raceGap, "+15 LAPS");
+  assert.equal(stroll.raceStatusLabel, "NC · +15 laps");
+  assert.equal(view.detailRows.find((row) => row.driver === "Fernando Alonso").raceLabel, "NC");
+  assert.equal(view.detailRows.find((row) => row.driver === "Fernando Alonso").raceStatusLabel, "DNF · 21 laps");
+  assert.equal(view.detailRows.find((row) => row.driver === "Oscar Piastri").raceLabel, "NC");
+});
+
 test("constructor detail groups the canonical two-seat lineup and merges team summary data", () => {
   const view = buildRaceDataAuditView({
     races: ["Australian Grand Prix"],
@@ -935,7 +982,7 @@ test("question focus projections expose DNF and grid-winner facts without changi
   assert.equal(dnfDriver.cells[0].focusHit, false);
   const dnfDetail = dnfView.detailRows.find((row) => row.driver === "Driver Beta");
   assert.equal(dnfDetail.racePosition, null);
-  assert.equal(dnfDetail.raceLabel, "Ret");
+  assert.equal(dnfDetail.raceLabel, "NC");
   assert.equal(dnfView.drivers.find((row) => row.name === "Driver Alpha").cells[0].label, "0");
   assert.match(dnfView.focusSummary.value, /Driver Beta/);
 

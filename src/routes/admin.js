@@ -94,6 +94,32 @@ function auditNonClassifiedLabel(row) {
   return ["Ret", "DNS", "DNQ", "DSQ", "NC", "WD"].includes(label) ? label : null;
 }
 
+function formatRaceStatusLabel(row) {
+  if (!row) return "—";
+  const position = Number(row.position);
+  if (Number.isFinite(position) && position > 0) return "Finished";
+  const rawStatus = String(row.status || "").trim().toLowerCase();
+  const auditLabel = auditResultLabel(row);
+  const label = rawStatus === "dnf"
+    ? "DNF"
+    : auditLabel === "—" ? "NC" : auditLabel;
+  const rawGap = Array.isArray(row.sessionGap) ? row.sessionGap.find(Boolean) : row.sessionGap;
+  const gap = String(rawGap || row.gap_to_leader || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\bLAPS?\b/i, "laps");
+  if (gap) return `${label} · ${gap}`;
+  const laps = Number(row.laps);
+  if (Number.isFinite(laps) && laps > 0) return `${label} · ${laps} lap${laps === 1 ? "" : "s"}`;
+  return label;
+}
+
+function formatRacePositionLabel(row) {
+  if (!row) return "—";
+  const position = Number(row.position);
+  return Number.isFinite(position) && position > 0 ? String(position) : "NC";
+}
+
 function fallbackEntityCode(value, kind = "driver") {
   const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return "—";
@@ -801,6 +827,9 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   const qualifyingRows = sessionRowsByKey.qualifying;
   const sprintRows = sessionRowsByKey.sprint;
   const raceByDriver = new Map(raceRows.map((row) => [row.driver, row]));
+  const raceResultOrderByDriver = new Map(
+    raceRows.map((row, index) => [String(row.driver || ""), index])
+  );
   const qualifyingByDriver = new Map(qualifyingRows.map((row) => [row.driver, row]));
   const sprintByDriver = new Map(sprintRows.map((row) => [row.driver, row]));
   const sessionDriverNames = Object.values(sessionRowsByKey)
@@ -886,16 +915,28 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
       racePositionNumber: Number(race?.position) > 0 ? Number(race.position) : null,
       racePosition: Number(race?.position) > 0 ? String(race.position) : null,
       finishLabel: formatRaceFinishLabel(race?.position),
-      raceLabel: auditResultLabel(race),
+      raceLabel: formatRacePositionLabel(race),
       raceStatus: race?.status || null,
+      raceStatusLabel: formatRaceStatusLabel(race),
+      raceLaps: race?.laps ?? null,
+      raceGap: race?.sessionGap ?? race?.gap_to_leader ?? null,
+      raceResultOrder: raceResultOrderByDriver.get(String(driver)) ?? Number.MAX_SAFE_INTEGER,
       racePoints: race?.calculatedPoints ?? race?.points ?? null
     };
   }).sort((left, right) => {
     const leftPosition = Number(left.racePosition);
     const rightPosition = Number(right.racePosition);
-    const leftRank = Number.isFinite(leftPosition) && leftPosition > 0 ? leftPosition : 999;
-    const rightRank = Number.isFinite(rightPosition) && rightPosition > 0 ? rightPosition : 999;
-    return leftRank - rightRank || String(left.driver).localeCompare(String(right.driver));
+    const leftClassified = Number.isFinite(leftPosition) && leftPosition > 0;
+    const rightClassified = Number.isFinite(rightPosition) && rightPosition > 0;
+    if (leftClassified && rightClassified) {
+      return leftPosition - rightPosition || String(left.driver).localeCompare(String(right.driver));
+    }
+    if (leftClassified !== rightClassified) return leftClassified ? -1 : 1;
+    const leftLaps = Number.isFinite(Number(left.raceLaps)) ? Number(left.raceLaps) : -1;
+    const rightLaps = Number.isFinite(Number(right.raceLaps)) ? Number(right.raceLaps) : -1;
+    return rightLaps - leftLaps
+      || left.raceResultOrder - right.raceResultOrder
+      || String(left.driver).localeCompare(String(right.driver));
   });
 
   return {
