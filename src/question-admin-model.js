@@ -13,6 +13,14 @@ const BASIS_LABELS = Object.freeze({
   external: "External"
 });
 
+const EVIDENCE_LABELS = Object.freeze({
+  race: "Race results",
+  qualifying: "Qualifying results",
+  sprint: "Sprint results",
+  driverStandings: "Driver standings",
+  constructorStandings: "Constructor standings"
+});
+
 function normalizeText(value) {
   return String(value == null ? "" : value).trim();
 }
@@ -69,6 +77,7 @@ function evidenceLabel(value) {
   if (text.startsWith("external.")) {
     return `External · ${text.slice("external.".length).replace(/[_-]+/g, " ")}`;
   }
+  if (EVIDENCE_LABELS[text]) return EVIDENCE_LABELS[text];
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
@@ -76,10 +85,14 @@ function evidenceLabel(value) {
 }
 
 function questionEvidence(question) {
+  const focus = question?.race_data_focus || {};
   const evidence = Array.isArray(question?.race_data_focus?.requiredEvidence)
     ? question.race_data_focus.requiredEvidence.map(evidenceLabel).filter(Boolean)
     : [];
-  return evidence.length ? evidence.join(" · ") : "Definition";
+  if (evidence.length) return evidence.join(" · ");
+  if (focus.view === "constructors") return "Constructor standings";
+  if (focus.view === "drivers") return "Driver standings";
+  return "Question configuration";
 }
 
 function pointsInputPlaceholder(question) {
@@ -128,7 +141,7 @@ function buildQuestionInputRows(questions = []) {
       basisLabel: basisLabel(question),
       derivationLabel: focus.metric ? raceDataFocusLabel(question) : "No race projection",
       evidenceLabel: evidence,
-      derivationMeta: "Evidence: " + evidence,
+      derivationMeta: "Source: " + evidence,
       scoringLabel: scoring.label,
       pointsCurrentLabel: scoring.currentLabel,
       pointsDefaultLabel: compactPoints(question?._basePoints ?? question?.points),
