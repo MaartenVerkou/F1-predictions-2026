@@ -81,9 +81,7 @@ The system SHALL write new entity-valued answers, normalized source rows, actual
 - **AND** the source label SHALL remain available for audit provenance
 
 ### Requirement: Season lineups have explicit order and seat occupancy
-Feature: Team-centric season lineup
-
-Rule: The system SHALL keep database identity separate from presentation order and driver seat assignment.
+The system SHALL keep database identity separate from presentation order and driver seat assignment.
 
 #### Scenario: Admin opens the team lineup
 - **GIVEN** an authenticated admin opens Inputs for a configured season

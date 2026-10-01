@@ -13,5 +13,5 @@
 ## 3. Verification and promotion
 
 - [x] 3.1 Run repository tests, image health and PostgreSQL-parity checks.
-- [ ] 3.2 Refresh the preview and obtain explicit approval.
+- [x] 3.2 Refresh the preview and obtain explicit approval.
 - [ ] 3.3 Enable Apps Hub delivery, deploy the approved digest and verify production.

@@ -1,7 +1,7 @@
 ## 1. Contract and policy tests
 
 - [x] 1.1 Add the historical-admin-edits and admin-interface delta specs and validate the change strictly.
-- [ ] 1.2 Add route-level lifecycle tests covering archived Inputs mutations with and without explicit confirmation.
+- [x] 1.2 Add route-level lifecycle tests covering archived Inputs mutations with and without explicit confirmation.
 - [x] 1.3 Add view-model tests for archived policy state, unresolved mapping count, and primary navigation capabilities.
 
 ## 2. Server mutation consistency
