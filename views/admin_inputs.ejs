@@ -115,6 +115,80 @@
           <p class="muted">No scoring rules configured for this season.</p>
         <% } %>
       </div>
+    <% } else if (tab === 'definitions') { %>
+      <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="definitions" data-table-capabilities="edit,add">
+        <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
+          <span class="muted admin-definition-locale">Locale: <%= definitionLocale || 'en' %></span>
+          <% if (definitionMode === 'edit') { %>
+            <a class="button-link secondary" href="/admin/inputs?season=<%= season %>&tab=definitions">Done</a>
+          <% } else { %>
+            <a class="button-link secondary admin-race-data-edit-button" href="/admin/inputs?season=<%= season %>&tab=definitions&mode=edit">Edit data</a>
+          <% } %>
+        </div>
+      </div>
+      <p class="muted admin-inputs-definitions-help">Shared terms are shown on the public Questions and Responses pages. A binding limits a term to the listed question IDs; an empty binding makes it available to every question.</p>
+      <% if (definitionMode === 'edit') { %>
+        <% (definitions || []).forEach((definition) => { %>
+          <form id="definition-form-<%= definition.id %>" method="post" action="/admin/inputs/definitions" data-season-mutation>
+            <%- csrfField() %><%- seasonPreparationField %>
+            <input type="hidden" name="season" value="<%= season %>">
+            <input type="hidden" name="id" value="<%= definition.id %>">
+            <input type="hidden" name="is_active" value="0">
+          </form>
+        <% }) %>
+        <form id="definition-form-new" method="post" action="/admin/inputs/definitions" data-season-mutation>
+          <%- csrfField() %><%- seasonPreparationField %>
+          <input type="hidden" name="season" value="<%= season %>">
+        </form>
+      <% } %>
+      <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="Definitions" tabindex="0">
+        <table class="table compact admin-inputs-table admin-inputs-definitions-table">
+          <thead><tr><th scope="col">Term</th><th scope="col">Explanation</th><th scope="col">Aliases</th><th scope="col">Question bindings</th><th scope="col">Status</th><% if (definitionMode === 'edit') { %><th scope="col">Order</th><th scope="col"></th><% } %></tr></thead>
+          <tbody>
+            <% (definitions || []).forEach((definition) => { %>
+              <tr>
+                <th scope="row">
+                  <% if (definitionMode === 'edit') { %>
+                    <label class="sr-only" for="definition-<%= definition.id %>-key">Stable term key</label>
+                    <input id="definition-<%= definition.id %>-key" name="term_key" form="definition-form-<%= definition.id %>" value="<%= definition.termKey %>" pattern="[a-z0-9]+(?:_[a-z0-9]+)*" required>
+                    <label class="admin-definition-label-field"><span>Label</span><input name="label" form="definition-form-<%= definition.id %>" value="<%= definition.label %>" required></label>
+                  <% } else { %>
+                    <div><strong><%= definition.label %></strong></div><small class="admin-inputs-entity-meta"><code><%= definition.termKey %></code></small>
+                  <% } %>
+                </th>
+                <td>
+                  <% if (definitionMode === 'edit') { %><textarea name="explanation" form="definition-form-<%= definition.id %>" rows="2" maxlength="500" required><%= definition.explanation %></textarea><% } else { %><span><%= definition.explanation %></span><% } %>
+                </td>
+                <td>
+                  <% if (definitionMode === 'edit') { %><input name="aliases" form="definition-form-<%= definition.id %>" value="<%= definition.aliases.join(', ') %>" required title="Comma-separated matching terms"><% } else { %><span class="admin-definition-aliases"><%= definition.aliases.join(' · ') || '—' %></span><% } %>
+                </td>
+                <td>
+                  <% if (definitionMode === 'edit') { %><input name="question_ids" form="definition-form-<%= definition.id %>" value="<%= definition.questionIds.join(', ') %>" placeholder="Empty = global" title="Comma-separated stable question IDs"><% } else if (definition.questionIds.length) { %><span class="admin-definition-bindings"><%= definition.questionIds.join(' · ') %></span><% } else { %><span class="muted">All questions</span><% } %>
+                </td>
+                <td>
+                  <% if (definitionMode === 'edit') { %><label class="admin-definition-active"><input type="checkbox" name="is_active" value="1" form="definition-form-<%= definition.id %>" <%= definition.isActive ? 'checked' : '' %>> Active</label><% } else { %><span class="<%= definition.isActive ? '' : 'muted' %>"><%= definition.isActive ? 'Active' : 'Archived' %></span><% } %>
+                </td>
+                <% if (definitionMode === 'edit') { %>
+                  <td><input name="sort_order" form="definition-form-<%= definition.id %>" type="number" min="0" max="9999" value="<%= definition.sortOrder %>" aria-label="Order for <%= definition.label %>"></td>
+                  <td><button class="secondary" type="submit" form="definition-form-<%= definition.id %>">Save</button></td>
+                <% } %>
+              </tr>
+            <% }) %>
+            <% if (definitionMode === 'edit') { %>
+              <tr class="admin-inputs-definition-new-row">
+                <th scope="row"><input name="term_key" form="definition-form-new" placeholder="new_term_key" pattern="[a-z0-9]+(?:_[a-z0-9]+)*" required><label class="admin-definition-label-field"><span>Label</span><input name="label" form="definition-form-new" required></label></th>
+                <td><textarea name="explanation" form="definition-form-new" rows="2" maxlength="500" required placeholder="Tooltip explanation"></textarea></td>
+                <td><input name="aliases" form="definition-form-new" required placeholder="term, alternate term"></td>
+                <td><input name="question_ids" form="definition-form-new" placeholder="Empty = global"></td>
+                <td><label class="admin-definition-active"><input type="checkbox" name="is_active" value="1" form="definition-form-new" checked> Active</label></td>
+                <td><input name="sort_order" form="definition-form-new" type="number" min="0" max="9999" value="200" aria-label="Order for new definition"></td>
+                <td><button class="secondary" type="submit" form="definition-form-new">Add</button></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
     <% } else if (tab === 'drivers') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="drivers" data-table-capabilities="edit,add,remove">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>

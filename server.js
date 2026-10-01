@@ -9,6 +9,11 @@ const nodemailer = require("nodemailer");
 const { createAppDatabase } = require("./src/app-database");
 const { BetterSqliteSessionStore, PostgresSessionStore } = require("./src/session-store");
 const { ensurePostgresSchema } = require("./src/postgres-schema");
+const {
+  ensureQuestionDefinitionsSchema,
+  listQuestionDefinitions,
+  renderQuestionPromptHtml
+} = require("./src/question-definitions");
 const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
 const leaderboardModel = require("./src/leaderboard-model");
 const {
@@ -761,6 +766,8 @@ if (db.dialect === "sqlite") {
 } else {
   ensurePostgresSchema(db);
 }
+
+ensureQuestionDefinitionsSchema(db);
 
 function ensureGroupColumns() {
   const columns = db.prepare("PRAGMA table_info(groups);").all();
@@ -1628,6 +1635,11 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
   return attachCanonicalCatalog(attachLastSeasonReferences(
     localizeQuestions(adjustedQuestions, resolvedLocale)
   ));
+}
+
+function getQuestionPromptHtml(locale = DEFAULT_LOCALE) {
+  const definitions = listQuestionDefinitions(db, { locale });
+  return (question) => renderQuestionPromptHtml(question, definitions);
 }
 
 function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
@@ -3091,6 +3103,14 @@ registerAuthRoutes(app, {
   getRaces
 });
 
+app.get("/definitions", (req, res) => {
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  res.render("definitions", {
+    user: getCurrentUser(req),
+    definitions: listQuestionDefinitions(db, { locale })
+  });
+});
+
 app.get("/api/groups/check-name", requireAuth, (req, res) => {
   const normalizedName = String(req.query.name || "").trim();
   if (!normalizedName) {
@@ -4011,6 +4031,7 @@ app.get("/join/:code/responses", (req, res) => {
     user: null,
     group,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     responses,
     groupBasePath: `/join/${code}`,
     viewerGuestAnswers,
@@ -4367,6 +4388,7 @@ app.get("/join/:code/questions", (req, res) => {
     group,
     groupRules,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     answers,
     prefillNotice: null,
     roster,
@@ -4962,6 +4984,7 @@ app.get("/global/questions", (req, res, next) => {
     group: globalGroup,
     groupRules,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     answers,
     prefillNotice: null,
     roster,
@@ -5094,6 +5117,7 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
     group,
     groupRules,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     answers,
     prefillNotice,
     prefillNoticePrefix,
@@ -5245,6 +5269,7 @@ app.get("/global/responses", (req, res, next) => {
     user: null,
     group,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     responses,
     groupBasePath: "/",
     viewerGuestAnswers,
@@ -5282,6 +5307,7 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
     user,
     group,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     responses,
     groupBasePath: getGroupBasePath(group),
     showMineOnly,

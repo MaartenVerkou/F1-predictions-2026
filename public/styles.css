@@ -1653,6 +1653,34 @@ button:disabled {
   border-bottom-color: var(--accent);
 }
 
+.public-definitions-page {
+  gap: 16px;
+}
+
+.public-definitions-page > p {
+  margin: 0;
+  max-width: 72ch;
+}
+
+.public-definitions-table {
+  min-width: 640px;
+}
+
+.public-definitions-table th,
+.public-definitions-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.public-definitions-table th[scope="row"] {
+  min-width: 120px;
+}
+
+.public-definition-scope {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+
 :root[data-theme="dark"] .question-term-label {
   border-bottom-color: rgba(169, 188, 224, 0.96);
 }
@@ -2069,6 +2097,61 @@ button:disabled {
 .admin-inputs-scoring-source {
   margin: 0;
   font-size: 12px;
+}
+
+.admin-inputs-definitions-help {
+  margin: 8px 2px 0;
+  max-width: 78ch;
+}
+
+.admin-definition-locale {
+  font-size: 12px;
+}
+
+.admin-inputs-definitions-table {
+  min-width: 860px;
+}
+
+.admin-inputs-definitions-table th,
+.admin-inputs-definitions-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.admin-inputs-definitions-table th[scope="row"] {
+  min-width: 150px;
+}
+
+.admin-inputs-definitions-table textarea,
+.admin-inputs-definitions-table input {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-definition-label-field {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-definition-aliases,
+.admin-definition-bindings {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.admin-definition-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.admin-inputs-definition-new-row {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .admin-inputs-scoring-sections {

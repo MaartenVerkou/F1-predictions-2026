@@ -156,13 +156,6 @@
     "scroll_to_end": "Zum Seitenende",
     "last_season_link": "Letzte Saison",
     "last_season_default_result": "Nicht direkt vergleichbar",
-    "tip_dnf": "Nur Grand Prix, DNS und DSQ zaehlen nicht als DNF.",
-    "tip_dns": "DNS bedeutet Did Not Start. DNS-Eintraege werden nicht als DNF gewertet.",
-    "tip_dq": "DSQ bedeutet disqualifiziert. Disqualifikationen werden nicht als DNF gewertet.",
-    "tip_gp_only_no_sprints": "Das bezieht sich nur auf Grand Prix Rennen, keine Sprints ausser es steht ausdruecklich dabei.",
-    "tip_sprints_only": "Diese Frage ist sprint-only: es werden nur Sprint-Ergebnisse gewertet.",
-    "tip_grand_prix": "Grand Prix meint das Hauptrennen (nicht den Sprint).",
-    "tip_initial_lineup": "Aus der Fahreraufstellung zu Beginn der Saison.",
     "couple_to_global_label": "Diese Gruppen-Prognosen mit meinen {group_name}-Prognosen koppeln",
     "couple_to_global_help": "Aktiv bedeutet: diese Gruppe nutzt immer deine Global-Tipps. Deaktiviere es fuer eigene Tipps in dieser Gruppe.",
     "guest_mode_notice": "Gastmodus: Erstelle ein Konto, um Gruppen beizutreten und andere Antworten zu sehen.",
@@ -180,12 +173,7 @@
     "points_multi_select_penalty": "{points} {points_word} pro korrektem {driver_word}, -{penalty} fuer jeden fehlenden oder falschen {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} minus 1 pro Punkt Abweichung (Sieger muss korrekt sein). Gleichstand + korrekt: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, oder {bonus}, wenn alle Teams ein Podium holen und du das vorhersagst",
-    "points_per_dnf_selected_races": "{points} {points_word} pro DNF in deinen ausgewaehlten Rennen",
-    "tip_podium_gp_only": "Nur Grand-Prix-Podien.",
-    "tip_race_gp_wins_only": "Nur Grand-Prix-Siege.",
-    "tip_races_grand_prix_only": "Nur Grand-Prix-Rennen.",
-    "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "Basierend auf den woechentlichen Destructors-Championship-Beitraegen von u/Dense-Strategy-867 auf Reddit (r/formula1)."
+    "points_per_dnf_selected_races": "{points} {points_word} pro DNF in deinen ausgewaehlten Rennen"
   },
   "join_guest": {
     "page_title": "Als Gast beitreten",

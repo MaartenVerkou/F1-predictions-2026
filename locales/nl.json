@@ -319,13 +319,6 @@
     "scroll_to_end": "Ga naar einde van pagina",
     "last_season_link": "Vorig seizoen",
     "last_season_default_result": "Niet direct vergelijkbaar",
-    "tip_dnf": "Alleen Grand Prix, DNS en DSQ tellen niet als DNF.",
-    "tip_dns": "DNS betekent Did Not Start. DNS-resultaten tellen niet als DNF.",
-    "tip_dq": "DSQ betekent diskwalificatie. Diskwalificaties tellen niet als DNF.",
-    "tip_gp_only_no_sprints": "Dit gaat alleen over Grand Prix-races, geen sprints tenzij dat expliciet staat.",
-    "tip_sprints_only": "Deze vraag gaat alleen over sprintraces: alleen sprintresultaten tellen mee.",
-    "tip_grand_prix": "Grand Prix betekent de hoofdrace (niet de sprint).",
-    "tip_initial_lineup": "Uit de coureursopstelling aan het begin van het seizoen.",
     "couple_to_global_label": "Koppel de voorspellingen van deze groep aan mijn {group_name}-voorspellingen",
     "couple_to_global_help": "AAN betekent dat deze groep altijd je algemene voorspellingen gebruikt. Zet uit om voor deze groep afwijkende voorspellingen te maken.",
     "guest_mode_notice": "Gastmodus: maak een account om lid te worden van groepen en andere antwoorden te bekijken.",
@@ -343,12 +336,7 @@
     "points_multi_select_penalty": "{points} {points_word} per correcte {driver_word}, -{penalty} voor elke ontbrekende of onjuiste {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} min 1 per punt afwijking (winnaar moet kloppen). Gelijk + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, of {bonus} als alle teams een podium scoren en jij dat voorspelt",
-    "points_per_dnf_selected_races": "{points} {points_word} per DNF in je geselecteerde races",
-    "tip_podium_gp_only": "Alleen Grand Prix-podia.",
-    "tip_race_gp_wins_only": "Alleen Grand Prix-zeges.",
-    "tip_races_grand_prix_only": "Alleen Grand Prix-races.",
-    "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "Gebaseerd op de wekelijkse Destructors Championship-posts van u/Dense-Strategy-867 op Reddit (r/formula1)."
+    "points_per_dnf_selected_races": "{points} {points_word} per DNF in je geselecteerde races"
   },
   "join_guest": {
     "page_title": "Meedoen als gast",

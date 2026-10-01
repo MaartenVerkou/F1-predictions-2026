@@ -72,6 +72,10 @@ const {
 } = require("../question-admin-model");
 const { upsertSeasonQuestionSettings } = require("../season-question-settings");
 const {
+  listQuestionDefinitions,
+  upsertQuestionDefinition
+} = require("../question-definitions");
+const {
   DEFAULT_SCORING_RULES,
   deriveStandingsForRounds,
   reconcileStandings,
@@ -2352,7 +2356,7 @@ function registerAdminRoutes(app, deps) {
   app.get("/admin/inputs", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const requestedTab = String(req.query.tab || "").trim().toLowerCase();
-    const tab = ["drivers", "teams", "races", "scoring", "mappings"].includes(requestedTab)
+    const tab = ["drivers", "teams", "races", "scoring", "definitions", "mappings"].includes(requestedTab)
       ? requestedTab
       : "teams";
     const seasonContext = resolveAdminSeasonContext(db, {
@@ -2390,6 +2394,11 @@ function registerAdminRoutes(app, deps) {
     catalog.impact = getSeasonInputImpact(season);
     catalog.mappings = seasonContext.selected ? listSeasonMappings(db, season) : [];
     const unresolvedMappingCount = catalog.mappings.filter((mapping) => mapping.status !== "resolved").length;
+    const definitionMode = String(req.query.mode || "").trim().toLowerCase() === "edit" ? "edit" : "view";
+    const definitions = listQuestionDefinitions(db, {
+      locale: res.locals.locale || "en",
+      includeInactive: tab === "definitions" && definitionMode === "edit"
+    });
     return res.render("admin_inputs", {
       user,
       season,
@@ -2398,6 +2407,9 @@ function registerAdminRoutes(app, deps) {
       teamLineupHistory,
       catalog,
       scoringRules,
+      definitions,
+      definitionMode,
+      definitionLocale: res.locals.locale || "en",
       unresolvedMappingCount,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
@@ -2445,6 +2457,58 @@ function registerAdminRoutes(app, deps) {
     });
     return res.redirect(`/admin/inputs?${params.toString()}`);
   }
+
+  app.post("/admin/inputs/definitions", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const adminUser = getCurrentUser(req);
+    try {
+      const context = requireSeasonMutation(req, season);
+      if (!context.selected || !context.isValid) throw new Error("A valid season is required.");
+      const idValue = String(req.body.id || "").trim();
+      const id = idValue ? Number(idValue) : null;
+      if (idValue && (!Number.isInteger(id) || id <= 0)) throw new Error("The definition ID is invalid.");
+      const termKey = String(req.body.term_key || "").trim();
+      const label = String(req.body.label || "").trim();
+      const explanation = String(req.body.explanation || "").trim();
+      const questionIds = String(req.body.question_ids || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const aliases = String(req.body.aliases || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const definitionId = upsertQuestionDefinition(db, {
+        id,
+        termKey,
+        label,
+        explanation,
+        aliases,
+        questionIds,
+        sortOrder: req.body.sort_order,
+        isActive: (Array.isArray(req.body.is_active) ? req.body.is_active : [req.body.is_active])
+          .map((value) => String(value || ""))
+          .includes("1")
+      }, {
+        locale: res.locals.locale || "en"
+      });
+      logAdminEvent("info", "admin_definition_updated", {
+        userId: adminUser?.id || null,
+        season,
+        definitionId,
+        termKey,
+        historicalCorrection: readSeasonMutationFlags(req).historicalCorrection
+      });
+      return redirectInputs(res, season, "definitions", "success", "Definition saved.", { mode: "edit" });
+    } catch (err) {
+      logAdminEvent("warn", "admin_definition_update_failed", {
+        userId: adminUser?.id || null,
+        season,
+        error: { message: err.message }
+      });
+      return redirectInputs(res, season, "definitions", "error", err.message, { mode: "edit" });
+    }
+  });
 
   function requireSeasonMutation(req, season, options = {}) {
     const context = resolveAdminSeasonContext(db, {

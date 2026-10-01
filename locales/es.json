@@ -156,13 +156,6 @@
     "scroll_to_end": "Ir al final de la pagina",
     "last_season_link": "Temporada pasada",
     "last_season_default_result": "No directamente comparable",
-    "tip_dnf": "Solo Grandes Premios, DNS y DSQ no cuentan como DNF.",
-    "tip_dns": "DNS significa Did Not Start. Los DNS no se cuentan como DNF.",
-    "tip_dq": "DSQ significa descalificado. Las descalificaciones no se cuentan como DNF.",
-    "tip_gp_only_no_sprints": "Esto se refiere solo a carreras de Gran Premio, sin sprints salvo que se indique expresamente.",
-    "tip_sprints_only": "Esta pregunta es solo de sprint: solo cuentan resultados de sprint.",
-    "tip_grand_prix": "Grand Prix se refiere a la carrera principal (no al sprint).",
-    "tip_initial_lineup": "De la alineacion de pilotos al inicio de la temporada.",
     "couple_to_global_label": "Acoplar las predicciones de este grupo a mis predicciones de {group_name}",
     "couple_to_global_help": "Activado = este grupo siempre usa tus picks Global. Desactivalo para hacer picks distintos en este grupo.",
     "guest_mode_notice": "Modo invitado: crea una cuenta para unirte a grupos y ver respuestas de otros.",
@@ -180,12 +173,7 @@
     "points_multi_select_penalty": "{points} {points_word} por cada {driver_word} correcto, -{penalty} por cada {driver_word} faltante o incorrecto (min {minimum})",
     "points_teammate_battle": "{base} {points_word} menos 1 por cada punto de diferencia (el ganador debe ser correcto). Empate + correcto: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, o {bonus} si todos los equipos logran podio y tu lo predices",
-    "points_per_dnf_selected_races": "{points} {points_word} por DNF en tus carreras seleccionadas",
-    "tip_podium_gp_only": "Solo podios de Gran Premio.",
-    "tip_race_gp_wins_only": "Solo victorias en Grandes Premios.",
-    "tip_races_grand_prix_only": "Solo carreras de Gran Premio.",
-    "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "Basado en las publicaciones semanales del Destructors Championship de u/Dense-Strategy-867 en Reddit (r/formula1)."
+    "points_per_dnf_selected_races": "{points} {points_word} por DNF en tus carreras seleccionadas"
   },
   "join_guest": {
     "page_title": "Unirse como invitado",

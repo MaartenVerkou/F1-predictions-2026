@@ -4,6 +4,9 @@
       <%= t('admin_inputs.tab_' + name) %>
     </a>
   <% }) %>
+  <a class="admin-race-data-tab <%= tab === 'definitions' ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=definitions">
+    Definitions
+  </a>
   <% if (Number(unresolvedMappingCount || 0) > 0 || tab === 'mappings') { %>
     <a class="admin-race-data-tab <%= tab === 'mappings' ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=mappings">
       <%= t('admin_inputs.data_quality') %><% if (Number(unresolvedMappingCount || 0) > 0) { %> · <%= unresolvedMappingCount %><% } %>

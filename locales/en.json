@@ -328,13 +328,6 @@
     "scroll_to_end": "Go to end of page",
     "last_season_link": "Last season",
     "last_season_default_result": "Not directly comparable",
-    "tip_dnf": "Grand Prix only, DNS and DSQ don't count as DNF.",
-    "tip_dns": "DNS means Did Not Start. DNS entries are not counted as DNF.",
-    "tip_dq": "DSQ means Disqualified. Disqualifications are not counted as DNF.",
-    "tip_gp_only_no_sprints": "This refers to Grand Prix races only, no sprints unless explicitly stated.",
-    "tip_sprints_only": "This question is sprint-only: only sprint results are counted.",
-    "tip_grand_prix": "Grand Prix means the main race event (not the sprint).",
-    "tip_initial_lineup": "From the driver line-up at the beginning of the season.",
     "couple_to_global_label": "Couple this group's predictions to my {group_name} predictions",
     "couple_to_global_help": "Enabled means this group always uses your Global picks. Turn off to make custom picks for this group.",
     "guest_mode_notice": "Guest mode: create an account to join groups and view other responses.",
@@ -352,12 +345,7 @@
     "points_multi_select_penalty": "{points} {points_word} per correct {driver_word}, -{penalty} for each missing or incorrect {driver_word} (min {minimum})",
     "points_teammate_battle": "{base} {points_word} minus 1 per point off (winner must be correct). Tie + correct: {tie_bonus} {points_word}",
     "points_all_podiums_bonus": "{base} {points_word}, or {bonus} if all teams score a podium and you predict that",
-    "points_per_dnf_selected_races": "{points} {points_word} per DNF in your selected races",
-    "tip_podium_gp_only": "Grand Prix podiums only.",
-    "tip_race_gp_wins_only": "Grand Prix wins only.",
-    "tip_races_grand_prix_only": "Grand Prix races only.",
-    "tip_mercedes_engine_teams": "Mercedes, McLaren, Williams, Alpine.",
-    "tip_damage_source": "Based on the weekly Destructors Championship posts by u/Dense-Strategy-867 on Reddit (r/formula1)."
+    "points_per_dnf_selected_races": "{points} {points_word} per DNF in your selected races"
   },
   "join_guest": {
     "page_title": "Join as guest",
