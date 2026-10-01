@@ -38,39 +38,25 @@
   <% } %>
 
   <% if (view === 'results') { %>
-    <div class="admin-question-table-toolbar admin-race-data-detail-toolbar">
-      <div class="admin-question-toolbar-leading">
-        <nav class="admin-race-data-tabs admin-questions-view-toggle admin-race-data-switch" role="tablist" aria-label="Questions workspace view">
-          <a class="admin-race-data-tab <%= view === 'questions' ? 'is-active' : '' %>" role="tab" aria-selected="<%= view === 'questions' ? 'true' : 'false' %>" href="/admin/questions?season=<%= seasonValue %>&view=questions<%= editing ? '&mode=edit' : '' %>">Questions</a>
-          <a class="admin-race-data-tab <%= view === 'results' ? 'is-active' : '' %>" role="tab" aria-selected="<%= view === 'results' ? 'true' : 'false' %>" href="/admin/questions?season=<%= seasonValue %>&view=results">Results</a>
-        </nav>
-        <div class="admin-race-data-section-heading">
-          <h2>Question results</h2>
-          <span class="muted admin-question-table-help">Read-only derived answers · <%= seasonValue %></span>
-        </div>
+    <div class="admin-question-table-region">
+      <div class="admin-race-data-detail-toolbar">
+        <%- include('partials/admin_questions_view_toggle', { view, seasonValue, editing }) %>
       </div>
+      <%- include('partials/admin_question_results') %>
     </div>
-    <%- include('partials/admin_question_results') %>
   <% } else { %>
-  <div class="admin-question-table-toolbar admin-race-data-detail-toolbar">
-    <div class="admin-question-toolbar-leading">
-      <nav class="admin-race-data-tabs admin-questions-view-toggle admin-race-data-switch" role="tablist" aria-label="Questions workspace view">
-        <a class="admin-race-data-tab <%= view === 'questions' ? 'is-active' : '' %>" role="tab" aria-selected="<%= view === 'questions' ? 'true' : 'false' %>" href="/admin/questions?season=<%= seasonValue %>&view=questions<%= editing ? '&mode=edit' : '' %>">Questions</a>
-        <a class="admin-race-data-tab <%= view === 'results' ? 'is-active' : '' %>" role="tab" aria-selected="<%= view === 'results' ? 'true' : 'false' %>" href="/admin/questions?season=<%= seasonValue %>&view=results">Results</a>
-      </nav>
-      <div class="admin-race-data-section-heading">
-        <h2>Question inputs</h2>
-      </div>
-    </div>
-    <div class="admin-race-data-detail-actions admin-toolbar-actions admin-question-actions">
+  <div class="admin-question-table-region">
+    <div class="admin-race-data-detail-toolbar">
+      <%- include('partials/admin_questions_view_toggle', { view, seasonValue, editing }) %>
+      <div class="admin-race-data-detail-actions admin-toolbar-actions">
       <% if (editing) { %>
         <button type="submit" form="admin-question-edit-form" class="secondary admin-question-save-button">Save changes</button>
         <a class="button-link secondary admin-question-cancel" href="/admin/questions?season=<%= seasonValue %>">Cancel</a>
       <% } else { %>
         <a class="button-link secondary admin-race-data-edit-button admin-question-edit-button" href="/admin/questions?season=<%= seasonValue %>&mode=edit">Edit data</a>
       <% } %>
+      </div>
     </div>
-  </div>
 
   <form id="admin-question-edit-form" method="post" action="/admin/questions" class="admin-question-edit-form">
     <%- csrfField() %>
@@ -159,6 +145,7 @@
   <p class="muted admin-question-contract-note">
     Calculation type and source are contract metadata and stay read-only here. Editing wording does not change the stable question ID or existing answers.
   </p>
+  </div>
   <% } %>
 </div>
 

@@ -31,7 +31,7 @@ test("Questions and Results share one season selector", async ({ page }) => {
   await page.goto("/admin/questions?season=2026&view=results");
   await expect(page.locator("[data-admin-questions-season-form] select[name=season]")).toHaveValue("2026");
   await expect(page.locator(".admin-questions-view-toggle .is-active")).toHaveText("Results");
-  await expect(page.getByRole("heading", { name: "Question results" })).toBeVisible();
+  await expect(page.locator(".admin-actuals-overview-table")).toBeVisible();
 
   await page.locator("[data-admin-questions-season-form] select[name=season]").selectOption("2027");
   await page.waitForURL(/\/admin\/questions\?view=results&season=2027/);
