@@ -39,6 +39,7 @@ test("Questions edit mode exposes in-place order controls", () => {
 test("Questions and Results share season-aware workspace state", () => {
   const view = readView("admin_questions.ejs");
   const results = readView("partials/admin_question_results.ejs");
+  const questionCell = readView("partials/admin_actuals_question_cell.ejs");
   const nav = readView("partials/admin_nav.ejs");
   assert.match(view, /admin-questions-season-form/);
   assert.match(view, /name="season"/);
@@ -53,21 +54,26 @@ test("Questions and Results share season-aware workspace state", () => {
   assert.match(toggle, /href="\/admin\/questions\?season=<%= seasonValue %>&view=results/);
   assert.match(view, /partials\/admin_question_results/);
   assert.match(results, /admin-actuals-overview-table/);
-  assert.match(results, /admin-actuals-question-view-link/);
+  assert.match(results, /admin_actuals_question_cell/);
+  assert.match(questionCell, /admin-actuals-question-short-link/);
+  assert.match(questionCell, /row\.question\.prompt/);
   assert.match(nav, /nav_questions[^\n]*&amp; Results/);
+  assert.ok(nav.indexOf('nav_race_data') < nav.indexOf('nav_questions'), "Race Data should precede Questions & Results");
   assert.doesNotMatch(nav, /nav_actuals/);
 });
 
 test("admin actuals is a read-only season overview", () => {
   const view = readView("admin_actuals.ejs");
+  const questionCell = readView("partials/admin_actuals_question_cell.ejs");
   assert.doesNotMatch(view, /autofill-current-season/);
   assert.doesNotMatch(view, /preview_autofill/);
   assert.match(view, /admin-race-data-selector-form admin-actuals-season-form/);
   assert.match(view, /data-admin-actuals-form/);
   assert.doesNotMatch(view, /admin-actuals-source-note|overview_source|pending_rounds|published_through|no_published_snapshot/);
-  assert.match(view, /admin-actuals-question-view-link/);
-  assert.match(view, /encodeURIComponent\(row\.question\.id\)/);
-  assert.match(view, /row\.focusLabel/);
+  assert.match(view, /admin_actuals_question_cell/);
+  assert.match(questionCell, /admin-actuals-question-short-link/);
+  assert.match(questionCell, /encodeURIComponent\(row\.question\.id\)/);
+  assert.match(questionCell, /row\.focusLabel/);
   assert.match(view, /cell\.displayText/);
   assert.match(view, /cell\.value/);
   assert.match(view, /target\.raceName/);
@@ -75,7 +81,6 @@ test("admin actuals is a read-only season overview", () => {
   assert.match(view, /admin-actuals-review-marker/);
   assert.match(view, /admin-actuals-round-header/);
   assert.doesNotMatch(view, /const statusLabel|admin-actuals-round-column small|is-pending/);
-  assert.match(view, /admin-actuals-question-content/);
   assert.match(view, /admin-actuals-value/);
   assert.doesNotMatch(view, /displayLines|displayMode|admin-actuals-value-line/);
   assert.doesNotMatch(view, /data-admin-actuals-target-form/);
@@ -85,16 +90,16 @@ test("admin actuals is a read-only season overview", () => {
   assert.doesNotMatch(view, /Mark this snapshot reviewed/);
 });
 
-test("season actuals keeps question prompts compact and readable on small screens", () => {
+test("season results keep the question key compact while preserving a full tooltip", () => {
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  const promptRule = styles.match(/\.admin-actuals-question-prompt\s*\{([\s\S]*?)\n\}/)?.[1] || "";
-  assert.match(promptRule, /-webkit-line-clamp:\s*2/);
-  assert.match(promptRule, /white-space:\s*normal/);
-  assert.match(styles, /--admin-actuals-question-width:\s*min\(280px, 31vw\)/);
+  assert.match(styles, /--admin-actuals-question-width:\s*58px/);
   assert.match(styles, /--admin-actuals-value-width:\s*72px/);
-  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*?--admin-actuals-question-width:\s*clamp\(128px, 34vw, 160px\)/);
   assert.match(styles, /@media \(max-width: 720px\)[\s\S]*?--admin-actuals-value-width:\s*clamp\(64px, 9\.5vw, 68px\)/);
   assert.doesNotMatch(styles, /@media \(max-width: 480px\)/);
+  assert.match(styles, /\.admin-actuals-question-short-link\s*\{[\s\S]*?font-weight:\s*700/);
+  assert.match(styles, /\.admin-actuals-question-column,\s*\n\.admin-actuals-question-cell\s*\{[\s\S]*?min-width:\s*var\(--admin-actuals-question-width\)/);
+  assert.doesNotMatch(styles, /admin-actuals-question-prompt/);
+  assert.doesNotMatch(styles, /admin-actuals-question-view-link/);
   assert.doesNotMatch(styles, /admin-actuals-value-line/);
   assert.match(styles, /\.admin-actuals-review-marker\s*\{/);
   assert.match(styles, /\.admin-actuals-round-header\s*\{[\s\S]*?white-space:\s*nowrap/);

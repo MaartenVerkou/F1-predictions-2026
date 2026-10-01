@@ -101,7 +101,9 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await expect(page.locator("[data-admin-questions-season-form] select[name=season]")).toBeVisible();
   await expect(page.locator("[data-admin-actuals-target-form]")).toHaveCount(0);
   await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
-  await expect(page.locator("[data-admin-actuals-form]")).toContainText("Does every team score points?");
+  const firstQuestionLink = page.locator("[data-admin-actuals-form] .admin-actuals-question-short-link").first();
+  await expect(firstQuestionLink).toHaveText(/^Q\d+$/);
+  await expect(firstQuestionLink).toHaveAttribute("title", /·/);
   await expect(page.locator('[data-admin-actuals-round="6"][data-review-status="pending"]').first()).toBeVisible();
   await expect(page.locator('a[href*="/admin/race-data"][href*="round=6"]').first()).toBeVisible();
   await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
@@ -213,6 +215,7 @@ test("admin actuals keeps one stable table layout across normal and compact mode
       const round = table?.querySelector(".admin-actuals-round-column");
       const value = table?.querySelector(".admin-actuals-value-cell");
       const values = [...document.querySelectorAll(".admin-actuals-value-cell a")];
+      const questionLink = question?.querySelector(".admin-actuals-question-short-link");
       const reviewMarkers = [...document.querySelectorAll(".admin-actuals-review-marker")];
       const reviewMarkerSameLine = reviewMarkers.every((marker) => {
         const markerRect = marker.getBoundingClientRect();
@@ -234,8 +237,8 @@ test("admin actuals keeps one stable table layout across normal and compact mode
         reviewMarkerSameLine,
         pendingCellsWithBorderClass: document.querySelectorAll(".admin-actuals-round-column.is-pending, .admin-actuals-value-cell.is-pending").length,
         rowAlignment: rows.every((row) => [...row.children].every((cell) => Math.round(cell.getBoundingClientRect().height) === Math.round(row.getBoundingClientRect().height))),
-        fullPromptVisible: question ? getComputedStyle(question.querySelector(".admin-actuals-question-prompt-full")).display !== "none" : false,
-        shortPromptVisible: question ? getComputedStyle(question.querySelector(".admin-actuals-question-prompt-short")).display !== "none" : false,
+        questionKey: questionLink?.textContent.trim() || "",
+        questionTitle: questionLink?.getAttribute("title") || "",
         legacyLineMarkup: Boolean(document.querySelector(".admin-actuals-value-line"))
       };
     });
@@ -249,12 +252,8 @@ test("admin actuals keeps one stable table layout across normal and compact mode
     expect(metrics.pendingCellsWithBorderClass).toBe(0);
     expect(metrics.rowAlignment).toBe(true);
     expect(metrics.legacyLineMarkup).toBe(false);
-    if (width <= 720) {
-      expect(metrics.fullPromptVisible).toBe(false);
-      expect(metrics.shortPromptVisible).toBe(true);
-    } else {
-      expect(metrics.fullPromptVisible).toBe(true);
-      expect(metrics.shortPromptVisible).toBe(false);
-    }
+    expect(metrics.questionWidth).toBe(58);
+    expect(metrics.questionKey).toMatch(/^Q\d+$/);
+    expect(metrics.questionTitle).toContain("·");
   }
 });

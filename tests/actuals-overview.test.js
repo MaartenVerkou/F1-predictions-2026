@@ -87,8 +87,6 @@ test("builds one season overview from the latest persisted snapshot per round", 
   assert.equal(overview.pendingCount, 1);
   assert.equal(overview.publishedRound, 1);
   assert.equal(overview.rows[0].cells[0].value, "Antonelli, Russell, Leclerc");
-  assert.equal(overview.rows[0].shortPrompt, "Championship top 3");
-  assert.equal(overview.rows[3].shortPrompt, "Three races · most DNFs");
   assert.equal(overview.rows[0].cells[0].displayText, "ANT · RUS · LEC");
   assert.equal(overview.rows[0].focusLabel, "Points");
   assert.equal(overview.rows[1].focusLabel, "DNF");
