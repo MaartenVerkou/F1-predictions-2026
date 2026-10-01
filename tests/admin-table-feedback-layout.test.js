@@ -43,7 +43,9 @@ test("Questions and Results share season-aware workspace state", () => {
   assert.match(view, /admin-questions-season-form/);
   assert.match(view, /name="season"/);
   assert.match(view, /name="view" value="<%= view %>"/);
-  assert.match(view, /admin-questions-view-toggle/);
+  assert.match(view, /admin-race-data-tabs admin-questions-view-toggle admin-race-data-switch/);
+  assert.match(view, /admin-race-data-tab <%= view === 'questions' \? 'is-active' : '' %>/);
+  assert.doesNotMatch(view, /Wording, order, scoring and inclusion/);
   assert.match(view, /href="\/admin\/questions\?season=<%= seasonValue %>&view=results/);
   assert.match(view, /partials\/admin_question_results/);
   assert.match(results, /admin-actuals-overview-table/);

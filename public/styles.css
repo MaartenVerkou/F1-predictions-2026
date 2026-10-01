@@ -5280,7 +5280,6 @@ button:disabled {
 .admin-questions-context {
   display: grid;
   justify-items: end;
-  gap: 10px;
   min-width: 0;
 }
 
@@ -5303,20 +5302,15 @@ button:disabled {
 }
 
 .admin-questions-view-toggle {
-  display: inline-flex;
-  gap: 0;
+  flex: 0 0 auto;
 }
 
-.admin-questions-view-toggle .admin-nav-link {
-  border-radius: 0;
-}
-
-.admin-questions-view-toggle .admin-nav-link:first-child {
-  border-radius: 6px 0 0 6px;
-}
-
-.admin-questions-view-toggle .admin-nav-link:last-child {
-  border-radius: 0 6px 6px 0;
+.admin-question-toolbar-leading {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
 }
 
 .admin-empty-state {
@@ -5519,7 +5513,7 @@ button:disabled {
     justify-content: stretch;
   }
 
-  .admin-questions-view-toggle .admin-nav-link {
+  .admin-questions-view-toggle .admin-race-data-tab {
     flex: 1 1 0;
     text-align: center;
   }
