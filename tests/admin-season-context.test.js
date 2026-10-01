@@ -149,3 +149,57 @@ test("archived Inputs mutations require explicit historical correction confirmat
   assert.equal(db.prepare("SELECT display_name FROM drivers WHERE id = 1").get().display_name, "Corrected Archived Driver");
   db.close();
 });
+
+test("all archived Inputs mutation routes reject missing historical confirmation before mutation", () => {
+  const db = new Database(":memory:");
+  db.dialect = "sqlite";
+  ensureSeasonInputsSchema(db);
+  db.exec(`
+    CREATE TABLE race_data_snapshots (id INTEGER PRIMARY KEY, season INTEGER NOT NULL);
+    CREATE TABLE actual_snapshots (id INTEGER PRIMARY KEY, season INTEGER NOT NULL);
+    CREATE TABLE actual_snapshot_values (snapshot_id INTEGER NOT NULL, question_id TEXT NOT NULL, value TEXT NOT NULL);
+    INSERT INTO seasons (id, year, label, status, created_at, updated_at)
+      VALUES (1, 2025, '2025', 'archived', 'now', 'now');
+  `);
+
+  const routes = {};
+  const app = {
+    get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers.at(-1); }
+  };
+  registerAdminRoutes(app, {
+    db,
+    requireAdmin: () => {},
+    getCurrentUser: () => ({ id: 7 }),
+    logEvent: () => {}
+  });
+
+  const cases = [
+    ["POST /admin/inputs/entity", { season: "2025", entity_type: "driver" }],
+    ["POST /admin/inputs/definitions", { season: "2025" }],
+    ["POST /admin/inputs/team-order", { season: "2025", team_id: "1", direction: "up" }],
+    ["POST /admin/inputs/remove", { season: "2025", entity_type: "driver", entity_id: "1" }],
+    ["POST /admin/inputs/driver", { season: "2025", display_name: "New Driver" }],
+    ["POST /admin/inputs/lineup", { season: "2025", round: "1" }],
+    ["POST /admin/inputs/team-history", { season: "2025", team_id: "1" }],
+    ["POST /admin/inputs/assignment", { season: "2025" }],
+    ["POST /admin/inputs/alias", { season: "2025" }],
+    ["POST /admin/inputs/provider-ref", { season: "2025" }],
+    ["POST /admin/inputs/mappings/resolve", { season: "2025" }]
+  ];
+
+  for (const [routeName, body] of cases) {
+    const handler = routes[routeName];
+    assert.equal(typeof handler, "function", `${routeName} should be registered`);
+    const response = {};
+    handler({ body }, { redirect(location) { response.location = location; } });
+    assert.match(
+      response.location || "",
+      /error=Archived\+seasons\+are\+read-only\.\+Confirm\+a\+historical\+correction\+before\+changing\+them\./,
+      `${routeName} should reject an unconfirmed archived mutation`
+    );
+  }
+
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM seasons").get().count, 1);
+  db.close();
+});

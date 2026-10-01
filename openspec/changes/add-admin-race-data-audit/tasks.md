@@ -9,7 +9,7 @@
 
 - [x] 2.1 Refactor sync to create an import batch and persist normalized round bundles before deriving actuals.
 - [x] 2.2 Derive values by loading persisted bundles through the cutoff; preserve review state and mark reconstructed historical imports.
-- [ ] 2.3 Add comparison output/tests for existing-vs-derived values before activation.
+- [x] 2.3 Add comparison output/tests for existing-vs-derived values before activation.
 
 ## 3. Admin audit workspace
 
@@ -21,6 +21,6 @@
 ## 4. Preview and verification
 
 - [x] 4.1 Extend the sanitized preview fixture across R1-R14 with deterministic complete, partial, future, cancelled, and reconstructed states.
-- [ ] 4.2 Add route/integration and pure tests for import persistence, persisted derivation, cutoff totals, access, read-only behavior, and missing-source states.
-- [ ] 4.3 Run OpenSpec strict validation, `checks.fast`, build/release checks where supported, and preview smoke checks.
-- [ ] 4.4 Mark the change complete only after the preview is refreshed and the user has reviewed the new workspace.
+- [x] 4.2 Add route/integration and pure tests for import persistence, persisted derivation, cutoff totals, access, read-only behavior, and missing-source states.
+- [x] 4.3 Run OpenSpec strict validation, `checks.fast`, build/release checks where supported, and preview smoke checks.
+- [x] 4.4 Mark the change complete only after the preview is refreshed and the user has reviewed the new workspace.
