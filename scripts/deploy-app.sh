@@ -16,12 +16,14 @@ test -s "$TOKEN_FILE" || { echo "Missing GHCR read credential" >&2; exit 2; }
 mkdir -p "$RELEASE_DIR"
 
 previous_image="$(docker inspect f1predictions-app-1 --format '{{.Image}}' 2>/dev/null || true)"
+previous_image_ref="$(docker inspect f1predictions-app-1 --format '{{.Config.Image}}' 2>/dev/null || true)"
 if [[ -n "$previous_image" ]]; then
   docker image tag "$previous_image" "$ROLLBACK_TAG"
-  if [[ -f "$RELEASE_DIR/f1-current.json" ]]; then
-    cp "$RELEASE_DIR/f1-current.json" "$RELEASE_DIR/f1-rollback.json"
+  rollback_image="${previous_image_ref:-$previous_image}"
+  if [[ "$previous_image_ref" == ghcr.io/*@sha256:* ]]; then
+    printf '{"image":"%s","deployed_at":"%s"}\n' "$rollback_image" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RELEASE_DIR/f1-rollback.json"
   else
-    printf '{"type":"legacy-image","image_id":"%s"}\n' "$previous_image" > "$RELEASE_DIR/f1-rollback.json"
+    printf '{"image":"%s","image_id":"%s","deployed_at":"%s"}\n' "$rollback_image" "$previous_image" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RELEASE_DIR/f1-rollback.json"
   fi
 fi
 
