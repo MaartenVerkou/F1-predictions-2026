@@ -70,6 +70,7 @@ const {
   buildQuestionInputRows,
   normalizeQuestionInputEdits
 } = require("../question-admin-model");
+const { upsertSeasonQuestionSettings } = require("../season-question-settings");
 const {
   DEFAULT_SCORING_RULES,
   deriveStandingsForRounds,
@@ -1191,13 +1192,60 @@ function registerAdminRoutes(app, deps) {
       return logEvent(level, event, fields);
     }
     try {
-      const questions = getQuestions("en", { includeExcluded: true, includeMeta: true });
+      const questions = getQuestions("en", {
+        includeExcluded: true,
+        includeMeta: true,
+        season: Number.isInteger(season) && season >= 1900 ? season : CURRENT_SEASON
+      });
       const catalog = buildSeasonCatalog(db, season, { questions });
       return logEvent(level, event, { ...fields, catalogRevision: catalog.catalogRevision || null });
     } catch (err) {
       return logEvent(level, event, { ...fields, catalogRevision: null });
     }
   };
+  function buildQuestionResultsModel({ season, locale, seasonContext }) {
+    const sourceQuestions = getQuestions(locale, { season });
+    // Results remain useful for a valid season even when a legacy/test database
+    // has not populated the season catalog yet; the evidence and question
+    // settings are still keyed by the selected year.
+    let catalog = null;
+    try {
+      catalog = buildSeasonCatalog(db, season, { questions: sourceQuestions });
+    } catch (error) {
+      catalog = null;
+    }
+    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
+    const races = (catalog?.races?.length
+      ? catalog.races.map((race) => race.display_name)
+      : getRaces()) || [];
+    const publishedActuals = loadPublishedActuals(db, season);
+    const latestSnapshots = listLatestSnapshotsForSeason(db, season, {
+      maxRoundNumber: races.length || null
+    });
+    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season, {
+      maxRoundNumber: races.length || null
+    });
+    const latestRoundNumber = Number.isFinite(Number(latestRoundSnapshot?.round_number))
+      ? Number(latestRoundSnapshot.round_number)
+      : null;
+    const overview = buildActualsOverview({
+      season,
+      races,
+      questions,
+      snapshots: latestSnapshots,
+      latestRoundNumber,
+      publishedActuals,
+      fetchSnapshotValues: (snapshotId) => loadSnapshotValues(db, snapshotId)
+    });
+    return {
+      resultsQuestions: questions,
+      races,
+      actualOverviewRows: overview.rows,
+      actualOverviewTargets: overview.targets,
+      catalogRevision: catalog?.catalogRevision || null,
+      catalogReadiness: catalog?.readiness || null
+    };
+  }
   const MULTI_ACTUAL_SINGLE_CHOICE_IDS = new Set([
     "most_driver_of_the_day",
     "most_dnfs_driver",
@@ -2864,72 +2912,79 @@ function registerAdminRoutes(app, deps) {
     const locale = res.locals.locale || "en";
     const saveError = req.query.error ? String(req.query.error) : null;
     const saveSuccess = req.query.success ? String(req.query.success) : null;
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: req.query.season,
+      currentSeason: CURRENT_SEASON
+    });
+    const season = Number(seasonContext.year || CURRENT_SEASON);
+    const workspaceView = String(req.query.view || "questions").trim().toLowerCase() === "results"
+      ? "results"
+      : "questions";
     const questions = getQuestions(locale, {
       includeExcluded: true,
-      includeMeta: true
+      includeMeta: true,
+      season
     });
     const questionRows = buildQuestionInputRows(questions);
     const requestedMode = String(req.query.mode || "").trim().toLowerCase();
     const mode = requestedMode === "edit" ? "edit" : "view";
+    const results = workspaceView === "results"
+      ? buildQuestionResultsModel({ season, locale, seasonContext })
+      : null;
     res.render("admin_questions", {
       user,
       questions,
       questionRows,
       mode,
+      workspaceView,
+      season,
+      seasonContext,
+      availableSeasons: seasonContext.availableSeasons,
+      ...results,
       saveError,
       saveSuccess
     });
   });
 
   app.post("/admin/questions", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
     const questions = getQuestions("en", {
       includeExcluded: true,
-      includeMeta: true
+      includeMeta: true,
+      season
     });
     const adminUser = getCurrentUser(req);
     try {
+      const seasonContext = resolveAdminSeasonContext(db, {
+        requestedSeason: season,
+        currentSeason: CURRENT_SEASON
+      });
+      if (seasonContext.availableSeasons.length > 0 && (!seasonContext.selected || !seasonContext.isValid)) {
+        throw new Error("The selected season is not available.");
+      }
       const edits = normalizeQuestionInputEdits(questions, req.body, {
         parsePointsOverride: parsePointsOverrideInput,
         validatePointsOverrideType
       });
       const now = new Date().toISOString();
-      const upsert = db.prepare(
-        `
-        INSERT INTO question_settings (question_id, included, points_override, order_index, prompt_override, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(question_id)
-        DO UPDATE SET
-          included = excluded.included,
-          points_override = excluded.points_override,
-          order_index = excluded.order_index,
-          prompt_override = excluded.prompt_override,
-          updated_at = excluded.updated_at
-        `
-      );
-      const tx = db.transaction(() => {
-        for (const edit of edits) {
-          upsert.run(
-            edit.questionId,
-            edit.included ? 1 : 0,
-            edit.pointsOverride == null ? null : JSON.stringify(edit.pointsOverride),
-            edit.orderIndex,
-            edit.promptOverride,
-            now
-          );
-        }
-      });
-      tx();
+      upsertSeasonQuestionSettings(db, season, edits, now);
       logAdminEvent("info", "admin_questions_updated", {
         userId: adminUser?.id || null,
+        season,
         questionIds: edits.map((edit) => edit.questionId),
         changedCount: edits.length
       });
       return res.redirect(
-        `/admin/questions?success=${encodeURIComponent("Questions updated.")}`
+        `/admin/questions?season=${encodeURIComponent(season)}&success=${encodeURIComponent("Questions updated.")}`
       );
     } catch (err) {
+      logAdminEvent("warn", "admin_questions_update_failed", {
+        userId: adminUser?.id || null,
+        season,
+        error: { message: err.message }
+      });
       return res.redirect(
-        `/admin/questions?mode=edit&error=${encodeURIComponent(err.message)}`
+        `/admin/questions?season=${encodeURIComponent(season)}&mode=edit&error=${encodeURIComponent(err.message)}`
       );
     }
   });
@@ -2965,7 +3020,7 @@ function registerAdminRoutes(app, deps) {
         sourceNote: "Admin correction from Race Data review"
       });
       const correctionSnapshot = findRaceDataSnapshot(db, season, round);
-      const sourceQuestions = getQuestions("en", { includeMeta: true });
+      const sourceQuestions = getQuestions("en", { includeMeta: true, season });
       const seasonContext = resolveAdminSeasonContext(db, {
         requestedSeason: season,
         currentSeason: CURRENT_SEASON
@@ -3085,7 +3140,8 @@ function registerAdminRoutes(app, deps) {
     });
     const season = Number(seasonContext.year || CURRENT_SEASON);
     const sourceQuestions = getQuestions(locale, {
-      includeMeta: true
+      includeMeta: true,
+      season
     });
     const pointsLabel = "Results";
     const metricOptions = buildRaceDataMetricOptions(t, { pointsLabel });
@@ -3124,13 +3180,18 @@ function registerAdminRoutes(app, deps) {
     focus.metricLabel = focusMetricLabels[focus.matrixMetric || focus.metric] || t("admin_race_data.points");
     focus.footerRoundLabel = t("admin_race_data.focus_round_total");
     focus.footerTotalLabel = t("admin_race_data.focus_total");
-    const catalog = seasonContext.selected
-      ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
-      : null;
+    let catalog = null;
+    try {
+      catalog = buildSeasonCatalog(db, season, { questions: sourceQuestions });
+    } catch (error) {
+      catalog = null;
+    }
     const scoringRules = catalog?.season?.id
       ? (readSeasonScoringRules(db, catalog.season.id) || DEFAULT_SCORING_RULES)
       : DEFAULT_SCORING_RULES;
-    const races = catalog?.races?.map((race) => race.display_name) || [];
+    const races = (catalog?.races?.length
+      ? catalog.races.map((race) => race.display_name)
+      : getRaces()) || [];
     const evidenceRows = listRaceDataSnapshots(db, season);
     let snapshotRows = listLatestSnapshotsForSeason(db, season, {
       maxRoundNumber: races.length
@@ -3203,57 +3264,14 @@ function registerAdminRoutes(app, deps) {
   });
 
   app.get("/admin/actuals", requireAdmin, (req, res) => {
-    const user = getCurrentUser(req);
-    const locale = res.locals.locale || "en";
-    const saveError = req.query.error ? String(req.query.error) : null;
-    const saveSuccess = req.query.success ? String(req.query.success) : null;
-    const seasonContext = resolveAdminSeasonContext(db, {
-      requestedSeason: req.query.season,
-      currentSeason: CURRENT_SEASON
-    });
-    const season = Number(seasonContext.year || CURRENT_SEASON);
-    const sourceQuestions = getQuestions(locale);
-    const catalog = seasonContext.selected
-      ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
-      : null;
-    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
-    const races = catalog?.races?.map((race) => race.display_name) || [];
-    const publishedActuals = seasonContext.selected
-      ? loadPublishedActuals(db, season)
-      : { available: false, values: {} };
-    const latestSnapshots = seasonContext.selected
-      ? listLatestSnapshotsForSeason(db, season, { maxRoundNumber: races.length })
-      : [];
-    const latestRoundSnapshot = seasonContext.selected
-      ? findLatestRoundSnapshotForSeason(season, { maxRoundNumber: races.length })
-      : null;
-    const latestRoundNumber =
-      Number.isFinite(Number(latestRoundSnapshot?.round_number))
-        ? Number(latestRoundSnapshot.round_number)
-        : null;
-    const overview = buildActualsOverview({
-      season,
-      races,
-      questions,
-      snapshots: latestSnapshots,
-      latestRoundNumber,
-      publishedActuals,
-      fetchSnapshotValues
-    });
-    res.render("admin_actuals", {
-      user,
-      questions,
-      season,
-      seasonContext,
-      availableSeasons: seasonContext.availableSeasons,
-      races,
-      actualOverviewRows: overview.rows,
-      actualOverviewTargets: overview.targets,
-      saveError,
-      saveSuccess,
-      catalogRevision: catalog?.catalogRevision || null,
-      catalogReadiness: catalog?.readiness || null
-    });
+    const params = new URLSearchParams();
+    params.set("view", "results");
+    if (req.query.season != null && String(req.query.season).trim()) {
+      params.set("season", String(req.query.season));
+    }
+    if (req.query.error != null) params.set("error", String(req.query.error));
+    if (req.query.success != null) params.set("success", String(req.query.success));
+    return res.redirect(`/admin/questions?${params.toString()}`);
   });
 
   app.post("/admin/actuals/run-auto-update", requireAdmin, async (req, res) => {

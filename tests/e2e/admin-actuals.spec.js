@@ -4,6 +4,7 @@ const path = require("path");
 const Database = require("better-sqlite3");
 const { expect, test } = require("@playwright/test");
 const { ensureRaceDataSchema, saveRaceDataSnapshot } = require("../../src/race-data-evidence");
+const { ensureSeasonInputsSchema } = require("../../src/season-inputs");
 
 const DB_PATH = path.join(__dirname, "..", "..", ".tmp", "playwright-state", "app.db");
 
@@ -12,8 +13,13 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
 
   const db = new Database(DB_PATH);
   db.dialect = "sqlite";
-  ensureRaceDataSchema(db);
   const now = new Date().toISOString();
+  ensureSeasonInputsSchema(db);
+  db.prepare(
+    `INSERT OR IGNORE INTO seasons (year, label, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)`
+  ).run(2026, "2026", "active", now, now);
+  ensureRaceDataSchema(db);
   db.exec(`
     DELETE FROM actual_snapshot_values;
     DELETE FROM actual_snapshots;
@@ -92,7 +98,7 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
 
   await page.goto("/admin/actuals");
 
-  await expect(page.locator("[data-admin-actuals-season-form] select[name=season]")).toBeVisible();
+  await expect(page.locator("[data-admin-questions-season-form] select[name=season]")).toBeVisible();
   await expect(page.locator("[data-admin-actuals-target-form]")).toHaveCount(0);
   await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
   await expect(page.locator("[data-admin-actuals-form]")).toContainText("Does every team score points?");
@@ -143,12 +149,12 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
       localStorage.setItem("theme", theme);
       document.documentElement.setAttribute("data-theme", theme);
     }, testCase.theme);
-    await expect(page.getByRole("heading", { name: "Season actuals" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Questions & Results" })).toBeVisible();
     await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
 
     const actualsMetrics = await page.evaluate(() => {
       const viewportWidth = document.documentElement.clientWidth;
-      const seasonSelect = document.querySelector('[data-admin-actuals-season-form] select[name="season"]');
+      const seasonSelect = document.querySelector('[data-admin-questions-season-form] select[name="season"]');
       const overviewTable = document.querySelector(".admin-actuals-overview-table");
       return {
         theme: document.documentElement.getAttribute("data-theme"),

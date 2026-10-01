@@ -5277,6 +5277,57 @@ button:disabled {
   align-items: flex-end;
 }
 
+.admin-questions-context {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-questions-season-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-questions-season-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-questions-season-form select {
+  min-width: 160px;
+  max-width: 100%;
+}
+
+.admin-questions-view-toggle {
+  display: inline-flex;
+  gap: 0;
+}
+
+.admin-questions-view-toggle .admin-nav-link {
+  border-radius: 0;
+}
+
+.admin-questions-view-toggle .admin-nav-link:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.admin-questions-view-toggle .admin-nav-link:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.admin-empty-state {
+  display: grid;
+  gap: 5px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 92%, var(--border));
+}
+
 .admin-question-table-toolbar {
   margin-top: 2px;
 }
@@ -5449,6 +5500,28 @@ button:disabled {
 @media (max-width: 720px) {
   .admin-questions-heading {
     align-items: stretch;
+  }
+
+  .admin-questions-context {
+    justify-items: stretch;
+  }
+
+  .admin-questions-season-form,
+  .admin-questions-season-form select {
+    width: 100%;
+  }
+
+  .admin-questions-season-form {
+    justify-content: space-between;
+  }
+
+  .admin-questions-view-toggle {
+    justify-content: stretch;
+  }
+
+  .admin-questions-view-toggle .admin-nav-link {
+    flex: 1 1 0;
+    text-align: center;
   }
 
   .admin-question-actions {

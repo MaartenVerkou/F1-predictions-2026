@@ -23,6 +23,12 @@ const {
 } = require("../src/race-data-evidence");
 const { createAppDatabase } = require("../src/app-database");
 const { ensurePostgresSchema } = require("../src/postgres-schema");
+const {
+  applySeasonQuestionSettings,
+  ensureSeasonQuestionSettingsSchema,
+  migrateLegacyQuestionSettings,
+  readSeasonQuestionSettingsMap
+} = require("../src/season-question-settings");
 const { resolveConfiguredRaceName } = require("../src/race-names");
 const { buildPersistedDataFromEvidence } = require("../src/race-evidence-derivation");
 const {
@@ -139,6 +145,22 @@ function parseArgs(argv) {
 
 function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
+}
+
+function loadSeasonQuestions(args, catalogQuestions) {
+  let db = null;
+  try {
+    db = createAppDatabase({ databaseUrl: args.databaseUrl, sqlitePath: args.dbPath });
+    ensureSeasonQuestionSettingsSchema(db);
+    migrateLegacyQuestionSettings(db, args.season);
+    const settings = readSeasonQuestionSettingsMap(db, args.season);
+    return applySeasonQuestionSettings(catalogQuestions, settings);
+  } catch (error) {
+    console.warn(`Using catalog question defaults because season settings could not be loaded: ${error.message}`);
+    return catalogQuestions;
+  } finally {
+    db?.close?.();
+  }
 }
 
 function selectCompletedRounds(completedRounds, { round = null, maxRound = null } = {}) {
@@ -903,12 +925,14 @@ function compareSnapshotValues(existingValues, derivedValues) {
   };
 }
 
-function ensureActualsSchema(db) {
+function ensureActualsSchema(db, season = SEASON) {
   if (db.dialect === "postgres") {
     ensurePostgresSchema(db);
     ensureActualSnapshotColumns(db);
     ensurePublishedActualsSchema(db);
     ensureRaceDataSchema(db);
+    ensureSeasonQuestionSettingsSchema(db);
+    migrateLegacyQuestionSettings(db, season);
     return;
   }
 
@@ -952,6 +976,8 @@ function ensureActualsSchema(db) {
   ensureActualSnapshotColumns(db);
   ensurePublishedActualsSchema(db);
   ensureRaceDataSchema(db);
+  ensureSeasonQuestionSettingsSchema(db);
+  migrateLegacyQuestionSettings(db, season);
 }
 
 function writeActualsAndSnapshots(db, {
@@ -1054,7 +1080,8 @@ function writeActualsAndSnapshots(db, {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const questions = readJsonFile(QUESTIONS_PATH).questions || [];
+  const catalogQuestions = readJsonFile(QUESTIONS_PATH).questions || [];
+  const questions = loadSeasonQuestions(args, catalogQuestions);
   const roster = readJsonFile(ROSTER_PATH);
   const raceCatalog = readJsonFile(RACES_PATH);
   const races = raceCatalog.races || [];
@@ -1132,7 +1159,7 @@ async function main() {
       if (db.dialect === "sqlite") {
         db.pragma("busy_timeout = 5000");
       }
-      ensureActualsSchema(db);
+      ensureActualsSchema(db, args.season);
       const existingEvidenceRows = listRaceDataSnapshots(db, args.season);
       const existingEvidenceByRound = new Map(
         existingEvidenceRows.map((row) => [Number(row.round_number), row])

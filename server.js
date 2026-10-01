@@ -23,6 +23,12 @@ const { registerAdminRoutes } = require("./src/routes/admin");
 const { ensureRaceDataSchema } = require("./src/race-data-evidence");
 const { ensureSeasonInputsSchema, listSeasonInputs } = require("./src/season-inputs");
 const {
+  applySeasonQuestionSettings,
+  migrateLegacyQuestionSettings,
+  readSeasonQuestionSettingsMap,
+  ensureSeasonQuestionSettingsSchema
+} = require("./src/season-question-settings");
+const {
   buildCanonicalCatalog,
   canonicalizeQuestionValue
 } = require("./src/canonical-answers");
@@ -675,6 +681,20 @@ if (db.dialect === "sqlite") {
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS season_question_settings (
+    season INTEGER NOT NULL,
+    question_id TEXT NOT NULL,
+    included INTEGER NOT NULL DEFAULT 1,
+    points_override TEXT,
+    order_index INTEGER,
+    prompt_override TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (season, question_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_season_question_settings_order
+    ON season_question_settings(season, order_index, question_id);
+
   CREATE TABLE IF NOT EXISTS email_verifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -849,6 +869,8 @@ ensureActualSnapshotColumns(db);
 ensurePublishedActualsSchema(db);
 ensureRaceDataSchema(db);
 ensureSeasonInputsSchema(db);
+ensureSeasonQuestionSettingsSchema(db);
+migrateLegacyQuestionSettings(db, CURRENT_SEASON);
 
 function seedAdminIdeas() {
   const now = new Date().toISOString();
@@ -1543,103 +1565,8 @@ function readJsonFile(filePath) {
   }
 }
 
-function getQuestionSettingsMap() {
-  const rows = db
-    .prepare(
-      "SELECT question_id, included, points_override, order_index, prompt_override FROM question_settings"
-    )
-    .all();
-  const map = new Map();
-  for (const row of rows) {
-    const included = Number(row.included) !== 0;
-    const rawOverride =
-      row.points_override == null ? "" : String(row.points_override).trim();
-    let parsedOverride = null;
-    let hasValidOverride = false;
-    if (rawOverride) {
-      try {
-        parsedOverride = JSON.parse(rawOverride);
-        hasValidOverride = true;
-      } catch (err) {
-        console.warn(
-          `Ignoring invalid points_override JSON for question ${row.question_id}:`,
-          err.message
-        );
-      }
-    }
-    const orderIndexRaw = row.order_index;
-    const orderIndex =
-      orderIndexRaw == null || !Number.isFinite(Number(orderIndexRaw))
-        ? null
-        : Number(orderIndexRaw);
-    const promptOverride =
-      row.prompt_override == null ? "" : String(row.prompt_override).trim();
-    map.set(row.question_id, {
-      included,
-      rawOverride,
-      parsedOverride,
-      hasValidOverride,
-      orderIndex,
-      promptOverride
-    });
-  }
-  return map;
-}
-
-function applyQuestionSettings(
-  questions,
-  settingsMap,
-  { includeExcluded = false, includeMeta = false } = {}
-) {
-  const out = [];
-  for (const [sourceIndex, original] of (questions || []).entries()) {
-    const setting = settingsMap.get(original.id);
-    const included = setting ? setting.included : true;
-    if (!includeExcluded && !included) continue;
-
-    const question = { ...original };
-    const basePoints = question.points;
-    if (setting?.promptOverride) {
-      question.prompt = setting.promptOverride;
-      question._promptOverrideRaw = setting.promptOverride;
-    }
-    if (setting?.hasValidOverride) {
-      question.points = setting.parsedOverride;
-      // points_display in questions.json can become stale if points are overridden.
-      delete question.points_display;
-    }
-
-    if (includeMeta) {
-      question._included = included;
-      question._basePoints = basePoints;
-      question._effectivePoints = question.points;
-      question._pointsOverrideRaw = setting?.rawOverride || "";
-      question._hasValidPointsOverride = Boolean(setting?.hasValidOverride);
-      question._promptOverrideRaw = setting?.promptOverride || "";
-      question._orderIndex =
-        setting && Number.isFinite(Number(setting.orderIndex))
-          ? Number(setting.orderIndex)
-          : sourceIndex;
-    }
-
-    question._sourceIndex = sourceIndex;
-    question._sortOrderIndex =
-      setting && Number.isFinite(Number(setting.orderIndex))
-        ? Number(setting.orderIndex)
-        : sourceIndex;
-    out.push(question);
-  }
-  out.sort((a, b) => {
-    if (a._sortOrderIndex !== b._sortOrderIndex) {
-      return a._sortOrderIndex - b._sortOrderIndex;
-    }
-    return a._sourceIndex - b._sourceIndex;
-  });
-  for (const question of out) {
-    delete question._sortOrderIndex;
-    delete question._sourceIndex;
-  }
-  return out;
+function getQuestionSettingsMap(season = CURRENT_SEASON) {
+  return readSeasonQuestionSettingsMap(db, season);
 }
 
 function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
@@ -1655,6 +1582,10 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
 
   const includeExcluded = Boolean(resolvedOptions?.includeExcluded);
   const includeMeta = Boolean(resolvedOptions?.includeMeta);
+  const requestedSeason = Number(resolvedOptions?.season || CURRENT_SEASON);
+  const resolvedSeason = Number.isInteger(requestedSeason) && requestedSeason >= 1900 && requestedSeason <= 2200
+    ? requestedSeason
+    : CURRENT_SEASON;
 
   if (!fs.existsSync(QUESTIONS_PATH)) {
     const fallback = [
@@ -1671,8 +1602,8 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
         helper: "Example: Ferrari"
       }
     ];
-    const settings = getQuestionSettingsMap();
-    const adjustedFallback = applyQuestionSettings(fallback, settings, {
+    const settings = getQuestionSettingsMap(resolvedSeason);
+    const adjustedFallback = applySeasonQuestionSettings(fallback, settings, {
       includeExcluded,
       includeMeta
     });
@@ -1689,8 +1620,8 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
     questions = parsed.questions;
   }
 
-  const settings = getQuestionSettingsMap();
-  const adjustedQuestions = applyQuestionSettings(questions, settings, {
+  const settings = getQuestionSettingsMap(resolvedSeason);
+  const adjustedQuestions = applySeasonQuestionSettings(questions, settings, {
     includeExcluded,
     includeMeta
   });

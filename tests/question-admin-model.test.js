@@ -134,7 +134,7 @@ test("scoring summary is compact while retaining the detailed rule", () => {
   assert.equal(summary.detail, "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts");
 });
 
-test("Questions route renders one global input table and one edit mode", () => {
+test("Questions route renders the selected season input table and edit mode", () => {
   const db = {
     prepare() {
       return {
@@ -174,7 +174,8 @@ test("Questions route renders one global input table and one edit mode", () => {
 
   assert.equal(rendered.view, "admin_questions");
   assert.equal(rendered.model.mode, "edit");
-  assert.equal(rendered.model.season, undefined);
+  assert.equal(rendered.model.season, 2099);
+  assert.equal(rendered.model.workspaceView, "questions");
   assert.equal(rendered.model.questionRows[0].prompt, "Select three races with the most DNFs");
 });
 
@@ -226,8 +227,8 @@ test("Questions edit save persists prompt, points, inclusion and order together"
   );
 
   assert.match(redirected, /Questions%20updated/);
-  assert.deepEqual(writes.map((args) => args.slice(0, 5)), [
-    ["second", 0, "5", 0, "Rewritten second"],
-    ["first", 1, "12", 1, "Rewritten first"]
+  assert.deepEqual(writes.map((args) => args.slice(0, 6)), [
+    [2026, "second", 0, "5", 0, "Rewritten second"],
+    [2026, "first", 1, "12", 1, "Rewritten first"]
   ]);
 });

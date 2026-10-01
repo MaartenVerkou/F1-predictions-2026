@@ -1,16 +1,36 @@
-<%- include('partials/header', { title: 'Questions', user }) %>
-<%- include('partials/admin_nav', { active: 'questions' }) %>
+<%- include('partials/header', { title: 'Questions & Results', user }) %>
+<%- include('partials/admin_nav', { active: 'questions', season }) %>
 
 <% const rows = Array.isArray(questionRows) ? questionRows : []; %>
-<% const editing = mode === 'edit'; %>
+<% const view = workspaceView === 'results' ? 'results' : 'questions'; %>
+<% const editing = view === 'questions' && mode === 'edit'; %>
+<% const seasonValue = Number(season || 2026); %>
 
 <div class="card admin-page-card admin-questions-page">
   <div class="admin-race-data-heading admin-questions-heading">
     <div>
-      <h1>Questions</h1>
+      <h1>Questions &amp; Results</h1>
       <p class="muted admin-page-intro">
-        Manage question wording, order, scoring and inclusion. Stable question IDs keep answers and derivations connected.
+        <%= view === 'results'
+          ? 'Review derived question results from the selected season. Correct source evidence in Race Data.'
+          : 'Manage this season’s question wording, order, scoring and inclusion.' %>
       </p>
+    </div>
+    <div class="admin-questions-context">
+      <form method="get" action="/admin/questions" class="admin-questions-season-form" data-admin-questions-season-form>
+        <input type="hidden" name="view" value="<%= view %>">
+        <% if (editing) { %><input type="hidden" name="mode" value="edit"><% } %>
+        <label for="admin-questions-season">Season</label>
+        <select id="admin-questions-season" name="season" onchange="this.form.submit()">
+          <% (availableSeasons || []).forEach((availableSeason) => { %>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === seasonValue ? 'selected' : '' %>><%= availableSeason.displayLabel %></option>
+          <% }) %>
+        </select>
+      </form>
+      <nav class="admin-questions-view-toggle" aria-label="Questions workspace view">
+        <a class="admin-nav-link <%= view === 'questions' ? 'is-active' : '' %>" href="/admin/questions?season=<%= seasonValue %>&view=questions<%= editing ? '&mode=edit' : '' %>">Questions</a>
+        <a class="admin-nav-link <%= view === 'results' ? 'is-active' : '' %>" href="/admin/questions?season=<%= seasonValue %>&view=results">Results</a>
+      </nav>
     </div>
   </div>
 
@@ -21,6 +41,15 @@
     </div>
   <% } %>
 
+  <% if (view === 'results') { %>
+    <div class="admin-question-table-toolbar admin-race-data-detail-toolbar">
+      <div class="admin-race-data-section-heading">
+        <h2>Question results</h2>
+        <span class="muted admin-question-table-help">Read-only derived answers · <%= seasonValue %></span>
+      </div>
+    </div>
+    <%- include('partials/admin_question_results') %>
+  <% } else { %>
   <div class="admin-question-table-toolbar admin-race-data-detail-toolbar">
     <div class="admin-race-data-section-heading">
       <h2>Question inputs</h2>
@@ -29,15 +58,16 @@
     <div class="admin-race-data-detail-actions admin-toolbar-actions admin-question-actions">
       <% if (editing) { %>
         <button type="submit" form="admin-question-edit-form" class="secondary admin-question-save-button">Save changes</button>
-        <a class="button-link secondary admin-question-cancel" href="/admin/questions">Cancel</a>
+        <a class="button-link secondary admin-question-cancel" href="/admin/questions?season=<%= seasonValue %>">Cancel</a>
       <% } else { %>
-        <a class="button-link secondary admin-race-data-edit-button admin-question-edit-button" href="/admin/questions?mode=edit">Edit data</a>
+        <a class="button-link secondary admin-race-data-edit-button admin-question-edit-button" href="/admin/questions?season=<%= seasonValue %>&mode=edit">Edit data</a>
       <% } %>
     </div>
   </div>
 
   <form id="admin-question-edit-form" method="post" action="/admin/questions" class="admin-question-edit-form">
     <%- csrfField() %>
+    <input type="hidden" name="season" value="<%= seasonValue %>">
     <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Questions input table" tabindex="0">
       <table class="table compact admin-question-table <%= editing ? 'admin-question-table--editing' : '' %>" <%= editing ? 'data-question-order-table' : '' %>>
         <thead>
@@ -122,6 +152,7 @@
   <p class="muted admin-question-contract-note">
     Calculation type and source are contract metadata and stay read-only here. Editing wording does not change the stable question ID or existing answers.
   </p>
+  <% } %>
 </div>
 
 <%- include('partials/footer') %>

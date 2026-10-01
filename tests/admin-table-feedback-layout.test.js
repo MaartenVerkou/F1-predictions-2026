@@ -36,6 +36,22 @@ test("Questions edit mode exposes in-place order controls", () => {
   assert.match(app, /body\.insertBefore\(nextRow, row\)/);
 });
 
+test("Questions and Results share season-aware workspace state", () => {
+  const view = readView("admin_questions.ejs");
+  const results = readView("partials/admin_question_results.ejs");
+  const nav = readView("partials/admin_nav.ejs");
+  assert.match(view, /admin-questions-season-form/);
+  assert.match(view, /name="season"/);
+  assert.match(view, /name="view" value="<%= view %>"/);
+  assert.match(view, /admin-questions-view-toggle/);
+  assert.match(view, /href="\/admin\/questions\?season=<%= seasonValue %>&view=results/);
+  assert.match(view, /partials\/admin_question_results/);
+  assert.match(results, /admin-actuals-overview-table/);
+  assert.match(results, /admin-actuals-question-view-link/);
+  assert.match(nav, /nav_questions[^\n]*&amp; Results/);
+  assert.doesNotMatch(nav, /nav_actuals/);
+});
+
 test("admin actuals is a read-only season overview", () => {
   const view = readView("admin_actuals.ejs");
   assert.doesNotMatch(view, /autofill-current-season/);
