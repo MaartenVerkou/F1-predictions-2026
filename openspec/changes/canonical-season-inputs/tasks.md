@@ -23,12 +23,12 @@
 
 - [x] 4.1 Update Race data, Actuals, question forms, leaderboards, analysis, and scoring views to resolve labels from canonical IDs.
 - [x] 4.2 Replace index-based preview driver/team generation with a coherent sanitized catalog and assignment fixture.
-- [ ] 4.3 Add tests for renames, team changes, provider aliases, ambiguous mappings, legacy values, round cutoff consistency, and seat occupancy.
+- [x] 4.3 Add tests for renames, team changes, provider aliases, ambiguous mappings, legacy values, round cutoff consistency, and seat occupancy.
 - [x] 4.4 Refresh the sanitized preview and verify Inputs → Questions → Race data → Actuals end-to-end without changing production.
 - [x] 4.5 Add season-specific team display ordering and round-bounded seat 1/seat 2 assignments without using IDs as order.
 - [x] 4.6 Present the team list and two driver seats as the primary Inputs lineup view while preserving normalized assignment history.
 
 ## 5. Release gates
 
-- [ ] 5.1 Run OpenSpec strict validation, syntax/assets checks, targeted tests, full checks where supported, and preview smoke checks.
+- [x] 5.1 Run OpenSpec strict validation, syntax/assets checks, targeted tests, full checks where supported, and preview smoke checks.
 - [ ] 5.2 Keep the production migration and deployment pending explicit preview approval.

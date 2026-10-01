@@ -16,7 +16,8 @@ const {
   listSeasonMappings,
   resolveEntity,
   normalizeDriverNumber,
-  sortSeasonDrivers
+  sortSeasonDrivers,
+  upsertDriverTeamAssignment
 } = require("../src/season-inputs");
 
 const catalog = buildCanonicalCatalog({
@@ -105,7 +106,8 @@ function createCanonicalDb() {
       (2, 'replacement-driver', 'Replacement', 'Driver', 'Replacement Driver', 'now', 'now'),
       (3, 'other-season-driver', 'Other', 'Driver', 'Other Driver', 'now', 'now');
     INSERT INTO teams (id, slug, display_name, created_at, updated_at) VALUES
-      (10, 'test-team', 'Test Team', 'now', 'now');
+      (10, 'test-team', 'Test Team', 'now', 'now'),
+      (11, 'replacement-team', 'Replacement Team', 'now', 'now');
     INSERT INTO races (id, season_id, round_number, slug, display_name, calendar_state, created_at, updated_at) VALUES
       (101, 1, 1, 'round-1', 'Round 1', 'completed', 'now', 'now'),
       (102, 1, 8, 'round-8', 'Round 8', 'scheduled', 'now', 'now'),
@@ -113,10 +115,11 @@ function createCanonicalDb() {
     INSERT INTO season_drivers (season_id, driver_id, created_at, updated_at) VALUES
       (1, 1, 'now', 'now'), (1, 2, 'now', 'now'), (2, 3, 'now', 'now');
     INSERT INTO season_teams (season_id, team_id, created_at, updated_at) VALUES
-      (1, 10, 'now', 'now');
+      (1, 10, 'now', 'now'), (1, 11, 'now', 'now');
     INSERT INTO driver_team_assignments (id, season_id, driver_id, team_id, from_round, to_round, seat_number, source, created_at, updated_at) VALUES
       (1001, 1, 1, 10, 1, 7, 1, 'seed', 'now', 'now'),
-      (1002, 1, 2, 10, 8, NULL, 1, 'seed', 'now', 'now');
+      (1002, 1, 2, 10, 8, NULL, 1, 'seed', 'now', 'now'),
+      (1003, 1, 1, 11, 8, NULL, 1, 'seed', 'now', 'now');
   `);
   return db;
 }
@@ -197,7 +200,24 @@ test("assignment lookup respects both season and selected round cutoff", (t) => 
   t.after(() => db.close());
 
   assert.equal(assignmentForRound(db, { seasonId: 1, driverId: 1, roundNumber: 7 }).team_id, 10);
-  assert.equal(assignmentForRound(db, { seasonId: 1, driverId: 1, roundNumber: 8 }), null);
+  assert.equal(assignmentForRound(db, { seasonId: 1, driverId: 1, roundNumber: 8 }).team_id, 11);
   assert.equal(assignmentForRound(db, { seasonId: 1, driverId: 2, roundNumber: 8 }).from_round, 8);
   assert.equal(assignmentForRound(db, { seasonId: 2, driverId: 1, roundNumber: 8 }), null);
+});
+
+test("season contract rejects overlapping team seats while allowing an explicit team change", (t) => {
+  const db = createCanonicalDb();
+  t.after(() => db.close());
+
+  assert.throws(
+    () => upsertDriverTeamAssignment(db, {
+      seasonId: 1,
+      driverId: 3,
+      teamId: 10,
+      seatNumber: 1,
+      fromRound: 8
+    }),
+    /Team seat overlaps assignment 1002/
+  );
+  assert.equal(assignmentForRound(db, { seasonId: 1, driverId: 1, roundNumber: 8 }).team_id, 11);
 });
