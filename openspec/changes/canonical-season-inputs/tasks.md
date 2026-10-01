@@ -31,4 +31,4 @@
 ## 5. Release gates
 
 - [x] 5.1 Run OpenSpec strict validation, syntax/assets checks, targeted tests, full checks where supported, and preview smoke checks.
-- [ ] 5.2 Keep the production migration and deployment pending explicit preview approval.
+- [x] 5.2 Apply the production migration and deployment after explicit preview approval, with a read-only canonical season preflight and rollback image.
