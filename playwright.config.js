@@ -9,6 +9,7 @@ const stateDir = path.join(__dirname, ".tmp", "playwright-state");
 
 module.exports = defineConfig({
   testDir: "./tests/e2e",
+  globalSetup: "./tests/e2e/global-setup.js",
   timeout: 30_000,
   workers: 1,
   expect: {
