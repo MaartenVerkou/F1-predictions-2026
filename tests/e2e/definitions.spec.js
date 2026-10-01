@@ -14,5 +14,5 @@ test("admin Inputs exposes the definitions tab and protected edit form", async (
   await expect(page.locator(".admin-inputs-tabs .admin-race-data-tab.is-active")).toHaveText("Definitions");
   await page.getByRole("link", { name: "Edit data" }).click();
   await expect(page.locator("#definition-form-1")).toBeAttached();
-  await expect(page.locator("#definition-form-1 input[name=term_key]")).toHaveValue("dnf");
+  await expect(page.locator('input[name="term_key"][form="definition-form-1"]')).toHaveValue("dnf");
 });

@@ -3804,7 +3804,7 @@ button:disabled {
   line-height: 1.15;
 }
 
-\n@media (max-width: 720px) {
+@media (max-width: 720px) {
   .account-page,
   .about-page {
     gap: 14px;
