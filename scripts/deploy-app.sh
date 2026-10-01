@@ -46,7 +46,8 @@ healthy=0
 for _attempt in {1..20}; do
   container_id="$(docker compose "${COMPOSE[@]}" ps -q app)"
   container_ip="$(docker inspect "$container_id" --format '{{(index .NetworkSettings.Networks "mhv-web").IPAddress}}')"
-  if curl --fail --silent "http://$container_ip:3000/healthz" | python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("status") == "ok" and d.get("databaseBackend") == "postgres" else 1)'; then
+  if health_payload="$(curl --fail --silent "http://$container_ip:3000/healthz")" &&
+    printf '%s' "$health_payload" | python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("status") == "ok" and d.get("databaseBackend") == "postgres" else 1)'; then
     healthy=1
     break
   fi
