@@ -52,3 +52,31 @@ The system SHALL read legacy display-value answers and provider labels only thro
 - **WHEN** a stored answer cannot be resolved
 - **THEN** the answer SHALL remain unchanged for auditability
 - **AND** scoring SHALL mark it unavailable rather than awarding a guessed result
+
+### Requirement: Questions administration stays focused on question inputs
+The Questions administration view SHALL render the global question inputs from the stable definition, localized metadata, and `question_settings`. It SHALL show only order, prompt, answer basis/type, derivation label, points, inclusion, and stable question identity; Actual lifecycle, catalog readiness, and downstream navigation SHALL not be duplicated here.
+
+#### Scenario: An administrator opens Questions
+- **WHEN** the Questions page is opened
+- **THEN** it SHALL show one input table without a season selector or downstream-status columns
+- **AND** the table SHALL preserve stable question IDs and the current persisted order
+
+#### Scenario: An administrator edits question inputs
+- **WHEN** the administrator presses the single Edit button
+- **THEN** the same table SHALL switch to inline editing for order, prompt, points, and inclusion
+- **AND** basis, type, and derivation metadata SHALL remain read-only
+
+#### Scenario: An administrator saves question inputs
+- **WHEN** Save is submitted
+- **THEN** the system SHALL reject empty prompts, duplicate/out-of-range order values, and points overrides with the wrong shape
+- **AND** one transaction SHALL persist the validated order, prompt override, points override, and inclusion values
+- **AND** stable question IDs, derivation metadata, historical snapshots, and participant answers SHALL remain unchanged
+
+#### Scenario: A prompt is customized
+- **WHEN** a non-empty prompt override is saved for a question ID
+- **THEN** the override SHALL be stored in `question_settings.prompt_override`
+- **AND** all later question views SHALL use that prompt while continuing to resolve responses and scoring by the stable question ID
+
+#### Scenario: Editing is cancelled
+- **WHEN** the administrator presses Cancel before saving
+- **THEN** no question setting SHALL be changed

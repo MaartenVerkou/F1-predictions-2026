@@ -1085,6 +1085,9 @@ const initAdminInputTables = () => {
       table.querySelectorAll('[data-row-editor]').forEach((editor) => {
         editor.hidden = true;
       });
+      rows.forEach((row) => {
+        row.classList.remove('is-editing');
+      });
     };
 
     const clearSelection = () => {
@@ -1137,7 +1140,8 @@ const initAdminInputTables = () => {
       if (!editor) return;
       closeEditors();
       editor.hidden = false;
-      editor.querySelector('input, select, textarea')?.focus();
+      selectedRow.classList.add('is-editing');
+      editor.querySelector('input:not([type="hidden"]), select, textarea')?.focus();
     });
 
     removeButton?.addEventListener('click', () => {
@@ -1204,6 +1208,220 @@ const initAdminLineupHistoryEditors = () => {
   });
 };
 
+const initQuestionOrderControls = () => {
+  document.querySelectorAll('[data-question-order-table]').forEach((table) => {
+    const body = table.tBodies[0];
+    if (!body) return;
+
+    const rows = () => Array.from(body.querySelectorAll('[data-question-order-row]'));
+    const syncOrder = () => {
+      const currentRows = rows();
+      currentRows.forEach((row, index) => {
+        const input = row.querySelector('[data-question-order-input]');
+        const up = row.querySelector('[data-question-order-move="up"]');
+        const down = row.querySelector('[data-question-order-move="down"]');
+        if (input) input.value = String(index + 1);
+        if (up) up.disabled = index === 0;
+        if (down) down.disabled = index === currentRows.length - 1;
+      });
+    };
+
+    table.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-question-order-move]');
+      if (!button || !table.contains(button) || button.disabled) return;
+      event.preventDefault();
+      const row = button.closest('[data-question-order-row]');
+      if (!row) return;
+      const currentRows = rows();
+      const index = currentRows.indexOf(row);
+      const direction = button.dataset.questionOrderMove;
+      const nextIndex = direction === 'up' ? index - 1 : index + 1;
+      const nextRow = currentRows[nextIndex];
+      if (!nextRow) return;
+
+      if (direction === 'up') body.insertBefore(row, nextRow);
+      else body.insertBefore(nextRow, row);
+      syncOrder();
+      row.querySelector(`[data-question-order-move="${direction}"]`)?.focus();
+    });
+
+    syncOrder();
+  });
+};
+
+let raceDataRegionController = null;
+let raceDataHistoryBound = false;
+let raceDataCorrectionBound = false;
+
+const syncRaceDataSeasonForm = (url) => {
+  const form = document.querySelector('.admin-race-data-page .admin-inputs-season-form');
+  if (!form) return;
+  const matrix = document.querySelector('[data-race-data-matrix]');
+  const view = url.searchParams.get('view') || matrix?.dataset.raceDataActiveView || 'drivers';
+  const round = url.searchParams.get('round');
+  const focus = url.searchParams.get('focus') || document.querySelector('[data-race-data-focus-form] select[name="focus"]')?.value || 'points';
+  const viewInput = form.querySelector('input[name="view"]');
+  const roundInput = form.querySelector('input[name="round"]');
+  const roundSelect = document.querySelector('[data-race-data-round-form] select[name="round"]');
+  const focusInput = form.querySelector('input[name="focus"]');
+  if (viewInput) viewInput.value = view;
+  if (roundInput && round) roundInput.value = round;
+  if (roundSelect) roundSelect.value = round || '';
+  if (focusInput) focusInput.value = focus;
+};
+
+const requestRaceDataRegion = async (targetUrl, { pushHistory = false } = {}) => {
+  const region = document.querySelector('[data-race-data-round-region]');
+  if (!region) return;
+  const cleanUrl = new URL(targetUrl, window.location.href);
+  cleanUrl.searchParams.delete('fragment');
+  const requestUrl = new URL(cleanUrl.href);
+  requestUrl.searchParams.set('fragment', 'round');
+  const controller = new AbortController();
+  raceDataRegionController?.abort();
+  raceDataRegionController = controller;
+  region.setAttribute('aria-busy', 'true');
+
+  try {
+    const response = await fetch(requestUrl.href, {
+      headers: { Accept: 'text/html' },
+      credentials: 'same-origin',
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`Race data update failed (${response.status})`);
+    const html = await response.text();
+    const template = document.createElement('template');
+    template.innerHTML = html.trim();
+    const nextRegion = template.content.querySelector('[data-race-data-round-region]');
+    if (!nextRegion) throw new Error('Race data update returned no workspace');
+    if (pushHistory) window.history.pushState({ raceData: true }, '', cleanUrl.href);
+    region.replaceWith(nextRegion);
+    syncRaceDataSeasonForm(cleanUrl);
+    initRaceDataViewToggle();
+    initRaceDataCorrection();
+  } catch (error) {
+    if (error?.name === 'AbortError') return;
+    region.removeAttribute('aria-busy');
+    window.location.assign(cleanUrl.href);
+  } finally {
+    if (raceDataRegionController === controller) raceDataRegionController = null;
+  }
+};
+
+const initRaceDataViewToggle = () => {
+  const page = document.querySelector('.admin-race-data-page');
+  const region = document.querySelector('[data-race-data-round-region]');
+  if (!page || !region || page.dataset.raceDataNavigationBound === 'true') return;
+  page.dataset.raceDataNavigationBound = 'true';
+
+  page.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-race-data-view-toggle]');
+    const metricToggle = event.target.closest('[data-race-data-metric-toggle]');
+    const roundLink = event.target.closest('[data-race-data-round-link]');
+    const link = toggle || metricToggle || roundLink;
+    if (!link || !page.contains(link) || event.defaultPrevented) return;
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    const current = new URL(window.location.href);
+    url.searchParams.delete('fragment');
+    if (url.href === current.href) {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    void requestRaceDataRegion(url, { pushHistory: true });
+  });
+
+  page.addEventListener('change', (event) => {
+    const focusSelect = event.target.closest('[data-race-data-focus-form] select[name="focus"]');
+    if (focusSelect && page.contains(focusSelect)) {
+      const form = focusSelect.form;
+      const url = new URL(form?.action || window.location.href, window.location.href);
+      const current = new URL(window.location.href);
+      const option = focusSelect.options[focusSelect.selectedIndex];
+      const focusView = option?.dataset.raceDataFocusView;
+      url.searchParams.set('season', form?.elements.season?.value || current.searchParams.get('season') || '');
+      url.searchParams.set('round', form?.elements.round?.value || current.searchParams.get('round') || '');
+      url.searchParams.set('focus', focusSelect.value || 'points');
+      url.searchParams.set('view', focusView && focusView !== 'all'
+        ? focusView
+        : document.querySelector('[data-race-data-matrix]')?.dataset.raceDataActiveView || 'drivers');
+      event.preventDefault();
+      void requestRaceDataRegion(url, { pushHistory: true });
+      return;
+    }
+    const select = event.target.closest('[data-race-data-round-form] select[name="round"]');
+    if (!select || !page.contains(select)) return;
+    const form = select.form;
+    const url = new URL(form?.action || window.location.href, window.location.href);
+    const current = new URL(window.location.href);
+    url.searchParams.set('season', form?.elements.season?.value || current.searchParams.get('season') || '');
+    url.searchParams.set('view', form?.elements.view?.value || document.querySelector('[data-race-data-matrix]')?.dataset.raceDataActiveView || 'drivers');
+    url.searchParams.set('round', select.value);
+    url.searchParams.set('focus', form?.elements.focus?.value || current.searchParams.get('focus') || 'points');
+    event.preventDefault();
+    void requestRaceDataRegion(url, { pushHistory: true });
+  });
+
+  if (!raceDataHistoryBound) {
+    window.addEventListener('popstate', () => {
+      if (document.querySelector('[data-race-data-round-region]')) {
+        void requestRaceDataRegion(window.location.href);
+      }
+    });
+    raceDataHistoryBound = true;
+  }
+};
+
+const initRaceDataCorrection = () => {
+  const page = document.querySelector('.admin-race-data-page');
+  if (!page || raceDataCorrectionBound) return;
+  raceDataCorrectionBound = true;
+
+  const setEditing = (editing) => {
+    const region = page.querySelector('[data-race-data-round-region]');
+    const form = page.querySelector('[data-race-data-correction-form]');
+    const edit = page.querySelector('[data-race-data-edit]');
+    const refresh = page.querySelector('[data-race-data-refresh-form]');
+    const actions = page.querySelector('[data-race-data-edit-actions]');
+    const details = page.querySelector('[data-race-data-editor-details]');
+    if (!region || !form) return;
+    const isEditing = Boolean(editing);
+    region.dataset.raceDataEditing = isEditing ? 'true' : 'false';
+    form.dataset.raceDataEditor = isEditing ? 'true' : 'false';
+    form.setAttribute('aria-busy', isEditing ? 'true' : 'false');
+    form.querySelectorAll('[data-race-data-edit-input]').forEach((input) => {
+      input.disabled = !isEditing;
+    });
+    if (edit) {
+      edit.hidden = isEditing;
+      edit.setAttribute('aria-hidden', isEditing ? 'true' : 'false');
+    }
+    if (refresh) {
+      refresh.hidden = isEditing;
+      refresh.setAttribute('aria-hidden', isEditing ? 'true' : 'false');
+    }
+    if (actions) actions.hidden = !isEditing;
+    if (details) details.hidden = !isEditing;
+    if (isEditing) form.querySelector('[data-race-data-edit-input]')?.focus();
+  };
+
+  page.addEventListener('click', (event) => {
+    const edit = event.target.closest('[data-race-data-edit]');
+    if (edit && page.contains(edit)) {
+      setEditing(true);
+      return;
+    }
+    const close = event.target.closest('[data-race-data-editor-close]');
+    if (close && page.contains(close)) {
+      const form = page.querySelector('[data-race-data-correction-form]');
+      form?.reset();
+      setEditing(false);
+    }
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   initHeaderMenu();
   initHeaderOffsets();
@@ -1227,7 +1445,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initAdminActualsUnsavedState();
   initAdminSeasonMutationConfirmation();
   initAdminInputTables();
+  initQuestionOrderControls();
   initAdminLineupHistoryEditors();
+  initRaceDataViewToggle();
+  initRaceDataCorrection();
   initSignupPasswordMatch();
   initScrollToEndButton();
 });

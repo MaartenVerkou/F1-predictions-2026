@@ -11,6 +11,14 @@ function statusLabel(status) {
   return normalizeSeasonStatus(status);
 }
 
+function displaySeasonLabel({ year, label, status }) {
+  const normalizedStatus = statusLabel(status);
+  const baseLabel = String(label || year)
+    .replace(/\s*(?:[·•|/–—-]\s*)?(?:planned|preparation|active|archived|archive)$/i, "")
+    .trim() || String(year);
+  return baseLabel + " " + normalizedStatus;
+}
+
 function countForSeason(db, table, column, seasonId) {
   const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table} WHERE ${column} = ?`).get(Number(seasonId));
   return Number(row?.count || 0);
@@ -27,6 +35,7 @@ function listAdminSeasons(db) {
       label: String(row.label || row.year),
       status,
       statusLabel: statusLabel(status),
+      displayLabel: displaySeasonLabel({ year: Number(row.year), label: row.label, status }),
       editable: status !== "archived",
       syncable: status === "active",
       counts: {
@@ -86,6 +95,7 @@ function assertSeasonMutationAllowed(context, { historicalCorrection = false, pr
 module.exports = {
   SEASON_STATUSES,
   normalizeSeasonStatus,
+  displaySeasonLabel,
   listAdminSeasons,
   readSeasonMutationFlags,
   resolveAdminSeasonContext,

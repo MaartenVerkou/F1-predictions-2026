@@ -23,6 +23,91 @@ test("admin feedback uses the shared context wrapper", () => {
   }
 });
 
+test("Questions edit mode exposes in-place order controls", () => {
+  const view = readView("admin_questions.ejs");
+  const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
+  assert.match(view, /data-question-order-table/);
+  assert.match(view, /data-question-order-row/);
+  assert.match(view, /data-question-order-move="up"/);
+  assert.match(view, /data-question-order-move="down"/);
+  assert.match(view, /type="button"/);
+  assert.match(app, /const initQuestionOrderControls/);
+  assert.match(app, /body\.insertBefore\(row, nextRow\)/);
+  assert.match(app, /body\.insertBefore\(nextRow, row\)/);
+});
+
+test("Questions and Results share season-aware workspace state", () => {
+  const view = readView("admin_questions.ejs");
+  const results = readView("partials/admin_question_results.ejs");
+  const questionCell = readView("partials/admin_actuals_question_cell.ejs");
+  const nav = readView("partials/admin_nav.ejs");
+  assert.match(view, /admin-questions-season-form/);
+  assert.match(view, /name="season"/);
+  assert.match(view, /name="view" value="<%= view %>"/);
+  const toggle = readView("partials/admin_questions_view_toggle.ejs");
+  assert.match(view, /admin-question-table-region/);
+  assert.match(view, /partials\/admin_questions_view_toggle/);
+  assert.match(toggle, /admin-race-data-tabs admin-questions-view-toggle admin-race-data-switch/);
+  assert.match(toggle, /admin-race-data-tab <%= view === 'questions' \? 'is-active' : '' %>/);
+  assert.doesNotMatch(view, /Question inputs|Question results/);
+  assert.doesNotMatch(view, /Wording, order, scoring and inclusion/);
+  assert.match(toggle, /href="\/admin\/questions\?season=<%= seasonValue %>&view=results/);
+  assert.match(view, /partials\/admin_question_results/);
+  assert.match(results, /admin-actuals-overview-table/);
+  assert.match(results, /admin_actuals_question_cell/);
+  assert.match(questionCell, /admin-actuals-question-short-link/);
+  assert.match(questionCell, /row\.question\.prompt/);
+  assert.match(nav, /nav_questions[^\n]*&amp; Results/);
+  assert.ok(nav.indexOf('nav_race_data') < nav.indexOf('nav_questions'), "Race Data should precede Questions & Results");
+  assert.doesNotMatch(nav, /nav_actuals/);
+});
+
+test("admin actuals is a read-only season overview", () => {
+  const view = readView("admin_actuals.ejs");
+  const questionCell = readView("partials/admin_actuals_question_cell.ejs");
+  assert.doesNotMatch(view, /autofill-current-season/);
+  assert.doesNotMatch(view, /preview_autofill/);
+  assert.match(view, /admin-race-data-selector-form admin-actuals-season-form/);
+  assert.match(view, /data-admin-actuals-form/);
+  assert.doesNotMatch(view, /admin-actuals-source-note|overview_source|pending_rounds|published_through|no_published_snapshot/);
+  assert.match(view, /admin_actuals_question_cell/);
+  assert.match(questionCell, /admin-actuals-question-short-link/);
+  assert.match(questionCell, /encodeURIComponent\(row\.question\.id\)/);
+  assert.match(questionCell, /row\.focusLabel/);
+  assert.match(view, /cell\.displayText/);
+  assert.match(view, /cell\.value/);
+  assert.match(view, /target\.raceName/);
+  assert.match(view, /target\.raceCode/);
+  assert.match(view, /admin-actuals-review-marker/);
+  assert.match(view, /admin-actuals-round-header/);
+  assert.doesNotMatch(view, /const statusLabel|admin-actuals-round-column small|is-pending/);
+  assert.match(view, /admin-actuals-value/);
+  assert.doesNotMatch(view, /displayLines|displayMode|admin-actuals-value-line/);
+  assert.doesNotMatch(view, /data-admin-actuals-target-form/);
+  assert.doesNotMatch(view, /name="target"/);
+  assert.doesNotMatch(view, /admin\/actuals\/review/);
+  assert.doesNotMatch(view, /run-auto-update/);
+  assert.doesNotMatch(view, /Mark this snapshot reviewed/);
+});
+
+test("season results keep the question key compact while preserving a full tooltip", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(styles, /--admin-actuals-question-width:\s*58px/);
+  assert.match(styles, /--admin-actuals-value-width:\s*72px/);
+  assert.match(styles, /@media \(max-width: 720px\)[\s\S]*?--admin-actuals-value-width:\s*clamp\(64px, 9\.5vw, 68px\)/);
+  assert.doesNotMatch(styles, /@media \(max-width: 480px\)/);
+  assert.match(styles, /\.admin-actuals-question-short-link\s*\{[\s\S]*?font-weight:\s*700/);
+  assert.match(styles, /\.admin-actuals-question-column,\s*\n\.admin-actuals-question-cell\s*\{[\s\S]*?min-width:\s*var\(--admin-actuals-question-width\)/);
+  assert.doesNotMatch(styles, /admin-actuals-question-prompt/);
+  assert.doesNotMatch(styles, /admin-actuals-question-view-link/);
+  assert.doesNotMatch(styles, /admin-actuals-value-line/);
+  assert.match(styles, /\.admin-actuals-review-marker\s*\{/);
+  assert.match(styles, /\.admin-actuals-round-header\s*\{[\s\S]*?white-space:\s*nowrap/);
+  assert.doesNotMatch(styles, /admin-actuals-round-column\.is-pending|admin-actuals-value-cell\.is-pending/);
+  assert.match(styles, /admin-actuals-value-cell a[\s\S]*?-webkit-line-clamp:\s*var\(--admin-actuals-max-value-lines\)/);
+  assert.match(styles, /admin-actuals-value[\s\S]*?overflow-wrap:\s*inherit/);
+});
+
 test("team lineup overview keeps the toolbar concise", () => {
   const view = readView("admin_inputs.ejs");
   const help = view.indexOf("admin-inputs-lineup-help");
@@ -69,11 +154,138 @@ test("all input tables use explicit responsive table variants", () => {
   assert.match(view, /admin-inputs-race-table/);
   assert.match(view, /admin-inputs-mapping-table/);
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  assert.match(styles, /\.admin-inputs-data-table-wrap\s*\{[\s\S]*?max-width:\s*100%/);
+  assert.match(styles, /\.admin-inputs-page \.admin-table-scroll\s*\{[\s\S]*?max-width:\s*100%/);
   assert.match(styles, /\.admin-inputs-race-table\s*\{/);
   assert.match(styles, /\.admin-inputs-mapping-table\s*\{/);
   assert.match(styles, /\.admin-inputs-page \.admin-inputs-view-toolbar\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
   assert.match(styles, /overflow-wrap:\s*anywhere/);
+});
+
+test("scoring rules live in a dedicated Inputs sub-section", () => {
+  const view = readView("admin_inputs.ejs");
+  const tabs = readView("partials/admin_inputs_tabs.ejs");
+  assert.match(tabs, /\['drivers', 'teams', 'races', 'scoring'\]/);
+  assert.match(view, /tab === 'scoring'/);
+  assert.match(view, /admin-inputs-scoring-section/);
+  assert.match(view, /admin-inputs-scoring-table/);
+  assert.match(view, /label: 'Race'/);
+  assert.match(view, /label: 'Sprint'/);
+  assert.match(view, /admin-inputs-scoring-source/);
+  assert.doesNotMatch(view, /Scoring rules/);
+  assert.doesNotMatch(view, /admin-inputs-scoring-overview/);
+  const scoringStart = view.indexOf("tab === 'scoring'");
+  const driversStart = view.indexOf("tab === 'drivers'");
+  assert.ok(scoringStart >= 0 && driversStart > scoringStart);
+  assert.ok(view.slice(scoringStart, driversStart).includes("admin-inputs-scoring-section"));
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(styles, /\.admin-inputs-scoring-sections\s*\{/);
+  assert.match(styles, /\.admin-inputs-scoring-table\s*\{/);
+  assert.match(styles, /\.admin-inputs-scoring-sections\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.doesNotMatch(styles, /\.admin-inputs-scoring-overview\s*\{/);
+});
+
+test("hidden input helper forms do not create spacing between toolbar and tables", () => {
+  const view = readView("admin_inputs.ejs");
+  assert.match(view, /id="admin-inputs-new-driver-form"[^>]*\bhidden\b/);
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(styles, /form\[hidden\]\s*\{[\s\S]*?display:\s*none\s*!important/);
+  assert.match(styles, /\.admin-inputs-page \.admin-table-scroll\s*\{[\s\S]*?margin-top:\s*8px/);
+  assert.match(styles, /\.admin-inputs-page \.admin-inputs-scoring\s*\{[\s\S]*?margin-top:\s*8px/);
+});
+
+test("definitions keep the edit toolbar above a compact wrapped table", () => {
+  const view = readView("admin_inputs.ejs");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(view, /admin-inputs-definitions-table <%= definitionMode === 'edit' \? 'is-editing' : '' %>/);
+  assert.match(view, /admin-definition-col-explanation/);
+  assert.match(view, /admin-definition-col-aliases/);
+  assert.match(styles, /\.admin-inputs-table\.admin-inputs-definitions-table\s*\{[\s\S]*?table-layout:\s*fixed/);
+  assert.match(styles, /\.admin-inputs-table\.admin-inputs-definitions-table\.is-editing\s*\{[\s\S]*?width:\s*920px/);
+  assert.match(styles, /\.admin-inputs-definitions-table \.admin-definition-col-explanation\s*\{[\s\S]*?width:\s*210px/);
+  assert.match(styles, /\.admin-inputs-definitions-table \.admin-definition-col-aliases\s*\{[\s\S]*?width:\s*125px/);
+});
+
+test("race data views share one identity column and a common row rhythm", () => {
+  const page = readView("admin_race_data.ejs");
+  const region = readView("partials/admin_race_data_round_region.ejs");
+  const row = readView("partials/admin_race_data_matrix_row.ejs");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(page, /partials\/admin_race_data_round_region/);
+  assert.match(region, /<tbody data-race-data-body="<%= viewMode %>">/);
+  assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
+  assert.match(page, /admin-race-data-selector-stack/);
+  assert.doesNotMatch(page, /availableSeason\.label %> ·/);
+  assert.doesNotMatch(readView("admin_actuals.ejs"), /availableSeason\.label %> ·/);
+  assert.match(page, /admin_race_data\.season_overview/);
+  assert.match(page, /raceDataError \|\| raceDataSuccess/);
+  assert.match(page, /class="admin-race-data-selector-form admin-race-data-round-form" data-race-data-round-form/);
+  assert.doesNotMatch(region, /class="admin-race-data-controls"/);
+  assert.match(region, /questions_label/);
+  assert.match(region, /data-race-data-round-link/);
+  assert.match(region, /option\.id === view\.activeMetricId/);
+  assert.match(region, /admin-race-data-metric-tab <%= option\.id === view\.activeMetricId \? 'is-active' : '' %>/);
+  assert.match(region, /class="admin-race-data-table-section"/);
+  assert.match(region, /admin_race_data\.championship_standings/);
+  assert.doesNotMatch(region, /admin_race_data\.race_result/);
+  assert.match(region, /admin-race-data-section-heading/);
+  assert.match(region, /view\.hasSelectedRound/);
+  assert.match(region, /roundQuery/);
+  assert.match(region, /admin-race-data-evidence-meta/);
+  assert.match(region, /admin-race-data-legend/);
+  assert.doesNotMatch(region, /admin-race-data-revision-meta/);
+  assert.match(region, /class="admin-race-data-table-toolbar"/);
+  assert.doesNotMatch(region, /admin-race-data-toolbar/);
+  assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
+  assert.match(region, /data-race-data-result-row/);
+  assert.match(region, /data-race-data-edit>Edit data/);
+  assert.match(region, /action="\/admin\/race-data\/review"/);
+  assert.match(region, /name="returnTo"/);
+  assert.match(region, /admin-race-data-review-state/);
+  assert.match(region, /admin-race-data-review-button/);
+  assert.match(region, /admin-race-data-review-icon/);
+  assert.match(region, /data-race-data-review-status/);
+  assert.match(region, /admin_race_data_entity_label/);
+  assert.match(region, /round\.code/);
+  assert.match(region, /option\.shortLabel/);
+  assert.doesNotMatch(region, /admin-race-data-edit-column/);
+  assert.match(region, /data-race-data-editor-details/);
+  assert.match(region, /data-race-data-edit-input/);
+  assert.doesNotMatch(region, /data-race-data-selection-label/);
+  assert.match(region, /resultColumns\.forEach/);
+  assert.match(region, /column\.id === 'finish'/);
+  assert.match(row, /rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail"/);
+  assert.doesNotMatch(row, /admin-race-data-constructor-driver/);
+  assert.doesNotMatch(row, /admin-race-data-team-detail/);
+  assert.doesNotMatch(row, /admin-race-data-driver-detail/);
+  assert.match(styles, /\.admin-race-data-matrix th,[\s\S]*?line-height:\s*1\.25/);
+  assert.match(styles, /\.admin-race-data-controls\s*\{/);
+  assert.match(styles, /\.admin-race-data-table-section\s*\{/);
+  assert.match(styles, /\.admin-race-data-table-toolbar\s*\{/);
+  assert.match(styles, /\.admin-race-data-section-heading\s*\{/);
+  assert.match(styles, /\.admin-race-data-section-heading h2\s*\{/);
+  const roundRegionStyles = styles.match(/\.admin-race-data-round-region\s*\{([\s\S]*?)\n\}/);
+  assert.ok(roundRegionStyles, "race data round region styles should be explicit");
+  assert.match(roundRegionStyles[1], /gap:\s*28px/);
+  const pageStyles = styles.match(/\.admin-page-card\.admin-race-data-page\s*\{([\s\S]*?)\n\}/);
+  assert.ok(pageStyles, "race data page styles should be explicit");
+  assert.match(pageStyles[1], /gap:\s*24px/);
+  const championshipStyles = styles.match(/\.admin-race-data-table-section\[data-race-data-championship\]\s*\{([\s\S]*?)\n\}/);
+  assert.ok(championshipStyles, "championship section styles should be explicit");
+  assert.match(championshipStyles[1], /margin-top:\s*0/);
+  assert.match(championshipStyles[1], /padding-top:\s*0/);
+  assert.doesNotMatch(championshipStyles[1], /border-top/);
+  const derivationStyles = styles.match(/\.admin-race-data-derivation\s*\{([\s\S]*?)\n\}/);
+  assert.ok(derivationStyles, "derivation section styles should be explicit");
+  assert.doesNotMatch(derivationStyles[1], /border-top|padding-top/);
+  const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
+  assert.match(app, /data-race-data-round-form\] select\[name="round"\]/);
+  assert.match(app, /roundSelect\.value = round \|\| ''/);
+  assert.match(styles, /\.admin-race-data-review-state\s*\{/);
+  assert.match(styles, /\.admin-race-data-review-form\s*\{/);
+  assert.match(styles, /\.admin-race-data-review-button\s*\{/);
+  assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
+  assert.match(styles, /\.admin-race-data-detail-table--result \.admin-race-data-result-cell--driver \.admin-race-data-compact-label/);
+  assert.doesNotMatch(styles, /\.admin-race-data-team\s*\{/);
 });
 
 test("inputs exposes shared historical confirmation and advanced data states", () => {
@@ -128,10 +340,91 @@ test("lineup period metadata stays adjacent to the driver name", () => {
   assert.match(styles, /admin-inputs-team-col-driver/);
 });
 
-test("inputs toolbar actions use the same compact rhythm as the tabs", () => {
+test("inputs toolbar actions use the shared compact rhythm", () => {
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
-  assert.match(styles, /\.admin-inputs-view-toolbar \.admin-inputs-toolbar-end > button/);
-  assert.match(styles, /\.admin-inputs-view-toolbar \.admin-inputs-toolbar-end > \.admin-inputs-advanced-link/);
-  assert.match(styles, /min-height:\s*34px/);
-  assert.match(styles, /border-radius:\s*999px/);
+  assert.match(styles, /\.admin-toolbar-actions\s*\{/);
+  assert.match(styles, /\.admin-toolbar-actions\s*>\s*button/);
+  assert.match(styles, /min-height:\s*30px/);
+});
+
+test("inputs navigation and actions reuse the race-data controls", () => {
+  const view = readView("admin_inputs.ejs");
+  const tabs = readView("partials/admin_inputs_tabs.ejs");
+  const raceData = readView("partials/admin_race_data_round_region.ejs");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+
+  assert.match(tabs, /admin-race-data-tabs admin-inputs-tabs admin-race-data-switch/);
+  assert.match(tabs, /admin-race-data-tab <%= tab === name \? 'is-active' : '' %>/);
+  assert.match(view, /admin-inputs-toolbar-end admin-toolbar-actions/);
+  assert.match(raceData, /admin-race-data-detail-actions admin-toolbar-actions/);
+  assert.match(styles, /\.admin-toolbar-actions\s*\{/);
+  assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
+});
+
+test("input editing keeps team reordering scoped to the selected row", () => {
+  const view = readView("admin_inputs.ejs");
+  const app = fs.readFileSync(path.join(repoRoot, "public", "app.js"), "utf8");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+
+  assert.match(view, /data-table-capabilities="edit,remove,reorder"/);
+  assert.match(view, /class="admin-inputs-team-order"/);
+  assert.match(view, /class="admin-inputs-team-position"><%= index \+ 1 %><\/span>/);
+  assert.match(view, /<th scope="col"><abbr title="<%= t\('admin_inputs.display_order'\) %>">#<\/abbr><\/th>/);
+  assert.match(app, /selectedRow\.classList\.add\('is-editing'\)/);
+  assert.match(app, /row\.classList\.remove\('is-editing'\)/);
+  assert.match(styles, /\.admin-inputs-team-order \.admin-order-buttons\s*\{[\s\S]*?display:\s*none/);
+  assert.match(styles, /\.admin-inputs-team-table \[data-selectable-row\]\.is-editing \.admin-order-buttons\s*\{[\s\S]*?display:\s*inline-flex/);
+  assert.match(styles, /\.admin-inputs-team-order-inner\s*\{[\s\S]*?display:\s*inline-flex/);
+  assert.match(styles, /\.admin-inputs-team-position\s*\{[\s\S]*?font-variant-numeric:\s*tabular-nums/);
+});
+
+test("driver number column stays compact without changing the table identity columns", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const numberRule = styles.match(/\.admin-inputs-driver-table \.admin-inputs-driver-col-number\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(numberRule, /width:\s*5%/);
+  assert.match(styles, /\.admin-inputs-driver-table th:first-child,[\s\S]*?white-space:\s*nowrap/);
+});
+
+test("race data matrix palette follows the active theme", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const lightMatrixRule = styles.match(/\.admin-race-data-matrix\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(lightMatrixRule, /--card:\s*#ffffff/);
+  assert.match(
+    styles,
+    /:root\[data-theme="dark"\]\s+\.admin-race-data-matrix\s*\{[\s\S]*?--card:\s*#0f1730/
+  );
+});
+
+test("race data matrix exposes shared compact width variables", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const matrixRule = styles.match(/\.admin-race-data-matrix\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(matrixRule, /--admin-race-entity-width/);
+  assert.match(matrixRule, /--admin-race-round-width/);
+  assert.match(matrixRule, /--admin-race-summary-width/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*?--admin-race-summary-width:\s*50px/);
+});
+
+test("race data variant switches share the bordered segmented shell", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const switchRule = styles.match(/\.admin-race-data-switch\s*\{([\s\S]*?)\}/)?.[1] || "";
+  assert.match(switchRule, /border:\s*1px solid var\(--border\)/);
+  assert.match(switchRule, /border-radius:\s*8px/);
+  assert.match(styles, /\.admin-race-data-metric-tabs[^}]*overflow-x:\s*auto/);
+  const metricRule = styles.match(/\.admin-race-data-metric-tabs\s*\{([\s\S]*?)\}/)?.[1] || "";
+  assert.doesNotMatch(metricRule, /padding-bottom/);
+});
+
+test("race data question metadata uses the Actuals subtitle treatment", () => {
+  const view = readView("partials/admin_race_data_round_region.ejs");
+  assert.match(view, /admin-race-data-question-picker/);
+  assert.match(view, /admin-race-data-question-meta/);
+  assert.match(view, /selectedQuestionTableLabel/);
+  assert.match(view, /selectedQuestionFocusLabel/);
+
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const metaRule = styles.match(/\.admin-race-data-question-meta\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+  assert.match(metaRule, /color:\s*var\(--muted\)/);
+  assert.match(metaRule, /font-size:\s*10px/);
+  assert.match(metaRule, /font-weight:\s*600/);
+  assert.match(metaRule, /text-overflow:\s*ellipsis/);
 });

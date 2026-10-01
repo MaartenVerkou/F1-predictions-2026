@@ -9,17 +9,30 @@ const nodemailer = require("nodemailer");
 const { createAppDatabase } = require("./src/app-database");
 const { BetterSqliteSessionStore, PostgresSessionStore } = require("./src/session-store");
 const { ensurePostgresSchema } = require("./src/postgres-schema");
+const {
+  ensureQuestionDefinitionsSchema,
+  listQuestionDefinitions,
+  renderQuestionPromptHtml
+} = require("./src/question-definitions");
 const { runActualsAutoUpdate } = require("./src/actuals-auto-update");
 const leaderboardModel = require("./src/leaderboard-model");
 const {
   REVIEW_STATUS_PENDING,
   ensureActualSnapshotColumns,
+  ensurePublishedActualsSchema,
+  loadPublishedActuals,
   listLatestSnapshotsForSeason
 } = require("./src/actuals-snapshots");
 const { registerAuthRoutes } = require("./src/routes/auth");
 const { registerAdminRoutes } = require("./src/routes/admin");
 const { ensureRaceDataSchema } = require("./src/race-data-evidence");
 const { ensureSeasonInputsSchema, listSeasonInputs } = require("./src/season-inputs");
+const {
+  applySeasonQuestionSettings,
+  migrateLegacyQuestionSettings,
+  readSeasonQuestionSettingsMap,
+  ensureSeasonQuestionSettingsSchema
+} = require("./src/season-question-settings");
 const {
   buildCanonicalCatalog,
   canonicalizeQuestionValue
@@ -669,8 +682,23 @@ if (db.dialect === "sqlite") {
     included INTEGER NOT NULL DEFAULT 1,
     points_override TEXT,
     order_index INTEGER,
+    prompt_override TEXT,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS season_question_settings (
+    season INTEGER NOT NULL,
+    question_id TEXT NOT NULL,
+    included INTEGER NOT NULL DEFAULT 1,
+    points_override TEXT,
+    order_index INTEGER,
+    prompt_override TEXT,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (season, question_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_season_question_settings_order
+    ON season_question_settings(season, order_index, question_id);
 
   CREATE TABLE IF NOT EXISTS email_verifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -738,6 +766,8 @@ if (db.dialect === "sqlite") {
 } else {
   ensurePostgresSchema(db);
 }
+
+ensureQuestionDefinitionsSchema(db);
 
 function ensureGroupColumns() {
   const columns = db.prepare("PRAGMA table_info(groups);").all();
@@ -836,12 +866,18 @@ function ensureQuestionSettingsColumns() {
   if (!names.has("order_index")) {
     db.exec("ALTER TABLE question_settings ADD COLUMN order_index INTEGER;");
   }
+  if (!names.has("prompt_override")) {
+    db.exec("ALTER TABLE question_settings ADD COLUMN prompt_override TEXT;");
+  }
 }
 
 ensureQuestionSettingsColumns();
 ensureActualSnapshotColumns(db);
+ensurePublishedActualsSchema(db);
 ensureRaceDataSchema(db);
 ensureSeasonInputsSchema(db);
+ensureSeasonQuestionSettingsSchema(db);
+migrateLegacyQuestionSettings(db, CURRENT_SEASON);
 
 function seedAdminIdeas() {
   const now = new Date().toISOString();
@@ -1536,95 +1572,8 @@ function readJsonFile(filePath) {
   }
 }
 
-function getQuestionSettingsMap() {
-  const rows = db
-    .prepare(
-      "SELECT question_id, included, points_override, order_index FROM question_settings"
-    )
-    .all();
-  const map = new Map();
-  for (const row of rows) {
-    const included = Number(row.included) !== 0;
-    const rawOverride =
-      row.points_override == null ? "" : String(row.points_override).trim();
-    let parsedOverride = null;
-    let hasValidOverride = false;
-    if (rawOverride) {
-      try {
-        parsedOverride = JSON.parse(rawOverride);
-        hasValidOverride = true;
-      } catch (err) {
-        console.warn(
-          `Ignoring invalid points_override JSON for question ${row.question_id}:`,
-          err.message
-        );
-      }
-    }
-    const orderIndexRaw = row.order_index;
-    const orderIndex =
-      orderIndexRaw == null || !Number.isFinite(Number(orderIndexRaw))
-        ? null
-        : Number(orderIndexRaw);
-    map.set(row.question_id, {
-      included,
-      rawOverride,
-      parsedOverride,
-      hasValidOverride,
-      orderIndex
-    });
-  }
-  return map;
-}
-
-function applyQuestionSettings(
-  questions,
-  settingsMap,
-  { includeExcluded = false, includeMeta = false } = {}
-) {
-  const out = [];
-  for (const [sourceIndex, original] of (questions || []).entries()) {
-    const setting = settingsMap.get(original.id);
-    const included = setting ? setting.included : true;
-    if (!includeExcluded && !included) continue;
-
-    const question = { ...original };
-    const basePoints = question.points;
-    if (setting?.hasValidOverride) {
-      question.points = setting.parsedOverride;
-      // points_display in questions.json can become stale if points are overridden.
-      delete question.points_display;
-    }
-
-    if (includeMeta) {
-      question._included = included;
-      question._basePoints = basePoints;
-      question._effectivePoints = question.points;
-      question._pointsOverrideRaw = setting?.rawOverride || "";
-      question._hasValidPointsOverride = Boolean(setting?.hasValidOverride);
-      question._orderIndex =
-        setting && Number.isFinite(Number(setting.orderIndex))
-          ? Number(setting.orderIndex)
-          : sourceIndex;
-    }
-
-    question._sourceIndex = sourceIndex;
-    question._sortOrderIndex =
-      setting && Number.isFinite(Number(setting.orderIndex))
-        ? Number(setting.orderIndex)
-        : sourceIndex;
-    out.push(question);
-  }
-  out.sort((a, b) => {
-    if (a._sortOrderIndex !== b._sortOrderIndex) {
-      return a._sortOrderIndex - b._sortOrderIndex;
-    }
-    return a._sourceIndex - b._sourceIndex;
-  });
-  for (const question of out) {
-    delete question._sortOrderIndex;
-    delete question._sourceIndex;
-  }
-  return out;
+function getQuestionSettingsMap(season = CURRENT_SEASON) {
+  return readSeasonQuestionSettingsMap(db, season);
 }
 
 function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
@@ -1640,6 +1589,10 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
 
   const includeExcluded = Boolean(resolvedOptions?.includeExcluded);
   const includeMeta = Boolean(resolvedOptions?.includeMeta);
+  const requestedSeason = Number(resolvedOptions?.season || CURRENT_SEASON);
+  const resolvedSeason = Number.isInteger(requestedSeason) && requestedSeason >= 1900 && requestedSeason <= 2200
+    ? requestedSeason
+    : CURRENT_SEASON;
 
   if (!fs.existsSync(QUESTIONS_PATH)) {
     const fallback = [
@@ -1656,8 +1609,8 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
         helper: "Example: Ferrari"
       }
     ];
-    const settings = getQuestionSettingsMap();
-    const adjustedFallback = applyQuestionSettings(fallback, settings, {
+    const settings = getQuestionSettingsMap(resolvedSeason);
+    const adjustedFallback = applySeasonQuestionSettings(fallback, settings, {
       includeExcluded,
       includeMeta
     });
@@ -1674,14 +1627,19 @@ function getQuestions(locale = DEFAULT_LOCALE, options = {}) {
     questions = parsed.questions;
   }
 
-  const settings = getQuestionSettingsMap();
-  const adjustedQuestions = applyQuestionSettings(questions, settings, {
+  const settings = getQuestionSettingsMap(resolvedSeason);
+  const adjustedQuestions = applySeasonQuestionSettings(questions, settings, {
     includeExcluded,
     includeMeta
   });
   return attachCanonicalCatalog(attachLastSeasonReferences(
     localizeQuestions(adjustedQuestions, resolvedLocale)
   ));
+}
+
+function getQuestionPromptHtml(locale = DEFAULT_LOCALE) {
+  const definitions = listQuestionDefinitions(db, { locale });
+  return (question) => renderQuestionPromptHtml(question, definitions);
 }
 
 function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
@@ -1704,6 +1662,9 @@ function localizeQuestions(questions, locale = DEFAULT_LOCALE) {
     }
     if (translation.option_labels && typeof translation.option_labels === "object") {
       localized.option_labels = translation.option_labels;
+    }
+    if (typeof question._promptOverrideRaw === "string" && question._promptOverrideRaw.trim()) {
+      localized.prompt = question._promptOverrideRaw.trim();
     }
     return localized;
   });
@@ -2909,7 +2870,7 @@ function predictionsClosed() {
 
 function isLeaderboardAvailable() {
   if (LEADERBOARD_ENABLED) return true;
-  return !!db.prepare("SELECT 1 FROM actuals LIMIT 1").get();
+  return loadPublishedActuals(db, CURRENT_SEASON).available;
 }
 
 function clampNumber(value, min, max) {
@@ -3140,6 +3101,14 @@ registerAuthRoutes(app, {
   getQuestions,
   CURRENT_SEASON,
   getRaces
+});
+
+app.get("/definitions", (req, res) => {
+  const locale = res.locals.locale || DEFAULT_LOCALE;
+  res.render("definitions", {
+    user: getCurrentUser(req),
+    definitions: listQuestionDefinitions(db, { locale })
+  });
 });
 
 app.get("/api/groups/check-name", requireAuth, (req, res) => {
@@ -3470,10 +3439,17 @@ function fetchSnapshotValuesBySnapshotIds(snapshotIds) {
 function getLatestPreviewRoundDeltas({ groupId, questions, leaderboardInputs, excludeHiddenAdmins = false }) {
   const safeGroupId = Number(groupId || 0);
   if (!Number.isFinite(safeGroupId) || safeGroupId <= 0) return {};
+  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
+  if (!publishedActuals.available) return {};
   const races = getRaces();
   const snapshots = listLatestSnapshotsForSeason(db, CURRENT_SEASON, {
-    maxRoundNumber: Array.isArray(races) ? races.length : null
-  });
+    maxRoundNumber:
+      Number.isFinite(Number(publishedActuals.snapshot?.round_number))
+        ? Number(publishedActuals.snapshot.round_number)
+        : Array.isArray(races)
+          ? races.length
+          : null
+  }).filter((snapshot) => snapshot.review_status === "reviewed");
   if (snapshots.length < 2) return {};
 
   const snapshotValuesById = fetchSnapshotValuesBySnapshotIds(snapshots.map((snapshot) => snapshot.id));
@@ -3508,12 +3484,9 @@ function getGroupLeaderboardPreview(group, locale, currentUserId, limit = 5) {
   if (!Number.isFinite(groupId) || groupId <= 0) return null;
   const questions = getQuestions(locale);
   if (!Array.isArray(questions) || questions.length === 0) return null;
-  const actualRows = db.prepare("SELECT question_id, value FROM actuals").all();
-  if (actualRows.length === 0) return null;
-  const actualsByQuestion = actualRows.reduce((acc, row) => {
-    acc[row.question_id] = row.value;
-    return acc;
-  }, {});
+  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
+  if (!publishedActuals.available) return null;
+  const actualsByQuestion = publishedActuals.values || {};
   const excludeHiddenAdmins = isGlobalGroup(group);
   const leaderboardInputs = getGroupLeaderboardInputs(groupId, { excludeHiddenAdmins });
   const latestRoundDeltasByParticipantId = getLatestPreviewRoundDeltas({
@@ -4058,6 +4031,7 @@ app.get("/join/:code/responses", (req, res) => {
     user: null,
     group,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     responses,
     groupBasePath: `/join/${code}`,
     viewerGuestAnswers,
@@ -4414,6 +4388,7 @@ app.get("/join/:code/questions", (req, res) => {
     group,
     groupRules,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     answers,
     prefillNotice: null,
     roster,
@@ -5009,6 +4984,7 @@ app.get("/global/questions", (req, res, next) => {
     group: globalGroup,
     groupRules,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     answers,
     prefillNotice: null,
     roster,
@@ -5141,6 +5117,7 @@ app.get(["/global/questions", "/groups/:id/questions"], requireAuth, (req, res) 
     group,
     groupRules,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     answers,
     prefillNotice,
     prefillNoticePrefix,
@@ -5292,6 +5269,7 @@ app.get("/global/responses", (req, res, next) => {
     user: null,
     group,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     responses,
     groupBasePath: "/",
     viewerGuestAnswers,
@@ -5329,6 +5307,7 @@ app.get(["/global/responses", "/groups/:id/responses"], requireAuth, (req, res) 
     user,
     group,
     questions,
+    questionPromptHtml: getQuestionPromptHtml(locale),
     responses,
     groupBasePath: getGroupBasePath(group),
     showMineOnly,
@@ -5361,14 +5340,20 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
   if (!excludeHiddenAdmins && !adminAccess && !isMember(user.id, groupId)) {
     return sendError(req, res, 403, "Not a group member.");
   }
+  const publishedActuals = loadPublishedActuals(db, CURRENT_SEASON);
+  if (!publishedActuals.available) {
+    return sendError(
+      req,
+      res,
+      404,
+      "Leaderboard is not available until an actual snapshot is reviewed and published."
+    );
+  }
   const canViewQuestionBreakdown = Boolean(user);
   const questions = getQuestions(locale);
   const races = getRaces();
-  const actualRows = db.prepare("SELECT * FROM actuals").all();
-  const currentActuals = actualRows.reduce((acc, row) => {
-    acc[row.question_id] = row.value;
-    return acc;
-  }, {});
+  const currentActuals = publishedActuals.values || {};
+  const publishedRound = Number(publishedActuals.snapshot?.round_number);
   const snapshotRows = db
     .prepare(
       `
@@ -5387,6 +5372,13 @@ app.get(["/global/leaderboard", "/groups/:id/leaderboard"], (req, res) => {
     if (!Number.isFinite(roundNumber) || roundNumber <= 0) return;
     if (roundNumber > races.length) return;
     if (!Number.isFinite(season) || season <= 0) return;
+    if (String(row.review_status || "").trim().toLowerCase() !== "reviewed") return;
+    if (season === CURRENT_SEASON) {
+      if (!publishedActuals.available) return;
+      if (Number.isFinite(publishedRound) && publishedRound > 0 && roundNumber > publishedRound) {
+        return;
+      }
+    }
     const key = `${season}:${roundNumber}`;
     if (snapshotByRound.has(key)) return;
     snapshotByRound.add(key);

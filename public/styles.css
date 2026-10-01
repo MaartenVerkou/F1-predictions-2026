@@ -89,6 +89,7 @@
   --header-logo-bg: rgba(255, 255, 255, 0.95);
   --header-popover-bg: #ffffff;
   --shadow-soft: 0 16px 36px rgba(8, 17, 39, 0.08);
+  color-scheme: light;
   --shadow-strong: 0 18px 34px rgba(214, 11, 34, 0.24);
   --glow-a: rgba(214, 11, 34, 0.12);
   --glow-b: rgba(29, 62, 129, 0.16);
@@ -127,6 +128,7 @@
   --header-logo-bg: rgba(5, 9, 17, 0.68);
   --header-popover-bg: rgba(11, 18, 38, 0.98);
   --shadow-soft: 0 22px 46px rgba(0, 0, 0, 0.42);
+  color-scheme: dark;
   --shadow-strong: 0 20px 36px rgba(255, 45, 69, 0.28);
   --glow-a: rgba(255, 45, 69, 0.18);
   --glow-b: rgba(56, 93, 171, 0.24);
@@ -783,6 +785,10 @@ h1 {
 form {
   display: grid;
   gap: 16px;
+}
+
+form[hidden] {
+  display: none !important;
 }
 
 label {
@@ -1647,6 +1653,34 @@ button:disabled {
   border-bottom-color: var(--accent);
 }
 
+.public-definitions-page {
+  gap: 16px;
+}
+
+.public-definitions-page > p {
+  margin: 0;
+  max-width: 72ch;
+}
+
+.public-definitions-table {
+  min-width: 640px;
+}
+
+.public-definitions-table th,
+.public-definitions-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.public-definitions-table th[scope="row"] {
+  min-width: 120px;
+}
+
+.public-definition-scope {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+
 :root[data-theme="dark"] .question-term-label {
   border-bottom-color: rgba(169, 188, 224, 0.96);
 }
@@ -2008,8 +2042,29 @@ button:disabled {
 }
 
 
-.admin-race-data-page {
-  gap: 18px;
+.admin-page-card.admin-race-data-page {
+  gap: 24px;
+}
+
+.admin-race-data-round-region {
+  display: grid;
+  gap: 28px;
+}
+
+/* Let the page controls shrink to the card; the matrix owns horizontal scroll. */
+.admin-race-data-round-region,
+.admin-race-data-controls,
+.admin-race-data-table-section,
+.admin-race-data-table-toolbar,
+.admin-race-data-focus-form,
+.admin-race-data-round-form {
+  min-width: 0;
+}
+
+.admin-race-data-round-region[aria-busy="true"] {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 120ms ease;
 }
 
 .admin-race-data-heading,
@@ -2031,6 +2086,193 @@ button:disabled {
 
 .admin-page-card.admin-inputs-page {
   gap: 6px;
+}
+
+.admin-inputs-page .admin-inputs-scoring {
+  display: grid;
+  gap: 16px;
+  margin: 8px 0 0;
+}
+
+.admin-inputs-scoring-source {
+  margin: 0;
+  font-size: 12px;
+}
+
+.admin-inputs-definitions-help {
+  margin: 8px 2px 0;
+  max-width: 78ch;
+}
+
+.admin-definition-locale {
+  font-size: 12px;
+}
+
+.admin-inputs-table.admin-inputs-definitions-table {
+  min-width: 800px;
+  width: 800px;
+  table-layout: fixed;
+}
+
+.admin-inputs-table.admin-inputs-definitions-table.is-editing {
+  min-width: 920px;
+  width: 920px;
+}
+
+.admin-inputs-definitions-table th,
+.admin-inputs-definitions-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.admin-inputs-definitions-table th[scope="row"] {
+  min-width: 0;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-term {
+  width: 145px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-explanation {
+  width: 210px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-aliases {
+  width: 125px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-bindings {
+  width: 190px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-status {
+  width: 85px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-order {
+  width: 70px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-action {
+  width: 70px;
+}
+
+.admin-inputs-definitions-table textarea,
+.admin-inputs-definitions-table input {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-definition-label-field {
+  display: grid;
+  gap: 3px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-definition-aliases,
+.admin-definition-bindings {
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-definition-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.admin-inputs-definition-new-row {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.admin-inputs-scoring-sections {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+.admin-inputs-scoring-section {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-inputs-scoring-section h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.admin-inputs-scoring-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.admin-inputs-scoring-table {
+  width: max-content;
+  min-width: 100%;
+  border: 1px solid var(--border);
+}
+
+.admin-inputs-scoring-table th,
+.admin-inputs-scoring-table td {
+  padding: 8px 12px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-inputs-scoring-table th {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.admin-inputs-scoring-table th[scope="row"] {
+  text-align: left;
+}
+
+.admin-inputs-scoring-details {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-inputs-scoring-details > div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr);
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-inputs-scoring-details dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-inputs-scoring-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.admin-race-data-summary-reconciliation {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
 }
 
 .admin-season-policy {
@@ -2200,7 +2442,8 @@ button:disabled {
 }
 
 .admin-inputs-toolbar-start,
-.admin-inputs-toolbar-end {
+.admin-inputs-toolbar-end,
+.admin-toolbar-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2211,13 +2454,12 @@ button:disabled {
   min-height: 32px;
 }
 
-.admin-inputs-view-toolbar .admin-inputs-toolbar-end > button,
-.admin-inputs-view-toolbar .admin-inputs-toolbar-end > .admin-inputs-advanced-link {
-  min-height: 34px;
-  padding: 6px 11px;
-  border-radius: 999px;
-  font-size: 13px;
-  line-height: 1.2;
+.admin-toolbar-actions > button,
+.admin-toolbar-actions > form > button,
+.admin-toolbar-actions .admin-race-data-edit-actions > button {
+  min-width: 0 !important;
+  min-height: 30px;
+  padding: 4px 10px;
 }
 
 .admin-inputs-selection {
@@ -2294,8 +2536,28 @@ button:disabled {
   text-align: center !important;
 }
 
-.admin-inputs-team-order .admin-order-buttons {
+.admin-inputs-team-order-inner {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+}
+
+.admin-inputs-team-position {
+  min-width: 2ch;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.admin-inputs-team-order .admin-order-buttons {
+  display: none;
+  align-items: center;
+}
+
+.admin-inputs-team-table [data-selectable-row].is-editing .admin-order-buttons {
+  display: inline-flex;
 }
 
 .admin-inputs-team-order form {
@@ -2303,10 +2565,10 @@ button:disabled {
   margin: 0;
 }
 
-.admin-inputs-data-table-wrap {
+.admin-inputs-page .admin-table-scroll {
   min-width: 0;
   max-width: 100%;
-  margin-top: 0;
+  margin-top: 8px;
 }
 
 .admin-inputs-race-start,
@@ -2640,11 +2902,17 @@ button:disabled {
   table-layout: fixed;
 }
 
-.admin-inputs-driver-table .admin-inputs-driver-col-number { width: 8%; }
+.admin-inputs-driver-table .admin-inputs-driver-col-number { width: 5%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-name { width: 38%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-code { width: 15%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-nationality { width: 21%; }
 .admin-inputs-driver-table .admin-inputs-driver-col-age { width: 18%; }
+
+.admin-inputs-driver-table th:first-child,
+.admin-inputs-driver-table td:first-child {
+  white-space: nowrap;
+  text-align: center;
+}
 
 .admin-inputs-race-table {
   min-width: 680px;
@@ -2711,9 +2979,10 @@ button:disabled {
   white-space: nowrap;
 }
 
-.admin-race-data-toolbar,
+.admin-race-data-controls,
 .admin-race-data-tabs,
 .admin-race-data-round-form,
+.admin-race-data-focus-form,
 .admin-race-data-legend,
 .admin-race-data-coverage {
   display: flex;
@@ -2722,9 +2991,76 @@ button:disabled {
   gap: 8px 12px;
 }
 
-.admin-race-data-toolbar {
-  justify-content: space-between;
-  padding-bottom: 2px;
+.admin-race-data-controls {
+  align-items: flex-end;
+  padding: 0 0 8px;
+}
+
+.admin-race-data-controls .admin-race-data-focus-form {
+  flex: 1 1 34rem;
+  min-width: min(100%, 280px);
+}
+
+.admin-race-data-controls .admin-race-data-round-form {
+  flex: 0 1 18rem;
+}
+
+.admin-race-data-table-section {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-race-data-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.admin-race-data-focus-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+  margin: 2px 0 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--card) 92%, var(--accent) 8%);
+  font-size: 12px;
+}
+
+.admin-race-data-focus-summary-label,
+.admin-race-data-focus-summary-status {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-race-data-focus-summary-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-focus-summary-detail {
+  min-width: 0;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-race-data-focus-summary-status {
+  margin-left: auto;
+}
+
+.admin-race-data-focus-summary.is-partial {
+  border-left-color: #b7791f;
+}
+
+.admin-race-data-focus-summary.is-unavailable {
+  border-left-color: var(--muted);
 }
 
 .admin-race-data-tab {
@@ -2748,18 +3084,22 @@ button:disabled {
   background: rgba(214, 11, 34, 0.08);
 }
 
-.admin-race-data-round-form {
+.admin-race-data-round-form,
+.admin-race-data-focus-form {
   margin: 0;
 }
 
-.admin-race-data-round-form label {
+.admin-race-data-round-form label,
+.admin-race-data-focus-form label {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
 }
 
-.admin-race-data-round-form select {
+.admin-race-data-round-form select,
+.admin-race-data-focus-form select {
   min-width: 220px;
+  max-width: 100%;
 }
 
 .admin-race-data-legend,
@@ -2775,8 +3115,27 @@ button:disabled {
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) color-mix(in srgb, var(--card) 86%, var(--border));
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.admin-race-data-table-wrap::-webkit-scrollbar {
+  height: 10px;
+}
+
+.admin-race-data-table-wrap::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--card) 86%, var(--border));
+  border-radius: 999px;
+}
+
+.admin-race-data-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 2px solid color-mix(in srgb, var(--card) 86%, var(--border));
+  border-radius: 999px;
 }
 
 .admin-race-data-matrix,
@@ -2788,7 +3147,45 @@ button:disabled {
 }
 
 .admin-race-data-matrix {
-  min-width: 980px;
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
+  --admin-race-rank-width: 44px;
+  --admin-race-entity-width: 150px;
+  --admin-race-round-width: 52px;
+  --admin-race-summary-width: 60px;
+  /* Keep audit meaning hue-independent: a neutral, high-contrast matrix. */
+  --card: #ffffff;
+  --border: #cbd5e1;
+  --text: #111827;
+  --muted: #6b7280;
+  --accent: #111827;
+  background: var(--card);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .admin-race-data-matrix {
+  --card: #0f1730;
+  --border: #27385d;
+  --text: #f1f5ff;
+  --muted: #9ba9c9;
+  --accent: #f1f5ff;
+}
+
+.admin-race-data-matrix .admin-race-data-col-rank {
+  width: var(--admin-race-rank-width);
+}
+
+.admin-race-data-matrix .admin-race-data-col-entity {
+  width: var(--admin-race-entity-width);
+}
+
+.admin-race-data-matrix .admin-race-data-col-round {
+  width: var(--admin-race-round-width);
+}
+
+.admin-race-data-matrix .admin-race-data-col-summary {
+  width: var(--admin-race-summary-width);
 }
 
 .admin-race-data-matrix th,
@@ -2799,6 +3196,8 @@ button:disabled {
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   text-align: center;
+  line-height: 1.25;
+  vertical-align: middle;
   white-space: nowrap;
 }
 
@@ -2828,31 +3227,52 @@ button:disabled {
   background: var(--card);
 }
 
+.admin-race-data-sticky-right {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  background: var(--card);
+  border-left: 1px solid var(--border) !important;
+  box-shadow: -8px 0 12px rgba(15, 23, 42, 0.08);
+}
+
 .admin-race-data-matrix thead .admin-race-data-sticky {
   z-index: 4;
   background: color-mix(in srgb, var(--card) 90%, var(--border));
 }
 
+.admin-race-data-matrix thead .admin-race-data-sticky-right {
+  z-index: 5;
+  background: color-mix(in srgb, var(--card) 90%, var(--border));
+}
+
 .admin-race-data-rank {
   left: 0;
-  width: 44px;
-  min-width: 44px;
+  width: var(--admin-race-rank-width);
+  min-width: var(--admin-race-rank-width);
+  border-right: 0 !important;
+}
+
+.admin-race-data-rank {
+  padding-right: 8px !important;
+  padding-left: 8px !important;
 }
 
 .admin-race-data-entity {
-  left: 44px;
-  min-width: 150px;
-  text-align: left !important;
-}
-
-.admin-race-data-team {
-  left: 194px;
-  min-width: 128px;
+  left: var(--admin-race-rank-width);
+  width: var(--admin-race-entity-width);
+  min-width: var(--admin-race-entity-width);
+  border-left: 0 !important;
   text-align: left !important;
 }
 
 .admin-race-data-round-head {
-  min-width: 52px;
+  min-width: var(--admin-race-round-width);
+}
+
+.admin-race-data-round-head.is-after-cutoff {
+  color: var(--muted);
+  opacity: 0.55;
 }
 
 .admin-race-data-round-head a,
@@ -2862,8 +3282,43 @@ button:disabled {
 }
 
 .admin-race-data-cell {
+  width: var(--admin-race-round-width);
+  min-width: var(--admin-race-round-width);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+}
+
+.admin-race-data-result {
+  display: inline-block;
+  min-width: 1.1em;
+  text-align: center;
+}
+
+.admin-race-data-marker {
+  display: inline-block;
+  margin-left: 3px;
+  color: inherit;
+  cursor: help;
+  font-size: 0.68em;
+  font-weight: 800;
+  letter-spacing: -0.08em;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.admin-race-data-cell.is-podium-1 {
+  border-color: color-mix(in srgb, var(--border) 48%, #c89b2b);
+  background: linear-gradient(135deg, rgba(214, 11, 34, 0.1) 0%, rgba(200, 155, 43, 0.2) 100%);
+}
+
+.admin-race-data-cell.is-podium-2 {
+  border-color: color-mix(in srgb, var(--border) 48%, #9aa7ba);
+  background: linear-gradient(135deg, rgba(128, 146, 182, 0.14) 0%, rgba(210, 216, 226, 0.26) 100%);
+}
+
+.admin-race-data-cell.is-podium-3 {
+  border-color: color-mix(in srgb, var(--border) 42%, #b5743f);
+  background: linear-gradient(135deg, rgba(181, 116, 63, 0.16) 0%, rgba(232, 199, 170, 0.24) 100%);
 }
 
 .admin-race-data-cell.state-incomplete {
@@ -2878,10 +3333,79 @@ button:disabled {
   font-weight: 500;
 }
 
+.admin-race-data-cell.is-after-cutoff {
+  opacity: 0.42;
+}
+
 .admin-race-data-summary {
-  min-width: 68px;
+  min-width: var(--admin-race-summary-width);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-summary-points {
+  display: block;
+}
+
+.admin-race-data-matrix-footer th,
+.admin-race-data-matrix-footer td {
+  border-top: 2px solid var(--border);
+  background: color-mix(in srgb, var(--card) 86%, var(--border));
+  font-weight: 750;
+}
+.admin-race-data-matrix-footer th {
+  text-align: left;
+}
+.admin-race-data-footer-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: calc(var(--admin-race-rank-width) + var(--admin-race-entity-width));
+  text-align: left !important;
+}
+.admin-race-data-footer-label {
+  white-space: nowrap;
+}
+.admin-race-data-footer-cell {
+  width: var(--admin-race-round-width);
+  min-width: var(--admin-race-round-width);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.admin-race-data-footer-cell.is-after-cutoff {
+  color: var(--muted);
+  opacity: 0.42;
+}
+.admin-race-data-footer-cell.state-not_synced,
+.admin-race-data-footer-cell.state-cancelled,
+.admin-race-data-footer-cell.is-empty {
+  color: var(--muted);
+  font-weight: 500;
+}
+.admin-race-data-footer-total {
+  min-width: var(--admin-race-summary-width);
+  font-variant-numeric: tabular-nums;
+  text-align: center !important;
+}
+
+.admin-race-data-constructor-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 750;
+}
+
+.admin-race-data-group-driver.is-empty .admin-race-data-constructor-detail {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.admin-race-data-full-label {
+  display: inline;
+}
+
+.admin-race-data-compact-label {
+  display: none;
 }
 
 .admin-race-data-detail {
@@ -2903,45 +3427,383 @@ button:disabled {
   color: var(--muted);
 }
 
-.admin-race-data-derived {
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
-}
-
-.admin-race-data-derived dl {
-  display: grid;
-  gap: 4px;
-  margin: 10px 0 0;
-}
-
-.admin-race-data-derived dl div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.admin-race-data-derived dt {
-  color: var(--muted);
-}
 
 @media (max-width: 720px) {
   .admin-race-data-heading,
   .admin-race-data-detail-heading,
-  .admin-race-data-toolbar {
+  .admin-race-data-controls,
+  .admin-race-data-table-toolbar {
     display: grid;
     justify-content: stretch;
   }
 
-  .admin-race-data-round-form,
-  .admin-race-data-round-form select,
+  .admin-race-data-focus-summary-status {
+    margin-left: 0;
+  }
+
+  .admin-race-data-controls .admin-race-data-round-form,
+  .admin-race-data-controls .admin-race-data-round-form select,
+  .admin-race-data-controls .admin-race-data-focus-form,
+  .admin-race-data-controls .admin-race-data-focus-form select,
   .admin-race-data-detail-heading .button {
     width: 100%;
   }
 
-  .admin-race-data-round-form {
+  .admin-race-data-controls {
+    align-items: stretch;
+  }
+
+  .admin-race-data-round-form,
+  .admin-race-data-focus-form {
     align-items: stretch;
   }
 }
+
+/* Actuals is a read-only derivation index; editing and review belong in Race Data. */
+.admin-actuals-page {
+  min-width: 0;
+}
+
+.admin-actuals-overview {
+  min-width: 0;
+}
+
+.admin-actuals-overview-wrap {
+  scrollbar-width: thin;
+}
+
+.admin-actuals-overview-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  --admin-actuals-question-width: 58px;
+  --admin-actuals-value-width: 72px;
+  --admin-actuals-max-value-lines: 2;
+}
+
+.admin-actuals-overview-table th,
+.admin-actuals-overview-table td {
+  padding: 7px 5px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-actuals-overview-table thead th {
+  background: color-mix(in srgb, var(--card) 90%, var(--border));
+  border-bottom: 2px solid var(--border);
+  vertical-align: middle;
+}
+
+.admin-actuals-overview-table tr:last-child th,
+.admin-actuals-overview-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-actuals-overview-table th:last-child,
+.admin-actuals-overview-table td:last-child {
+  border-right: 0;
+}
+
+.admin-actuals-question-column,
+.admin-actuals-question-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: var(--admin-actuals-question-width);
+  min-width: var(--admin-actuals-question-width);
+  max-width: var(--admin-actuals-question-width);
+  text-align: center !important;
+  background: var(--card);
+}
+
+.admin-actuals-overview-table thead .admin-actuals-question-column {
+  z-index: 3;
+  background: color-mix(in srgb, var(--card) 90%, var(--border));
+}
+
+.admin-actuals-question-cell {
+  white-space: nowrap;
+}
+
+.admin-actuals-round-column {
+  width: var(--admin-actuals-value-width);
+  min-width: var(--admin-actuals-value-width);
+  max-width: var(--admin-actuals-value-width);
+  white-space: normal !important;
+}
+
+.admin-actuals-round-column a {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.15;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.admin-actuals-round-header {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.admin-actuals-round-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-actuals-review-marker {
+  display: inline-block;
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.admin-actuals-question-short-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  color: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.admin-actuals-question-short-link:hover,
+.admin-actuals-question-short-link:focus-visible {
+  text-decoration: underline;
+}
+
+.admin-actuals-round-column a,
+.admin-actuals-value-cell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-actuals-round-column a:hover,
+.admin-actuals-round-column a:focus-visible,
+.admin-actuals-value-cell a:hover,
+.admin-actuals-value-cell a:focus-visible {
+  text-decoration: underline;
+}
+
+.admin-actuals-round-column.is-future,
+.admin-actuals-value-cell.is-future {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.admin-actuals-value-cell {
+  width: var(--admin-actuals-value-width);
+  min-width: var(--admin-actuals-value-width);
+  max-width: var(--admin-actuals-value-width);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.admin-actuals-overview-table .admin-actuals-value-cell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-actuals-value-cell a {
+  display: -webkit-box;
+  max-height: calc(1.2em * var(--admin-actuals-max-value-lines));
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--admin-actuals-max-value-lines);
+}
+
+.admin-actuals-value {
+  display: block;
+  line-height: 1.2;
+  overflow-wrap: inherit;
+  word-break: inherit;
+}
+
+.admin-actuals-value-cell.is-published {
+  background: color-mix(in srgb, var(--card) 92%, var(--accent) 8%);
+}
+
+@media (max-width: 720px) {
+  .admin-actuals-overview-table {
+    --admin-actuals-question-width: 58px;
+    --admin-actuals-value-width: clamp(64px, 9.5vw, 68px);
+  }
+
+  .admin-actuals-question-column,
+  .admin-actuals-question-cell {
+    width: var(--admin-actuals-question-width);
+    min-width: var(--admin-actuals-question-width);
+    max-width: var(--admin-actuals-question-width);
+  }
+}
+
+@media (max-width: 860px) {
+  .admin-race-data-matrix {
+    --admin-race-entity-width: 96px;
+    --admin-race-round-width: 46px;
+    --admin-race-summary-width: 54px;
+  }
+
+  /* Constructors already show three-letter team codes at this breakpoint. */
+  .admin-race-data-matrix--constructors {
+    --admin-race-entity-width: 64px;
+  }
+
+  .admin-race-data-entity {
+    width: var(--admin-race-entity-width);
+    min-width: var(--admin-race-entity-width);
+  }
+
+  .admin-race-data-matrix--constructors .admin-race-data-entity .admin-race-data-full-label {
+    display: none;
+  }
+
+  .admin-race-data-matrix--constructors .admin-race-data-entity .admin-race-data-compact-label {
+    display: inline;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-race-data-matrix {
+    font-size: 12px;
+    --admin-race-rank-width: 36px;
+    --admin-race-entity-width: 60px;
+    --admin-race-round-width: 42px;
+    --admin-race-summary-width: 50px;
+  }
+
+  .admin-race-data-matrix th,
+  .admin-race-data-matrix td {
+    padding: 6px 5px;
+  }
+
+  .admin-race-data-entity {
+    width: var(--admin-race-entity-width);
+    min-width: var(--admin-race-entity-width);
+  }
+
+  .admin-race-data-entity .admin-race-data-full-label {
+    display: none;
+  }
+
+  .admin-race-data-entity .admin-race-data-compact-label {
+    display: inline;
+  }
+
+  .admin-race-data-summary {
+    min-width: var(--admin-race-summary-width);
+  }
+}
+
+:root[data-theme="dark"] .admin-race-data-cell.is-podium-1 {
+  border-color: rgba(214, 170, 73, 0.46);
+  background: linear-gradient(135deg, rgba(91, 55, 9, 0.66) 0%, rgba(36, 24, 10, 0.94) 100%);
+}
+
+:root[data-theme="dark"] .admin-race-data-cell.is-podium-2 {
+  border-color: rgba(157, 171, 194, 0.42);
+  background: linear-gradient(135deg, rgba(52, 64, 84, 0.74) 0%, rgba(20, 27, 39, 0.94) 100%);
+}
+
+:root[data-theme="dark"] .admin-race-data-cell.is-podium-3 {
+  border-color: rgba(177, 118, 74, 0.44);
+  background: linear-gradient(135deg, rgba(94, 49, 23, 0.74) 0%, rgba(31, 18, 13, 0.94) 100%);
+}
+
+/* Neutral audit states remain legible without relying on colour differences. */
+.admin-race-data-matrix tbody td {
+  background: var(--card);
+  color: var(--text);
+}
+
+.admin-race-data-matrix .admin-race-data-cell.is-podium-1,
+.admin-race-data-matrix .admin-race-data-cell.is-podium-2,
+.admin-race-data-matrix .admin-race-data-cell.is-podium-3 {
+  border-color: var(--border);
+  background: var(--card);
+  color: var(--text);
+}
+
+.admin-race-data-matrix .admin-race-data-cell.is-focus-hit {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--text) 6%, var(--card));
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--text) 34%, transparent);
+  color: var(--text);
+  font-weight: 750;
+}
+
+/* Focus states use one neutral treatment so the evidence stays scannable in
+   both themes and does not depend on hue or a strong cell outline. */
+/* Focus columns use the same quiet neutral treatment as focus rows. The
+   column edge makes a selected race scannable without outlining every value. */
+.admin-race-data-matrix thead .admin-race-data-round-head.is-focus-column {
+  background: color-mix(in srgb, var(--text) 7%, var(--card));
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 28%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--text) 28%, transparent);
+  font-weight: 750;
+}
+
+.admin-race-data-matrix tbody td.is-focus-column {
+  background: color-mix(in srgb, var(--text) 4%, var(--card));
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 22%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.admin-race-data-matrix-footer td.is-focus-column {
+  background: color-mix(in srgb, var(--text) 7%, var(--card));
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 28%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--text) 28%, transparent);
+}
+
+.admin-race-data-matrix tbody tr.is-focus-row > th,
+.admin-race-data-matrix tbody tr.is-focus-row > td {
+  background: color-mix(in srgb, var(--text) 4%, var(--card));
+}
+
+.admin-race-data-matrix tbody tr.is-focus-row > .admin-race-data-entity {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--text) 54%, transparent);
+  font-weight: 750;
+}
+
+.admin-race-data-matrix tbody tr.is-focus-row > .admin-race-data-sticky-right {
+  background: color-mix(in srgb, var(--text) 6%, var(--card));
+}
+
+.admin-race-data-matrix .admin-race-data-cell.state-incomplete {
+  color: var(--muted);
+}
+
+.admin-race-data-matrix-footer th,
+.admin-race-data-matrix-footer td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  line-height: 1.15;
+}
+
 @media (max-width: 720px) {
   .account-page,
   .about-page {
@@ -4018,18 +4880,6 @@ button:disabled {
   margin: 0;
 }
 
-.admin-actuals-target-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px;
-  min-width: 0;
-}
-
-.admin-actuals-target-row > .admin-target-form {
-  flex: 1 1 340px;
-}
-
 .admin-target-action,
 .admin-target-meta {
   margin-left: auto;
@@ -4146,8 +4996,7 @@ button:disabled {
   margin: 0;
 }
 
-.admin-inputs-table-toolbar,
-.admin-race-data-toolbar {
+.admin-inputs-table-toolbar {
   margin-top: 14px;
   margin-bottom: 8px;
 }
@@ -4290,45 +5139,6 @@ button:disabled {
   width: 1%;
 }
 
-.admin-actuals-actions {
-  margin: 4px 0 2px;
-}
-
-.admin-actuals-question {
-  min-width: 0;
-}
-
-.admin-actuals-question-title {
-  font-weight: 700;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.admin-actuals-control-row {
-  align-items: flex-start;
-}
-
-.admin-actuals-control-row > select,
-.admin-actuals-control-row > input,
-.admin-actuals-control-row > .number-spinner {
-  flex: 1 1 190px;
-}
-
-.admin-actuals-control-row > label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 42px;
-}
-
-.admin-actuals-dnf-card {
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--rules-bg);
-  min-width: 0;
-}
-
 .admin-analysis-create-form {
   align-items: flex-end;
   margin: 0;
@@ -4449,8 +5259,7 @@ button:disabled {
   background: rgba(255, 45, 69, 0.15);
 }
 
-:root[data-theme="dark"] .admin-status-panel,
-:root[data-theme="dark"] .admin-actuals-dnf-card {
+:root[data-theme="dark"] .admin-status-panel {
   background: color-mix(in srgb, var(--card) 82%, var(--rules-bg));
   border-color: color-mix(in srgb, var(--border) 86%, #ffffff 6%);
 }
@@ -4462,90 +5271,36 @@ button:disabled {
 }
 
 .admin-question-table {
-  min-width: 1100px;
-  table-layout: fixed;
+  width: 100%;
 }
 
 .admin-question-table th,
 .admin-question-table td {
-  vertical-align: top;
-  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
-.admin-question-table th:nth-child(1),
-.admin-question-table td:nth-child(1) {
-  width: 6%;
+.admin-questions-page .admin-race-data-heading {
+  align-items: start;
 }
 
-.admin-question-table th:nth-child(2),
-.admin-question-table td:nth-child(2) {
-  width: 28%;
+.admin-question-order-number {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
-.admin-question-table th:nth-child(3),
-.admin-question-table td:nth-child(3) {
-  width: 11%;
-}
-
-.admin-question-table th:nth-child(4),
-.admin-question-table td:nth-child(4) {
-  width: 8%;
-}
-
-.admin-question-table th:nth-child(5),
-.admin-question-table td:nth-child(5) {
-  width: 16%;
-}
-
-.admin-question-table th:nth-child(6),
-.admin-question-table td:nth-child(6) {
-  width: 17%;
-}
-
-.admin-question-table th:nth-child(7),
-.admin-question-table td:nth-child(7) {
-  width: 14%;
-}
-
-.admin-question-order {
-  padding-top: 8px;
-}
-
-.admin-order-buttons {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.admin-order-btn {
-  width: 28px;
-  height: 24px;
-  min-width: 28px;
-  border-radius: 8px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  line-height: 1;
-}
-
-.admin-order-btn:disabled {
-  opacity: 0.45;
-}
-
-.admin-order-btn:hover:not(:disabled),
-.admin-order-btn:focus-visible {
-  transform: none;
-}
-
-.admin-question-cell {
-  vertical-align: top;
+.admin-question-meta {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .admin-question-title {
-  font-weight: 600;
-  line-height: 1.35;
+  font-weight: 650;
+  line-height: 1.3;
 }
 
 .admin-question-id {
@@ -4553,7 +5308,7 @@ button:disabled {
 }
 
 .admin-question-code {
-  display: block;
+  display: inline;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -4565,25 +5320,265 @@ button:disabled {
   align-items: center;
   gap: 6px;
   font-weight: 400;
+  white-space: nowrap;
+}
+
+.admin-question-override {
+  min-width: 150px;
 }
 
 .admin-question-override input {
   display: block;
   width: 100%;
-  max-width: 100%;
+  max-width: 190px;
   min-width: 0;
   font-size: 14px;
-  padding: 8px 10px;
+  padding: 7px 9px;
 }
 
-.admin-question-override {
-  max-width: 0;
+.admin-question-contract-note {
+  margin: 14px 0 0;
 }
 
-.admin-inline-checkbox {
+/* Questions is one compact input table; edit mode changes controls in place. */
+.admin-questions-heading {
+  align-items: flex-end;
+}
+
+.admin-questions-context {
+  display: grid;
+  justify-items: end;
+  min-width: 0;
+}
+
+.admin-questions-season-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-questions-season-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-questions-season-form select {
+  min-width: 160px;
+  max-width: 100%;
+}
+
+.admin-questions-view-toggle {
+  flex: 0 0 auto;
+}
+
+.admin-question-table-region {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-empty-state {
+  display: grid;
+  gap: 5px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 92%, var(--border));
+}
+
+.admin-question-table {
+  min-width: 820px;
+  table-layout: fixed;
+}
+
+.admin-question-table th,
+.admin-question-table td {
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.admin-question-table th:first-child,
+.admin-question-table td:first-child {
+  width: 54px;
+  min-width: 54px;
+  text-align: center;
+}
+
+.admin-question-table th:nth-child(2),
+.admin-question-table td:nth-child(2) {
+  width: 34%;
+  min-width: 240px;
+}
+
+.admin-question-table th:nth-child(3),
+.admin-question-table td:nth-child(3) {
+  width: 30%;
+}
+
+.admin-question-table th:nth-child(4),
+.admin-question-table td:nth-child(4) {
+  width: 14%;
+}
+
+.admin-question-table th:nth-child(5),
+.admin-question-table td:nth-child(5) {
+  width: 90px;
+  min-width: 90px;
+}
+
+.admin-question-table--editing {
+  min-width: 900px;
+}
+
+.admin-question-order-input,
+.admin-question-table textarea,
+.admin-question-table input[type="text"],
+.admin-question-table input[type="number"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+}
+
+.admin-question-order-input {
+  width: 48px;
+  padding-inline: 5px;
+  text-align: center;
+}
+
+.admin-question-order-controls {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+}
+
+.admin-question-order-buttons {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-question-order-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 20px;
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;
+}
+
+.admin-question-order-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.admin-question-table--editing th:first-child,
+.admin-question-table--editing td:first-child {
+  width: 104px;
+  min-width: 104px;
+}
+
+.admin-question-table textarea {
+  min-height: 58px;
+  resize: vertical;
+  line-height: 1.3;
+}
+
+.admin-question-table input[type="text"] {
+  max-width: 150px;
+}
+
+.admin-question-points-current {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.admin-question-points-current code {
+  color: var(--text);
+}
+
+.admin-question-points-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-question-points-fields label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-question-points-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: 4px 5px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.admin-question-override input[type="number"] {
+  max-width: 100px;
+}
+
+.admin-question-included-value {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+@media (max-width: 720px) {
+  .admin-questions-heading {
+    align-items: stretch;
+  }
+
+  .admin-questions-context {
+    justify-items: stretch;
+  }
+
+  .admin-questions-season-form,
+  .admin-questions-season-form select {
+    width: 100%;
+  }
+
+  .admin-questions-season-form {
+    justify-content: space-between;
+  }
+
+  .admin-questions-view-toggle {
+    justify-content: stretch;
+  }
+
+  .admin-questions-view-toggle .admin-race-data-tab {
+    flex: 1 1 0;
+    text-align: center;
+  }
+
+  .admin-question-table {
+    min-width: 700px;
+  }
+
+  .admin-question-table--editing {
+    min-width: 800px;
+  }
+
+  .admin-question-table th:nth-child(2),
+  .admin-question-table td:nth-child(2) {
+    min-width: 190px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -4643,8 +5638,7 @@ button:disabled {
     margin: 4px 0 0;
   }
 
-  .admin-status-panel,
-  .admin-actuals-dnf-card {
+  .admin-status-panel {
     padding: 11px;
   }
 
@@ -4665,28 +5659,6 @@ button:disabled {
   .admin-idea-actions form,
   .admin-idea-actions button {
     width: 100%;
-  }
-
-  .admin-actuals-control-row {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .admin-actuals-control-row > select,
-  .admin-actuals-control-row > input,
-  .admin-actuals-control-row > .number-spinner {
-    width: 100%;
-    flex-basis: auto;
-  }
-
-  .actuals-dnf-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .actuals-dnf-row {
-    grid-template-columns: minmax(0, 1fr) 82px;
-    gap: 10px;
   }
 
   .table-actions {
@@ -5895,28 +6867,6 @@ circle.leaderboard-chart-line.is-current-user:not(.is-selected) {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-}
-
-.admin-actuals-save-row {
-  margin-top: 12px;
-}
-
-.admin-actuals-save-feedback {
-  min-height: 1.2em;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-}
-
-.admin-actuals-save-feedback.is-visible {
-  opacity: 1;
-}
-
-.admin-actuals-save-feedback.is-unsaved {
-  color: color-mix(in srgb, var(--text) 76%, #b16a00);
-}
-
-.admin-actuals-save-feedback.is-saving {
-  color: var(--muted);
 }
 
 .questions-responses-link {
@@ -7202,5 +8152,681 @@ button.lang-option.is-active {
   .group-page > .group-main-column > .card,
   .group-page > .card {
     padding: 18px;
+  }
+}
+
+
+/* Final Race Data review layout: selectors stack in the page header and the
+   facts table starts immediately below it. */
+.admin-race-data-selector-stack {
+  display: grid;
+  gap: 6px;
+  width: min(360px, 100%);
+  min-width: 0;
+}
+
+.admin-race-data-selector-form {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-race-data-selector-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-race-data-selector-form select {
+  min-width: 0;
+  width: 100%;
+}
+
+.admin-race-data-detail-first {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.admin-race-data-section-heading {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.admin-race-data-section-heading h2 {
+  margin: 0;
+}
+
+.admin-race-data-detail-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.admin-race-data-fact-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.admin-race-data-detail-actions {
+  flex: 0 0 auto;
+}
+
+.admin-race-data-refresh-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.admin-race-data-refresh-form[hidden] {
+  display: none;
+}
+
+.admin-race-data-result-row {
+  vertical-align: middle;
+}
+
+.admin-race-data-detail-table--result {
+  min-width: 900px;
+}
+
+.admin-race-data-result-col--finish,
+.admin-race-data-result-cell--finish {
+  width: 62px;
+  text-align: center !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-result-col--driver,
+.admin-race-data-result-cell--driver {
+  min-width: 170px;
+  text-align: left !important;
+}
+
+.admin-race-data-result-col--constructor,
+.admin-race-data-result-cell--constructor {
+  min-width: 150px;
+  text-align: left !important;
+}
+
+.admin-race-data-result-cell--qualifying,
+.admin-race-data-result-cell--sprint,
+.admin-race-data-result-cell--grid,
+.admin-race-data-result-cell--points {
+  text-align: center !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-result-cell--status {
+  min-width: 112px;
+  text-align: left !important;
+}
+
+.admin-race-data-result-cell small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-heading {
+    display: grid;
+    gap: 10px;
+  }
+
+  .admin-race-data-selector-stack {
+    width: 100%;
+  }
+
+  .admin-race-data-detail-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-race-data-section-heading {
+    align-items: flex-end;
+    flex-direction: row;
+    gap: 4px 8px;
+  }
+
+  .admin-race-data-detail-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+}
+
+
+/* Keep each control readable as a label-plus-selector pair, even when the
+   controls wrap as a group on a narrow viewport. */
+.admin-race-data-controls .admin-race-data-focus-form,
+.admin-race-data-controls .admin-race-data-round-form {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+.admin-race-data-controls .admin-race-data-focus-form label,
+.admin-race-data-controls .admin-race-data-round-form label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.admin-race-data-controls .admin-race-data-focus-form select,
+.admin-race-data-controls .admin-race-data-round-form select {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.admin-race-data-table-section {
+  margin-top: 10px;
+}
+
+/* Race-data review workspace: factual results first, derived metrics second. */
+.admin-race-data-source-meta {
+  margin-left: auto;
+  align-self: center;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-race-data-detail-table--result {
+  min-width: 860px;
+}
+
+.admin-race-data-evidence-meta {
+  justify-content: space-between;
+  margin: 0;
+  row-gap: 4px;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-position {
+  width: 54px;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-race-data-correction-form {
+  display: block;
+  margin: 0;
+}
+
+.admin-race-data-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.admin-race-data-edit-actions[hidden],
+.admin-race-data-edit-button[hidden] {
+  display: none;
+}
+
+.admin-race-data-edit-input {
+  display: none;
+  min-width: 0;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: inherit;
+}
+
+.admin-race-data-round-region[data-race-data-editing="true"] [data-race-data-edit-display] {
+  display: none;
+}
+
+.admin-race-data-round-region[data-race-data-editing="true"] .admin-race-data-edit-input {
+  display: block;
+}
+
+.admin-race-data-editor-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: end;
+  margin-top: 10px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.admin-race-data-editor-details[hidden] {
+  display: none;
+}
+
+.admin-race-data-editor-details label {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-race-data-editor-details textarea {
+  min-width: 0;
+  width: 100%;
+  padding: 5px 6px;
+  font-size: 12px;
+}
+
+.admin-race-data-correction-confirm {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.admin-race-data-correction-confirm input {
+  width: auto;
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-editor-details {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-race-data-correction-confirm {
+    white-space: normal;
+  }
+}
+
+.admin-race-data-table-section[data-race-data-championship] {
+  gap: 10px;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.admin-race-data-table-section[data-race-data-championship] .admin-race-data-table-toolbar {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.admin-race-data-metric-tabs {
+  max-width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.admin-race-data-metric-tab {
+  min-height: 30px;
+  padding: 4px 9px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-race-data-derivation {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-race-data-derivation-heading,
+.admin-race-data-question-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  min-width: 0;
+}
+
+.admin-race-data-derivation-heading h2 {
+  margin: 0;
+}
+
+.admin-race-data-derivation-heading p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.admin-race-data-question-form label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-race-data-question-picker {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  width: min(430px, 100%);
+}
+
+.admin-race-data-question-picker select {
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.admin-race-data-question-meta {
+  display: block;
+  min-width: 0;
+  padding-inline: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-source-meta {
+    margin-left: 0;
+  }
+
+  .admin-race-data-table-section[data-race-data-championship] .admin-race-data-table-toolbar,
+  .admin-race-data-derivation-heading,
+  .admin-race-data-question-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-race-data-question-picker {
+    width: 100%;
+  }
+}
+
+/* The primary facts table is a compact review surface. Keep canonical names
+   discoverable through title/ARIA while using stable codes when the table
+   would otherwise force the facts off-screen. */
+.admin-race-data-review-state {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-race-data-review-form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.admin-race-data-review-form button,
+.admin-race-data-review-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.admin-race-data-review-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  max-width: min(100%, 330px);
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-race-data-review-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.admin-race-data-detail-table--result {
+  min-width: 760px;
+  table-layout: fixed;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--finish,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--finish {
+  width: 52px;
+  min-width: 52px;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver,
+.admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+  width: 82px;
+  min-width: 82px;
+  max-width: 82px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--status {
+  min-width: 86px;
+  width: 86px;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-full-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-full-label {
+  display: none;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-compact-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-compact-label {
+  display: inline;
+}
+
+.admin-race-data-feedback {
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.admin-race-data-feedback .notice {
+  margin: 0;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: 6px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 92%, var(--accent) 8%);
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-detail-table--result {
+    min-width: 700px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver,
+  .admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+    width: 68px;
+    min-width: 68px;
+    max-width: 68px;
+  }
+}
+
+/* Final order-sensitive overrides for the canonical Race Data presentation. */
+.admin-race-data-detail-table--result {
+  min-width: 900px;
+  table-layout: fixed;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--finish,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--finish {
+  width: 52px;
+  min-width: 52px;
+  border-right: 0 !important;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver {
+  width: 190px;
+  min-width: 190px;
+  max-width: 220px;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+  width: 170px;
+  min-width: 170px;
+  max-width: 210px;
+  border-left: 0 !important;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-full-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-full-label {
+  display: inline;
+}
+
+.admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-compact-label,
+.admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-compact-label {
+  display: none;
+}
+
+/* Drivers/Constructors and metric choices are the same segmented control.
+   Keep the shell on the group so every variant has a complete outline. */
+.admin-race-data-switch {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--card) 92%, var(--border));
+  box-sizing: border-box;
+}
+
+.admin-race-data-switch.admin-race-data-metric-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.admin-race-data-switch.admin-inputs-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.admin-race-data-switch .admin-race-data-tab {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--muted);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.admin-race-data-switch .admin-race-data-tab:last-child {
+  border-right: 0;
+}
+
+.admin-race-data-switch .admin-race-data-tab:hover,
+.admin-race-data-switch .admin-race-data-tab:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 80%, var(--border));
+}
+
+.admin-race-data-switch .admin-race-data-tab.is-active {
+  border-color: var(--accent);
+  color: var(--card);
+  background: var(--accent);
+}
+
+.admin-race-data-metric-select-form {
+  display: none;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-race-data-metric-select-form label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-race-data-metric-select-form select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 980px) {
+  .admin-race-data-detail-table--result .admin-race-data-result-col--constructor,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor {
+    width: 86px;
+    min-width: 86px;
+    max-width: 86px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-full-label {
+    display: none;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--constructor .admin-race-data-compact-label {
+    display: inline;
+  }
+}
+
+/* Switch the content variants to a select before the segmented strip has to
+   scroll inside the toolbar. The driver/constructor control remains visible. */
+@media (max-width: 1080px) {
+  .admin-race-data-metric-tabs {
+    display: none;
+  }
+
+  .admin-race-data-metric-select-form {
+    display: flex;
+    flex: 1 1 220px;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-race-data-detail-table--result {
+    min-width: 700px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-col--driver,
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver {
+    width: 82px;
+    min-width: 82px;
+    max-width: 82px;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-full-label {
+    display: none;
+  }
+
+  .admin-race-data-detail-table--result .admin-race-data-result-cell--driver .admin-race-data-compact-label {
+    display: inline;
+  }
+
+  .admin-race-data-metric-select-form {
+    flex: 1 1 100%;
+    justify-content: stretch;
+  }
+
+  .admin-race-data-metric-select-form select {
+    flex: 1 1 auto;
+    width: 100%;
   }
 }

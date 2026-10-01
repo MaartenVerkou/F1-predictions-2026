@@ -1,0 +1,40 @@
+<% const isGroupedDriver = detailMode && rowKind === 'constructor-driver'; %>
+<% const groupIsFirst = isGroupedDriver && groupIndex === 0; %>
+<% const rowClass = [
+  isGroupedDriver ? 'admin-race-data-group-driver' : '',
+  isGroupedDriver && groupIsFirst ? 'is-group-start' : '',
+  isGroupedDriver && groupIndex === groupSize - 1 ? 'is-group-end' : '',
+  (row.focusRow || (group && group.focusRow)) ? 'is-focus-row' : '',
+  row.isEmpty ? 'is-empty' : ''
+].filter(Boolean).join(' '); %>
+<tr class="<%= rowClass %>">
+  <% if (isGroupedDriver) { %>
+    <% if (groupIsFirst) { %>
+      <td rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-rank">
+        <%= group.summary.focusPosition || group.summary.championshipPosition || '—' %>
+      </td>
+    <% } %>
+    <% if (groupIsFirst) { %>
+      <th scope="row" rowspan="<%= groupSize %>" class="admin-race-data-sticky admin-race-data-entity admin-race-data-constructor-detail" data-race-data-identity-cell="constructors" aria-label="<%= group.summary.name %>">
+        <%- include('admin_race_data_entity_label', { fullLabel: group.summary.name, compactLabel: group.summary.code || group.summary.name }) %>
+      </th>
+    <% } %>
+  <% } else { %>
+    <td class="admin-race-data-sticky admin-race-data-rank"><%= row.focusPosition || row.championshipPosition || index + 1 %></td>
+    <th scope="row" class="admin-race-data-sticky admin-race-data-entity" data-race-data-identity-cell="drivers">
+      <%- include('admin_race_data_entity_label', { fullLabel: row.name, compactLabel: row.code || row.name }) %>
+    </th>
+  <% } %>
+
+  <% row.cells.forEach((cell, cellIndex) => { %>
+    <%- include('admin_race_data_matrix_cell', { season, viewMode, cell, cellIndex, focusId }) %>
+  <% }) %>
+
+  <% if (isGroupedDriver) { %>
+    <% if (groupIsFirst) { %>
+      <%- include('admin_race_data_summary_cell', { row: group.summary, viewMode: 'constructors', rowspan: groupSize, focusId }) %>
+    <% } %>
+  <% } else { %>
+    <%- include('admin_race_data_summary_cell', { row, viewMode, rowspan: null, focusId }) %>
+  <% } %>
+</tr>

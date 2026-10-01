@@ -38,7 +38,7 @@
       <select id="admin-inputs-season" name="season" onchange="this.form.submit()">
         <% (availableSeasons || []).forEach((availableSeason) => { %>
           <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>>
-            <%= availableSeason.label %>
+            <%= availableSeason.displayLabel %>
           </option>
         <% }) %>
       </select>
@@ -73,16 +73,140 @@
         <% if (query?.success) { %><div class="alert success" role="status"><%= query.success %></div><% } %>
       </div>
     <% } %>
-    <% if (tab === 'drivers') { %>
+    <% if (tab === 'scoring') { %>
+      <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
+      <div class="admin-inputs-scoring">
+        <% if (scoringRules) { %>
+          <% const toScoringEntries = (values) => Object.entries(values || {}).sort(([left], [right]) => Number(left) - Number(right)); %>
+          <% const scoringTables = [
+            { id: 'race', label: 'Race', entries: toScoringEntries(scoringRules.racePoints) },
+            { id: 'sprint', label: 'Sprint', entries: toScoringEntries(scoringRules.sprintPoints) }
+          ]; %>
+          <div class="admin-inputs-scoring-sections">
+            <% scoringTables.forEach((scoringTable) => { %>
+              <section class="admin-inputs-scoring-section" aria-labelledby="admin-inputs-scoring-<%= scoringTable.id %>">
+                <h2 id="admin-inputs-scoring-<%= scoringTable.id %>"><%= scoringTable.label %></h2>
+                <div class="admin-inputs-scoring-table-wrap">
+                  <table class="table compact admin-inputs-scoring-table">
+                    <tbody>
+                      <tr><th scope="row">Position</th><% scoringTable.entries.forEach(([position]) => { %><td>P<%= position %></td><% }) %></tr>
+                      <tr><th scope="row">Points</th><% scoringTable.entries.forEach(([, points]) => { %><td><%= points %></td><% }) %></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            <% }) %>
+            <section class="admin-inputs-scoring-section" aria-labelledby="admin-inputs-scoring-fastest-lap">
+              <h2 id="admin-inputs-scoring-fastest-lap">Fastest lap</h2>
+              <dl class="admin-inputs-scoring-details">
+                <div><dt>Bonus</dt><dd><%= scoringRules.fastestLap.eligible ? `${scoringRules.fastestLap.points} point${scoringRules.fastestLap.points === 1 ? '' : 's'}` : 'No bonus' %></dd></div>
+                <% if (scoringRules.fastestLap.eligible) { %><div><dt>Eligibility</dt><dd>Finishes P<%= scoringRules.fastestLap.minimumFinish %> or higher</dd></div><% } %>
+              </dl>
+            </section>
+            <section class="admin-inputs-scoring-section" aria-labelledby="admin-inputs-scoring-constructors">
+              <h2 id="admin-inputs-scoring-constructors">Constructors</h2>
+              <dl class="admin-inputs-scoring-details">
+                <div><dt>Aggregation</dt><dd><%= scoringRules.constructorAggregation === 'sum-driver-points' ? 'Sum of driver points' : scoringRules.constructorAggregation %></dd></div>
+              </dl>
+            </section>
+          </div>
+          <p class="admin-inputs-scoring-source muted"><%= scoringRules.revision %> · <%= scoringRules.source %></p>
+        <% } else { %>
+          <p class="muted">No scoring rules configured for this season.</p>
+        <% } %>
+      </div>
+    <% } else if (tab === 'definitions') { %>
+      <p class="muted admin-inputs-definitions-help">Shared terms are shown on the public Questions and Responses pages. A binding limits a term to the listed question IDs; an empty binding makes it available to every question.</p>
+      <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="definitions" data-table-capabilities="edit,add">
+        <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
+          <span class="muted admin-definition-locale">Locale: <%= definitionLocale || 'en' %></span>
+          <% if (definitionMode === 'edit') { %>
+            <a class="button-link secondary" href="/admin/inputs?season=<%= season %>&tab=definitions">Done</a>
+          <% } else { %>
+            <a class="button-link secondary admin-race-data-edit-button" href="/admin/inputs?season=<%= season %>&tab=definitions&mode=edit">Edit data</a>
+          <% } %>
+        </div>
+      </div>
+      <% if (definitionMode === 'edit') { %>
+        <% (definitions || []).forEach((definition) => { %>
+          <form id="definition-form-<%= definition.id %>" method="post" action="/admin/inputs/definitions" data-season-mutation>
+            <%- csrfField() %><%- seasonPreparationField %>
+            <input type="hidden" name="season" value="<%= season %>">
+            <input type="hidden" name="id" value="<%= definition.id %>">
+            <input type="hidden" name="is_active" value="0">
+          </form>
+        <% }) %>
+        <form id="definition-form-new" method="post" action="/admin/inputs/definitions" data-season-mutation>
+          <%- csrfField() %><%- seasonPreparationField %>
+          <input type="hidden" name="season" value="<%= season %>">
+        </form>
+      <% } %>
+      <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="Definitions" tabindex="0">
+        <table class="table compact admin-inputs-table admin-inputs-definitions-table <%= definitionMode === 'edit' ? 'is-editing' : '' %>">
+          <colgroup>
+            <col class="admin-definition-col-term">
+            <col class="admin-definition-col-explanation">
+            <col class="admin-definition-col-aliases">
+            <col class="admin-definition-col-bindings">
+            <col class="admin-definition-col-status">
+            <% if (definitionMode === 'edit') { %><col class="admin-definition-col-order"><col class="admin-definition-col-action"><% } %>
+          </colgroup>
+          <thead><tr><th scope="col">Term</th><th scope="col">Explanation</th><th scope="col">Aliases</th><th scope="col">Question bindings</th><th scope="col">Status</th><% if (definitionMode === 'edit') { %><th scope="col">Order</th><th scope="col"></th><% } %></tr></thead>
+          <tbody>
+            <% (definitions || []).forEach((definition) => { %>
+              <tr>
+                <th scope="row">
+                  <% if (definitionMode === 'edit') { %>
+                    <label class="sr-only" for="definition-<%= definition.id %>-key">Stable term key</label>
+                    <input id="definition-<%= definition.id %>-key" name="term_key" form="definition-form-<%= definition.id %>" value="<%= definition.termKey %>" pattern="[a-z0-9]+(?:_[a-z0-9]+)*" required>
+                    <label class="admin-definition-label-field"><span>Label</span><input name="label" form="definition-form-<%= definition.id %>" value="<%= definition.label %>" required></label>
+                  <% } else { %>
+                    <div><strong><%= definition.label %></strong></div><small class="admin-inputs-entity-meta"><code><%= definition.termKey %></code></small>
+                  <% } %>
+                </th>
+                <td>
+                  <% if (definitionMode === 'edit') { %><textarea name="explanation" form="definition-form-<%= definition.id %>" rows="2" maxlength="500" required><%= definition.explanation %></textarea><% } else { %><span><%= definition.explanation %></span><% } %>
+                </td>
+                <td>
+                  <% if (definitionMode === 'edit') { %><textarea name="aliases" form="definition-form-<%= definition.id %>" rows="2" required title="Comma-separated matching terms"><%= definition.aliases.join(', ') %></textarea><% } else { %><span class="admin-definition-aliases"><%= definition.aliases.join(' · ') || '—' %></span><% } %>
+                </td>
+                <td>
+                  <% if (definitionMode === 'edit') { %><input name="question_ids" form="definition-form-<%= definition.id %>" value="<%= definition.questionIds.join(', ') %>" placeholder="Empty = global" title="Comma-separated stable question IDs"><% } else if (definition.questionIds.length) { %><span class="admin-definition-bindings"><%= definition.questionIds.join(' · ') %></span><% } else { %><span class="muted">All questions</span><% } %>
+                </td>
+                <td>
+                  <% if (definitionMode === 'edit') { %><label class="admin-definition-active"><input type="checkbox" name="is_active" value="1" form="definition-form-<%= definition.id %>" <%= definition.isActive ? 'checked' : '' %>> Active</label><% } else { %><span class="<%= definition.isActive ? '' : 'muted' %>"><%= definition.isActive ? 'Active' : 'Archived' %></span><% } %>
+                </td>
+                <% if (definitionMode === 'edit') { %>
+                  <td><input name="sort_order" form="definition-form-<%= definition.id %>" type="number" min="0" max="9999" value="<%= definition.sortOrder %>" aria-label="Order for <%= definition.label %>"></td>
+                  <td><button class="secondary" type="submit" form="definition-form-<%= definition.id %>">Save</button></td>
+                <% } %>
+              </tr>
+            <% }) %>
+            <% if (definitionMode === 'edit') { %>
+              <tr class="admin-inputs-definition-new-row">
+                <th scope="row"><input name="term_key" form="definition-form-new" placeholder="new_term_key" pattern="[a-z0-9]+(?:_[a-z0-9]+)*" required><label class="admin-definition-label-field"><span>Label</span><input name="label" form="definition-form-new" required></label></th>
+                <td><textarea name="explanation" form="definition-form-new" rows="2" maxlength="500" required placeholder="Tooltip explanation"></textarea></td>
+                <td><textarea name="aliases" form="definition-form-new" rows="2" required placeholder="term, alternate term"></textarea></td>
+                <td><input name="question_ids" form="definition-form-new" placeholder="Empty = global"></td>
+                <td><label class="admin-definition-active"><input type="checkbox" name="is_active" value="1" form="definition-form-new" checked> Active</label></td>
+                <td><input name="sort_order" form="definition-form-new" type="number" min="0" max="9999" value="200" aria-label="Order for new definition"></td>
+                <td><button class="secondary" type="submit" form="definition-form-new">Add</button></td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    <% } else if (tab === 'drivers') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="drivers" data-table-capabilities="edit,add,remove">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-        <div class="admin-inputs-toolbar-end">
-          <button type="button" data-add-driver-row>+ <%= t('admin_inputs.add_driver') %></button>
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
+          <button class="secondary" type="button" data-add-driver-row>+ <%= t('admin_inputs.add_driver') %></button>
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
       </div>
-      <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver" data-season-mutation>
+      <form id="admin-inputs-new-driver-form" method="post" action="/admin/inputs/driver" data-season-mutation hidden>
         <%- csrfField() %>
         <%- seasonPreparationField %>
         <input type="hidden" name="season" value="<%= season %>">
@@ -110,7 +234,7 @@
     <% } else if (tab === 'teams') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="teams" data-table-capabilities="edit,remove,reorder">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-        <div class="admin-inputs-toolbar-end">
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
           <button class="secondary" type="button" data-table-remove data-remove-confirm="<%= t('admin_inputs.remove_confirm') %>" disabled><%= t('admin_inputs.remove') %></button>
         </div>
@@ -125,12 +249,12 @@
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-team-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_teams') %>" tabindex="0">
         <table class="table compact admin-inputs-table admin-inputs-team-table" data-selectable-table="teams">
           <colgroup><col class="admin-inputs-team-col-order"><col class="admin-inputs-team-col-name"><col class="admin-inputs-team-col-driver"><col class="admin-inputs-team-col-driver"></colgroup>
-          <thead><tr><th aria-label="<%= t('admin_inputs.display_order') %>"></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.driver_1') %></th><th><%= t('admin_inputs.driver_2') %></th></tr></thead>
+          <thead><tr><th scope="col"><abbr title="<%= t('admin_inputs.display_order') %>">#</abbr></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.driver_1') %></th><th><%= t('admin_inputs.driver_2') %></th></tr></thead>
           <tbody>
             <% teamLineupHistory.forEach((lineupTeam, index) => { %>
               <% const team = catalog.teams.find((item) => Number(item.id) === Number(lineupTeam.teamId)); %>
               <tr data-selectable-row data-edit-target="team-editor-<%= lineupTeam.teamId %>" data-row-label="<%= lineupTeam.teamName %>" tabindex="0">
-                <td class="admin-inputs-team-order"><div class="admin-order-buttons"><form method="post" action="/admin/inputs/team-order" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="up" <%= index === 0 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_up') %>" aria-label="<%= t('admin_inputs.move_up') %>">&#8593;</button></form><form method="post" action="/admin/inputs/team-order" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="down" <%= index === teamLineupHistory.length - 1 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_down') %>" aria-label="<%= t('admin_inputs.move_down') %>">&#8595;</button></form></div></td>
+                <td class="admin-inputs-team-order"><div class="admin-inputs-team-order-inner"><span class="admin-inputs-team-position"><%= index + 1 %></span><div class="admin-order-buttons"><form method="post" action="/admin/inputs/team-order" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="up" <%= index === 0 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_up') %>" aria-label="<%= t('admin_inputs.move_up') %>">&#8593;</button></form><form method="post" action="/admin/inputs/team-order" data-season-mutation><%- csrfField() %><input type="hidden" name="season" value="<%= season %>"><input type="hidden" name="team_id" value="<%= lineupTeam.teamId %>"><button type="submit" class="secondary admin-order-btn" name="direction" value="down" <%= index === teamLineupHistory.length - 1 ? 'disabled' : '' %> title="<%= t('admin_inputs.move_down') %>" aria-label="<%= t('admin_inputs.move_down') %>">&#8595;</button></form></div></div></td>
                 <th scope="row"><div><%= lineupTeam.teamName %></div><% if (team && (team.team_code || team.base_country_code || team.f1_entry_year || team.power_unit)) { %><small class="admin-inputs-entity-meta"><%= [team.team_code, team.base_country_code, team.f1_entry_year ? t('admin_inputs.f1_since_short', { year: team.f1_entry_year }) : null, team.power_unit ? t('admin_inputs.power_unit_short', { value: team.power_unit }) : null].filter(Boolean).join(' · ') %></small><% } %></th>
                 <% [1, 2].forEach((seatNumber) => { const periods = lineupTeam.seats[seatNumber] || []; %>
                   <td class="admin-inputs-lineup-history-cell">
@@ -192,7 +316,7 @@
     <% } else if (tab === 'races') { %>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="races" data-table-capabilities="edit">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
-        <div class="admin-inputs-toolbar-end">
+        <div class="admin-inputs-toolbar-end admin-toolbar-actions">
           <button class="secondary" type="button" data-table-edit disabled><%= t('admin_inputs.edit') %></button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 ## Context
 
-See `proposal.md` for the motivation and scope. The existing code already has canonical Inputs tables, normalized race evidence, actual snapshots, canonical answer helpers, and a leaderboard model, but the boundaries are incomplete: actual derivation is duplicated in the admin route and backfill script, scoring is duplicated across routes, and the global `actuals` table is not season-scoped. The preview must remain sanitized and production PostgreSQL must remain untouched until explicit approval.
+See `proposal.md` for the motivation and scope. The existing code already has canonical Inputs tables, normalized race evidence, actual snapshots, canonical answer helpers, and a leaderboard model, but the boundaries are incomplete: actual derivation is duplicated in the admin route and backfill script, scoring is duplicated across routes, and the public preview must remain isolated and production PostgreSQL must remain untouched until explicit approval. Its audit dataset must be provider-backed; deterministic fixtures are only for automated tests and local UI work.
 
 The durable boundary and its ownership consequences are recorded in [ADR 0006](../../../adr/0006-inputs-canonical-boundary.md).
 
@@ -33,11 +33,11 @@ The catalog owns identity and configuration; it does not own observed race facts
 
 Extend evidence import identity and payload metadata so each effective bundle is keyed by season, round, source identity, payload revision, and parser version. Normalized rows carry canonical IDs where resolution is unique, preserve provider labels, and retain unresolved reasons. The importer is idempotent for equivalent normalized bundles and creates a new evidence revision when facts or parser behavior change.
 
-Race data and Actuals use the same persisted evidence row and cutoff resolver. A missing or partial bundle is a visible coverage state, not an implicit zero.
+Race data and Actuals use the same persisted evidence row and effective season-end resolver. A missing or partial bundle is a visible coverage state, not an implicit zero.
 
 ### 3. Use one derivation engine with strategy modules
 
-Move question-specific derivation out of `src/routes/admin.js` and `scripts/backfill-actuals-2026.js` into a shared season-aware service. Strategies receive a catalog, a cutoff, normalized evidence, and the question definition; they return a canonical value plus provenance or an explicit unavailable reason. Question IDs and 2026-only constants belong in data/configuration or strategy metadata, not route control flow. The admin sync route and backfill command become thin callers of the same service.
+Move question-specific derivation out of `src/routes/admin.js` and `scripts/backfill-actuals-2026.js` into a shared season-aware service. Strategies receive a catalog, an effective end round, normalized evidence, and the question definition; they return a canonical value plus provenance or an explicit unavailable reason. Question IDs and 2026-only constants belong in data/configuration or strategy metadata, not route control flow. The admin sync route and backfill command become thin callers of the same service.
 
 ### 4. Make actual snapshots a review/publish lifecycle
 
@@ -51,7 +51,7 @@ Make `leaderboard-model` (or a single adjacent score service) the only scoring i
 
 - Inputs: canonical identities, memberships, assignments, calendar, mappings, and readiness.
 - Questions: question definitions with options resolved from the selected catalog revision.
-- Race data: immutable evidence, coverage, cutoff totals, and source links.
+- Race data: immutable evidence, coverage, effective season-end totals, source links, and read-only question-linked audit projections. Projection metadata selects a reusable metric/view over the same evidence; it is not a second source-of-truth table and never mutates Actuals.
 - Actuals: derived values, provenance, review/correction state, and publishability.
 - Leaderboard/analysis: scoring output for the selected published snapshot.
 
@@ -74,8 +74,32 @@ Add columns/tables and dual-read compatibility first. Backfill or report resolva
 
 1. Close the remaining tests/release checks for the current Inputs, race-data audit, and historical-confirmation changes; do not archive them with unchecked behavior.
 2. Add catalog readiness/revision and integration tests without changing production tables' meaning.
-3. Add evidence identity/cutoff metadata and compare shared derivation output to the current route/script output on sanitized preview data.
+3. Add evidence identity/effective-end metadata and compare shared derivation output to the current route/script output on sanitized preview data.
 4. Introduce the season-scoped actual publication read/write path with dual reads and an explicit rollback switch.
 5. Route admin sync, backfill, Actuals, Race data, and scoring through shared services; keep legacy label reads until migration reports are clean.
 6. Refresh the preview from the feature commit, run health, targeted, full, build, and critical Playwright checks, and wait for explicit preview approval.
 7. Only then merge/deploy to production using the approved immutable artifact. Rollback is the previous image plus the retained compatibility columns/tables; no destructive data migration is required.
+
+### 8. Use provider-backed evidence for the public preview
+
+The public sanitized preview SHALL use the same normalized provider-import path as an admin sync, backed by an isolated preview PostgreSQL database. Preview creation SHALL seed canonical Inputs, fetch the completed public rounds from the approved provider, persist evidence and pending actual snapshots, and expose source/provenance metadata. It SHALL fail if the provider import fails; it SHALL not fall back to generated positions, synthetic points, or a production database clone. Deterministic fixture seeding remains available only through an explicitly test-only helper.
+
+### 9. Add Formula 1 Dashboard as a versioned evidence adapter
+
+Formula 1 Dashboard is an external, unofficial read-only provider. Its API is accessed only by the import boundary through a configurable base URL (`FORMULA1_DASHBOARD_API_BASE_URL`, defaulting to the documented public host) and a provider selector (`F1_DATA_PROVIDER`). The application never calls it while rendering Race data, Actuals, or scoring.
+
+The adapter fetches the season calendar, race classifications, starting grids, qualifying, sprint results, driver-standings evolution, constructor-standings evolution, and the provider's destructors-championship component-cost rows. It converts the provider response into the existing provider-neutral source shape before `buildEvidenceBundle` persists it. Destructors rows retain each component, unit price, quantity, calculated total, driver/team IDs and round; non-calendar rows (such as an API round 0) are retained as raw provenance but are excluded from round projections. Provider IDs and labels are retained, while canonical IDs are resolved through the season catalog; a missing or ambiguous match stays unresolved.
+
+Each imported round carries `source_type = formula1_dashboard`, the exact endpoint URLs, provider schema revision, fetch timestamp, normalized payload revision, and a compact provenance record. Formula 1 Dashboard data may be compared with another provider, but neither provider silently overwrites the other. A conflicting fact is recorded as an unresolved/conflict state and blocks affected derivations until an administrator reviews it. A provider outage, malformed response, or partial session does not become zeroes and does not trigger a synthetic fallback.
+
+The adapter is used by the preview and by explicit admin sync configuration first. Production keeps its existing provider until a separately approved comparison and deployment; both environments still derive actuals and scoring solely from persisted reviewed evidence.
+
+### 10. Keep Questions focused on input configuration
+
+The Questions admin page remains a read model over `data/questions.json`, localized metadata, and `question_settings`. It is a global input-management page, not an Actuals or evidence dashboard: Actual lifecycle, catalog readiness, and Race Data/Actuals links belong on those downstream pages and are not repeated here.
+
+Read mode shows only input-adjacent fields: stable order, prompt, answer basis/type, derivation label, points, and inclusion. The stable question ID remains visible as compact secondary text so operators can identify a definition without exposing downstream status columns.
+
+A single page-level Edit button on the right opens the same table in inline edit mode. The edit mode allows order, prompt override, validated points override, and inclusion to be changed together, with Save and Cancel actions in the same toolbar. Basis/type/derivation metadata remain read-only because changing them would alter the definition contract and requires a versioned migration. Prompt overrides are stored in `question_settings.prompt_override`; stable IDs, participant answers, derivation metadata, and historical snapshots are never rewritten.
+
+The save operation validates non-empty prompts, unique one-based order values, and the existing question-specific points shape before one transaction updates all rows. The change is recorded in the admin audit log without copying downstream Actuals state into the Questions model.

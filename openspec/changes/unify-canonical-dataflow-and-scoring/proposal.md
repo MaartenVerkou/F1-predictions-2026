@@ -8,7 +8,9 @@ This change makes Inputs the upstream contract and gives every later stage a sin
 
 - Treat the canonical season catalog as the only semantic source for drivers, teams, races, assignments, aliases, provider references, and season-specific metadata.
 - Add a readiness/read-model contract so Questions, Race data, Actuals, and scoring consume the same resolved catalog and report unresolved mappings instead of guessing.
-- Persist normalized race evidence before derivation, with canonical entity references, cutoff context, provenance, and an idempotent import identity.
+- Persist normalized race evidence before derivation, with canonical entity references, effective season-end context, provenance, and an idempotent import identity.
+- Add a versioned Formula 1 Dashboard evidence adapter for constructor, race, qualifying, starting-grid, sprint, and standings data without making the external provider a runtime scoring dependency.
+- Keep the public preview isolated from production while bootstrapping it with validated provider evidence; deterministic synthetic fixtures remain test-only and are never used as the audit dataset.
 - Replace route/script-specific actuals logic with one season-aware derivation engine that reads Inputs and persisted evidence.
 - Make actual snapshots and the published actual set season-scoped, versioned, reviewable, and traceable to the catalog and evidence revisions.
 - Make scoring use one shared canonical-value service and the season's reviewed/published actual set.
@@ -20,6 +22,7 @@ This change makes Inputs the upstream contract and gives every later stage a sin
 
 - `canonical-dataflow`: Defines the resolved season catalog, readiness checks, revisions, and ownership boundaries used by all downstream stages.
 - `race-evidence-derivation`: Defines normalized evidence imports, cutoff-aware derivation, provenance, idempotency, and unresolved-data handling.
+- `external-evidence-providers`: Defines the Formula 1 Dashboard adapter contract, validation, provenance, conflict handling, and provider-independent persistence boundary.
 
 ### Modified Capabilities
 
@@ -33,4 +36,3 @@ This change makes Inputs the upstream contract and gives every later stage a sin
 - Shared services used by `src/season-inputs.js`, `src/race-data-evidence.js`, `src/actuals-snapshots.js`, `src/leaderboard-model.js`, sync/backfill scripts, and admin routes.
 - Admin Inputs, Questions, Race data, Actuals, leaderboard, analysis, and scoring read models and their tests.
 - Preview fixtures and end-to-end checks; production deployment remains gated on explicit preview approval.
-

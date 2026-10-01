@@ -16,6 +16,7 @@
 - [x] 3.1 Add the admin-only GET route and view-model for the Race data workspace, including driver and constructor matrices, selected round, source coverage, and actuals links.
 - [x] 3.2 Make the selected round a real cutoff: cumulative standings and points must come from that bundle; mute future rounds.
 - [x] 3.3 Place Race data before Actuals and show import/cutoff state with compact selected-round detail.
+- [x] 3.4 Reorganize the audit controls around a flat Questions selector, selected round, and a single shared matrix section; remove the redundant Actuals link and derived-values panel.
 
 ## 4. Preview and verification
 

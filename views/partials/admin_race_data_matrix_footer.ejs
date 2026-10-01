@@ -1,0 +1,18 @@
+<% if (view.focusFooter) { %>
+  <tfoot class="admin-race-data-matrix-footer">
+    <tr>
+      <th scope="row" colspan="2" class="admin-race-data-footer-label">
+        <span><%= view.focusFooter.label %></span>
+      </th>
+      <% view.focusFooter.cells.forEach((cell, cellIndex) => { %>
+        <td class="admin-race-data-footer-cell state-<%= cell.state %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.label === '—' ? 'is-empty' : '' %> <%= cell.focusColumn ? 'is-focus-column' : '' %>"
+            title="<%= cell.title %>">
+          <span><%= cell.label %></span>
+        </td>
+      <% }) %>
+      <th scope="col" class="admin-race-data-footer-total admin-race-data-sticky-right">
+        <span><%= view.focusFooter.total == null ? '—' : view.focusFooter.total %></span>
+      </th>
+    </tr>
+  </tfoot>
+<% } %>

@@ -319,7 +319,15 @@ function seedSanitizedPreview(descriptor) {
   if (descriptor.dataMode !== "sanitized") return { seeded: false, mode: descriptor.dataMode };
   const result = spawnSync(
     "docker",
-    ["exec", descriptor.containerName, "node", "scripts/seed-wok-preview.js"],
+    [
+      "exec",
+      ...(String(process.env.WOK_PREVIEW_MAX_ROUND || "").trim()
+        ? ["-e", `WOK_PREVIEW_MAX_ROUND=${String(process.env.WOK_PREVIEW_MAX_ROUND).trim()}`]
+        : []),
+      descriptor.containerName,
+      "node",
+      "scripts/seed-wok-preview.js"
+    ],
     { encoding: "utf8" }
   );
   if (result.status !== 0) {
@@ -521,10 +529,21 @@ function createPreview(registry, app, options) {
   let routeActivated = false;
   try {
     fs.mkdirSync(previewDir, { recursive: true, mode: 0o700 });
-    shell("git", ["-C", app.paths.currentProduction, "fetch", "--prune", "origin", descriptor.ref]);
-    // Use FETCH_HEAD from the just-completed fetch so a remote branch does not
-    // need to exist as a local branch in the production checkout.
-    shell("git", ["-C", app.paths.currentProduction, "worktree", "add", "--detach", descriptor.worktree, "FETCH_HEAD"]);
+    let worktreeRef = "FETCH_HEAD";
+    try {
+      shell("git", ["-C", app.paths.currentProduction, "fetch", "--prune", "origin", descriptor.ref]);
+    } catch (fetchError) {
+      const localRef = spawnSync(
+        "git",
+        ["-C", app.paths.currentProduction, "rev-parse", "--verify", descriptor.ref + "^{commit}"],
+        { encoding: "utf8" }
+      );
+      if (localRef.status !== 0) throw fetchError;
+      worktreeRef = descriptor.ref;
+    }
+    // Prefer the freshly fetched remote commit; fall back only to an exact local
+    // ref imported into the preview host for private/local verification.
+    shell("git", ["-C", app.paths.currentProduction, "worktree", "add", "--detach", descriptor.worktree, worktreeRef]);
     worktreeCreated = true;
     fs.mkdirSync(descriptor.stateDir, { recursive: true, mode: 0o700 });
     const fileState = clonePreviewFileState(app, descriptor);

@@ -1,11 +1,11 @@
 ## Purpose
 
-Define the durable path from provider race data to normalized evidence and derived actuals, with round cutoffs, provenance, idempotency, and safe handling of incomplete data.
+Define the durable path from provider race data to normalized evidence and derived actuals, with effective season-end rounds, provenance, idempotency, and safe handling of incomplete data.
 
 ## ADDED Requirements
 
 ### Requirement: Evidence is normalized and persisted before derivation
-An import SHALL normalize provider payloads into an immutable, season- and round-scoped evidence bundle containing canonical entity references where resolved, source labels, source metadata, coverage state, and the selected cutoff context before any actuals are derived.
+An import SHALL normalize provider payloads into an immutable, season- and round-scoped evidence bundle containing canonical entity references where resolved, source labels, source metadata, coverage state, and the selected effective season-end context before any actuals are derived.
 
 #### Scenario: A completed race is imported
 - **WHEN** the provider returns race, qualifying, sprint, and standings data
@@ -30,13 +30,13 @@ The system SHALL identify equivalent source imports by season, round, source ide
 - **THEN** the system SHALL persist a new evidence revision
 - **AND** any newly derived actual snapshot SHALL require review
 
-### Requirement: Round cutoffs are consistent across evidence, actuals, and standings
-For a selected round, every cumulative result SHALL include only evidence through that round and SHALL exclude future rounds, cancelled rounds without results, and untrusted incomplete rows according to their explicit coverage state.
+### Requirement: Effective season ends are consistent across evidence, actuals, and standings
+For a selected round, every cumulative result SHALL run the normal season derivation over evidence through that round, treating the selected round as a virtual season end. Later evidence remains stored and SHALL be excluded only from that temporary projection. Cancelled rounds without results and untrusted incomplete rows SHALL be excluded according to their explicit coverage state.
 
 #### Scenario: An administrator selects an earlier round
 - **WHEN** Race data or Actuals is opened for round R8
-- **THEN** driver and constructor totals, derived answers, and displayed evidence SHALL use the same R8 cutoff
-- **AND** later rounds SHALL be visibly excluded or marked future
+- **THEN** driver and constructor totals, derived answers, and displayed evidence SHALL use the same R8 effective season end
+- **AND** later rounds SHALL remain stored and SHALL be visibly excluded or marked future only in this R8 projection
 
 #### Scenario: A round is incomplete
 - **WHEN** the selected evidence bundle is partial or missing required source coverage
@@ -50,3 +50,22 @@ Each derived actual value SHALL record the derivation version, catalog revision,
 - **WHEN** an actual value is shown in the review workspace
 - **THEN** the admin SHALL be able to identify the source evidence and derivation/catalog revisions used
 - **AND** an unavailable value SHALL show why it could not be derived
+
+### Requirement: Title decisions use the selected effective season end and season scoring rules
+The Drivers' title-decision derivation SHALL treat the selected round as the virtual end of the observed season. It SHALL evaluate every completed round through that effective end, subtract the maximum points still available in each later scheduled race weekend up to that effective end using that season's race, sprint, and eligible fastest-lap rules, and return the number of races before the selected effective end for the first round where the leader is mathematically uncatchable.
+
+#### Scenario: A title is clinched before the selected effective season end
+- **WHEN** the selected effective season end is R9 and the leader's R8 points gap exceeds the maximum points available in R9
+- **THEN** the derived answer SHALL be `1`
+- **AND** the value SHALL be derived from the season scoring rules rather than a hardcoded 25-point weekend
+- **AND** rounds after R9 SHALL not affect the answer
+
+#### Scenario: A title is not yet clinched
+- **WHEN** no leader is mathematically uncatchable through the selected effective season end
+- **THEN** the derived answer SHALL be unavailable rather than `0`
+- **AND** `0` SHALL be reserved for a title clinched after the selected effective end
+
+#### Scenario: A points tie can be resolved by countback
+- **WHEN** a challenger can only tie the leader on points with the maximum remaining score
+- **THEN** the derivation SHALL compare the complete finishing-position counts through the selected effective season end and the challenger's best possible future race finishes
+- **AND** it SHALL leave the title open when the challenger can still win countback

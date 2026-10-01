@@ -1,6 +1,11 @@
 "use strict";
 
 const { assertAssignmentIntervals } = require("./season-lineup");
+const {
+  DEFAULT_SCORING_RULES,
+  ensureSeasonScoringRulesSchema,
+  seedSeasonScoringRules
+} = require("./season-scoring-rules");
 
 const ENTITY_TYPES = Object.freeze({
   DRIVER: "driver",
@@ -265,6 +270,14 @@ function ensureSeasonInputsSchema(db) {
   addColumnIfMissing("drivers", "nationality_code", "TEXT");
   addColumnIfMissing("drivers", "date_of_birth", "TEXT");
 
+  ensureSeasonScoringRulesSchema(db);
+  db.prepare("SELECT id FROM seasons ORDER BY id").all().forEach((season) => {
+    seedSeasonScoringRules(db, {
+      seasonId: Number(season.id),
+      rules: DEFAULT_SCORING_RULES
+    });
+  });
+
   if (hasColumn("season_drivers", "active")) {
     db.exec(
       "DELETE FROM season_drivers WHERE active = 0 AND NOT EXISTS " +
@@ -287,11 +300,18 @@ function ensureSeasonInputsSchema(db) {
 
 function createOrGetSeason(db, { year, label = String(year), status = "active", now = new Date().toISOString() }) {
   const existing = db.prepare("SELECT id, year, label, status FROM seasons WHERE year = ? LIMIT 1").get(Number(year));
-  if (existing) return { ...existing, id: Number(existing.id), year: Number(existing.year) };
+  if (existing) {
+    ensureSeasonScoringRulesSchema(db);
+    seedSeasonScoringRules(db, { seasonId: Number(existing.id), rules: DEFAULT_SCORING_RULES, now });
+    return { ...existing, id: Number(existing.id), year: Number(existing.year) };
+  }
   const result = db.prepare(
     "INSERT INTO seasons (year, label, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
   ).run(Number(year), String(label), String(status), now, now);
-  return { id: Number(result.lastInsertRowid), year: Number(year), label: String(label), status: String(status) };
+  const seasonId = Number(result.lastInsertRowid);
+  ensureSeasonScoringRulesSchema(db);
+  seedSeasonScoringRules(db, { seasonId, rules: DEFAULT_SCORING_RULES, now });
+  return { id: seasonId, year: Number(year), label: String(label), status: String(status) };
 }
 
 function upsertDriver(db, {
@@ -485,10 +505,17 @@ function listSeasonMappings(db, year) {
   const season = db.prepare("SELECT id FROM seasons WHERE year = ? LIMIT 1").get(Number(year));
   if (!season) return [];
   const mappings = [];
+  const seasonId = Number(season.id);
+  const seasonEntityIds = {
+    driver: new Set(db.prepare("SELECT driver_id FROM season_drivers WHERE season_id = ?").all(seasonId).map((row) => Number(row.driver_id))),
+    team: new Set(db.prepare("SELECT team_id FROM season_teams WHERE season_id = ?").all(seasonId).map((row) => Number(row.team_id))),
+    race: new Set(db.prepare("SELECT id FROM races WHERE season_id = ?").all(seasonId).map((row) => Number(row.id)))
+  };
   const providerRows = db.prepare(
-    "SELECT entity_type, entity_id, provider, provider_key, provider_label FROM entity_provider_refs ORDER BY provider, provider_key"
+    "SELECT id, entity_type, entity_id, provider, provider_key, provider_label FROM entity_provider_refs ORDER BY provider, provider_key"
   ).all();
   providerRows.forEach((row) => {
+    if (!seasonEntityIds[row.entity_type]?.has(Number(row.entity_id))) return;
     const entity = findEntityById(db, row.entity_type, row.entity_id);
     mappings.push({
       id: Number(row.id),
@@ -505,9 +532,10 @@ function listSeasonMappings(db, year) {
     });
   });
   const aliasRows = db.prepare(
-    "SELECT entity_type, entity_id, alias, season_id FROM entity_aliases WHERE season_id IS NULL OR season_id = ? ORDER BY normalized_alias"
-  ).all(Number(season.id));
+    "SELECT id, entity_type, entity_id, alias, season_id FROM entity_aliases WHERE season_id IS NULL OR season_id = ? ORDER BY normalized_alias"
+  ).all(seasonId);
   aliasRows.forEach((row) => {
+    if (!seasonEntityIds[row.entity_type]?.has(Number(row.entity_id))) return;
     const entity = findEntityById(db, row.entity_type, row.entity_id);
     mappings.push({
       id: Number(row.id),

@@ -4,19 +4,24 @@ const { runActualsAutoUpdate } = require("../actuals-auto-update");
 const { resolveConfiguredRaceName } = require("../race-names");
 const {
   REVIEW_STATUS_PENDING,
-  REVIEW_STATUS_REVIEWED,
+  loadPublishedActuals,
   fetchSnapshotValues: loadSnapshotValues,
   findLatestRoundSnapshotForSeason: loadLatestRoundSnapshotForSeason,
   findSnapshotById,
+  linkEvidenceToActualSnapshot,
   listLatestSnapshotsForSeason,
   markSnapshotReviewed,
+  publishActualSnapshot,
   upsertSnapshotForRound
 } = require("../actuals-snapshots");
 const {
-  listRaceDataImports,
+  findRaceDataSnapshot,
+  listRaceDataSnapshotRevisions,
   listRaceDataSnapshots,
+  saveCorrectedRaceDataSnapshot,
   summarizeEvidence
 } = require("../race-data-evidence");
+const { deriveSnapshotsFromPersistedEvidence } = require("../../scripts/backfill-actuals-2026");
 const {
   addEntityAlias,
   addProviderReference,
@@ -31,6 +36,7 @@ const {
   upsertTeam
 } = require("../season-inputs");
 const { buildCanonicalCatalog, canonicalizeQuestionValue } = require("../canonical-answers");
+const { buildSeasonCatalog } = require("../season-catalog");
 const {
   applyTeamLineupHistory,
   applySeasonLineup,
@@ -45,12 +51,41 @@ const {
   readSeasonMutationFlags,
   resolveAdminSeasonContext
 } = require("../admin-season-context");
+const {
+  applyDriverPointsMetric,
+  applyRaceDataFocus,
+  defaultRaceDataHighlightMode
+} = require("../race-data-audit");
+const {
+  buildRaceResultColumns,
+  buildRaceDataMetricOptions,
+  formatRaceFinishLabel,
+  getRaceSessionRows
+} = require("../race-data-review-model");
+const { buildActualsOverview } = require("../actuals-overview");
+const leaderboardModel = require("../leaderboard-model");
+const { topDamageEntities } = require("../destructors-damage");
+const { compactQuestionLabel, raceDataFocusLabel } = require("../race-data-focus");
+const {
+  buildQuestionInputRows,
+  normalizeQuestionInputEdits
+} = require("../question-admin-model");
+const { upsertSeasonQuestionSettings } = require("../season-question-settings");
+const {
+  listQuestionDefinitions,
+  upsertQuestionDefinition
+} = require("../question-definitions");
+const {
+  DEFAULT_SCORING_RULES,
+  deriveStandingsForRounds,
+  reconcileStandings,
+  readSeasonScoringRules,
+  scoringRulesTableValue
+} = require("../season-scoring-rules");
 
 
 function auditResultLabel(row) {
   if (!row) return "—";
-  const position = Number(row.position);
-  if (Number.isFinite(position) && position > 0) return String(position);
   const raw = String(row.status || row.positionText || "").trim();
   const key = raw.toLowerCase();
   if (key.includes("retir") || key === "dnf") return "Ret";
@@ -59,7 +94,251 @@ function auditResultLabel(row) {
   if (key.includes("disqual") || key === "dsq") return "DSQ";
   if (key.includes("not classified") || key === "nc") return "NC";
   if (key.includes("withdrew") || key === "wd") return "WD";
+  const position = Number(row.position);
+  if (Number.isFinite(position) && position > 0) return String(position);
   return raw || "—";
+}
+
+function auditNonClassifiedLabel(row) {
+  const label = auditResultLabel(row);
+  return ["Ret", "DNS", "DNQ", "DSQ", "NC", "WD"].includes(label) ? label : null;
+}
+
+function formatRaceStatusLabel(row) {
+  if (!row) return "—";
+  const rawStatus = String(row.status || "").trim().toLowerCase();
+  const auditLabel = auditResultLabel(row);
+  const explicitLabel = {
+    dnf: "DNF",
+    dns: "DNS",
+    dsq: "DSQ",
+    dnq: "DNQ",
+    nc: "NC",
+    wd: "WD"
+  }[rawStatus] || null;
+  const label = explicitLabel || (auditLabel === "—" ? "NC" : auditLabel);
+  const rawGap = Array.isArray(row.sessionGap) ? row.sessionGap.find(Boolean) : row.sessionGap;
+  const gap = String(rawGap || row.gap_to_leader || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\bLAPS?\b/i, "laps");
+  if (label === "NC" && gap) return gap;
+  if (explicitLabel) return explicitLabel;
+  const position = Number(row.position);
+  if (Number.isFinite(position) && position > 0) return "Finished";
+  return label;
+}
+
+function formatRacePositionLabel(row) {
+  if (!row) return "—";
+  const position = Number(row.position);
+  return Number.isFinite(position) && position > 0 ? String(position) : "NC";
+}
+
+function fallbackEntityCode(value, kind = "driver") {
+  const parts = String(value || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "—";
+  if (kind === "team" && parts.length > 1) {
+    const condensed = parts.join("").replace(/[^A-Za-z0-9]/g, "");
+    if (condensed) return condensed.slice(0, 3).toUpperCase();
+  }
+  const lastPart = parts.at(-1).replace(/[^A-Za-z0-9]/g, "");
+  return (lastPart || parts.join("")).slice(0, 3).toUpperCase() || "—";
+}
+
+function fallbackRaceCode(value) {
+  const words = String(value || "")
+    .replace(/[^A-Za-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((word) => !["grand", "prix", "gp"].includes(word.toLowerCase()));
+  if (!words.length) return "—";
+  if (words.length > 1) {
+    return `${words[0][0] || ""}${words[1].slice(0, 2)}`.toUpperCase();
+  }
+  return words[0].slice(0, 3).toUpperCase() || "—";
+}
+
+function isSafeRaceDataReturnPath(value) {
+  const path = String(value || "").trim();
+  return /^\/admin\/race-data(?:[?#]|$)/.test(path)
+    && !path.includes("://")
+    && !path.startsWith("//");
+}
+
+function sortAuditRows(rows, valueField = "points") {
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((left, right) => {
+      const leftValue = Number(left.row[valueField]);
+      const rightValue = Number(right.row[valueField]);
+      const leftHasValue = Number.isFinite(leftValue);
+      const rightHasValue = Number.isFinite(rightValue);
+      if (leftHasValue !== rightHasValue) return leftHasValue ? -1 : 1;
+      if (leftHasValue && leftValue !== rightValue) return rightValue - leftValue;
+      const leftPosition = Number(left.row.championshipPosition);
+      const rightPosition = Number(right.row.championshipPosition);
+      const leftHasPosition = Number.isFinite(leftPosition);
+      const rightHasPosition = Number.isFinite(rightPosition);
+      if (leftHasPosition !== rightHasPosition) return leftHasPosition ? -1 : 1;
+      if (leftHasPosition && leftPosition !== rightPosition) return leftPosition - rightPosition;
+      return left.index - right.index;
+    })
+    .map(({ row }) => row);
+}
+
+function matchesAuditEntity(row, entity, { idField, nameField }) {
+  if (!row || !entity) return false;
+  if (entity.id != null && row[idField] != null) {
+    return Number(row[idField]) === Number(entity.id);
+  }
+  return row[nameField] === entity.name;
+}
+
+function buildAuditMarkerMeta({ pole = false, fastestLap = false } = {}) {
+  const markers = [];
+  if (pole) markers.push("P");
+  if (fastestLap) markers.push("FL");
+  return {
+    markers,
+    markerGlyph: markers.join(" "),
+    markerTitle: [pole ? "Pole position" : null, fastestLap ? "Fastest lap" : null]
+      .filter(Boolean)
+      .join(" · ")
+  };
+}
+
+function buildConstructorPodiumPosition(raceRows, entity) {
+  const bestPosition = (raceRows || [])
+    .filter((row) => matchesAuditEntity(row, entity, {
+      idField: "team_id",
+      nameField: "constructor"
+    }))
+    .map((row) => Number(row.position))
+    .filter((position) => Number.isInteger(position) && position >= 1 && position <= 3)
+    .sort((left, right) => left - right)[0];
+  return bestPosition || null;
+}
+
+function buildAuditPodiumSummary(cells) {
+  const podiumCells = (cells || []).filter((cell) => !cell.afterCutoff && cell.podiumPosition);
+  return {
+    wins: podiumCells.filter((cell) => cell.podiumPosition === 1).length,
+    podiums: podiumCells.length
+  };
+}
+
+function buildAuditMatrixCell({
+  round,
+  cutoffRoundNumber,
+  label,
+  title,
+  state = round.state,
+  podiumPosition = null,
+  markers = [],
+  markerGlyph = "",
+  markerTitle = "",
+  focusHit = false
+}) {
+  const afterCutoff = round.roundNumber > cutoffRoundNumber;
+  return {
+    label: label == null ? "—" : String(label),
+    state: afterCutoff ? "future" : state,
+    afterCutoff,
+    podiumPosition: afterCutoff ? null : podiumPosition,
+    markers,
+    markerGlyph,
+    markerTitle,
+    focusHit: afterCutoff ? false : focusHit,
+    title: afterCutoff ? ["After selected round", title].filter(Boolean).join(" · ") : title
+  };
+}
+
+function buildRaceDataFocusOptions(questions = [], { pointsLabel = "Championship points", metricOptions = [] } = {}) {
+  const options = [{
+    id: "points",
+    view: "all",
+    metric: "points",
+    questionId: null,
+    questionNumber: null,
+    group: "standings",
+    label: pointsLabel,
+    focusLabel: raceDataFocusLabel({ metric: "points" })
+  }];
+  const seen = new Set(["points"]);
+  for (const metricOption of metricOptions || []) {
+    const id = String(metricOption?.id || "").trim();
+    if (!id || seen.has(id)) continue;
+    options.push({ ...metricOption });
+    seen.add(id);
+  }
+  let questionNumber = 0;
+  for (const question of questions || []) {
+    const projection = question?.race_data_focus;
+    const id = String(question?.id || "").trim();
+    const view = String(projection?.view || "").trim().toLowerCase();
+    const metric = String(projection?.metric || "").trim().toLowerCase();
+    if (!id || seen.has(id) || !["drivers", "constructors"].includes(view)) continue;
+    const inferredGroup = ["championship_top3", "last_standing", "all_teams_points"].includes(metric)
+      ? "standings"
+      : ["podiums", "dnfs", "grid_wins", "driver_of_day", "sprint_points", "dnf_by_race"].includes(metric)
+        ? "race"
+        : ["teammate_points", "qualifying_h2h", "alpine_comparison"].includes(metric)
+          ? "comparisons"
+          : ["damage", "engine_switch"].includes(metric)
+            ? "external"
+            : "other";
+    const group = String(projection?.group || inferredGroup).trim().toLowerCase();
+    questionNumber += 1;
+    options.push({
+      id,
+      view,
+      metric,
+      matrixMetric: String(projection?.matrixMetric || (metric === "points" || metric === "podiums" ? metric : "points")).trim().toLowerCase(),
+      cellMode: String(projection?.cellMode || "").trim().toLowerCase() || null,
+      highlightMode: String(
+        projection?.highlightMode || defaultRaceDataHighlightMode(metric)
+      ).trim().toLowerCase(),
+      footerMode: String(projection?.footerMode || "").trim().toLowerCase() || null,
+      sort: String(projection?.sort || "desc").trim().toLowerCase(),
+      kind: String(projection?.kind || "matrix").trim().toLowerCase(),
+      // Every question is a season derivation. A selected round is only a
+      // temporary effective season end in the audit workspace, not a
+      // question-specific scope or a truncated source dataset.
+      scope: "season",
+      group,
+      options: Array.isArray(question.options) ? question.options.slice() : [],
+      compareDrivers: Array.isArray(projection?.compareDrivers) ? projection.compareDrivers.slice() : [],
+      compareTeams: Array.isArray(projection?.compareTeams) ? projection.compareTeams.slice() : [],
+      targetTeam: String(projection?.targetTeam || "").trim() || null,
+      targetEngine: String(projection?.targetEngine || "").trim() || null,
+      requiredEvidence: Array.isArray(projection?.requiredEvidence) ? projection.requiredEvidence.slice() : [],
+      questionId: id,
+      questionNumber,
+      label: String(question.prompt || id),
+      shortLabel: compactQuestionLabel(question, metric),
+      focusLabel: raceDataFocusLabel(question)
+    });
+    seen.add(id);
+  }
+  return options;
+}
+
+function resolveRaceDataFocus({ questions = [], focusId = "points", viewMode = "drivers", pointsLabel = "Championship points", metricOptions = [] } = {}) {
+  const options = buildRaceDataFocusOptions(questions, { pointsLabel, metricOptions });
+  const requested = options.find((option) => option.id === String(focusId || "points"));
+  if (requested && (requested.view === "all" || requested.view === viewMode)) {
+    return { ...requested, view: viewMode };
+  }
+  return { ...options[0], view: viewMode };
+}
+
+function resolveActiveRaceDataMetricId({ focus = null, metricOptions = [] } = {}) {
+  const metric = String(focus?.matrixMetric || focus?.metric || "points").trim().toLowerCase();
+  const preferredId = ["points", "championship_points_results"].includes(metric)
+    ? metric
+    : `metric:${metric}`;
+  return metricOptions.some((option) => option.id === preferredId) ? preferredId : "points";
 }
 
 function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
@@ -67,9 +346,47 @@ function auditSourceState(evidence, roundNumber, latestEvidenceRound) {
   return Number(roundNumber) > Number(latestEvidenceRound || 0) ? "future" : "not_synced";
 }
 
-function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster }) {
+function attachSeasonCatalogToQuestions(questions, seasonCatalog) {
+  const canonical = seasonCatalog?.canonical || { driver: [], team: [], race: [] };
+  return (questions || []).map((question) => {
+    const attached = { ...question };
+    Object.defineProperty(attached, "_canonicalCatalog", {
+      value: canonical,
+      enumerable: false,
+      configurable: true
+    });
+    Object.defineProperty(attached, "_catalogRevision", {
+      value: seasonCatalog?.catalogRevision || null,
+      enumerable: false,
+      configurable: true
+    });
+    return attached;
+  });
+}
+
+function attachSnapshotReviewerNames(db, snapshots = []) {
+  const reviewerIds = Array.from(new Set(
+    (snapshots || [])
+      .map((snapshot) => Number(snapshot?.reviewed_by_user_id))
+      .filter((id) => Number.isInteger(id) && id > 0)
+  ));
+  if (!reviewerIds.length) return snapshots || [];
+  const placeholders = reviewerIds.map(() => "?").join(", ");
+  const reviewers = db.prepare(
+    `SELECT id, name FROM users WHERE id IN (${placeholders})`
+  ).all(...reviewerIds);
+  const namesById = new Map(
+    reviewers.map((reviewer) => [Number(reviewer.id), String(reviewer.name || "").trim() || null])
+  );
+  return (snapshots || []).map((snapshot) => ({
+    ...snapshot,
+    reviewed_by_name: namesById.get(Number(snapshot.reviewed_by_user_id)) || null
+  }));
+}
+
+function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster, seasonCatalog }) {
   const base = fallbackRoster || { drivers: [], teams: [], races: races || [] };
-  const catalog = listSeasonInputs(db, season);
+  const catalog = seasonCatalog || listSeasonInputs(db, season);
   if (!catalog.season || !Number.isInteger(Number(roundNumber)) || Number(roundNumber) < 1) return base;
   const projection = buildLineupProjection({
     teams: catalog.teams,
@@ -77,16 +394,49 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster 
     assignments: catalog.assignments,
     roundNumber: Number(roundNumber)
   });
+  const driverCatalogById = new Map(
+    (catalog.drivers || []).map((driver) => [Number(driver.id), driver])
+  );
+  const teamCatalogById = new Map(
+    (catalog.teams || []).map((team) => [Number(team.id), team])
+  );
   const drivers = Array.from(new Map(
     projection.flatMap((team) => team.seats)
       .filter((seat) => seat.driverId != null && seat.driverName)
       .map((seat) => [String(seat.driverName), String(seat.driverName)])
   ).values());
   const teams = projection.map((team) => team.teamName);
+  const driverEntities = Array.from(new Map(
+    projection.flatMap((team) => team.seats.map((seat) => ({ seat, team })))
+      .filter(({ seat }) => seat.driverId != null && seat.driverName)
+      .map(({ seat, team }) => [Number(seat.driverId), {
+        id: Number(seat.driverId),
+        name: String(seat.driverName),
+        code: driverCatalogById.get(Number(seat.driverId))?.driver_code || null,
+        teamId: Number(team.teamId),
+        teamName: String(team.teamName),
+        seatNumber: Number(seat.seatNumber)
+      }])
+  ).values());
+  const teamEntities = projection
+    .filter((team) => team.teamId != null && team.teamName)
+    .map((team) => ({
+      id: Number(team.teamId),
+      name: String(team.teamName),
+      code: teamCatalogById.get(Number(team.teamId))?.team_code || null,
+      powerUnit: teamCatalogById.get(Number(team.teamId))?.power_unit || null,
+      seats: team.seats.map((seat) => ({
+        seatNumber: Number(seat.seatNumber),
+        driverId: seat.driverId == null ? null : Number(seat.driverId),
+        driverName: seat.driverName || null
+      }))
+    }));
   return {
     ...base,
     drivers: drivers.length ? drivers : base.drivers || [],
     teams: teams.length ? teams : base.teams || [],
+    driver_entities: driverEntities,
+    team_entities: teamEntities,
     driver_options: drivers.length ? drivers : base.driver_options || base.drivers || [],
     team_options: teams.length ? teams : base.team_options || base.teams || [],
     race_options: races || base.race_options || base.races || [],
@@ -94,7 +444,85 @@ function buildRoundAwareRoster({ db, season, roundNumber, races, fallbackRoster 
   };
 }
 
-function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound }) {
+function expandRaceDataRosterWithHistoricalParticipants({ driverEntities, teamEntities, rounds, cutoffRoundNumber }) {
+  const drivers = (driverEntities || []).map((entity) => ({ ...entity }));
+  const teams = (teamEntities || []).map((entity) => ({ ...entity }));
+  const driverById = new Map(
+    drivers
+      .filter((entity) => entity.id != null)
+      .map((entity) => [Number(entity.id), entity])
+  );
+  const driverByName = new Map(drivers.map((entity) => [String(entity.name || ""), entity]));
+  const teamById = new Map(
+    teams
+      .filter((entity) => entity.id != null)
+      .map((entity) => [Number(entity.id), entity])
+  );
+  const teamByName = new Map(teams.map((entity) => [String(entity.name || ""), entity]));
+  const asPositiveInteger = (value) => {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  for (const round of rounds || []) {
+    if (round.roundNumber > cutoffRoundNumber || !round.evidence) continue;
+    const payload = round.evidence.payload || {};
+    const rows = [
+      ...(payload.race?.rows || []),
+      ...(payload.sprint?.rows || [])
+    ];
+    for (const row of rows) {
+      const name = String(row.driver || row.driver_label || "").trim();
+      if (!name) continue;
+      const driverId = asPositiveInteger(row.driver_id);
+      const teamName = String(row.constructor || row.team_label || "").trim() || null;
+      const teamId = asPositiveInteger(row.team_id);
+      let entity = (driverId != null ? driverById.get(driverId) : null) || driverByName.get(name);
+      if (!entity) {
+        entity = {
+          id: driverId,
+          name,
+          code: fallbackEntityCode(name, "driver"),
+          teamId,
+          teamName,
+          seatNumber: null,
+          historical: true
+        };
+        drivers.push(entity);
+        if (driverId != null) driverById.set(driverId, entity);
+        driverByName.set(name, entity);
+      } else if (entity.historical) {
+        entity.teamId = teamId ?? entity.teamId ?? null;
+        entity.teamName = teamName || entity.teamName || null;
+      }
+
+      if (!teamName) continue;
+      let team = (teamId != null ? teamById.get(teamId) : null) || teamByName.get(teamName);
+      if (!team) {
+        team = {
+          id: teamId,
+          name: teamName,
+          code: fallbackEntityCode(teamName, "team"),
+          powerUnit: null,
+          historical: true
+        };
+        teams.push(team);
+        if (teamId != null) teamById.set(teamId, team);
+        teamByName.set(teamName, team);
+      }
+    }
+  }
+  return { drivers, teams };
+}
+
+function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, selectedRound, catalogRevision = null, focus = null, showRaceResult = true, scoringRules = DEFAULT_SCORING_RULES }) {
+  const activeFocus = {
+    id: "points",
+    metric: "points",
+    view: "drivers",
+    label: "Championship points",
+    ...(focus || {})
+  };
   const evidenceByRound = new Map(
     evidenceRows.map((row) => [Number(row.round_number), row])
   );
@@ -148,122 +576,599 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
             : selected.summary.status
       }
     : null;
+  const derivedStandingsByRound = deriveStandingsForRounds(
+    evidenceRows.map((row) => ({
+      roundNumber: Number(row.round_number),
+      raceRows: row.payload?.race?.rows || [],
+      sprintRows: row.payload?.sprint?.rows || []
+    })),
+    scoringRules
+  );
   const selectedPayload = selected?.evidence?.payload || null;
-  const selectedDriverStandings = selectedPayload?.standings?.drivers || [];
-  const selectedConstructorStandings = selectedPayload?.standings?.constructors || [];
+  const selectedDerivedStandings = derivedStandingsByRound.get(cutoffRoundNumber) || { drivers: [], constructors: [] };
+  const selectedLegacyStandings = selectedPayload?.legacyStandings || selectedPayload?.standings || { drivers: [], constructors: [] };
+  const selectedDriverStandings = selectedDerivedStandings.drivers.length
+    ? selectedDerivedStandings.drivers
+    : (selectedPayload?.standings?.drivers || []);
+  const selectedConstructorStandings = selectedDerivedStandings.constructors.length
+    ? selectedDerivedStandings.constructors
+    : (selectedPayload?.standings?.constructors || []);
   const selectedDriverMap = new Map(selectedDriverStandings.map((row) => [row.entity, row]));
   const selectedConstructorMap = new Map(selectedConstructorStandings.map((row) => [row.entity, row]));
+  const selectedLegacyDriverMap = new Map(selectedLegacyStandings.drivers.map((row) => [row.entity, row]));
+  const selectedLegacyConstructorMap = new Map(selectedLegacyStandings.constructors.map((row) => [row.entity, row]));
+  const selectedDriverIdMap = new Map(
+    selectedDriverStandings
+      .filter((row) => row.entity_id != null)
+      .map((row) => [Number(row.entity_id), row])
+  );
+  const selectedConstructorIdMap = new Map(
+    selectedConstructorStandings
+      .filter((row) => row.entity_id != null)
+      .map((row) => [Number(row.entity_id), row])
+  );
 
   const drivers = Array.isArray(roster?.drivers) ? roster.drivers : [];
   const teams = Array.isArray(roster?.teams) ? roster.teams : [];
-  const driverRows = drivers.map((driver) => {
+  const baseDriverEntities = Array.isArray(roster?.driver_entities)
+    ? roster.driver_entities
+    : drivers.map((name) => ({ id: null, name }));
+  const baseTeamEntities = Array.isArray(roster?.team_entities)
+    ? roster.team_entities
+    : teams.map((name) => ({ id: null, name }));
+  const expandedRoster = expandRaceDataRosterWithHistoricalParticipants({
+    driverEntities: baseDriverEntities,
+    teamEntities: baseTeamEntities,
+    rounds,
+    cutoffRoundNumber
+  });
+  const driverEntities = expandedRoster.drivers;
+  const teamEntities = expandedRoster.teams;
+  const podiumFocus = activeFocus.matrixMetric === "podiums" || ["podiums", "ferrari_podium"].includes(activeFocus.metric);
+  const driverRows = sortAuditRows(driverEntities.map((entity) => {
+    const driver = entity.name;
     const cells = rounds.map((round) => {
       const raceRows = round.evidence?.payload?.race?.rows || [];
-      const row = raceRows.find((item) => item.driver === driver) || null;
+      const qualifyingRows = round.evidence?.payload?.qualifying?.rows || [];
+      const row = raceRows.find((item) => matchesAuditEntity(item, entity, {
+        idField: "driver_id",
+        nameField: "driver"
+      })) || null;
+      const qualifying = qualifyingRows.find((item) => matchesAuditEntity(item, entity, {
+        idField: "driver_id",
+        nameField: "driver"
+      })) || null;
       const afterCutoff = round.roundNumber > cutoffRoundNumber;
+      const qualifyingOutcome = auditNonClassifiedLabel(qualifying);
+      const pole = Boolean(qualifying?.pole || Number(qualifying?.position) === 1);
+      const fastestLap = Boolean(row?.fastestLap);
+      const podiumPosition = !afterCutoff && [1, 2, 3].includes(Number(row?.position))
+        ? Number(row.position)
+        : null;
+      const podiumHit = !afterCutoff && Boolean(row) && [1, 2, 3].includes(Number(row.position));
+      const resultLabel = podiumFocus
+        ? (round.evidence && row ? (podiumHit ? "1" : "0") : "—")
+        : round.evidence
+          ? (row ? auditResultLabel(row) : qualifyingOutcome || "—")
+          : "—";
+      const markerMeta = podiumFocus ? buildAuditMarkerMeta() : buildAuditMarkerMeta({ pole, fastestLap });
+      const resultTitle = podiumFocus
+        ? (round.evidence && row
+          ? (podiumHit ? "Podium finish" : "No podium finish")
+          : round.evidence ? "No classified row" : "Evidence unavailable")
+        : row || qualifyingOutcome
+          ? [row?.status || qualifyingOutcome || resultLabel, row?.grid != null ? "grid " + row.grid : null, row?.calculatedPoints != null || row?.points != null ? (row.calculatedPoints ?? row.points) + " pts" : null, markerMeta.markerTitle || null]
+            .filter(Boolean)
+            .join(" · ")
+          : round.evidence ? "No classified row" : "Evidence unavailable";
       return {
-        label: afterCutoff ? "—" : round.evidence ? auditResultLabel(row) : "—",
-        title: afterCutoff
-          ? "After selected cutoff"
-          : row
-            ? [row.status, row.grid != null ? "grid " + row.grid : null, row.points != null ? row.points + " pts" : null]
-                .filter(Boolean)
-                .join(" · ")
-            : round.evidence ? "No classified row" : "Evidence unavailable",
-        state: round.afterCutoff ? "future" : round.state,
+        ...buildAuditMatrixCell({
+          round,
+          cutoffRoundNumber,
+          label: resultLabel,
+          title: resultTitle,
+          podiumPosition: podiumFocus ? null : podiumPosition,
+          focusHit: podiumFocus && podiumHit,
+          ...markerMeta
+        }),
+        pole,
+        fastestLap,
         row
       };
     });
-    const standing = selectedDriverMap.get(driver) || null;
-    const constructor = cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
+    const standing = (entity.id != null ? selectedDriverIdMap.get(Number(entity.id)) : null)
+      || selectedDriverMap.get(driver)
+      || null;
+    const legacyStanding = selectedLegacyDriverMap.get(driver) || null;
+    const constructor = entity.teamName || cells.map((cell) => cell.row?.constructor).find(Boolean) || null;
+    const constructorEntity = teamEntities.find((item) => item.name === constructor);
+    const summaryValue = podiumFocus
+      ? cells.filter((cell) => cell.focusHit).length
+      : standing?.points ?? null;
     return {
       name: driver,
+      code: entity.code || fallbackEntityCode(driver, "driver"),
+      id: entity.id,
+      teamId: entity.teamId ?? null,
+      seatNumber: entity.seatNumber == null ? null : Number(entity.seatNumber),
       constructor,
+      constructorCode: constructorEntity?.code || (constructor ? fallbackEntityCode(constructor, "team") : null),
       cells,
       points: standing?.points ?? null,
+      legacyPoints: legacyStanding?.points ?? null,
+      reconciliationStatus: legacyStanding == null || standing == null
+        ? "missing"
+        : Number(legacyStanding.points) === Number(standing.points) ? "match" : "difference",
+      summaryValue,
       championshipPosition: standing?.position ?? null
     };
-  });
+  }), podiumFocus ? "summaryValue" : "points");
 
-  const constructorRows = teams.map((team) => {
+  const constructorRows = sortAuditRows(teamEntities.map((entity) => {
+    const team = entity.name;
     const cells = rounds.map((round) => {
-      if (round.roundNumber > cutoffRoundNumber) {
-        return { label: "—", state: "future", title: "After selected cutoff" };
-      }
       if (!round.evidence) {
-        return { label: "—", state: round.state, title: "Evidence unavailable" };
+        return buildAuditMatrixCell({
+          round,
+          cutoffRoundNumber,
+          label: "—",
+          title: "Evidence unavailable"
+        });
       }
       const raceRows = round.evidence.payload?.race?.rows || [];
       const sprintRows = round.evidence.payload?.sprint?.rows || [];
       const points = raceRows
-        .filter((row) => row.constructor === team)
-        .concat(sprintRows.filter((row) => row.constructor === team))
-        .reduce((total, row) => total + Number(row.points || 0), 0);
-      return {
-        label: String(points),
-        state: round.state,
-        title: points + " points from race and sprint"
-      };
+        .filter((row) => matchesAuditEntity(row, entity, {
+          idField: "team_id",
+          nameField: "constructor"
+        }))
+        .concat(sprintRows.filter((row) => matchesAuditEntity(row, entity, {
+          idField: "team_id",
+          nameField: "constructor"
+        })))
+        .reduce((total, row) => total + Number(row.calculatedPoints ?? row.points ?? 0), 0);
+      const podiumPosition = buildConstructorPodiumPosition(raceRows, entity);
+      return buildAuditMatrixCell({
+        round,
+        cutoffRoundNumber,
+        label: points,
+        title: points + " points from race and sprint",
+        podiumPosition
+      });
     });
-    const standing = selectedConstructorMap.get(team) || null;
+    const standing = (entity.id != null ? selectedConstructorIdMap.get(Number(entity.id)) : null)
+      || selectedConstructorMap.get(team)
+      || null;
+    const legacyStanding = selectedLegacyConstructorMap.get(team) || null;
     return {
       name: team,
+      code: entity.code || fallbackEntityCode(team, "team"),
+      id: entity.id,
+      powerUnit: entity.powerUnit || null,
       cells,
       points: standing?.points ?? null,
-      championshipPosition: standing?.position ?? null
+      legacyPoints: legacyStanding?.points ?? null,
+      reconciliationStatus: legacyStanding == null || standing == null
+        ? "missing"
+        : Number(legacyStanding.points) === Number(standing.points) ? "match" : "difference",
+      summaryValue: standing?.points ?? null,
+      championshipPosition: standing?.position ?? null,
+      podiumSummary: buildAuditPodiumSummary(cells)
+    };
+  }));
+
+  const focusProjection = applyRaceDataFocus({
+    focus: activeFocus,
+    rounds,
+    driverRows,
+    constructorRows,
+    cutoffRoundNumber,
+    standingsByRound: derivedStandingsByRound,
+    scoringRules
+  });
+  driverRows.splice(0, driverRows.length, ...focusProjection.drivers);
+  constructorRows.splice(0, constructorRows.length, ...focusProjection.constructors);
+
+  const buildUnavailableDriverRow = (team, seatNumber) => ({
+    name: "—",
+    code: "—",
+    id: null,
+    teamId: team.id ?? null,
+    seatNumber,
+    constructor: team.name,
+    constructorCode: team.code || fallbackEntityCode(team.name, "team"),
+    isEmpty: true,
+    cells: rounds.map((round) => buildAuditMatrixCell({
+      round,
+      cutoffRoundNumber,
+      label: "—",
+      title: `Seat ${seatNumber} unavailable`
+    })),
+    points: null,
+    summaryValue: null,
+    championshipPosition: null
+  });
+
+  const constructorPointsMode = activeFocus.view === "constructors"
+    && String(activeFocus.matrixMetric || activeFocus.metric || "points") === "points";
+
+  const constructorGroups = constructorRows.map((summary) => {
+    const team = teamEntities.find((entity) => (
+      summary.id != null && entity.id != null
+        ? Number(entity.id) === Number(summary.id)
+        : entity.name === summary.name
+    )) || summary;
+    const teamDrivers = driverRows
+      .filter((row) => (
+        summary.id != null && row.teamId != null
+          ? Number(row.teamId) === Number(summary.id)
+          : row.constructor === summary.name
+      ))
+      .sort((left, right) => (
+        (Number(left.seatNumber) || 999) - (Number(right.seatNumber) || 999)
+          || left.name.localeCompare(right.name)
+      ));
+    const displayTeamDrivers = constructorPointsMode
+      ? teamDrivers.map((driver) => applyDriverPointsMetric({
+        ...driver,
+        cells: (driver.cells || []).map((cell) => ({ ...cell }))
+      }, rounds))
+      : teamDrivers;
+    const driversBySeat = [1, 2].map((seatNumber) => (
+      displayTeamDrivers.find((row) => Number(row.seatNumber) === seatNumber)
+        || (displayTeamDrivers.every((row) => row.seatNumber == null)
+          ? displayTeamDrivers[seatNumber - 1]
+          : null)
+        || buildUnavailableDriverRow({
+          id: team.id,
+          name: team.name,
+          code: team.code
+        }, seatNumber)
+    ));
+    return {
+      id: summary.id,
+      name: summary.name,
+      summary,
+      focusRow: Boolean(summary.focusRow),
+      drivers: driversBySeat
     };
   });
 
   const payload = selected?.evidence?.payload || null;
   const raceRows = payload?.race?.rows || [];
-  const qualifyingRows = payload?.qualifying?.rows || [];
-  const sprintRows = payload?.sprint?.rows || [];
+  const sessionRowsByKey = {
+    practice1: getRaceSessionRows(payload, "practice1"),
+    practice2: getRaceSessionRows(payload, "practice2"),
+    practice3: getRaceSessionRows(payload, "practice3"),
+    sprintQualifying: getRaceSessionRows(payload, "sprintQualifying"),
+    sprint: getRaceSessionRows(payload, "sprint"),
+    qualifying: getRaceSessionRows(payload, "qualifying")
+  };
+  const qualifyingRows = sessionRowsByKey.qualifying;
+  const sprintRows = sessionRowsByKey.sprint;
   const raceByDriver = new Map(raceRows.map((row) => [row.driver, row]));
+  const raceResultOrderByDriver = new Map(
+    raceRows.map((row, index) => [String(row.driver || ""), index])
+  );
   const qualifyingByDriver = new Map(qualifyingRows.map((row) => [row.driver, row]));
   const sprintByDriver = new Map(sprintRows.map((row) => [row.driver, row]));
+  const sessionDriverNames = Object.values(sessionRowsByKey)
+    .flatMap((rows) => rows.map((row) => row.driver));
   const detailNames = Array.from(
     new Set(
       drivers.concat(
         raceRows.map((row) => row.driver),
-        qualifyingRows.map((row) => row.driver),
-        sprintRows.map((row) => row.driver)
+        sessionDriverNames
       )
     )
   ).filter(Boolean);
+  const driverCodeByName = new Map(
+    driverEntities.map((entity) => [
+      entity.name,
+      entity.code || fallbackEntityCode(entity.name, "driver")
+    ])
+  );
+  const teamCodeByName = new Map(
+    teamEntities.map((entity) => [
+      entity.name,
+      entity.code || fallbackEntityCode(entity.name, "team")
+    ])
+  );
+  const findSessionRow = (rows, driver) => rows.find((row) => String(row.driver || "") === String(driver)) || null;
+  const buildSessionDetail = (row) => row ? {
+    label: auditResultLabel(row),
+    title: [row.status || null, row.position != null ? `position ${row.position}` : null]
+      .filter(Boolean)
+      .join(" · ") || auditResultLabel(row)
+  } : null;
+  const buildSessionEditorValue = (row) => row ? {
+    driverId: row.driver_id == null ? null : Number(row.driver_id),
+    driver: row.driver || null,
+    constructor: row.constructor || null,
+    position: row.position == null ? null : Number(row.position),
+    positionText: row.positionText || null,
+    status: row.status || null
+  } : null;
   const detailRows = detailNames.map((driver) => {
     const race = raceByDriver.get(driver) || null;
     const qualifying = qualifyingByDriver.get(driver) || null;
     const sprint = sprintByDriver.get(driver) || null;
+    const allSessionRows = Object.values(sessionRowsByKey).map((rows) => findSessionRow(rows, driver));
+    const driverId = race?.driver_id
+      ?? qualifying?.driver_id
+      ?? sprint?.driver_id
+      ?? allSessionRows.find((row) => row?.driver_id != null)?.driver_id
+      ?? null;
+    const constructor = race?.constructor
+      || qualifying?.constructor
+      || sprint?.constructor
+      || allSessionRows.find((row) => row?.constructor)?.constructor
+      || null;
     return {
       driver,
-      constructor: race?.constructor || qualifying?.constructor || sprint?.constructor || null,
+      driverCode: driverCodeByName.get(driver) || fallbackEntityCode(driver, "driver"),
+      driverId,
+      hasEvidence: Boolean(race || qualifying || sprint || allSessionRows.some(Boolean)),
+      constructor,
+      constructorCode: teamCodeByName.get(constructor || "")
+        || fallbackEntityCode(constructor || "", "team"),
+      sessions: Object.fromEntries(
+        Object.entries(sessionRowsByKey).map(([sessionKey, rows]) => [
+          sessionKey,
+          buildSessionDetail(findSessionRow(rows, driver))
+        ])
+      ),
+      sessionValues: Object.fromEntries(
+        Object.entries(sessionRowsByKey).map(([sessionKey, rows]) => [
+          sessionKey,
+          buildSessionEditorValue(findSessionRow(rows, driver))
+        ])
+      ),
       grid: race?.grid ?? null,
       qualifyingPosition: qualifying?.position ?? null,
       sprintPosition: sprint?.position ?? null,
       sprintStatus: sprint?.status || null,
       sprintPoints: sprint?.points ?? null,
-      racePosition: race?.positionText || null,
-      raceLabel: auditResultLabel(race),
+      // A provider may encode a non-classified result with position `0`.
+      // Keep the numeric finish position only for classified finishers so the
+      // detail table can use the status label (Ret/DNS/DNQ) for the others.
+      racePositionNumber: Number(race?.position) > 0 ? Number(race.position) : null,
+      racePosition: Number(race?.position) > 0 ? String(race.position) : null,
+      finishLabel: formatRaceFinishLabel(race?.position),
+      raceLabel: formatRacePositionLabel(race),
       raceStatus: race?.status || null,
-      racePoints: race?.points ?? null
+      raceStatusLabel: formatRaceStatusLabel(race),
+      raceLaps: race?.laps ?? null,
+      raceGap: race?.sessionGap ?? race?.gap_to_leader ?? null,
+      raceResultOrder: raceResultOrderByDriver.get(String(driver)) ?? Number.MAX_SAFE_INTEGER,
+      racePoints: race?.calculatedPoints ?? race?.points ?? null
     };
+  }).sort((left, right) => {
+    const leftPosition = Number(left.racePosition);
+    const rightPosition = Number(right.racePosition);
+    const leftClassified = Number.isFinite(leftPosition) && leftPosition > 0;
+    const rightClassified = Number.isFinite(rightPosition) && rightPosition > 0;
+    if (leftClassified && rightClassified) {
+      return leftPosition - rightPosition || String(left.driver).localeCompare(String(right.driver));
+    }
+    if (leftClassified !== rightClassified) return leftClassified ? -1 : 1;
+    const leftLaps = Number.isFinite(Number(left.raceLaps)) ? Number(left.raceLaps) : -1;
+    const rightLaps = Number.isFinite(Number(right.raceLaps)) ? Number(right.raceLaps) : -1;
+    return rightLaps - leftLaps
+      || left.raceResultOrder - right.raceResultOrder
+      || String(left.driver).localeCompare(String(right.driver));
   });
 
   return {
     rounds,
     drivers: driverRows,
     constructors: constructorRows,
+    constructorGroups,
     selectedRound: selected,
     selectedRoundNumber: selected?.roundNumber || cutoffRoundNumber,
+    // This is the semantic name used by the UI: the selected round is the
+    // temporary end of the observed season, not a destructive data cutoff.
+    effectiveEndRound: cutoffRoundNumber,
+    hasSelectedRound: showRaceResult !== false,
     cutoffRoundNumber,
     selectedEvidence: selected?.evidence || null,
+    selectedSnapshotId: selected?.evidence?.id || null,
     selectedSummary,
-    selectedImportId: selected?.evidence?.import_id || null,
     detailRows,
     latestEvidence,
     latestEvidenceRound,
-    snapshotRows
+    snapshotRows,
+    catalogRevision,
+    focus: activeFocus,
+    focusId: activeFocus.id,
+    focusSummary: focusProjection.summary,
+    focusFooter: focusProjection.footer,
+    scoringRules: scoringRulesTableValue(scoringRules),
+    selectedReconciliation: {
+      drivers: reconcileStandings(selectedLegacyStandings.drivers, selectedDerivedStandings.drivers),
+      constructors: reconcileStandings(selectedLegacyStandings.constructors, selectedDerivedStandings.constructors)
+    }
   };
+}
+
+function parseCorrectionNumber(raw, label, { integer = true, min = 0, max = 1000 } = {}) {
+  const text = String(raw == null ? "" : raw).trim();
+  if (!text) return null;
+  const value = Number(text);
+  if (!Number.isFinite(value) || (integer && !Number.isInteger(value)) || value < min || value > max) {
+    throw new Error(`${label} must be empty or a valid value between ${min} and ${max}.`);
+  }
+  return value;
+}
+
+function correctionRowsInput(rawRows) {
+  if (Array.isArray(rawRows)) return rawRows;
+  if (!rawRows || typeof rawRows !== "object") return [];
+  return Object.keys(rawRows)
+    .sort((left, right) => Number(left) - Number(right))
+    .map((key) => rawRows[key]);
+}
+
+function correctionLookupKey(value) {
+  return String(value || "")
+    .normalize("NFKD")
+    .replace(/[^\x00-\x7F]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function correctionIdentity(row) {
+  const driverId = Number(row?.driverId || row?.driver_id || 0);
+  if (Number.isInteger(driverId) && driverId > 0) return `id:${driverId}`;
+  const driver = correctionLookupKey(row?.driver || row?.driver_name || "");
+  return driver ? `name:${driver}` : null;
+}
+
+function evidenceRowIdentity(row) {
+  const driverId = Number(row?.driver_id || 0);
+  if (Number.isInteger(driverId) && driverId > 0) return `id:${driverId}`;
+  const driver = correctionLookupKey(row?.driver || row?.driver_name || "");
+  return driver ? `name:${driver}` : null;
+}
+
+function correctedSessionValue(raw, label) {
+  const text = String(raw == null ? "" : raw).trim();
+  if (!text) return { position: null, positionText: null, status: null };
+  const numeric = Number(text);
+  if (Number.isInteger(numeric) && numeric >= 1 && numeric <= 99) {
+    return { position: numeric, positionText: String(numeric), status: "Finished" };
+  }
+  if (text.length > 120) throw new Error(`${label} is too long.`);
+  return { position: null, positionText: text, status: text };
+}
+
+function evidenceRowCollections(payload) {
+  return [
+    ["race", payload?.race?.rows],
+    ["sessions.race", payload?.sessions?.race?.rows],
+    ["qualifying", payload?.qualifying?.rows],
+    ["sessions.qualifying", payload?.sessions?.qualifying?.rows],
+    ["sprint", payload?.sprint?.rows],
+    ["sessions.sprint", payload?.sessions?.sprint?.rows],
+    ["practice1", payload?.practice?.practice1?.rows],
+    ["sessions.practice1", payload?.sessions?.practice1?.rows],
+    ["practice2", payload?.practice?.practice2?.rows],
+    ["sessions.practice2", payload?.sessions?.practice2?.rows],
+    ["practice3", payload?.practice?.practice3?.rows],
+    ["sessions.practice3", payload?.sessions?.practice3?.rows],
+    ["sprintQualifying", payload?.sprintQualifying?.rows],
+    ["sessions.sprintQualifying", payload?.sessions?.sprintQualifying?.rows]
+  ].filter(([, rows]) => Array.isArray(rows));
+}
+
+function buildCorrectedRaceEvidence(baseSnapshot, input) {
+  const payload = baseSnapshot?.payload;
+  if (!payload || !Array.isArray(payload.race?.rows)) {
+    throw new Error("The selected race evidence cannot be edited.");
+  }
+  const submittedRows = correctionRowsInput(input.rows);
+  if (!submittedRows.length) throw new Error("The complete race table is required.");
+
+  const nextPayload = JSON.parse(JSON.stringify(payload));
+  const collections = evidenceRowCollections(nextPayload);
+  const knownIdentities = new Set(
+    collections.flatMap(([, rows]) => rows.map(evidenceRowIdentity).filter(Boolean))
+  );
+  const seenIdentities = new Set();
+  const normalizedRows = submittedRows.map((submitted, index) => {
+    const identity = correctionIdentity(submitted);
+    if (!identity || !knownIdentities.has(identity)) {
+      throw new Error(`Row ${index + 1} does not match a persisted driver identity.`);
+    }
+    if (seenIdentities.has(identity)) {
+      throw new Error(`Driver row ${index + 1} is duplicated in the correction.`);
+    }
+    seenIdentities.add(identity);
+    return { submitted, identity, index };
+  });
+  if (seenIdentities.size !== knownIdentities.size) {
+    throw new Error("The complete race table must include every persisted driver row.");
+  }
+
+  const updateRows = (rows, identity, updater) => {
+    const target = rows.find((candidate) => evidenceRowIdentity(candidate) === identity);
+    if (target) updater(target);
+  };
+  const sessionKeys = ["practice1", "practice2", "practice3", "sprintQualifying", "sprint", "qualifying"];
+  normalizedRows.forEach(({ submitted, identity, index }) => {
+    const position = parseCorrectionNumber(submitted.position, `Row ${index + 1} finish position`, { min: 1, max: 99 });
+    const grid = parseCorrectionNumber(submitted.grid, `Row ${index + 1} grid position`, { min: 1, max: 99 });
+    const points = parseCorrectionNumber(submitted.points, `Row ${index + 1} points`, { integer: false, min: 0, max: 200 });
+    const status = String(submitted.status == null ? "" : submitted.status).trim();
+    if (status.length > 120) throw new Error(`Row ${index + 1} status is too long.`);
+    collections.forEach(([collection, rows]) => {
+      if (collection === "race" || collection === "sessions.race") {
+        updateRows(rows, identity, (target) => {
+          target.position = position;
+          target.positionText = position == null ? (status || null) : String(position);
+          target.grid = grid;
+          target.points = points == null ? 0 : points;
+          target.calculatedPoints = points == null ? 0 : points;
+          target.status = status || (position != null ? "Finished" : null);
+        });
+      }
+    });
+    const sessionInput = submitted.sessions || {};
+    sessionKeys.forEach((sessionKey) => {
+      if (!Object.prototype.hasOwnProperty.call(sessionInput, sessionKey)) return;
+      const corrected = correctedSessionValue(sessionInput[sessionKey], `Row ${index + 1} ${sessionKey}`);
+      collections.forEach(([collection, rows]) => {
+        if (collection === sessionKey || collection === `sessions.${sessionKey}`) {
+          updateRows(rows, identity, (target) => {
+            target.position = corrected.position;
+            target.positionText = corrected.positionText;
+            target.status = corrected.status;
+          });
+        }
+      });
+    });
+  });
+  return nextPayload;
+}
+
+function rederiveActualSnapshotFromRaceEvidence({
+  db,
+  season,
+  roundNumber,
+  roundName,
+  questions,
+  roster,
+  races,
+  catalog,
+  evidenceSnapshot
+}) {
+  const derived = deriveSnapshotsFromPersistedEvidence(db, {
+    season,
+    rounds: [Number(roundNumber)],
+    questions,
+    roster,
+    races,
+    totalRounds: races.length
+  })[0];
+  const values = derived?.values || {};
+  const result = upsertSnapshotForRound(db, {
+    season,
+    roundNumber,
+    roundName: roundName || derived?.roundName || `Round ${roundNumber}`,
+    valuesByQuestion: values,
+    sourceType: "race_data_derivation",
+    sourceNote: "Derived from the persisted race-data evidence revision",
+    label: `R${roundNumber} - ${roundName || derived?.roundName || `Round ${roundNumber}`}`,
+    reviewStatus: REVIEW_STATUS_PENDING,
+    preserveReviewIfUnchanged: true,
+    catalogRevision: catalog?.catalogRevision || null,
+    evidenceRevision: evidenceSnapshot?.payload_revision || evidenceSnapshot?.sync_id || null,
+    derivationVersion: "race-data-derivation-v5"
+  });
+  if (result?.snapshotId && evidenceSnapshot?.id) {
+    linkEvidenceToActualSnapshot(db, result.snapshotId, evidenceSnapshot.id, evidenceSnapshot.import_id || null);
+  }
+  return { ...result, valueCount: Object.keys(values).length };
 }
 
 function registerAdminRoutes(app, deps) {
@@ -274,7 +1179,6 @@ function registerAdminRoutes(app, deps) {
     getQuestions,
     getRoster,
     getRaces,
-    clampNumber,
     generateUniqueGroupId,
     dataDir,
     dbPath,
@@ -282,63 +1186,70 @@ function registerAdminRoutes(app, deps) {
     questionsPath,
     rosterPath,
     racesPath,
-    logEvent
+    logEvent,
+    runActualsAutoUpdate: runAutoUpdate = runActualsAutoUpdate
   } = deps;
   const CURRENT_SEASON = Number(process.env.F1_SEASON || 2026);
-  const CURRENT_SEASON_API_BASE = "https://api.jolpi.ca/ergast/f1";
-  const CURRENT_SEASON_DOTD_RESULTS_URL = (season) =>
-    `https://www.formula1.com/en/results/${Number(season)}/awards/driver-of-the-day`;
-  const CURRENT_SEASON_RESULTS_URL = (season) =>
-    `https://www.formula1.com/en/results/${Number(season)}/races`;
-  const CURRENT_SEASON_USER_AGENT = "f1-predictions-current-actuals";
-  const DRIVER_NAME_ALIASES = {
-    andreakimiantonelli: "Kimi Antonelli",
-    carlossainz: "Carlos Sainz Jr.",
-    carlossainzjr: "Carlos Sainz Jr.",
-    nicohulkenberg: "Nico Hulkenberg",
-    nicohuelkenberg: "Nico Hulkenberg"
+  const logAdminEvent = (level, event, fields = {}) => {
+    const season = Number(fields.season);
+    if (!Number.isInteger(season) || season < 1900 || fields.catalogRevision != null) {
+      return logEvent(level, event, fields);
+    }
+    try {
+      const questions = getQuestions("en", {
+        includeExcluded: true,
+        includeMeta: true,
+        season: Number.isInteger(season) && season >= 1900 ? season : CURRENT_SEASON
+      });
+      const catalog = buildSeasonCatalog(db, season, { questions });
+      return logEvent(level, event, { ...fields, catalogRevision: catalog.catalogRevision || null });
+    } catch (err) {
+      return logEvent(level, event, { ...fields, catalogRevision: null });
+    }
   };
-  const TEAM_NAME_ALIASES = {
-    redbull: "Red Bull Racing",
-    redbullracing: "Red Bull Racing",
-    rbf1team: "Racing Bulls",
-    racingbulls: "Racing Bulls",
-    cadillacf1team: "Cadillac",
-    alpinef1team: "Alpine",
-    astonmartinf1team: "Aston Martin"
-  };
-  const FORMULA1_RACE_SLUG_ALIASES = {
-    australiangrandprix: "australia",
-    chinesegrandprix: "china",
-    japanesegrandprix: "japan",
-    bahraingrandprix: "bahrain",
-    saudiarabiangrandprix: "saudi-arabia",
-    miamigrandprix: "miami",
-    canadiangrandprix: "canada",
-    monacograndprix: "monaco",
-    barcelonacatalunyagrandprix: "barcelona-catalunya",
-    austriangrandprix: "austria",
-    britishgrandprix: "great-britain",
-    belgiangrandprix: "belgium",
-    hungariangrandprix: "hungary",
-    dutchgrandprix: "netherlands",
-    italiangrandprix: "italy",
-    spanishgrandprix: "spain",
-    azerbaijangrandprix: "azerbaijan",
-    singaporegrandprix: "singapore",
-    unitedstatesgrandprix: "united-states",
-    mexicocitygrandprix: "mexico",
-    saopaulograndprix: "brazil",
-    lasvegasgrandprix: "las-vegas",
-    qatargrandprix: "qatar",
-    abudhabigrandprix: "abu-dhabi"
-  };
-  const MERCEDES_ENGINE_TEAMS_2026 = new Set([
-    "Mercedes",
-    "McLaren",
-    "Williams",
-    "Alpine"
-  ]);
+  function buildQuestionResultsModel({ season, locale, seasonContext }) {
+    const sourceQuestions = getQuestions(locale, { season });
+    // Results remain useful for a valid season even when a legacy/test database
+    // has not populated the season catalog yet; the evidence and question
+    // settings are still keyed by the selected year.
+    let catalog = null;
+    try {
+      catalog = buildSeasonCatalog(db, season, { questions: sourceQuestions });
+    } catch (error) {
+      catalog = null;
+    }
+    const questions = attachSeasonCatalogToQuestions(sourceQuestions, catalog);
+    const races = (catalog?.races?.length
+      ? catalog.races.map((race) => race.display_name)
+      : getRaces()) || [];
+    const publishedActuals = loadPublishedActuals(db, season);
+    const latestSnapshots = listLatestSnapshotsForSeason(db, season, {
+      maxRoundNumber: races.length || null
+    });
+    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season, {
+      maxRoundNumber: races.length || null
+    });
+    const latestRoundNumber = Number.isFinite(Number(latestRoundSnapshot?.round_number))
+      ? Number(latestRoundSnapshot.round_number)
+      : null;
+    const overview = buildActualsOverview({
+      season,
+      races,
+      questions,
+      snapshots: latestSnapshots,
+      latestRoundNumber,
+      publishedActuals,
+      fetchSnapshotValues: (snapshotId) => loadSnapshotValues(db, snapshotId)
+    });
+    return {
+      resultsQuestions: questions,
+      races,
+      actualOverviewRows: overview.rows,
+      actualOverviewTargets: overview.targets,
+      catalogRevision: catalog?.catalogRevision || null,
+      catalogReadiness: catalog?.readiness || null
+    };
+  }
   const MULTI_ACTUAL_SINGLE_CHOICE_IDS = new Set([
     "most_driver_of_the_day",
     "most_dnfs_driver",
@@ -352,781 +1263,6 @@ function registerAdminRoutes(app, deps) {
   ]);
   const ADMIN_IDEA_TYPES = ["question", "feature", "other"];
   const ADMIN_IDEA_STATUSES = ["open", "resolved", "ignored"];
-
-  function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  async function fetchJson(url, { retries = 4, baseDelayMs = 600 } = {}) {
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
-      const res = await fetch(url, {
-        headers: {
-          "user-agent": CURRENT_SEASON_USER_AGENT
-        }
-      });
-
-      if (res.ok) return res.json();
-
-      if (res.status === 429 && attempt < retries) {
-        const retryAfter = Number(res.headers.get("retry-after") || 0);
-        const waitMs = retryAfter > 0 ? retryAfter * 1000 : baseDelayMs * (attempt + 1);
-        await sleep(waitMs);
-        continue;
-      }
-
-      throw new Error(`${res.status} ${res.statusText} for ${url}`);
-    }
-
-    throw new Error(`Failed to fetch after retries: ${url}`);
-  }
-
-  async function fetchText(url, { retries = 4, baseDelayMs = 600 } = {}) {
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
-      const res = await fetch(url, {
-        headers: {
-          "user-agent": CURRENT_SEASON_USER_AGENT
-        }
-      });
-
-      if (res.ok) return res.text();
-
-      if (res.status === 429 && attempt < retries) {
-        const retryAfter = Number(res.headers.get("retry-after") || 0);
-        const waitMs = retryAfter > 0 ? retryAfter * 1000 : baseDelayMs * (attempt + 1);
-        await sleep(waitMs);
-        continue;
-      }
-
-      throw new Error(`${res.status} ${res.statusText} for ${url}`);
-    }
-
-    throw new Error(`Failed to fetch after retries: ${url}`);
-  }
-
-  function withPagination(url, limit, offset) {
-    const parsed = new URL(url);
-    parsed.searchParams.set("limit", String(limit));
-    parsed.searchParams.set("offset", String(offset));
-    return parsed.toString();
-  }
-
-  function mergeRaceRows(existing, incoming, resultKey) {
-    if (!existing) {
-      return {
-        ...incoming,
-        [resultKey]: Array.isArray(incoming?.[resultKey]) ? incoming[resultKey].slice() : []
-      };
-    }
-    const merged = existing;
-    const seen = new Set(
-      (merged[resultKey] || []).map((row) =>
-        [row?.number, row?.Driver?.driverId, row?.position, row?.grid].join(":")
-      )
-    );
-    for (const row of incoming?.[resultKey] || []) {
-      const key = [row?.number, row?.Driver?.driverId, row?.position, row?.grid].join(":");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged[resultKey].push(row);
-    }
-    return merged;
-  }
-
-  async function fetchAllRaceTableRaces(url, resultKey) {
-    const limit = 100;
-    let offset = 0;
-    let total = Infinity;
-    const byRound = new Map();
-
-    while (offset < total) {
-      const payload = await fetchJson(withPagination(url, limit, offset));
-      total = parseNum(payload?.MRData?.total, 0);
-      const pageLimit = parseNum(payload?.MRData?.limit, limit) || limit;
-      const races = payload?.MRData?.RaceTable?.Races || [];
-      for (const race of races) {
-        const round = Number(race.round);
-        if (!Number.isFinite(round)) continue;
-        byRound.set(round, mergeRaceRows(byRound.get(round), race, resultKey));
-      }
-      offset += pageLimit;
-      if (pageLimit <= 0) break;
-    }
-
-    return Array.from(byRound.values()).sort((a, b) => parseNum(a.round) - parseNum(b.round));
-  }
-
-  function normalizeLookupKey(value) {
-    return String(value || "")
-      .normalize("NFKD")
-      .replace(/[^\x00-\x7F]/g, "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "");
-  }
-
-  function decodeHtmlEntities(value) {
-    return String(value || "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&quot;/g, '"')
-      .replace(/&#x27;|&#39;/g, "'")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">");
-  }
-
-  function stripHtml(value) {
-    return decodeHtmlEntities(String(value || ""))
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function resolveCanonicalName(raw, allowedValues, aliasMap = {}) {
-    const key = normalizeLookupKey(raw);
-    if (!key) return null;
-
-    const aliased = aliasMap[key];
-    if (aliased && (allowedValues || []).includes(aliased)) {
-      return aliased;
-    }
-
-    const direct = (allowedValues || []).find(
-      (value) => normalizeLookupKey(value) === key
-    );
-    if (direct) return direct;
-
-    return null;
-  }
-
-  function driverNameFromApi(driver, rosterDrivers) {
-    if (!driver) return null;
-    const raw = `${driver.givenName || ""} ${driver.familyName || ""}`.trim();
-    return resolveCanonicalName(raw, rosterDrivers, DRIVER_NAME_ALIASES);
-  }
-
-  function teamNameFromApi(constructor, rosterTeams) {
-    if (!constructor) return null;
-    return resolveCanonicalName(constructor.name, rosterTeams, TEAM_NAME_ALIASES);
-  }
-
-  function parseNum(value, fallback = 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  }
-
-  function isDnfStatus(statusRaw) {
-    const status = String(statusRaw || "").toLowerCase();
-    if (!status) return false;
-    if (status.includes("finished") || status.includes("lapped") || status.startsWith("+")) {
-      return false;
-    }
-    if (
-      status.includes("disqual") ||
-      status.includes("did not start") ||
-      status.includes("did not qualify") ||
-      status.includes("withdrew")
-    ) {
-      return false;
-    }
-    return true;
-  }
-
-  function isOfficialRaceDnfStatus(statusRaw) {
-    const status = String(statusRaw || "").trim().toLowerCase();
-    if (!status) return false;
-    return status === "dnf" || status === "retired";
-  }
-
-  function cleanOfficialDriverName(raw) {
-    return String(raw || "")
-      .replace(/\s+[A-Z]{3}$/, "")
-      .trim();
-  }
-
-  function getFormula1RaceSlug(raceName) {
-    const key = normalizeLookupKey(raceName);
-    if (!key) return "";
-    const aliased = FORMULA1_RACE_SLUG_ALIASES[key];
-    if (aliased) return aliased;
-    return key.replace(/grandprix$/, "");
-  }
-
-  function extractFormula1SeasonRaceResultUrls(html, season) {
-    const hrefMatches = String(html || "").match(
-      new RegExp(`/en/results/${Number(season)}/races/\\d+/[^"'\\\\\\s]+/race-result`, "g")
-    ) || [];
-    const bySlug = new Map();
-    hrefMatches.forEach((href) => {
-      const parts = href.split("/");
-      const slug = String(parts[parts.length - 2] || "").trim().toLowerCase();
-      if (!slug || bySlug.has(slug)) return;
-      bySlug.set(slug, `https://www.formula1.com${href}`);
-    });
-    return bySlug;
-  }
-
-  function parseOfficialRaceResultRows(html, roster) {
-    const tbodyMatch = String(html || "").match(/<tbody[^>]*>([\s\S]*?)<\/tbody>/i);
-    if (!tbodyMatch) return [];
-    const rows = [];
-    const trMatches = tbodyMatch[1].matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi);
-    for (const match of trMatches) {
-      const cells = Array.from(
-        match[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi),
-        (cellMatch) => stripHtml(cellMatch[1])
-      );
-      if (cells.length < 7) continue;
-      const driver = resolveCanonicalName(
-        cleanOfficialDriverName(cells[2]),
-        roster.drivers || [],
-        DRIVER_NAME_ALIASES
-      );
-      const team = resolveCanonicalName(cells[3], roster.teams || [], TEAM_NAME_ALIASES);
-      rows.push({
-        positionText: cells[0],
-        carNumber: cells[1],
-        driver,
-        team,
-        laps: parseNum(cells[4], 0),
-        status: cells[5],
-        points: parseNum(cells[6], 0)
-      });
-    }
-    return rows;
-  }
-
-  function pickUniqueTopRow(rows, getScore) {
-    const list = Array.isArray(rows) ? rows.slice() : [];
-    list.sort((a, b) => {
-      const diff = getScore(b) - getScore(a);
-      if (diff !== 0) return diff;
-      return String(a?.name || a?.team || "").localeCompare(String(b?.name || b?.team || ""));
-    });
-    if (list.length === 0) return null;
-    const topScore = getScore(list[0]);
-    const tied = list.filter((row) => getScore(row) === topScore);
-    return tied.length === 1 ? tied[0] : null;
-  }
-
-  function pickTopTiedRows(rows, getScore) {
-    const list = Array.isArray(rows) ? rows.slice() : [];
-    list.sort((a, b) => {
-      const diff = getScore(b) - getScore(a);
-      if (diff !== 0) return diff;
-      return String(a?.name || a?.team || "").localeCompare(String(b?.name || b?.team || ""));
-    });
-    if (list.length === 0) return [];
-    const topScore = getScore(list[0]);
-    return list.filter((row) => getScore(row) === topScore);
-  }
-
-  function pickUniqueClosestTeam(qualStats) {
-    const rows = Array.from(qualStats.entries())
-      .map(([team, stat]) => ({
-        team,
-        total: Number(stat.aWins || 0) + Number(stat.bWins || 0),
-        diff: Math.abs(Number(stat.aWins || 0) - Number(stat.bWins || 0))
-      }))
-      .filter((row) => row.total > 0)
-      .sort((a, b) => {
-        if (a.diff !== b.diff) return a.diff - b.diff;
-        if (b.total !== a.total) return b.total - a.total;
-        return a.team.localeCompare(b.team);
-      });
-
-    if (rows.length === 0) return null;
-    if (rows.length === 1) return rows[0].team;
-
-    const first = rows[0];
-    const second = rows[1];
-    if (first.diff === second.diff && first.total === second.total) {
-      return null;
-    }
-    return first.team;
-  }
-
-  function pickClosestTeams(qualStats) {
-    const rows = Array.from(qualStats.entries())
-      .map(([team, stat]) => ({
-        team,
-        total: Number(stat.aWins || 0) + Number(stat.bWins || 0),
-        diff: Math.abs(Number(stat.aWins || 0) - Number(stat.bWins || 0))
-      }))
-      .filter((row) => row.total > 0)
-      .sort((a, b) => {
-        if (a.diff !== b.diff) return a.diff - b.diff;
-        if (b.total !== a.total) return b.total - a.total;
-        return a.team.localeCompare(b.team);
-      });
-    if (rows.length === 0) return [];
-    const first = rows[0];
-    return rows
-      .filter((row) => row.diff === first.diff && row.total === first.total)
-      .map((row) => row.team);
-  }
-
-  function collapseTiedActuals(questionId, values) {
-    const filtered = Array.isArray(values)
-      ? values.filter((value) => value != null && value !== "")
-      : [];
-    if (filtered.length === 0) return null;
-    if (
-      MULTI_ACTUAL_SINGLE_CHOICE_IDS.has(questionId) ||
-      MULTI_ACTUAL_DRIVER_FIELD_IDS.has(questionId)
-    ) {
-      return filtered.length === 1 ? filtered[0] : filtered;
-    }
-    return filtered[0];
-  }
-
-  function computeTitleDecidedRacesBeforeEnd(roundStandings, sprintRoundSet) {
-    const ordered = Array.isArray(roundStandings) ? roundStandings.slice() : [];
-    if (ordered.length === 0) return null;
-
-    const maxWeekendPoints = (roundNumber) =>
-      26 + (sprintRoundSet.has(Number(roundNumber)) ? 8 : 0);
-
-    for (let index = 0; index < ordered.length; index += 1) {
-      const entry = ordered[index];
-      const standings = Array.isArray(entry?.standings) ? entry.standings : [];
-      if (standings.length < 2) continue;
-
-      const leaderPoints = parseNum(standings[0]?.points);
-      const secondPoints = parseNum(standings[1]?.points);
-      let maxRemainingPoints = 0;
-      for (let nextIndex = index + 1; nextIndex < ordered.length; nextIndex += 1) {
-        maxRemainingPoints += maxWeekendPoints(ordered[nextIndex].round);
-      }
-
-      if (leaderPoints - secondPoints > maxRemainingPoints) {
-        return ordered.length - index - 1;
-      }
-    }
-
-    return 0;
-  }
-
-  function escapeRegExp(value) {
-    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  function stripHtmlToText(html) {
-    return String(html || "")
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&#39;/g, "'")
-      .replace(/&quot;/gi, "\"")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  function pickDriverOfTheDayLeadersFromOfficialResults(html, rosterDrivers) {
-    const text = stripHtmlToText(html);
-    if (!text) return [];
-
-    const startToken = "Salesforce Driver of the Day RESULTS";
-    const endToken = "OUR PARTNERS";
-    const startIndex = text.indexOf(startToken);
-    if (startIndex < 0) return [];
-
-    const endIndex = text.indexOf(endToken, startIndex);
-    const section = text
-      .slice(startIndex + startToken.length, endIndex > startIndex ? endIndex : undefined)
-      .trim();
-    if (!section) return [];
-
-    const counts = (rosterDrivers || [])
-      .map((driver) => {
-        const matches = section.match(new RegExp(`\\b${escapeRegExp(driver)}\\b`, "g"));
-        return {
-          name: driver,
-          count: matches ? matches.length : 0
-        };
-      })
-      .filter((row) => row.count > 0);
-
-    return pickTopTiedRows(counts, (row) => Number(row.count || 0)).map((row) => row.name);
-  }
-
-  async function buildCurrentSeasonActualsSnapshot({ questions, roster, races, season }) {
-    const safeSeason = Number.isFinite(Number(season)) ? Number(season) : CURRENT_SEASON;
-    const [
-      driverStandingsJson,
-      constructorStandingsJson,
-      completedRaces,
-      completedQualifying,
-      completedSprints,
-      driverOfTheDayResultsHtml,
-      officialSeasonResultsHtml
-    ] = await Promise.all([
-      fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/driverStandings.json`),
-      fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/constructorStandings.json`),
-      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/results.json`, "Results"),
-      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/qualifying.json`, "QualifyingResults"),
-      fetchAllRaceTableRaces(`${CURRENT_SEASON_API_BASE}/${safeSeason}/sprint.json`, "SprintResults"),
-      fetchText(CURRENT_SEASON_DOTD_RESULTS_URL(safeSeason)).catch(() => null),
-      fetchText(CURRENT_SEASON_RESULTS_URL(safeSeason)).catch(() => null)
-    ]);
-
-    const driverStandings =
-      driverStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || [];
-    const constructorStandings =
-      constructorStandingsJson?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings || [];
-    if (driverStandings.length === 0 || constructorStandings.length === 0 || completedRaces.length === 0) {
-      throw new Error(`No completed ${safeSeason} season data is available yet.`);
-    }
-
-    const pointsByDriver = new Map();
-    driverStandings.forEach((row) => {
-      const driver = driverNameFromApi(row.Driver, roster.drivers || []);
-      if (!driver) return;
-      pointsByDriver.set(driver, parseNum(row.points));
-    });
-
-    const questionsById = Object.fromEntries((questions || []).map((question) => [question.id, question]));
-
-    const podiumDrivers = new Set();
-    const podiumTeams = new Set();
-    const dnfCountsByDriver = new Map();
-    const dnfByRace = {};
-    const winnerGridRows = [];
-    const qualStats = new Map();
-    const sprintPointsByDriver = new Map();
-    const sprintRoundSet = new Set();
-    const officialRaceUrlsBySlug = extractFormula1SeasonRaceResultUrls(
-      officialSeasonResultsHtml,
-      safeSeason
-    );
-    const officialRaceRowsByName = new Map(
-      await Promise.all(
-        completedRaces.map(async (race) => {
-          const raceName =
-            resolveConfiguredRaceName(race.raceName, races || []) ||
-            String(race.raceName || "");
-          const slug = getFormula1RaceSlug(raceName);
-          const url = officialRaceUrlsBySlug.get(slug);
-          if (!raceName || !url) return [raceName, null];
-          try {
-            const html = await fetchText(url);
-            const rows = parseOfficialRaceResultRows(html, roster);
-            return [raceName, rows.length > 0 ? rows : null];
-          } catch (err) {
-            return [raceName, null];
-          }
-        })
-      )
-    );
-
-    completedRaces.forEach((race) => {
-      const raceName =
-        resolveConfiguredRaceName(race.raceName, races || []) ||
-        String(race.raceName || "");
-      const officialRows = officialRaceRowsByName.get(raceName);
-      const apiResults = Array.isArray(race.Results) ? race.Results : [];
-      let dnfCountThisRace = 0;
-
-      if (Array.isArray(officialRows) && officialRows.length > 0) {
-        officialRows.forEach((row) => {
-          const position = parseNum(row.positionText, 0);
-
-          if (position >= 1 && position <= 3 && row.driver) podiumDrivers.add(row.driver);
-          if (position >= 1 && position <= 3 && row.team) podiumTeams.add(row.team);
-
-          if (row.driver && isOfficialRaceDnfStatus(row.status)) {
-            dnfCountThisRace += 1;
-            dnfCountsByDriver.set(row.driver, (dnfCountsByDriver.get(row.driver) || 0) + 1);
-          }
-        });
-      } else {
-        apiResults.forEach((row) => {
-          const driver = driverNameFromApi(row.Driver, roster.drivers || []);
-          const team = teamNameFromApi(row.Constructor, roster.teams || []);
-          const position = parseNum(row.position, 0);
-
-          if (position >= 1 && position <= 3 && driver) podiumDrivers.add(driver);
-          if (position >= 1 && position <= 3 && team) podiumTeams.add(team);
-
-          if (driver && isDnfStatus(row.status)) {
-            dnfCountThisRace += 1;
-            dnfCountsByDriver.set(driver, (dnfCountsByDriver.get(driver) || 0) + 1);
-          }
-        });
-      }
-
-      apiResults.forEach((row) => {
-        const driver = driverNameFromApi(row.Driver, roster.drivers || []);
-        if (parseNum(row.position, 0) === 1 && driver) {
-          const grid = parseNum(row.grid, 0);
-          winnerGridRows.push({
-            raceName,
-            driver,
-            grid: grid > 22 ? 23 : grid
-          });
-        }
-      });
-
-      if (raceName) {
-        dnfByRace[raceName] = dnfCountThisRace;
-      }
-    });
-
-    completedQualifying.forEach((race) => {
-      const rows = Array.isArray(race.QualifyingResults) ? race.QualifyingResults : [];
-      const byTeam = new Map();
-
-      rows.forEach((row) => {
-        const team = teamNameFromApi(row.Constructor, roster.teams || []);
-        const driver = driverNameFromApi(row.Driver, roster.drivers || []);
-        if (!team || !driver) return;
-        if (!byTeam.has(team)) byTeam.set(team, []);
-        byTeam.get(team).push({
-          driver,
-          position: parseNum(row.position, 999)
-        });
-      });
-
-      byTeam.forEach((drivers, team) => {
-        if (drivers.length < 2) return;
-        const sorted = drivers
-          .slice()
-          .sort((a, b) => a.position - b.position)
-          .slice(0, 2);
-
-        if (!qualStats.has(team)) {
-          qualStats.set(team, {
-            aName: sorted[0].driver,
-            bName: sorted[1].driver,
-            aWins: 0,
-            bWins: 0
-          });
-        }
-
-        const stat = qualStats.get(team);
-        if (sorted[0].driver === stat.aName) stat.aWins += 1;
-        else if (sorted[0].driver === stat.bName) stat.bWins += 1;
-        else if (stat.aWins <= stat.bWins) {
-          stat.aName = sorted[0].driver;
-          stat.aWins += 1;
-        } else {
-          stat.bName = sorted[0].driver;
-          stat.bWins += 1;
-        }
-      });
-    });
-
-    completedSprints.forEach((race) => {
-      const sprintRows = Array.isArray(race.SprintResults) ? race.SprintResults : [];
-      if (sprintRows.length > 0) {
-        sprintRoundSet.add(Number(race.round));
-      }
-      sprintRows.forEach((row) => {
-        const driver = driverNameFromApi(row.Driver, roster.drivers || []);
-        if (!driver) return;
-        sprintPointsByDriver.set(
-          driver,
-          (sprintPointsByDriver.get(driver) || 0) + parseNum(row.points, 0)
-        );
-      });
-    });
-
-    const completedRounds = completedRaces
-      .map((race) => Number(race.round))
-      .filter((round) => Number.isFinite(round) && round > 0)
-      .sort((a, b) => a - b);
-    const latestCompletedRace = completedRaces
-      .slice()
-      .sort((a, b) => parseNum(a?.round) - parseNum(b?.round))
-      .pop() || null;
-    const latestRaceRound = latestCompletedRace ? parseNum(latestCompletedRace.round, 0) : 0;
-    const latestRaceName = latestCompletedRace
-      ? (resolveConfiguredRaceName(latestCompletedRace.raceName, races || []) ||
-        String(latestCompletedRace.raceName || "").trim())
-      : "";
-
-    const standingsByRoundJson = await Promise.all(
-      completedRounds.map((round) =>
-        fetchJson(`${CURRENT_SEASON_API_BASE}/${safeSeason}/${round}/driverStandings.json`)
-      )
-    );
-    const roundStandings = standingsByRoundJson.map((payload, index) => ({
-      round: completedRounds[index],
-      standings:
-        payload?.MRData?.StandingsTable?.StandingsLists?.[0]?.DriverStandings || []
-    }));
-
-    const currentLeader = driverNameFromApi(driverStandings[0]?.Driver, roster.drivers || []);
-    const topSprintRows = Array.from(sprintPointsByDriver.entries())
-      .map(([name, points]) => ({ name, points }))
-      .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
-    const uniqueSprintLeader =
-      topSprintRows.length > 0 &&
-      (topSprintRows.length === 1 || topSprintRows[0].points > topSprintRows[1].points)
-        ? topSprintRows[0].name
-        : null;
-
-    const firstRaceWinner = winnerGridRows[0] || null;
-    const lowestGridWins = winnerGridRows
-      .slice()
-      .sort((a, b) => b.grid - a.grid || a.raceName.localeCompare(b.raceName));
-    const lowestGridWin = lowestGridWins[0] || null;
-    const lowestGridWinDrivers = lowestGridWin
-      ? collapseTiedActuals(
-          "lowest_grid_win_position",
-          lowestGridWins
-            .filter((row) => row.grid === lowestGridWin.grid)
-            .map((row) => row.driver)
-        )
-      : null;
-    const constructorsNoPodium = constructorStandings
-      .map((row) => ({
-        name: teamNameFromApi(row.Constructor, roster.teams || []),
-        points: parseNum(row.points)
-      }))
-      .filter((row) => row.name && !podiumTeams.has(row.name));
-    const mostDnfDrivers = pickTopTiedRows(
-      Array.from(dnfCountsByDriver.entries()).map(([name, count]) => ({ name, count })),
-      (row) => Number(row.count || 0)
-    ).map((row) => row.name);
-    const topNoPodiumTeams = pickTopTiedRows(
-      constructorsNoPodium.map((row) => ({ name: row.name, points: row.points })),
-      (row) => Number(row.points || 0)
-    ).map((row) => row.name);
-    const closestQualifyingTeams = pickClosestTeams(qualStats);
-    const mostDriverOfTheDayDrivers = pickDriverOfTheDayLeadersFromOfficialResults(
-      driverOfTheDayResultsHtml,
-      roster.drivers || []
-    );
-
-    const autofillableActuals = {
-      drivers_championship_top_3: driverStandings
-        .slice(0, 3)
-        .map((row) => driverNameFromApi(row.Driver, roster.drivers || []))
-        .filter(Boolean),
-      constructors_championship_top_3: constructorStandings
-        .slice(0, 3)
-        .map((row) => teamNameFromApi(row.Constructor, roster.teams || []))
-        .filter(Boolean),
-      drivers_championship_last: driverNameFromApi(
-        driverStandings[driverStandings.length - 1]?.Driver,
-        roster.drivers || []
-      ),
-      constructors_championship_last: teamNameFromApi(
-        constructorStandings[constructorStandings.length - 1]?.Constructor,
-        roster.teams || []
-      ),
-      lowest_grid_win_position: lowestGridWin
-        ? {
-            value: lowestGridWin.grid >= 23 ? "Pitlane" : String(lowestGridWin.grid),
-            driver: lowestGridWinDrivers
-          }
-        : null,
-      all_podium_finishers: Array.from(podiumDrivers).sort((a, b) => a.localeCompare(b)),
-      most_driver_of_the_day: collapseTiedActuals(
-        "most_driver_of_the_day",
-        mostDriverOfTheDayDrivers
-      ),
-      most_points_no_podium:
-        constructorsNoPodium.length > 0
-          ? collapseTiedActuals("most_points_no_podium", topNoPodiumTeams)
-          : String(questionsById.most_points_no_podium?.bonus_value || "All teams scored a podium"),
-      most_dnfs_driver: collapseTiedActuals("most_dnfs_driver", mostDnfDrivers),
-      teammate_battle_antonelli_russell: (() => {
-        const question = questionsById.teammate_battle_antonelli_russell;
-        const pair = Array.isArray(question?.options) ? question.options.slice(0, 2) : [];
-        if (pair.length < 2) return null;
-        const left = parseNum(pointsByDriver.get(pair[0]));
-        const right = parseNum(pointsByDriver.get(pair[1]));
-        return {
-          winner: left === right ? "tie" : (left > right ? pair[0] : pair[1]),
-          diff: Math.abs(left - right)
-        };
-      })(),
-      teammate_battle_lawson_lindblad: (() => {
-        const question = questionsById.teammate_battle_lawson_lindblad;
-        const pair = Array.isArray(question?.options) ? question.options.slice(0, 2) : [];
-        if (pair.length < 2) return null;
-        const left = parseNum(pointsByDriver.get(pair[0]));
-        const right = parseNum(pointsByDriver.get(pair[1]));
-        return {
-          winner: left === right ? "tie" : (left > right ? pair[0] : pair[1]),
-          diff: Math.abs(left - right)
-        };
-      })(),
-      closest_qualifying_teammates: collapseTiedActuals(
-        "closest_qualifying_teammates",
-        closestQualifyingTeams
-      ),
-      alpine_vs_cadillac_audi:
-        parseNum(
-          constructorStandings.find(
-            (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Alpine"
-          )?.points
-        ) >
-        (
-          parseNum(
-            constructorStandings.find(
-              (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Cadillac"
-            )?.points
-          ) +
-          parseNum(
-            constructorStandings.find(
-              (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Audi"
-            )?.points
-          ) +
-          parseNum(
-            constructorStandings.find(
-              (row) => teamNameFromApi(row.Constructor, roster.teams || []) === "Aston Martin"
-            )?.points
-          )
-        )
-          ? "More"
-          : "Less",
-      select_three_races_dnfs: {
-        dnf_by_race: dnfByRace
-      },
-      races_before_title_decided: computeTitleDecidedRacesBeforeEnd(
-        roundStandings,
-        sprintRoundSet
-      ),
-      all_teams_score_points: constructorStandings.every(
-        (row) => parseNum(row.points) > 0
-      )
-        ? "yes"
-        : "no",
-      mini_q1_first_race_winner_champion:
-        firstRaceWinner && currentLeader && firstRaceWinner.driver === currentLeader
-          ? "yes"
-          : "no",
-      mini_q2_mercedes_engines_top5:
-        constructorStandings
-          .slice(0, 5)
-          .map((row) => teamNameFromApi(row.Constructor, roster.teams || []))
-          .filter((team) => MERCEDES_ENGINE_TEAMS_2026.has(team)).length >= 4
-          ? "yes"
-          : "no",
-      mini_q3_ferrari_podium: ["Charles Leclerc", "Lewis Hamilton"].every((driver) =>
-        podiumDrivers.has(driver)
-      )
-        ? "yes"
-        : "no",
-      mini_q4_sprint_champion_same:
-        uniqueSprintLeader && currentLeader && uniqueSprintLeader === currentLeader
-          ? "yes"
-          : "no"
-    };
-
-    const supportedQuestionIds = new Set(Object.keys(autofillableActuals));
-    return {
-      season: safeSeason,
-      completedRounds: completedRounds.length,
-      latestRaceRound: latestRaceRound > 0 ? latestRaceRound : null,
-      latestRaceName,
-      supportedQuestionIds,
-      actualsByQuestion: autofillableActuals
-    };
-  }
 
   function parsePointsOverrideInput(raw, questionId) {
     let parsed;
@@ -1209,137 +1345,17 @@ function registerAdminRoutes(app, deps) {
     return { maxRoundNumber: catalog.races.length || getRaces().length };
   }
 
-  function findLatestRoundSnapshotForSeason(season) {
-    return loadLatestRoundSnapshotForSeason(db, season, getSnapshotRoundOptions());
+  function findLatestRoundSnapshotForSeason(season, options = {}) {
+    return loadLatestRoundSnapshotForSeason(db, season, {
+      ...getSnapshotRoundOptions(season),
+      ...options
+    });
   }
 
   function fetchSnapshotValues(snapshotId) {
     return loadSnapshotValues(db, snapshotId);
   }
 
-  function upsertActualsSnapshot({
-    season,
-    roundNumber,
-    roundName = "",
-    valuesByQuestion,
-    sourceType = "manual",
-    sourceNote = "",
-    createdByUserId = null,
-    label = "",
-    reviewStatus = REVIEW_STATUS_REVIEWED,
-    preserveReviewIfUnchanged = false
-  }) {
-    return upsertSnapshotForRound(db, {
-      season,
-      roundNumber,
-      roundName,
-      valuesByQuestion,
-      sourceType,
-      sourceNote,
-      createdByUserId,
-      label,
-      reviewStatus,
-      preserveReviewIfUnchanged
-    });
-  }
-
-  function buildStoredActualsFromBody(body, questions, races, now) {
-    const valuesByQuestion = {};
-    for (const question of questions) {
-      const type = question.type || "text";
-      if (type === "ranking") {
-        const count = Number(question.count) || 3;
-        const selections = [];
-        for (let i = 1; i <= count; i += 1) {
-          const value = body[`${question.id}_${i}`];
-          if (!value) continue;
-          selections.push(value);
-        }
-        if (selections.length === 0) continue;
-        valuesByQuestion[question.id] = JSON.stringify(selections);
-        continue;
-      }
-      if (type === "multi_select") {
-        const selected = body[question.id];
-        if (!selected) continue;
-        const selections = Array.isArray(selected) ? selected : [selected];
-        valuesByQuestion[question.id] = JSON.stringify(selections);
-        continue;
-      }
-      if (type === "multi_select_limited") {
-        const dnfByRace = {};
-        races.forEach((race, index) => {
-          const value = body[`${question.id}_dnf_${index}`];
-          const countValue = clampNumber(value, 0, 999);
-          if (countValue != null) {
-            dnfByRace[race] = countValue;
-          }
-        });
-        valuesByQuestion[question.id] = JSON.stringify({ dnf_by_race: dnfByRace });
-        continue;
-      }
-      if (type === "teammate_battle") {
-        const winner = body[`${question.id}_winner`];
-        const diffRaw = body[`${question.id}_diff`];
-        if ((!winner || winner === "") && (diffRaw === "" || diffRaw === undefined)) {
-          continue;
-        }
-        const diff = winner === "tie" ? null : clampNumber(diffRaw, 0, 999);
-        valuesByQuestion[question.id] = JSON.stringify({ winner, diff });
-        continue;
-      }
-      if (type === "boolean_with_optional_driver") {
-        const choice = body[question.id];
-        const driver = body[`${question.id}_driver`];
-        if (!choice) continue;
-        valuesByQuestion[question.id] = JSON.stringify({ choice, driver });
-        continue;
-      }
-      if (type === "numeric_with_driver") {
-        const valueRaw = body[`${question.id}_value`];
-        const driver = body[`${question.id}_driver`];
-        if ((valueRaw === "" || valueRaw === undefined) && (!driver || driver === "")) {
-          continue;
-        }
-        const value = clampNumber(valueRaw, 0, 999);
-        valuesByQuestion[question.id] = JSON.stringify({ value, driver });
-        continue;
-      }
-      if (type === "single_choice_with_driver") {
-        const value = body[`${question.id}_value`];
-        const driverRaw = body[`${question.id}_driver`];
-        const driverSelections = Array.isArray(driverRaw)
-          ? driverRaw.filter(Boolean)
-          : (driverRaw ? [driverRaw] : []);
-        const driver = MULTI_ACTUAL_DRIVER_FIELD_IDS.has(question.id)
-          ? (driverSelections.length <= 1 ? (driverSelections[0] || null) : driverSelections)
-          : (driverSelections[0] || "");
-        if ((!value || value === "") && (!driver || driver === "")) {
-          continue;
-        }
-        valuesByQuestion[question.id] = JSON.stringify({ value, driver });
-        continue;
-      }
-
-      const answer = body[question.id];
-      if (type === "single_choice" && MULTI_ACTUAL_SINGLE_CHOICE_IDS.has(question.id)) {
-        if (!answer) continue;
-        const selections = Array.isArray(answer) ? answer.filter(Boolean) : [answer];
-        if (selections.length === 0) continue;
-        valuesByQuestion[question.id] = JSON.stringify(selections);
-        continue;
-      }
-      if (answer === undefined || answer === "") continue;
-      if (type === "numeric") {
-        const value = clampNumber(answer, 0, 999);
-        if (value == null) continue;
-        valuesByQuestion[question.id] = String(value);
-        continue;
-      }
-      valuesByQuestion[question.id] = String(answer).trim();
-    }
-    return valuesByQuestion;
-  }
 
   function validatePointsOverrideType(question, parsedOverride) {
     const basePoints = question?._basePoints;
@@ -1833,184 +1849,8 @@ function registerAdminRoutes(app, deps) {
     return String(canonical(answerValue));
   }
 
-  function parseStoredValue(question, raw) {
-    if (!raw) return null;
-    let parsed = null;
-    const text = String(raw).trim();
-    const type = question.type || "text";
-    if (
-      type === "ranking" ||
-      type === "multi_select" ||
-      type === "multi_select_limited" ||
-      type === "teammate_battle" ||
-      type === "boolean_with_optional_driver" ||
-      type === "numeric_with_driver" ||
-      type === "single_choice_with_driver"
-    ) {
-      try {
-        parsed = JSON.parse(raw);
-      } catch (err) {
-        return null;
-      }
-    } else if (text.startsWith("[") || text.startsWith("{")) {
-      try {
-        parsed = JSON.parse(text);
-      } catch (err) {}
-    } else {
-      parsed = raw;
-    }
-    return canonicalizeQuestionValue(question, parsed, question?._canonicalCatalog);
-  }
-
-  function isMatch(actualValue, predictedValue) {
-    if (actualValue == null || predictedValue == null) return false;
-    if (Array.isArray(actualValue)) return actualValue.includes(predictedValue);
-    return String(actualValue) === String(predictedValue);
-  }
-
-  function scoreQuestion(question, predictedRaw, actualRaw) {
-    if (actualRaw == null || predictedRaw == null) return 0;
-    const type = question.type || "text";
-    if (type === "ranking") {
-      const points = question.points || {};
-      let score = 0;
-      const positionLabels = ["1st", "2nd", "3rd", "4th", "5th"];
-      const count = Number(question.count) || 3;
-      for (let i = 0; i < count; i += 1) {
-        const actual = actualRaw[i];
-        const predicted = predictedRaw[i];
-        const key = positionLabels[i] || String(i + 1);
-        const value = points[key] || 0;
-        if (actual == null || predicted == null) continue;
-        if (Array.isArray(actual) ? actual.includes(predicted) : actual === predicted) {
-          score += value;
-        }
-      }
-      return score;
-    }
-    if (type === "single_choice" || type === "text") {
-      if (question.special_case === "all_podiums_bonus") {
-        if (String(actualRaw) === String(question.bonus_value)) {
-          return String(predictedRaw) === String(question.bonus_value)
-            ? Number(question.bonus_points || 0)
-            : 0;
-        }
-      }
-      return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
-    }
-    if (type === "boolean") {
-      return isMatch(actualRaw, predictedRaw) ? Number(question.points || 0) : 0;
-    }
-    if (type === "multi_select") {
-      const points = Number(question.points || 0);
-      const penalty = Number(question.penalty ?? points);
-      const minimum = Number(question.minimum ?? 0);
-      const actualSet = new Set(actualRaw || []);
-      const predictedSet = new Set(predictedRaw || []);
-      let correct = 0;
-      let wrong = 0;
-      let missing = 0;
-      predictedSet.forEach((item) => {
-        if (actualSet.has(item)) correct += 1;
-        else wrong += 1;
-      });
-      actualSet.forEach((item) => {
-        if (!predictedSet.has(item)) missing += 1;
-      });
-      const score = correct * points - (wrong + missing) * penalty;
-      return Math.max(minimum, score);
-    }
-    if (type === "teammate_battle") {
-      const base = Number(question.points || 0);
-      const tieBonus = Number(question.tie_bonus || 0);
-      const actualWinner = actualRaw?.winner;
-      const actualDiff = Number(actualRaw?.diff);
-      const predictedWinner = predictedRaw?.winner;
-      const predictedDiff = Number(predictedRaw?.diff);
-      if (!actualWinner) return 0;
-      if (actualWinner === "tie") {
-        return predictedWinner === "tie" ? tieBonus : 0;
-      }
-      if (predictedWinner !== actualWinner) return 0;
-      if (!Number.isFinite(actualDiff) || !Number.isFinite(predictedDiff)) return 0;
-      return Math.max(0, base - Math.abs(predictedDiff - actualDiff));
-    }
-    if (type === "boolean_with_optional_driver") {
-      const base = Number(question.points || 0);
-      const bonus = Number(question.bonus_points || 0);
-      const actualChoice = actualRaw?.choice;
-      const actualDriver = actualRaw?.driver;
-      const predictedChoice = predictedRaw?.choice;
-      const predictedDriver = predictedRaw?.driver;
-      if (actualChoice == null || predictedChoice == null) return 0;
-      let score = 0;
-      if (String(actualChoice) === String(predictedChoice)) {
-        score += base;
-        if (
-          String(actualChoice) === "yes" &&
-          actualDriver &&
-          String(actualDriver) === String(predictedDriver)
-        ) {
-          score += bonus;
-        }
-      }
-      return score;
-    }
-    if (type === "numeric_with_driver" || type === "single_choice_with_driver") {
-      const points = question.points || {};
-      const actualValue = actualRaw?.value;
-      const predictedValue = predictedRaw?.value;
-      const actualDriver = actualRaw?.driver;
-      const predictedDriver = predictedRaw?.driver;
-      let score = 0;
-      if (actualValue != null && predictedValue != null) {
-        if (isMatch(actualValue, predictedValue)) {
-          score += Number(points.position || 0);
-        } else if (
-          type === "single_choice_with_driver" &&
-          question.position_nearby_points &&
-          typeof question.position_nearby_points === "object"
-        ) {
-          const toGridNumber = (value) => {
-            if (value == null) return null;
-            const raw = String(value).trim().toLowerCase();
-            if (!raw) return null;
-            if (raw === "pitlane" || raw === "pit lane") return 23;
-            const numeric = Number(raw);
-            return Number.isFinite(numeric) ? numeric : null;
-          };
-
-          const actualGrid = toGridNumber(actualValue);
-          const predictedGrid = toGridNumber(predictedValue);
-          if (actualGrid != null && predictedGrid != null) {
-            const diff = Math.abs(actualGrid - predictedGrid);
-            const nearbyPoints = Number(
-              question.position_nearby_points[String(diff)] || 0
-            );
-            if (nearbyPoints > 0) score += nearbyPoints;
-          }
-        }
-      }
-      if (actualDriver && predictedDriver && isMatch(actualDriver, predictedDriver)) {
-        score += Number(points.driver || 0);
-      }
-      return score;
-    }
-    if (type === "multi_select_limited") {
-      const points = Number(question.points || 0);
-      const dnfByRace = actualRaw?.dnf_by_race || {};
-      let total = 0;
-      (predictedRaw || []).forEach((race) => {
-        const count = Number(dnfByRace[race] || 0);
-        total += count * points;
-      });
-      return total;
-    }
-    if (type === "numeric") {
-      return Number(actualRaw) === Number(predictedRaw) ? Number(question.points || 0) : 0;
-    }
-    return 0;
-  }
+  const parseStoredValue = leaderboardModel.parseLeaderboardStoredValue;
+  const scoreQuestion = leaderboardModel.scoreLeaderboardQuestion;
 
   function impactLabel(flipPercent, winnerShare) {
     if (flipPercent >= 35 || winnerShare >= 12) return "HIGH";
@@ -2516,7 +2356,7 @@ function registerAdminRoutes(app, deps) {
   app.get("/admin/inputs", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const requestedTab = String(req.query.tab || "").trim().toLowerCase();
-    const tab = ["drivers", "teams", "races", "mappings"].includes(requestedTab)
+    const tab = ["drivers", "teams", "races", "scoring", "definitions", "mappings"].includes(requestedTab)
       ? requestedTab
       : "teams";
     const seasonContext = resolveAdminSeasonContext(db, {
@@ -2527,6 +2367,12 @@ function registerAdminRoutes(app, deps) {
     const catalog = seasonContext.selected
       ? listSeasonInputs(db, season)
       : { season: null, drivers: [], teams: [], races: [], assignments: [], unresolved: [] };
+    const scoringRules = catalog.season?.id
+      ? (() => {
+          const rules = readSeasonScoringRules(db, catalog.season.id);
+          return rules ? scoringRulesTableValue(rules) : null;
+        })()
+      : null;
     const explicitRound = Number(req.query.round);
     const latestEvidenceRound = Number(
       db.prepare("SELECT MAX(round_number) AS round_number FROM race_data_snapshots WHERE season = ?").get(Number(season))?.round_number || 0
@@ -2548,6 +2394,11 @@ function registerAdminRoutes(app, deps) {
     catalog.impact = getSeasonInputImpact(season);
     catalog.mappings = seasonContext.selected ? listSeasonMappings(db, season) : [];
     const unresolvedMappingCount = catalog.mappings.filter((mapping) => mapping.status !== "resolved").length;
+    const definitionMode = String(req.query.mode || "").trim().toLowerCase() === "edit" ? "edit" : "view";
+    const definitions = listQuestionDefinitions(db, {
+      locale: res.locals.locale || "en",
+      includeInactive: tab === "definitions" && definitionMode === "edit"
+    });
     return res.render("admin_inputs", {
       user,
       season,
@@ -2555,6 +2406,10 @@ function registerAdminRoutes(app, deps) {
       lineupRound,
       teamLineupHistory,
       catalog,
+      scoringRules,
+      definitions,
+      definitionMode,
+      definitionLocale: res.locals.locale || "en",
       unresolvedMappingCount,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
@@ -2602,6 +2457,58 @@ function registerAdminRoutes(app, deps) {
     });
     return res.redirect(`/admin/inputs?${params.toString()}`);
   }
+
+  app.post("/admin/inputs/definitions", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const adminUser = getCurrentUser(req);
+    try {
+      const context = requireSeasonMutation(req, season);
+      if (!context.selected || !context.isValid) throw new Error("A valid season is required.");
+      const idValue = String(req.body.id || "").trim();
+      const id = idValue ? Number(idValue) : null;
+      if (idValue && (!Number.isInteger(id) || id <= 0)) throw new Error("The definition ID is invalid.");
+      const termKey = String(req.body.term_key || "").trim();
+      const label = String(req.body.label || "").trim();
+      const explanation = String(req.body.explanation || "").trim();
+      const questionIds = String(req.body.question_ids || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const aliases = String(req.body.aliases || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const definitionId = upsertQuestionDefinition(db, {
+        id,
+        termKey,
+        label,
+        explanation,
+        aliases,
+        questionIds,
+        sortOrder: req.body.sort_order,
+        isActive: (Array.isArray(req.body.is_active) ? req.body.is_active : [req.body.is_active])
+          .map((value) => String(value || ""))
+          .includes("1")
+      }, {
+        locale: res.locals.locale || "en"
+      });
+      logAdminEvent("info", "admin_definition_updated", {
+        userId: adminUser?.id || null,
+        season,
+        definitionId,
+        termKey,
+        historicalCorrection: readSeasonMutationFlags(req).historicalCorrection
+      });
+      return redirectInputs(res, season, "definitions", "success", "Definition saved.", { mode: "edit" });
+    } catch (err) {
+      logAdminEvent("warn", "admin_definition_update_failed", {
+        userId: adminUser?.id || null,
+        season,
+        error: { message: err.message }
+      });
+      return redirectInputs(res, season, "definitions", "error", err.message, { mode: "edit" });
+    }
+  });
 
   function requireSeasonMutation(req, season, options = {}) {
     const context = resolveAdminSeasonContext(db, {
@@ -2688,7 +2595,7 @@ function registerAdminRoutes(app, deps) {
       } else {
         throw new Error("Unsupported entity type.");
       }
-      logEvent("info", "admin_inputs_entity_updated", {
+      logAdminEvent("info", "admin_inputs_entity_updated", {
         userId: adminUser?.id || null,
         season,
         entityType,
@@ -2736,7 +2643,7 @@ function registerAdminRoutes(app, deps) {
         });
       });
       tx();
-      logEvent("info", "admin_inputs_team_reordered", {
+      logAdminEvent("info", "admin_inputs_team_reordered", {
         userId: adminUser?.id || null,
         season,
         teamId,
@@ -2773,7 +2680,7 @@ function registerAdminRoutes(app, deps) {
       } else {
         throw new Error("This input cannot be removed here.");
       }
-      logEvent("info", "admin_inputs_entity_removed", {
+      logAdminEvent("info", "admin_inputs_entity_removed", {
         userId: adminUser?.id || null,
         season,
         entityType,
@@ -2812,7 +2719,7 @@ function registerAdminRoutes(app, deps) {
         driverId,
         driverNumber
       });
-      logEvent("info", "admin_inputs_driver_created", {
+      logAdminEvent("info", "admin_inputs_driver_created", {
         userId: adminUser?.id || null,
         season,
         driverId,
@@ -2853,7 +2760,7 @@ function registerAdminRoutes(app, deps) {
         evidenceRounds: reviewState.evidenceRounds,
         historicalCorrectionConfirmed
       });
-      logEvent("info", "admin_inputs_lineup_updated", {
+      logAdminEvent("info", "admin_inputs_lineup_updated", {
         userId: adminUser?.id || null,
         season,
         roundNumber,
@@ -2914,7 +2821,7 @@ function registerAdminRoutes(app, deps) {
         evidenceRounds: reviewState.evidenceRounds,
         historicalCorrectionConfirmed
       });
-      logEvent("info", "admin_inputs_team_history_updated", {
+      logAdminEvent("info", "admin_inputs_team_history_updated", {
         userId: adminUser?.id || null,
         season,
         teamId,
@@ -2962,7 +2869,7 @@ function registerAdminRoutes(app, deps) {
         toRound,
         source
       });
-      logEvent("info", "admin_inputs_assignment_updated", {
+      logAdminEvent("info", "admin_inputs_assignment_updated", {
         userId: adminUser?.id || null,
         season,
         assignmentId,
@@ -3002,7 +2909,7 @@ function registerAdminRoutes(app, deps) {
         alias: req.body.alias,
         source: "admin"
       });
-      logEvent("info", "admin_inputs_alias_added", { userId: adminUser?.id || null, season, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
+      logAdminEvent("info", "admin_inputs_alias_added", { userId: adminUser?.id || null, season, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, tab, "success", "Alias saved.");
     } catch (err) {
       return redirectInputs(res, season, tab, "error", err.message);
@@ -3027,7 +2934,7 @@ function registerAdminRoutes(app, deps) {
         throw new Error("The canonical entity is not part of this season.");
       }
       addProviderReference(db, { entityType, entityId, provider, providerKey, providerLabel: req.body.provider_label || null });
-      logEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
+      logAdminEvent("info", "admin_inputs_provider_reference_added", { userId: adminUser?.id || null, season, entityType, entityId, provider, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, "mappings", "success", "Provider mapping saved.");
     } catch (err) {
       return redirectInputs(res, season, "mappings", "error", err.message);
@@ -3057,7 +2964,7 @@ function registerAdminRoutes(app, deps) {
       const table = mappingType === "alias" ? "entity_aliases" : "entity_provider_refs";
       const result = db.prepare(`UPDATE ${table} SET entity_type = ?, entity_id = ? WHERE id = ?`).run(entityType, entityId, mappingId);
       if (Number(result.changes || 0) !== 1) throw new Error("Mapping was not found.");
-      logEvent("info", "admin_inputs_mapping_resolved", { userId: adminUser?.id || null, season, mappingType, mappingId, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
+      logAdminEvent("info", "admin_inputs_mapping_resolved", { userId: adminUser?.id || null, season, mappingType, mappingId, entityType, entityId, historicalCorrection: readSeasonMutationFlags(req).historicalCorrection });
       return redirectInputs(res, season, "mappings", "success", "Mapping resolved.");
     } catch (err) {
       return redirectInputs(res, season, "mappings", "error", err.message);
@@ -3069,154 +2976,296 @@ function registerAdminRoutes(app, deps) {
     const locale = res.locals.locale || "en";
     const saveError = req.query.error ? String(req.query.error) : null;
     const saveSuccess = req.query.success ? String(req.query.success) : null;
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: req.query.season,
+      currentSeason: CURRENT_SEASON
+    });
+    const season = Number(seasonContext.year || CURRENT_SEASON);
+    const workspaceView = String(req.query.view || "questions").trim().toLowerCase() === "results"
+      ? "results"
+      : "questions";
     const questions = getQuestions(locale, {
       includeExcluded: true,
-      includeMeta: true
+      includeMeta: true,
+      season
     });
+    const questionRows = buildQuestionInputRows(questions);
+    const requestedMode = String(req.query.mode || "").trim().toLowerCase();
+    const mode = requestedMode === "edit" ? "edit" : "view";
+    const results = workspaceView === "results"
+      ? buildQuestionResultsModel({ season, locale, seasonContext })
+      : null;
     res.render("admin_questions", {
       user,
       questions,
+      questionRows,
+      mode,
+      workspaceView,
+      season,
+      seasonContext,
+      availableSeasons: seasonContext.availableSeasons,
+      ...results,
       saveError,
       saveSuccess
     });
   });
 
   app.post("/admin/questions", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
     const questions = getQuestions("en", {
       includeExcluded: true,
-      includeMeta: true
+      includeMeta: true,
+      season
     });
-    const now = new Date().toISOString();
-    const upsert = db.prepare(
-      `
-      INSERT INTO question_settings (question_id, included, points_override, order_index, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(question_id)
-      DO UPDATE SET
-        included = excluded.included,
-        points_override = excluded.points_override,
-        order_index = excluded.order_index,
-        updated_at = excluded.updated_at
-      `
-    );
-
+    const adminUser = getCurrentUser(req);
     try {
-      const tx = db.transaction(() => {
-        for (const [index, question] of questions.entries()) {
-          const includeKey = `${question.id}__included`;
-          const pointsKey = `${question.id}__points`;
-          const included = req.body[includeKey] ? 1 : 0;
-          const rawOverride = String(req.body[pointsKey] || "").trim();
-          let storedOverride = null;
-          if (rawOverride) {
-            const parsedOverride = parsePointsOverrideInput(
-              rawOverride,
-              question.id
-            );
-            validatePointsOverrideType(question, parsedOverride);
-            storedOverride = JSON.stringify(parsedOverride);
-          }
-          upsert.run(question.id, included, storedOverride, index, now);
-        }
+      const seasonContext = resolveAdminSeasonContext(db, {
+        requestedSeason: season,
+        currentSeason: CURRENT_SEASON
       });
-      tx();
-    } catch (err) {
+      if (seasonContext.availableSeasons.length > 0 && (!seasonContext.selected || !seasonContext.isValid)) {
+        throw new Error("The selected season is not available.");
+      }
+      const edits = normalizeQuestionInputEdits(questions, req.body, {
+        parsePointsOverride: parsePointsOverrideInput,
+        validatePointsOverrideType
+      });
+      const now = new Date().toISOString();
+      upsertSeasonQuestionSettings(db, season, edits, now);
+      logAdminEvent("info", "admin_questions_updated", {
+        userId: adminUser?.id || null,
+        season,
+        questionIds: edits.map((edit) => edit.questionId),
+        changedCount: edits.length
+      });
       return res.redirect(
-        `/admin/questions?error=${encodeURIComponent(err.message)}`
+        `/admin/questions?season=${encodeURIComponent(season)}&success=${encodeURIComponent("Questions updated.")}`
+      );
+    } catch (err) {
+      logAdminEvent("warn", "admin_questions_update_failed", {
+        userId: adminUser?.id || null,
+        season,
+        error: { message: err.message }
+      });
+      return res.redirect(
+        `/admin/questions?season=${encodeURIComponent(season)}&mode=edit&error=${encodeURIComponent(err.message)}`
       );
     }
-
-    return res.redirect(
-      `/admin/questions?success=${encodeURIComponent("Question settings saved.")}`
-    );
   });
 
-  app.post("/admin/questions/reorder", requireAdmin, (req, res) => {
-    const questions = getQuestions("en", {
-      includeExcluded: true,
-      includeMeta: true
-    });
-    let questionId = String(req.body.questionId || "").trim();
-    let direction = String(req.body.direction || "").trim().toLowerCase();
-    if (!questionId || !direction) {
-      const move = String(req.body.move || "").trim();
-      if (move.includes(":")) {
-        const [idPart, dirPart] = move.split(":", 2);
-        questionId = String(idPart || "").trim();
-        direction = String(dirPart || "").trim().toLowerCase();
+  app.post("/admin/race-data/correction", requireAdmin, (req, res) => {
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const round = Number(req.body.round || 0);
+    const viewMode = String(req.body.view || "drivers").toLowerCase() === "constructors"
+      ? "constructors"
+      : "drivers";
+    const focus = String(req.body.focus || "points").trim() || "points";
+    const redirectTo = `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(round)}&view=${encodeURIComponent(viewMode)}&focus=${encodeURIComponent(focus)}`;
+    const adminUser = getCurrentUser(req);
+    try {
+      if (String(req.body.confirmCorrection || "") !== "1") {
+        throw new Error("Confirm the protected race-data correction before saving.");
       }
-    }
-    if (!questionId || (direction !== "up" && direction !== "down")) {
-      return res.redirect(
-        `/admin/questions?error=${encodeURIComponent("Invalid reorder request.")}`
-      );
-    }
-
-    const index = questions.findIndex((q) => q.id === questionId);
-    if (index < 0) {
-      return res.redirect(
-        `/admin/questions?error=${encodeURIComponent("Question not found.")}`
-      );
-    }
-    const swapIndex = direction === "up" ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= questions.length) {
-      return res.redirect("/admin/questions");
-    }
-
-    const reordered = questions.slice();
-    const current = reordered[index];
-    reordered[index] = reordered[swapIndex];
-    reordered[swapIndex] = current;
-
-    const now = new Date().toISOString();
-    const upsertOrder = db.prepare(
-      `
-      INSERT INTO question_settings (question_id, included, points_override, order_index, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(question_id)
-      DO UPDATE SET
-        order_index = excluded.order_index,
-        updated_at = excluded.updated_at
-      `
-    );
-
-    const tx = db.transaction(() => {
-      for (const [orderIndex, question] of reordered.entries()) {
-        const included = question._included ? 1 : 0;
-        const rawOverride = String(question._pointsOverrideRaw || "").trim();
-        const storedOverride = rawOverride ? rawOverride : null;
-        upsertOrder.run(question.id, included, storedOverride, orderIndex, now);
+      if (!Number.isInteger(season) || season < 1900 || !Number.isInteger(round) || round < 1) {
+        throw new Error("Choose a valid season and round.");
       }
-    });
-    tx();
+      const snapshot = findRaceDataSnapshot(db, season, round);
+      if (!snapshot) throw new Error("No persisted race evidence exists for this round.");
+      const snapshotId = Number(req.body.snapshotId);
+      if (!Number.isInteger(snapshotId) || snapshotId !== Number(snapshot.id)) {
+        throw new Error("This evidence changed while you were editing. Reload the round and try again.");
+      }
+      const correctedEvidence = buildCorrectedRaceEvidence(snapshot, req.body);
+      const correctionId = saveCorrectedRaceDataSnapshot(db, {
+        baseSnapshot: snapshot,
+        evidence: correctedEvidence,
+        correctedByUserId: adminUser?.id,
+        correctionReason: req.body.correctionReason,
+        sourceNote: "Admin correction from Race Data review"
+      });
+      const correctionSnapshot = findRaceDataSnapshot(db, season, round);
+      const sourceQuestions = getQuestions("en", { includeMeta: true, season });
+      const seasonContext = resolveAdminSeasonContext(db, {
+        requestedSeason: season,
+        currentSeason: CURRENT_SEASON
+      });
+      const catalog = seasonContext.selected
+        ? buildSeasonCatalog(db, season, { questions: sourceQuestions })
+        : null;
+      const races = catalog?.races?.map((race) => race.display_name) || [];
+      const roster = buildRoundAwareRoster({
+        db,
+        season,
+        roundNumber: round,
+        races,
+        fallbackRoster: { drivers: [], teams: [], races },
+        seasonCatalog: catalog
+      });
+      const derivation = rederiveActualSnapshotFromRaceEvidence({
+        db,
+        season,
+        roundNumber: round,
+        roundName: correctionSnapshot?.round_name || snapshot.round_name,
+        questions: sourceQuestions,
+        roster,
+        races,
+        catalog,
+        evidenceSnapshot: correctionSnapshot
+      });
+      if (derivation?.snapshotId) {
+        markSnapshotReviewed(db, {
+          snapshotId: derivation.snapshotId,
+          reviewedByUserId: adminUser?.id
+        });
+        publishActualSnapshot(db, {
+          season,
+          snapshotId: derivation.snapshotId,
+          publishedByUserId: adminUser?.id
+        });
+      }
+      logAdminEvent("info", "admin_race_data_correction_created", {
+        userId: adminUser?.id || null,
+        season,
+        round,
+        baseSnapshotId: snapshot.id,
+        correctionSnapshotId: correctionId,
+        derivedActualSnapshotId: derivation?.snapshotId || null,
+        derivedValueCount: derivation?.valueCount || 0,
+        driverId: req.body.driverId || null,
+        reason: String(req.body.correctionReason || "").trim()
+      });
+      return res.redirect(redirectTo);
+    } catch (err) {
+      return res.redirect(withQueryParam(redirectTo, "error", err.message));
+    }
+  });
 
-    return res.redirect(
-      `/admin/questions?success=${encodeURIComponent("Question order updated.")}`
-    );
+  app.post("/admin/race-data/refresh", requireAdmin, async (req, res) => {
+    const adminUser = getCurrentUser(req);
+    const season = Number(req.body.season || CURRENT_SEASON);
+    const round = Number(req.body.round || 0);
+    const viewMode = String(req.body.view || "drivers").toLowerCase() === "constructors"
+      ? "constructors"
+      : "drivers";
+    const focus = String(req.body.focus || "points").trim() || "points";
+    const redirectTo = `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(round)}&view=${encodeURIComponent(viewMode)}&focus=${encodeURIComponent(focus)}`;
+    try {
+      if (String(req.body.confirmRefresh || "") !== "1") {
+        throw new Error("Confirm the source refresh before continuing.");
+      }
+      if (!Number.isInteger(season) || season < 1900 || !Number.isInteger(round) || round < 1) {
+        throw new Error("Choose a valid season and round.");
+      }
+      const snapshot = findRaceDataSnapshot(db, season, round);
+      if (!snapshot) throw new Error("No persisted race evidence exists for this round.");
+      const result = await runAutoUpdate({
+        season,
+        round,
+        dbPath,
+        databaseUrl,
+        dataDir,
+        questionsPath,
+        rosterPath,
+        racesPath,
+        dryRun: false
+      });
+      const refreshed = Array.isArray(result?.snapshots)
+        && result.snapshots.some((item) => Number(item?.roundNumber) === round);
+      if (!refreshed) throw new Error("The source returned no completed evidence for this round.");
+      logAdminEvent("info", "admin_race_data_source_refreshed", {
+        requestId: req.requestId,
+        userId: adminUser?.id || null,
+        season,
+        round,
+        previousSnapshotId: snapshot.id,
+        refreshedSnapshotId: result.snapshots.find((item) => Number(item?.roundNumber) === round)?.id || null,
+        reviewStatus: result.snapshots.find((item) => Number(item?.roundNumber) === round)?.reviewStatus || "pending"
+      });
+      return res.redirect(withQueryParam(redirectTo, "success", "Source refreshed; review required."));
+    } catch (err) {
+      logAdminEvent("warn", "admin_race_data_source_refresh_failed", {
+        requestId: req.requestId,
+        userId: adminUser?.id || null,
+        season,
+        round,
+        error: { message: err.message }
+      });
+      return res.redirect(withQueryParam(redirectTo, "error", err.message));
+    }
   });
 
   app.get("/admin/race-data", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
+    const t = res.locals.t || ((key) => key);
     const seasonContext = resolveAdminSeasonContext(db, {
       requestedSeason: req.query.season,
       currentSeason: CURRENT_SEASON
     });
     const season = Number(seasonContext.year || CURRENT_SEASON);
-    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
-    const races = catalog?.races?.map((race) => race.display_name) || [];
+    const sourceQuestions = getQuestions(locale, {
+      includeMeta: true,
+      season
+    });
+    const pointsLabel = "Results";
+    const metricOptions = buildRaceDataMetricOptions(t, { pointsLabel });
+    const focusOptions = buildRaceDataFocusOptions(sourceQuestions, { pointsLabel, metricOptions });
+    const requestedFocusId = String(req.query.focus || "points").trim() || "points";
+    const requestedFocus = focusOptions.find((option) => option.id === requestedFocusId) || null;
+    const requestedView = String(req.query.view || "").trim().toLowerCase();
+    const viewMode = requestedView === "constructors"
+      ? "constructors"
+      : requestedView === "drivers"
+        ? "drivers"
+        : requestedFocus?.view && requestedFocus.view !== "all"
+          ? requestedFocus.view
+          : "drivers";
+    const focus = resolveRaceDataFocus({
+      questions: sourceQuestions,
+      focusId: requestedFocusId,
+      viewMode,
+      pointsLabel,
+      metricOptions
+    });
+    const focusMetricLabels = {
+      points: "Points",
+      championship_points_results: "Points",
+      podiums: t("admin_race_data.focus_podiums"),
+      dnfs: t("admin_race_data.focus_dnfs"),
+      grid_wins: t("admin_race_data.focus_grid_wins"),
+      driver_of_day: t("admin_race_data.focus_driver_of_day"),
+      sprint_points: t("admin_race_data.focus_sprint_points"),
+      qualifying_h2h: t("admin_race_data.focus_qualifying_h2h"),
+      no_podium_points: t("admin_race_data.focus_no_podium_points"),
+      all_teams_points: t("admin_race_data.focus_team_coverage"),
+      damage: t("admin_race_data.focus_damage"),
+      engine_switch: t("admin_race_data.focus_external")
+    };
+    focus.metricLabel = focusMetricLabels[focus.matrixMetric || focus.metric] || t("admin_race_data.points");
+    focus.footerRoundLabel = t("admin_race_data.focus_round_total");
+    focus.footerTotalLabel = t("admin_race_data.focus_total");
+    let catalog = null;
+    try {
+      catalog = buildSeasonCatalog(db, season, { questions: sourceQuestions });
+    } catch (error) {
+      catalog = null;
+    }
+    const scoringRules = catalog?.season?.id
+      ? (readSeasonScoringRules(db, catalog.season.id) || DEFAULT_SCORING_RULES)
+      : DEFAULT_SCORING_RULES;
+    const races = (catalog?.races?.length
+      ? catalog.races.map((race) => race.display_name)
+      : getRaces()) || [];
     const evidenceRows = listRaceDataSnapshots(db, season);
-    const importRows = listRaceDataImports(db, season);
-    const snapshotRows = listLatestSnapshotsForSeason(db, season, {
+    let snapshotRows = listLatestSnapshotsForSeason(db, season, {
       maxRoundNumber: races.length
     });
-    const viewMode =
-      String(req.query.view || "").trim().toLowerCase() === "constructors"
-        ? "constructors"
-        : "drivers";
-    const requestedRound = Number(req.query.round || 0);
+    snapshotRows = attachSnapshotReviewerNames(db, snapshotRows);
+    const requestedRoundValue = String(req.query.round == null ? "" : req.query.round).trim();
+    const requestedRound = Number(requestedRoundValue || 0);
+    const hasSelectedRound = requestedRound > 0;
     const defaultRound =
-      requestedRound > 0
+      hasSelectedRound
         ? requestedRound
         : Number(evidenceRows.at(-1)?.round_number || 1);
     const roundRoster = buildRoundAwareRoster({
@@ -3224,20 +3273,42 @@ function registerAdminRoutes(app, deps) {
       season,
       roundNumber: defaultRound,
       races,
-      fallbackRoster: { drivers: [], teams: [], races }
+      fallbackRoster: { drivers: [], teams: [], races },
+      seasonCatalog: catalog
     });
     const view = buildRaceDataAuditView({
       races,
       roster: roundRoster,
       evidenceRows,
       snapshotRows,
-      selectedRound: defaultRound
+      selectedRound: defaultRound,
+      showRaceResult: hasSelectedRound,
+      catalogRevision: catalog?.catalogRevision || null,
+      focus,
+      scoringRules
     });
-    const selectedSnapshot = view.selectedRound?.snapshot || null;
-    const derivedActuals = selectedSnapshot
-      ? loadSnapshotValues(db, selectedSnapshot.id)
-      : {};
-    return res.render("admin_race_data", {
+    const raceCodeByName = new Map(
+      (catalog?.races || []).map((race) => [
+        race.display_name,
+        String(race.race_code || "").trim().toUpperCase() || fallbackRaceCode(race.display_name)
+      ])
+    );
+    view.rounds = view.rounds.map((round) => ({
+      ...round,
+      code: raceCodeByName.get(round.raceName) || fallbackRaceCode(round.raceName)
+    }));
+    view.raceResultColumns = buildRaceResultColumns({
+      payload: view.selectedEvidence?.payload || {},
+      t
+    });
+    view.evidenceRevisions = view.selectedEvidence
+      ? listRaceDataSnapshotRevisions(db, season, view.selectedRoundNumber)
+      : [];
+    view.focusOptions = focusOptions;
+    view.metricOptions = metricOptions;
+    view.activeMetricId = resolveActiveRaceDataMetricId({ focus, metricOptions });
+    view.questionOptions = focusOptions.filter((option) => option.questionId);
+    const model = {
       user,
       season,
       seasonContext,
@@ -3245,209 +3316,26 @@ function registerAdminRoutes(app, deps) {
       locale,
       view,
       viewMode,
-      derivedActuals,
-      selectedSnapshot,
-      importRows,
-      selectedImport: view.selectedImportId
-        ? importRows.find((item) => item.id === view.selectedImportId) || null
-        : null
-    });
+      catalogRevision: catalog?.catalogRevision || null,
+      catalogReadiness: catalog?.readiness || null,
+      raceDataError: req.query.error ? String(req.query.error) : null,
+      raceDataSuccess: req.query.success ? String(req.query.success) : null
+    };
+    if (String(req.query.fragment || "").trim().toLowerCase() === "round") {
+      return res.render("partials/admin_race_data_round_region", model);
+    }
+    return res.render("admin_race_data", model);
   });
 
   app.get("/admin/actuals", requireAdmin, (req, res) => {
-    const user = getCurrentUser(req);
-    const locale = res.locals.locale || "en";
-    const saveError = req.query.error ? String(req.query.error) : null;
-    const saveSuccess = req.query.success ? String(req.query.success) : null;
-    const seasonContext = resolveAdminSeasonContext(db, {
-      requestedSeason: req.query.season,
-      currentSeason: CURRENT_SEASON
-    });
-    const season = Number(seasonContext.year || CURRENT_SEASON);
-    const questions = getQuestions(locale);
-    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
-    const races = catalog?.races?.map((race) => race.display_name) || [];
-    const actualRows = seasonContext.syncable ? db.prepare("SELECT * FROM actuals").all() : [];
-    const persistedActuals = actualRows.reduce((acc, row) => {
-      acc[row.question_id] = row.value;
-      return acc;
-    }, {});
-    const draftActuals =
-      req.session &&
-      req.session.adminActualsDraft &&
-      typeof req.session.adminActualsDraft === "object" &&
-      seasonContext.syncable &&
-      req.session.adminActualsDraft.target === "current" &&
-      req.session.adminActualsDraft.values &&
-      typeof req.session.adminActualsDraft.values === "object"
-        ? req.session.adminActualsDraft.values
-        : null;
-    const latestSnapshots = listLatestSnapshotsForSeason(db, season, {
-      maxRoundNumber: races.length
-    });
-    const latestSnapshotByRound = new Map(
-      latestSnapshots.map((snapshot) => [Number(snapshot.round_number), snapshot])
-    );
-    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
-    const requestedTarget = String(req.query.target || "").trim();
-    const latestRoundNumber =
-      Number.isFinite(Number(latestRoundSnapshot?.round_number))
-        ? Number(latestRoundSnapshot.round_number)
-        : null;
-    const racesWithTargets = races.map((raceName, index) => {
-      const roundNumber = index + 1;
-      const snapshotMeta = latestSnapshotByRound.get(roundNumber) || null;
-      let timing = "future";
-      if (latestRoundNumber != null) {
-        if (roundNumber < latestRoundNumber) timing = "past";
-        else if (roundNumber === latestRoundNumber) timing = "current";
-      }
-      return {
-        key: `round:${roundNumber}`,
-        roundNumber,
-        raceName,
-        timing,
-        snapshotId: snapshotMeta ? Number(snapshotMeta.id) : null,
-        snapshotLabel: snapshotMeta ? String(snapshotMeta.label || "").trim() : "",
-        reviewStatus: snapshotMeta ? snapshotMeta.review_status : null,
-        reviewedAt: snapshotMeta ? snapshotMeta.reviewed_at || null : null,
-        updatedAt: snapshotMeta ? snapshotMeta.updated_at || snapshotMeta.created_at || null : null
-      };
-    });
-
-    const pendingReviewTargets = racesWithTargets.filter(
-      (target) => target.reviewStatus === REVIEW_STATUS_PENDING
-    );
-    const selectedTarget = requestedTarget || pendingReviewTargets.at(-1)?.key || "current";
-    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
-    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
-    const selectedRaceTarget =
-      selectedRoundNumber != null
-        ? racesWithTargets.find((race) => race.roundNumber === selectedRoundNumber) || null
-        : null;
-    const selectedSnapshotMeta =
-      selectedRaceTarget && selectedRaceTarget.snapshotId
-        ? latestSnapshotByRound.get(selectedRaceTarget.roundNumber) || null
-        : null;
-    const selectedSnapshotValues =
-      selectedRaceTarget && selectedRaceTarget.snapshotId
-        ? fetchSnapshotValues(selectedRaceTarget.snapshotId)
-        : null;
-    const actuals =
-      selectedTarget === "current"
-        ? (draftActuals || persistedActuals)
-        : (draftActuals || selectedSnapshotValues || persistedActuals);
-    const isPastRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "past");
-    const isFutureRaceTarget = Boolean(selectedRaceTarget && selectedRaceTarget.timing === "future");
-    const allowPastEdit = String(req.query.unlockPast || "").trim() === "1";
-    const requiresPastUnlock = isPastRaceTarget && !allowPastEdit;
-    const roster = buildRoundAwareRoster({
-      db,
-      season,
-      roundNumber: selectedRoundNumber || latestRoundNumber || races.length || 1,
-      races,
-      fallbackRoster: { drivers: [], teams: [], races }
-    });
-    res.render("admin_actuals", {
-      user,
-      questions,
-      season,
-      seasonContext,
-      availableSeasons: seasonContext.availableSeasons,
-      roster,
-      races,
-      actuals,
-      actualsTarget: selectedTarget,
-      raceTargets: racesWithTargets,
-      selectedRaceTarget,
-      selectedSnapshotMeta,
-      pendingReviewTargets,
-      requiresPastUnlock,
-      allowPastEdit,
-      isFutureRaceTarget,
-      hasDraft: Boolean(draftActuals),
-      saveError,
-      saveSuccess
-    });
-  });
-
-  app.post("/admin/actuals/autofill-current-season", requireAdmin, async (req, res) => {
-    try {
-      const requestedSeason = Number(req.body.season || CURRENT_SEASON);
-      const seasonContext = resolveAdminSeasonContext(db, {
-        requestedSeason,
-        currentSeason: CURRENT_SEASON
-      });
-      if (requestedSeason !== CURRENT_SEASON || !seasonContext.syncable) {
-        throw new Error("Automatic live sync is restricted to the active season.");
-      }
-      const questions = getQuestions();
-      const roster = getRoster();
-      const races = getRaces();
-      const snapshot = await buildCurrentSeasonActualsSnapshot({
-        questions,
-        roster,
-        races,
-        season: CURRENT_SEASON
-      });
-      const existingActuals = db
-        .prepare("SELECT question_id, value FROM actuals")
-        .all()
-        .reduce((acc, row) => {
-          acc[row.question_id] = row.value;
-          return acc;
-        }, {});
-      const draftActuals = { ...existingActuals };
-
-      let filledCount = 0;
-      let clearedCount = 0;
-      for (const question of questions) {
-        if (!snapshot.supportedQuestionIds.has(question.id)) continue;
-        const value = snapshot.actualsByQuestion[question.id];
-        const serialized = serializeAnswerForStorage(question, value);
-        if (serialized == null || serialized === "") {
-          delete draftActuals[question.id];
-          clearedCount += 1;
-          continue;
-        }
-        draftActuals[question.id] = serialized;
-        filledCount += 1;
-      }
-
-      if (req.session) {
-        req.session.adminActualsDraft = {
-          target: "current",
-          values: draftActuals,
-          updatedAt: new Date().toISOString()
-        };
-      }
-
-      const summary = [
-        `Autofilled ${filledCount} question${filledCount === 1 ? "" : "s"} into the form`
-      ];
-      if (clearedCount > 0) {
-        summary.push(
-          `cleared ${clearedCount} unresolved field${clearedCount === 1 ? "" : "s"} in the draft`
-        );
-      }
-      summary.push(
-        `from ${snapshot.season} standings after ${snapshot.completedRounds} completed round${snapshot.completedRounds === 1 ? "" : "s"}`
-      );
-      if (snapshot.latestRaceName) {
-        summary.push(`latest race: ${snapshot.latestRaceName}`);
-      }
-      summary.push("unsaved until you click Save actuals");
-
-      const redirectTo = `/admin/actuals?season=${encodeURIComponent(requestedSeason)}&success=${encodeURIComponent(summary.join(" | "))}`;
-      if (req.session) {
-        return req.session.save(() => res.redirect(redirectTo));
-      }
-      return res.redirect(redirectTo);
-    } catch (err) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(Number(req.body.season || CURRENT_SEASON))}&error=${encodeURIComponent(`Autofill failed: ${err.message}`)}`
-      );
+    const params = new URLSearchParams();
+    params.set("view", "results");
+    if (req.query.season != null && String(req.query.season).trim()) {
+      params.set("season", String(req.query.season));
     }
+    if (req.query.error != null) params.set("error", String(req.query.error));
+    if (req.query.success != null) params.set("success", String(req.query.success));
+    return res.redirect(`/admin/questions?${params.toString()}`);
   });
 
   app.post("/admin/actuals/run-auto-update", requireAdmin, async (req, res) => {
@@ -3491,7 +3379,7 @@ function registerAdminRoutes(app, deps) {
       summary.push("latest synced round is left pending review until an admin confirms it");
 
       if (typeof logEvent === "function") {
-        logEvent("info", "admin_actuals_auto_update_run", {
+        logAdminEvent("info", "admin_actuals_auto_update_run", {
           requestId: req.requestId,
           adminUserId: adminUser?.id || null,
           season: CURRENT_SEASON,
@@ -3503,7 +3391,7 @@ function registerAdminRoutes(app, deps) {
       return res.redirect(`/admin/actuals?season=${encodeURIComponent(requestedSeason)}&success=${encodeURIComponent(summary.join(" | "))}`);
     } catch (err) {
       if (typeof logEvent === "function") {
-        logEvent("warn", "admin_actuals_auto_update_failed", {
+        logAdminEvent("warn", "admin_actuals_auto_update_failed", {
           requestId: req.requestId,
           adminUserId: adminUser?.id || null,
           season: CURRENT_SEASON,
@@ -3518,7 +3406,7 @@ function registerAdminRoutes(app, deps) {
     }
   });
 
-  app.post("/admin/actuals/review", requireAdmin, (req, res) => {
+  app.post("/admin/race-data/review", requireAdmin, (req, res) => {
     const adminUser = getCurrentUser(req);
     const season = Number(req.body.season || req.query.season || CURRENT_SEASON);
     const seasonContext = resolveAdminSeasonContext(db, {
@@ -3528,168 +3416,41 @@ function registerAdminRoutes(app, deps) {
     const snapshotId = Number(req.body.snapshotId || 0);
     const target = String(req.body.target || "current").trim() || "current";
     const unlockPast = String(req.body.unlockPast || "").trim() === "1";
+    const rawReturnTo = String(req.body.returnTo || "").trim();
+    const returnTo = isSafeRaceDataReturnPath(rawReturnTo) ? rawReturnTo : null;
+    const targetRound = /^round:(\d+)$/.exec(target)?.[1] || "";
+    const fallbackPath = `/admin/race-data?season=${encodeURIComponent(season)}${targetRound ? `&round=${encodeURIComponent(targetRound)}` : ""}&view=drivers&focus=points`;
+    const redirectReview = (key, message) => res.redirect(
+      withQueryParam(returnTo || fallbackPath, key, message)
+    );
     let snapshot = null;
     try {
       assertSeasonMutationAllowed(seasonContext, { historicalCorrection: unlockPast });
       snapshot = findSnapshotById(db, snapshotId, getSnapshotRoundOptions(season));
       if (snapshot && Number(snapshot.season) !== season) snapshot = null;
     } catch (err) {
-      return res.redirect(`/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}&error=${encodeURIComponent(err.message)}`);
+      return redirectReview("error", err.message);
     }
     if (!snapshot) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&error=${encodeURIComponent("Snapshot not found.")}`
-      );
+      return redirectReview("error", "Snapshot not found.");
     }
 
     markSnapshotReviewed(db, {
       snapshotId,
       reviewedByUserId: adminUser?.id
     });
-    const label = snapshot.round_number
-      ? `R${snapshot.round_number} - ${String(snapshot.round_name || "").trim() || `Round ${snapshot.round_number}`}`
-      : `Snapshot #${snapshot.id}`;
-    return res.redirect(
-      `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(target)}${unlockPast ? "&unlockPast=1" : ""}&success=${encodeURIComponent(`${label} marked as reviewed.`)}`
-    );
-  });
-
-  app.post("/admin/actuals", requireAdmin, (req, res) => {
-    const adminUser = getCurrentUser(req);
-    const questions = getQuestions();
-    const season = Number(req.body.season || CURRENT_SEASON);
-    const seasonContext = resolveAdminSeasonContext(db, {
-      requestedSeason: season,
-      currentSeason: CURRENT_SEASON
-    });
-    const catalog = seasonContext.selected ? listSeasonInputs(db, season) : null;
-    const races = catalog?.races?.map((race) => race.display_name) || [];
-    const now = new Date().toISOString();
-    const selectedTarget = String(req.body.actualsTarget || "current").trim() || "current";
-    const selectedRoundMatch = /^round:(\d+)$/.exec(selectedTarget);
-    const selectedRoundNumber = selectedRoundMatch ? Number(selectedRoundMatch[1]) : null;
-    if (
-      selectedRoundNumber != null &&
-      (!Number.isFinite(selectedRoundNumber) ||
-        selectedRoundNumber < 1 ||
-        selectedRoundNumber > races.length)
-    ) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&error=${encodeURIComponent("Selected race is outside the configured calendar.")}`
-      );
-    }
-    const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
-    const latestRoundNumber =
-      Number.isFinite(Number(latestRoundSnapshot?.round_number))
-        ? Number(latestRoundSnapshot.round_number)
-        : null;
-    const isPastRaceTarget =
-      selectedRoundNumber != null &&
-      latestRoundNumber != null &&
-      selectedRoundNumber < latestRoundNumber;
-    const allowPastEdit = String(req.body.unlockPast || "").trim() === "1";
-
     try {
-      assertSeasonMutationAllowed(seasonContext, { historicalCorrection: allowPastEdit });
-    } catch (err) {
-      return res.redirect(`/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent(err.message)}`);
-    }
-
-    if (isPastRaceTarget && !allowPastEdit) {
-      return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&error=${encodeURIComponent("Unlock past-race editing before saving changes.")}`
-      );
-    }
-
-    const valuesByQuestion = buildStoredActualsFromBody(req.body, questions, races, now);
-
-    if (selectedRoundNumber != null) {
-      const roundName = races[selectedRoundNumber - 1] || `Round ${selectedRoundNumber}`;
-      let successMessage;
-      try {
-        const snapshotResult = upsertActualsSnapshot({
-          season,
-          roundNumber: selectedRoundNumber,
-          roundName,
-          valuesByQuestion,
-          sourceType: "manual",
-          sourceNote: "Manual save from admin actuals race selector",
-          createdByUserId: adminUser?.id,
-          label: `R${selectedRoundNumber} - ${roundName}`,
-          reviewStatus: REVIEW_STATUS_REVIEWED
-        });
-        successMessage = snapshotResult?.snapshotId
-          ? `Snapshot saved for R${selectedRoundNumber} - ${roundName} and marked reviewed.`
-          : `No values saved for R${selectedRoundNumber} - ${roundName}.`;
-      } catch (err) {
-        return res.redirect(
-          `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}&unlockPast=${allowPastEdit ? "1" : "0"}&error=${encodeURIComponent(err.message)}`
-        );
-      }
-      if (req.session) {
-        delete req.session.adminActualsDraft;
-      }
-      const redirectTo = `/admin/actuals?season=${encodeURIComponent(season)}&target=${encodeURIComponent(selectedTarget)}${allowPastEdit ? "&unlockPast=1" : ""}&success=${encodeURIComponent(successMessage)}`;
-      if (req.session) {
-        return req.session.save(() => res.redirect(redirectTo));
-      }
-      return res.redirect(redirectTo);
-    }
-
-    const clearAll = db.prepare("DELETE FROM actuals");
-    const upsert = db.prepare(
-      `
-      INSERT INTO actuals (question_id, value, updated_at)
-      VALUES (?, ?, ?)
-      ON CONFLICT(question_id)
-      DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-      `
-    );
-
-    const tx = db.transaction(() => {
-      clearAll.run();
-      Object.entries(valuesByQuestion).forEach(([questionId, value]) => {
-        upsert.run(questionId, value, now);
-      });
-    });
-    tx();
-
-    if (req.session) {
-      delete req.session.adminActualsDraft;
-    }
-
-    let successMessage = "Actuals saved.";
-    try {
-      const latestRoundSnapshot = findLatestRoundSnapshotForSeason(season);
-      const archivedSnapshot = upsertActualsSnapshot({
+      publishActualSnapshot(db, {
         season,
-        roundNumber: latestRoundSnapshot?.round_number || null,
-        roundName: String(latestRoundSnapshot?.round_name || "").trim(),
-        valuesByQuestion,
-        sourceType: "manual",
-        sourceNote: "Manual save from admin actuals",
-        createdByUserId: adminUser?.id,
-        label: latestRoundSnapshot?.round_number
-          ? `R${latestRoundSnapshot.round_number} - ${String(latestRoundSnapshot?.round_name || "Manual update").trim() || "Manual update"}`
-          : `Manual save ${now.slice(0, 10)}`,
-        reviewStatus: REVIEW_STATUS_REVIEWED
+        snapshotId,
+        publishedByUserId: adminUser?.id
       });
-      if (archivedSnapshot?.snapshotId) {
-        const label = latestRoundSnapshot?.round_number
-          ? `R${latestRoundSnapshot.round_number}`
-          : `snapshot #${archivedSnapshot.snapshotId}`;
-        successMessage = `Actuals saved. ${label} marked reviewed.`;
-      }
-    } catch (archiveErr) {
-      successMessage = `Actuals saved. Snapshot archive skipped: ${archiveErr.message}`;
+    } catch (err) {
+      return redirectReview("error", err.message);
     }
-
-    const redirectTo = `/admin/actuals?season=${encodeURIComponent(season)}&success=${encodeURIComponent(successMessage)}`;
-    if (req.session) {
-      return req.session.save(() => res.redirect(redirectTo));
-    }
-    return res.redirect(redirectTo);
+    return res.redirect(returnTo || fallbackPath);
   });
+
 
   app.get("/admin/overview", requireAdmin, (req, res) => {
     const user = getCurrentUser(req);
@@ -4589,6 +4350,7 @@ function registerAdminRoutes(app, deps) {
         const groupId = Number(req.params.groupId);
         const mode = String(req.query.mode || "actuals").trim().toLowerCase();
         const analysisMode = mode === "sim200" ? "sim200" : "actuals";
+        const analysisSeason = Number(req.query.season || CURRENT_SEASON);
         if (!groupId) {
           return res.redirect(
             `/admin/analysis?error=${encodeURIComponent("Invalid test group id.")}`
@@ -4660,11 +4422,7 @@ function registerAdminRoutes(app, deps) {
             originalPlayerCount
           });
         } else {
-          const actualRows = db.prepare("SELECT * FROM actuals").all();
-          const actualsMap = actualRows.reduce((acc, row) => {
-            acc[row.question_id] = row.value;
-            return acc;
-          }, {});
+          const actualsMap = loadPublishedActuals(db, analysisSeason).values || {};
           analysis = buildGroupAnalysis(
             groupId,
             questions,
@@ -5233,6 +4991,15 @@ function registerAdminRoutes(app, deps) {
 module.exports = {
   auditResultLabel,
   auditSourceState,
+  compactQuestionLabel,
+  fallbackEntityCode,
+  fallbackRaceCode,
+  buildRaceDataFocusOptions,
+  buildRaceDataMetricOptions,
+  resolveActiveRaceDataMetricId,
+  resolveRaceDataFocus,
   buildRaceDataAuditView,
+  buildCorrectedRaceEvidence,
+  isSafeRaceDataReturnPath,
   registerAdminRoutes
 };

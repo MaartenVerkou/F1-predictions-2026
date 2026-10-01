@@ -1,0 +1,31 @@
+<%- include('partials/header', { title: 'Definitions', user }) %>
+
+<div class="card survey-page-card public-definitions-page">
+  <div class="page-title-row">
+    <h1>Definitions</h1>
+    <a class="link page-back-link" href="/">&lt; <%= t('common.home') %></a>
+  </div>
+  <p class="muted">These terms explain the wording used in the prediction questions. Hover or focus an underlined term in Questions or Responses to see the same explanation in context.</p>
+  <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Definitions" tabindex="0">
+    <table class="table compact public-definitions-table">
+      <thead><tr><th scope="col">Term</th><th scope="col">Explanation</th><th scope="col">Used for</th></tr></thead>
+      <tbody>
+        <% (definitions || []).forEach((definition) => { %>
+          <tr>
+            <th scope="row"><%= definition.label %></th>
+            <td><%= definition.explanation %></td>
+            <td>
+              <% if (definition.questionIds.length) { %>
+                <span class="public-definition-scope"><%= definition.questionIds.join(' · ') %></span>
+              <% } else { %>
+                <span class="muted">All questions</span>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

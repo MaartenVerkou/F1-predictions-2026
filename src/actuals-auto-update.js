@@ -16,6 +16,7 @@ function runActualsAutoUpdate({
   racesPath,
   dryRun = false,
   maxRound = null,
+  round = null,
   extraEnv = {}
 } = {}) {
   const args = [SCRIPT_PATH, dryRun ? "--dry-run" : "--apply"];
@@ -27,6 +28,9 @@ function runActualsAutoUpdate({
   }
   if (maxRound != null && Number.isFinite(Number(maxRound)) && Number(maxRound) > 0) {
     args.push(`--max-round=${Math.floor(Number(maxRound))}`);
+  }
+  if (round != null && Number.isFinite(Number(round)) && Number(round) > 0) {
+    args.push(`--round=${Math.floor(Number(round))}`);
   }
 
   return new Promise((resolve, reject) => {

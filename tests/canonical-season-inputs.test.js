@@ -13,6 +13,7 @@ const {
   addProviderReference,
   assignmentForRound,
   ensureSeasonInputsSchema,
+  listSeasonMappings,
   resolveEntity,
   normalizeDriverNumber,
   sortSeasonDrivers
@@ -149,6 +150,21 @@ test("provider mappings resolve the stable canonical entity and reject type conf
   });
   assert.equal(conflict.status, "conflict");
   assert.equal(conflict.entity.entityId, 1);
+});
+
+test("season mappings do not leak provider references from another season", (t) => {
+  const db = createCanonicalDb();
+  t.after(() => db.close());
+
+  addProviderReference(db, {
+    entityType: "driver",
+    entityId: 3,
+    provider: "ergast",
+    providerKey: "other-season-driver"
+  });
+
+  const mappings = listSeasonMappings(db, 2026);
+  assert.equal(mappings.some((mapping) => mapping.entityId === 3), false);
 });
 
 test("season-scoped aliases remain unresolved when two canonical identities match", (t) => {

@@ -39,3 +39,16 @@ Every actual snapshot SHALL preserve the evidence revision, catalog revision, de
 - **WHEN** the correction is saved
 - **THEN** the system SHALL create an auditable correction linked to the prior snapshot
 - **AND** it SHALL require review before becoming the season's published actual set
+
+### Requirement: Actuals overview uses one bounded answer presentation
+The season Actuals overview SHALL use one shared presentation policy for multi-entity answers across all questions. It SHALL deduplicate repeated entities, prefer compact three-character entity codes, group visible codes into at most two lines, and expose an overflow count when more entities exist. The complete canonical answer SHALL remain available through the cell's accessible label or title.
+
+#### Scenario: A question returns a long driver or constructor list
+- **WHEN** an Actuals cell contains more than six unique driver or constructor values
+- **THEN** the visible cell SHALL remain within two compact code lines with an overflow count
+- **AND** the full answer SHALL remain available to assistive technology and hover inspection
+- **AND** the row height SHALL not depend on the number of returned entities
+
+#### Scenario: A future question returns a short entity list
+- **WHEN** a new question returns three or more unique entities through the shared overview model
+- **THEN** the same compact projection SHALL apply without adding question-specific formatting code

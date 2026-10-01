@@ -1,0 +1,6 @@
+<th scope="row" class="admin-actuals-question-cell">
+  <a class="admin-actuals-question-short-link"
+     href="/admin/race-data?season=<%= encodeURIComponent(season) %>&view=<%= encodeURIComponent(row.baseView) %>&focus=<%= encodeURIComponent(row.question.id) %>"
+     title="<%= row.question.prompt %> · <%= row.baseView === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view') %> · <%= row.focusLabel %>"
+     aria-label="Q<%= row.questionNumber %>: <%= row.question.prompt %>">Q<%= row.questionNumber %></a>
+</th>

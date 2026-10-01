@@ -43,7 +43,7 @@ The system SHALL allow an admin to select a configured round and inspect the per
 - **WHEN** the round detail renders
 - **THEN** it SHALL show each known driver with constructor, grid position, qualifying position when available, sprint result when available, race classification, race status, and points
 - **AND** it SHALL show import/source metadata and coverage state
-- **AND** it SHALL show the derived actual values associated with that round or link directly to the matching Actuals review target
+- **AND** it SHALL keep scoring review separate from this read-only evidence view
 
 #### Scenario: Admin opens a cancelled, future, or reconstructed round
 
@@ -52,16 +52,16 @@ The system SHALL allow an admin to select a configured round and inspect the per
 - **THEN** it SHALL show the calendar/import state and an explicit explanation
 - **AND** it SHALL not fabricate driver results or points
 
-### Requirement: Race data audit is linked to scoring review but remains read-only
+### Requirement: Race data audit remains read-only and separate from scoring review
 
-The system SHALL connect persisted source evidence to the derived actual snapshot without allowing the audit page to mutate scoring state.
+The system SHALL expose persisted source evidence for verification without allowing the audit page to mutate scoring state or presenting a duplicate scoring-review panel.
 
-#### Scenario: Admin follows derived actuals
+#### Scenario: Admin keeps scoring review separate
 
-- **GIVEN** a selected round has both source evidence and a derived actual snapshot
-- **WHEN** the admin chooses the Actuals review action
-- **THEN** the system SHALL open the existing Actuals review target for that round
-- **AND** the audit page SHALL preserve the selected cutoff context
+- **GIVEN** a selected round has source evidence
+- **WHEN** the admin reviews the Race data workspace
+- **THEN** the workspace SHALL show evidence and question-focused projections only
+- **AND** scoring changes SHALL remain in the existing Actuals workflow
 
 #### Scenario: Admin submits a mutation to the audit route
 

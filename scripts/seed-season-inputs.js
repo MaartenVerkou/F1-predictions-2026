@@ -6,7 +6,6 @@ const { createAppDatabase } = require("../src/app-database");
 const {
   ENTITY_TYPES,
   addEntityAlias,
-  addProviderReference,
   createOrGetSeason,
   ensureSeasonInputsSchema,
   slugify,
@@ -46,11 +45,25 @@ const DRIVER_TEAM_ASSIGNMENTS = {
   "Oscar Piastri": "McLaren",
   "Pierre Gasly": "Alpine",
   "Sergio Perez": "Cadillac",
-  "Valtteri Bottas": "Cadillac"
+  "Valtteri Bottas": "Cadillac",
+  "Yuki Tsunoda": "Racing Bulls"
 };
 
 // Stable presentation order for the season. IDs remain opaque database keys;
 // this list can be replaced for a future season without renumbering entities.
+const DRIVER_TEAM_ASSIGNMENT_PERIODS_2026 = {
+  "Liam Lawson": [
+    { team: "Racing Bulls", seat: 1, fromRound: 1, toRound: 11 },
+    { team: "Red Bull Racing", seat: 2, fromRound: 12, toRound: null }
+  ],
+  "Isack Hadjar": [
+    { team: "Red Bull Racing", seat: 2, fromRound: 1, toRound: 11 }
+  ],
+  "Yuki Tsunoda": [
+    { team: "Racing Bulls", seat: 1, fromRound: 12, toRound: null }
+  ]
+};
+
 const TEAM_DISPLAY_ORDER = [
   "Mercedes", "Ferrari", "McLaren", "Red Bull Racing", "Racing Bulls",
   "Alpine", "Haas F1 Team", "Audi", "Williams", "Aston Martin", "Cadillac"
@@ -72,10 +85,6 @@ const TEAM_DRIVER_ORDER = {
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
-}
-
-function providerKeyForDriver(name) {
-  return slugify(name).replace(/-/g, "_").replace(/_jr$/, "");
 }
 
 function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() } = {}) {
@@ -101,7 +110,6 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       });
       teamIds.set(teamName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, alias: teamName, source: "seed", now });
-      addProviderReference(db, { entityType: ENTITY_TYPES.TEAM, entityId: id, provider: "jolpica", providerKey: slugify(teamName), providerLabel: teamName, now });
       const displayOrder = TEAM_DISPLAY_ORDER.indexOf(teamName) + 1 || TEAM_DISPLAY_ORDER.length + 1;
       upsertSeasonTeam(db, { seasonId: seasonRow.id, teamId: id, displayOrder, orderBasis: "official", now });
     }
@@ -119,10 +127,28 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
       });
       driverIds.set(driverName, id);
       addEntityAlias(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, alias: driverName, source: "seed", now });
-      addProviderReference(db, { entityType: ENTITY_TYPES.DRIVER, entityId: id, provider: "jolpica", providerKey: providerKeyForDriver(driverName), providerLabel: driverName, now });
       const driverNumber = roster.driver_numbers?.[driverName];
       if (driverNumber == null) throw new Error(`Missing canonical driver number for ${driverName}.`);
       upsertSeasonDriver(db, { seasonId: seasonRow.id, driverId: id, driverNumber, now });
+      const periods = season === 2026 ? DRIVER_TEAM_ASSIGNMENT_PERIODS_2026[driverName] : null;
+      if (periods) {
+        db.prepare("DELETE FROM driver_team_assignments WHERE season_id = ? AND driver_id = ?").run(seasonRow.id, id);
+        periods.forEach((period) => {
+          const teamId = teamIds.get(period.team);
+          if (!teamId) throw new Error(`Missing canonical team assignment for ${driverName}.`);
+          upsertDriverTeamAssignment(db, {
+            seasonId: seasonRow.id,
+            driverId: id,
+            teamId,
+            seatNumber: period.seat,
+            fromRound: period.fromRound,
+            toRound: period.toRound,
+            source: "official-f1-2026-refresh",
+            now
+          });
+        });
+        continue;
+      }
       const teamName = DRIVER_TEAM_ASSIGNMENTS[driverName];
       if (!teamName || !teamIds.has(teamName)) throw new Error(`Missing canonical team assignment for ${driverName}.`);
       const seatNumber = (TEAM_DRIVER_ORDER[teamName] || []).indexOf(driverName) + 1 || 1;
@@ -135,23 +161,56 @@ function seedSeasonInputs(db, { season = SEASON, now = new Date().toISOString() 
     }
 
     const raceIds = [];
+    const existingRacesBySlug = new Map(
+      db.prepare("SELECT id, slug FROM races WHERE season_id = ?").all(seasonRow.id)
+        .map((row) => [String(row.slug), Number(row.id)])
+    );
+    // A corrected calendar can insert a round in the middle of an existing
+    // season. Move existing rows out of the unique round range first, then
+    // update them by stable slug so race identity and evidence references stay
+    // intact while aliases are rebuilt for the new schedule.
+    db.prepare("UPDATE races SET round_number = round_number + 1000 WHERE season_id = ?").run(seasonRow.id);
+    db.prepare("DELETE FROM entity_aliases WHERE entity_type = ? AND season_id = ?").run(ENTITY_TYPES.RACE, seasonRow.id);
+    for (const raceId of existingRacesBySlug.values()) {
+      db.prepare("DELETE FROM entity_provider_refs WHERE entity_type = ? AND entity_id = ?").run(ENTITY_TYPES.RACE, raceId);
+    }
     raceNames.forEach((raceName, index) => {
       const roundNumber = index + 1;
-      const raceId = upsertRace(db, {
-        seasonId: seasonRow.id,
+      const slug = slugify(raceName);
+      const existingRaceId = existingRacesBySlug.get(slug);
+      let raceId;
+      const values = [
         roundNumber,
-        slug: slugify(raceName),
-        displayName: raceName,
-        scheduledDate: calendar[raceName]?.start || null,
-        scheduledTimezone: calendar[raceName]?.timezone || null,
-        raceCode: calendar[raceName]?.code,
-        countryCode: calendar[raceName]?.country_code,
-        circuitName: calendar[raceName]?.circuit,
-        calendarState: "scheduled",
+        slug,
+        raceName,
+        calendar[raceName]?.start || null,
+        calendar[raceName]?.timezone || null,
+        calendar[raceName]?.code || null,
+        calendar[raceName]?.country_code || null,
+        calendar[raceName]?.circuit || null,
+        "scheduled",
         now
-      });
+      ];
+      if (existingRaceId) {
+        db.prepare("UPDATE races SET round_number = ?, slug = ?, display_name = ?, scheduled_date = ?, scheduled_timezone = ?, race_code = ?, country_code = ?, circuit_name = ?, calendar_state = ?, updated_at = ? WHERE id = ?")
+          .run(...values, existingRaceId);
+        raceId = existingRaceId;
+      } else {
+        raceId = upsertRace(db, {
+          seasonId: seasonRow.id,
+          roundNumber,
+          slug,
+          displayName: raceName,
+          scheduledDate: calendar[raceName]?.start || null,
+          scheduledTimezone: calendar[raceName]?.timezone || null,
+          raceCode: calendar[raceName]?.code,
+          countryCode: calendar[raceName]?.country_code,
+          circuitName: calendar[raceName]?.circuit,
+          calendarState: "scheduled",
+          now
+        });
+      }
       addEntityAlias(db, { entityType: ENTITY_TYPES.RACE, entityId: raceId, seasonId: seasonRow.id, alias: raceName, source: "seed", now });
-      addProviderReference(db, { entityType: ENTITY_TYPES.RACE, entityId: raceId, provider: "jolpica", providerKey: `${season}-round-${roundNumber}`, providerLabel: raceName, now });
       raceIds.push(raceId);
     });
     return { seasonId: seasonRow.id, driverCount: driverIds.size, teamCount: teamIds.size, raceCount: raceIds.length };

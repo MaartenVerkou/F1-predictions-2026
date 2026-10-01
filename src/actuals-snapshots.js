@@ -3,6 +3,9 @@
 const REVIEW_STATUS_PENDING = "pending";
 const REVIEW_STATUS_REVIEWED = "reviewed";
 
+const PUBLISHED_ACTUALS_UNAVAILABLE = "not_published";
+const PUBLISHED_ACTUALS_SNAPSHOT_NOT_REVIEWED = "snapshot_not_reviewed";
+
 function normalizeReviewStatus(raw) {
   return String(raw || "").trim().toLowerCase() === REVIEW_STATUS_PENDING
     ? REVIEW_STATUS_PENDING
@@ -38,6 +41,21 @@ function ensureActualSnapshotColumns(db) {
   if (!names.has("source_data_snapshot_id")) {
     db.exec("ALTER TABLE actual_snapshots ADD COLUMN source_data_snapshot_id INTEGER;");
   }
+  if (!names.has("catalog_revision")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN catalog_revision TEXT;");
+  }
+  if (!names.has("evidence_revision")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN evidence_revision TEXT;");
+  }
+  if (!names.has("derivation_version")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN derivation_version TEXT;");
+  }
+  if (!names.has("published_at")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN published_at TEXT;");
+  }
+  if (!names.has("manual_correction_json")) {
+    db.exec("ALTER TABLE actual_snapshots ADD COLUMN manual_correction_json TEXT;");
+  }
 
   db.exec(`
     UPDATE actual_snapshots
@@ -69,6 +87,28 @@ function ensureActualSnapshotColumns(db) {
   `);
 }
 
+/**
+ * Keep the season-level publication pointer separate from the historical
+ * snapshot rows. A reviewed snapshot is evidence ready for publication; the
+ * pointer is the explicit contract used by public scoring.
+ */
+function ensurePublishedActualsSchema(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS published_actual_sets (
+      season INTEGER PRIMARY KEY,
+      snapshot_id INTEGER NOT NULL,
+      published_at TEXT NOT NULL,
+      published_by_user_id INTEGER,
+      catalog_revision TEXT,
+      evidence_revision TEXT,
+      derivation_version TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_published_actual_sets_snapshot
+      ON published_actual_sets(snapshot_id);
+  `);
+}
+
 function mapSnapshotRow(row) {
   if (!row) return null;
   return {
@@ -91,7 +131,12 @@ function mapSnapshotRow(row) {
     source_data_snapshot_id:
       row.source_data_snapshot_id == null || row.source_data_snapshot_id === ""
         ? null
-        : Number(row.source_data_snapshot_id)
+        : Number(row.source_data_snapshot_id),
+    catalog_revision: row.catalog_revision ? String(row.catalog_revision) : null,
+    evidence_revision: row.evidence_revision ? String(row.evidence_revision) : null,
+    derivation_version: row.derivation_version ? String(row.derivation_version) : null,
+    published_at: row.published_at ? String(row.published_at) : null,
+    manual_correction_json: row.manual_correction_json ? String(row.manual_correction_json) : null
   };
 }
 
@@ -147,7 +192,12 @@ function findLatestSnapshotForRound(db, season, roundNumber, options = {}) {
           reviewed_at,
           reviewed_by_user_id,
           source_data_import_id,
-          source_data_snapshot_id
+          source_data_snapshot_id,
+          catalog_revision,
+          evidence_revision,
+          derivation_version,
+          published_at,
+          manual_correction_json
         FROM actual_snapshots
         WHERE season = ?
           AND round_number = ?
@@ -186,7 +236,12 @@ function findLatestRoundSnapshotForSeason(db, season, options = {}) {
           reviewed_at,
           reviewed_by_user_id,
           source_data_import_id,
-          source_data_snapshot_id
+          source_data_snapshot_id,
+          catalog_revision,
+          evidence_revision,
+          derivation_version,
+          published_at,
+          manual_correction_json
         FROM actual_snapshots
         WHERE season = ?
           AND round_number IS NOT NULL
@@ -225,7 +280,12 @@ function listLatestSnapshotsForSeason(db, season, options = {}) {
         reviewed_at,
         reviewed_by_user_id,
         source_data_import_id,
-        source_data_snapshot_id
+        source_data_snapshot_id,
+        catalog_revision,
+        evidence_revision,
+        derivation_version,
+        published_at,
+        manual_correction_json
       FROM actual_snapshots
       WHERE season = ?
         AND round_number IS NOT NULL
@@ -265,7 +325,12 @@ function findSnapshotById(db, snapshotId, options = {}) {
           reviewed_at,
           reviewed_by_user_id,
           source_data_import_id,
-          source_data_snapshot_id
+          source_data_snapshot_id,
+          catalog_revision,
+          evidence_revision,
+          derivation_version,
+          published_at,
+          manual_correction_json
         FROM actual_snapshots
         WHERE id = ?
         LIMIT 1
@@ -274,6 +339,147 @@ function findSnapshotById(db, snapshotId, options = {}) {
       .get(snapshotId)
   );
   return isSnapshotWithinRoundLimit(snapshot, options) ? snapshot : null;
+}
+
+function findPublishedActualSnapshot(db, season) {
+  ensurePublishedActualsSchema(db);
+  const safeSeason = Number(season);
+  if (!Number.isFinite(safeSeason)) return null;
+  const pointer = db
+    .prepare(
+      `
+      SELECT
+        pas.season AS published_season,
+        pas.published_at AS set_published_at,
+        pas.published_by_user_id,
+        pas.catalog_revision AS set_catalog_revision,
+        pas.evidence_revision AS set_evidence_revision,
+        pas.derivation_version AS set_derivation_version,
+        a.*
+      FROM published_actual_sets pas
+      JOIN actual_snapshots a ON a.id = pas.snapshot_id
+      WHERE pas.season = ?
+      LIMIT 1
+      `
+    )
+    .get(safeSeason);
+  if (!pointer) return null;
+  const snapshot = mapSnapshotRow(pointer);
+  if (!snapshot || Number(snapshot.season) !== safeSeason) return null;
+  return {
+    ...snapshot,
+    published_at: pointer.set_published_at || snapshot.published_at || null,
+    published_by_user_id:
+      pointer.published_by_user_id == null
+        ? null
+        : Number(pointer.published_by_user_id),
+    published_catalog_revision: pointer.set_catalog_revision || null,
+    published_evidence_revision: pointer.set_evidence_revision || null,
+    published_derivation_version: pointer.set_derivation_version || null
+  };
+}
+
+function loadPublishedActuals(db, season) {
+  ensurePublishedActualsSchema(db);
+  const safeSeason = Number(season);
+  const empty = {
+    available: false,
+    reason: PUBLISHED_ACTUALS_UNAVAILABLE,
+    season: Number.isFinite(safeSeason) ? safeSeason : null,
+    snapshot: null,
+    values: {}
+  };
+  if (!Number.isFinite(safeSeason)) return empty;
+
+  const snapshot = findPublishedActualSnapshot(db, safeSeason);
+  if (!snapshot) return empty;
+  if (normalizeReviewStatus(snapshot.review_status) !== REVIEW_STATUS_REVIEWED) {
+    return {
+      ...empty,
+      reason: PUBLISHED_ACTUALS_SNAPSHOT_NOT_REVIEWED,
+      snapshot
+    };
+  }
+  return {
+    available: true,
+    reason: null,
+    season: safeSeason,
+    snapshot,
+    values: fetchSnapshotValues(db, snapshot.id)
+  };
+}
+
+function publishActualSnapshot(db, {
+  season,
+  snapshotId,
+  publishedByUserId = null,
+  publishedAt = new Date().toISOString()
+}) {
+  ensurePublishedActualsSchema(db);
+  const safeSeason = Number(season);
+  const safeSnapshotId = Number(snapshotId);
+  if (!Number.isFinite(safeSeason) || !Number.isFinite(safeSnapshotId)) {
+    throw new Error("A valid season and actual snapshot are required for publication.");
+  }
+  const snapshot = findSnapshotById(db, safeSnapshotId);
+  if (!snapshot || Number(snapshot.season) !== safeSeason) {
+    throw new Error("The actual snapshot does not belong to the selected season.");
+  }
+  if (normalizeReviewStatus(snapshot.review_status) !== REVIEW_STATUS_REVIEWED) {
+    throw new Error("Only a reviewed actual snapshot can be published.");
+  }
+  const safePublishedAt = String(publishedAt || new Date().toISOString());
+  const safeUserId = Number.isFinite(Number(publishedByUserId))
+    ? Number(publishedByUserId)
+    : null;
+  const tx = db.transaction(() => {
+    db.prepare(
+      `
+      UPDATE actual_snapshots
+      SET published_at = NULL
+      WHERE season = ? AND id <> ?
+      `
+    ).run(safeSeason, safeSnapshotId);
+    db.prepare(
+      `
+      UPDATE actual_snapshots
+      SET published_at = ?, updated_at = COALESCE(updated_at, created_at)
+      WHERE id = ?
+      `
+    ).run(safePublishedAt, safeSnapshotId);
+    db.prepare(
+      `
+      INSERT INTO published_actual_sets (
+        season,
+        snapshot_id,
+        published_at,
+        published_by_user_id,
+        catalog_revision,
+        evidence_revision,
+        derivation_version
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(season)
+      DO UPDATE SET
+        snapshot_id = excluded.snapshot_id,
+        published_at = excluded.published_at,
+        published_by_user_id = excluded.published_by_user_id,
+        catalog_revision = excluded.catalog_revision,
+        evidence_revision = excluded.evidence_revision,
+        derivation_version = excluded.derivation_version
+      `
+    ).run(
+      safeSeason,
+      safeSnapshotId,
+      safePublishedAt,
+      safeUserId,
+      snapshot.catalog_revision || null,
+      snapshot.evidence_revision || null,
+      snapshot.derivation_version || null
+    );
+  });
+  tx();
+  return loadPublishedActuals(db, safeSeason);
 }
 
 function filterNonEmptyValues(valuesByQuestion) {
@@ -301,7 +507,11 @@ function sanitizeSnapshotMeta({
   sourceType = "manual",
   sourceNote = "",
   createdByUserId = null,
-  label = ""
+  label = "",
+  catalogRevision = null,
+  evidenceRevision = null,
+  derivationVersion = null,
+  manualCorrection = null
 }) {
   const now = new Date().toISOString();
   const safeSeason = Number.isFinite(Number(season)) ? Number(season) : null;
@@ -327,7 +537,11 @@ function sanitizeSnapshotMeta({
     safeLabel,
     safeSourceType,
     safeSourceNote,
-    safeUserId
+    safeUserId,
+    safeCatalogRevision: String(catalogRevision || "").trim() || null,
+    safeEvidenceRevision: String(evidenceRevision || "").trim() || null,
+    safeDerivationVersion: String(derivationVersion || "").trim() || null,
+    safeManualCorrection: manualCorrection == null ? null : JSON.stringify(manualCorrection)
   };
 }
 
@@ -341,7 +555,12 @@ function upsertSnapshotForRound(db, {
   createdByUserId = null,
   label = "",
   reviewStatus = REVIEW_STATUS_REVIEWED,
-  preserveReviewIfUnchanged = false
+  preserveReviewIfUnchanged = false,
+  catalogRevision = null,
+  evidenceRevision = null,
+  derivationVersion = null,
+  manualCorrection = null,
+  publishedAt = null
 }) {
   const entries = filterNonEmptyValues(valuesByQuestion);
   if (entries.length === 0) return null;
@@ -353,7 +572,11 @@ function upsertSnapshotForRound(db, {
     sourceType,
     sourceNote,
     createdByUserId,
-    label
+    label,
+    catalogRevision,
+    evidenceRevision,
+    derivationVersion,
+    manualCorrection
   });
   const existing = meta.safeRoundNumber
     ? findLatestSnapshotForRound(db, meta.safeSeason, meta.safeRoundNumber)
@@ -361,13 +584,19 @@ function upsertSnapshotForRound(db, {
   const nextValues = Object.fromEntries(entries);
   const existingValues = existing ? fetchSnapshotValues(db, existing.id) : {};
   const valuesChanged = !existing || !snapshotValuesEqual(existingValues, nextValues);
+  const provenanceChanged = Boolean(existing && (
+    String(existing.catalog_revision || "") !== String(meta.safeCatalogRevision || "")
+      || String(existing.evidence_revision || "") !== String(meta.safeEvidenceRevision || "")
+      || String(existing.derivation_version || "") !== String(meta.safeDerivationVersion || "")
+      || String(existing.manual_correction_json || "") !== String(meta.safeManualCorrection || "")
+  ));
 
   let nextReviewStatus = normalizeReviewStatus(reviewStatus);
   let nextReviewedAt = nextReviewStatus === REVIEW_STATUS_REVIEWED ? meta.now : null;
   let nextReviewedByUserId =
     nextReviewStatus === REVIEW_STATUS_REVIEWED ? meta.safeUserId : null;
 
-  if (existing && preserveReviewIfUnchanged && !valuesChanged) {
+  if (existing && preserveReviewIfUnchanged && !valuesChanged && !provenanceChanged) {
     nextReviewStatus = normalizeReviewStatus(existing.review_status);
     nextReviewedAt = existing.reviewed_at || null;
     nextReviewedByUserId = existing.reviewed_by_user_id || null;
@@ -387,9 +616,14 @@ function upsertSnapshotForRound(db, {
       created_by_user_id,
       review_status,
       reviewed_at,
-      reviewed_by_user_id
+      reviewed_by_user_id,
+      catalog_revision,
+      evidence_revision,
+      derivation_version,
+      published_at,
+      manual_correction_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
   );
   const insertValue = db.prepare(
@@ -405,6 +639,7 @@ function upsertSnapshotForRound(db, {
       Boolean(snapshotId)
       && preserveReviewIfUnchanged
       && !valuesChanged
+      && !provenanceChanged
       && normalizeReviewStatus(existing.review_status) === nextReviewStatus
       && String(existing.reviewed_at || "") === String(nextReviewedAt || "")
       && Number(existing.reviewed_by_user_id || 0) === Number(nextReviewedByUserId || 0);
@@ -413,6 +648,7 @@ function upsertSnapshotForRound(db, {
       return {
         snapshotId,
         valuesChanged,
+        provenanceChanged,
         reviewStatus: nextReviewStatus
       };
     }
@@ -429,7 +665,14 @@ function upsertSnapshotForRound(db, {
       meta.safeUserId,
       nextReviewStatus,
       nextReviewedAt,
-      nextReviewedByUserId
+      nextReviewedByUserId,
+      meta.safeCatalogRevision,
+      meta.safeEvidenceRevision,
+      meta.safeDerivationVersion,
+      nextReviewStatus === REVIEW_STATUS_REVIEWED
+        ? (publishedAt || meta.now)
+        : null,
+      meta.safeManualCorrection
     );
     snapshotId = Number(snapshotInfo.lastInsertRowid);
 
@@ -439,6 +682,7 @@ function upsertSnapshotForRound(db, {
     return {
       snapshotId,
       valuesChanged,
+      provenanceChanged,
       reviewStatus: nextReviewStatus
     };
   });
@@ -462,24 +706,31 @@ function markSnapshotReviewed(db, {
     SET review_status = ?,
         reviewed_at = ?,
         reviewed_by_user_id = ?,
+        published_at = COALESCE(published_at, ?),
         updated_at = COALESCE(updated_at, created_at)
     WHERE id = ?
     `
-  ).run(REVIEW_STATUS_REVIEWED, reviewedAt, safeUserId, safeSnapshotId);
+  ).run(REVIEW_STATUS_REVIEWED, reviewedAt, safeUserId, reviewedAt, safeSnapshotId);
   return Number(result.changes || 0);
 }
 
 module.exports = {
+  PUBLISHED_ACTUALS_SNAPSHOT_NOT_REVIEWED,
+  PUBLISHED_ACTUALS_UNAVAILABLE,
   REVIEW_STATUS_PENDING,
   REVIEW_STATUS_REVIEWED,
   ensureActualSnapshotColumns,
+  ensurePublishedActualsSchema,
   fetchSnapshotValues,
   findLatestRoundSnapshotForSeason,
   findLatestSnapshotForRound,
+  findPublishedActualSnapshot,
   findSnapshotById,
+  loadPublishedActuals,
   listLatestSnapshotsForSeason,
   markSnapshotReviewed,
   normalizeReviewStatus,
+  publishActualSnapshot,
   snapshotValuesEqual,
   upsertSnapshotForRound
 };

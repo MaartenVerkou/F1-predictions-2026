@@ -1,0 +1,6 @@
+<td class="admin-race-data-summary admin-race-data-sticky-right"<% if (rowspan) { %> rowspan="<%= rowspan %>"<% } %>>
+  <span class="admin-race-data-summary-points"><%= row.summaryLabel != null ? row.summaryLabel : (row.summaryValue == null ? (row.points == null ? '—' : row.points) : row.summaryValue) %></span>
+  <% if (focusId === 'championship_points_results' && row.reconciliationStatus && row.reconciliationStatus !== 'missing') { %>
+    <small class="admin-race-data-summary-reconciliation" title="Legacy imported standings: <%= row.legacyPoints == null ? '—' : row.legacyPoints %> · Derived from race results: <%= row.points == null ? '—' : row.points %>"><%= row.reconciliationStatus === 'match' ? 'match' : 'diff' %></small>
+  <% } %>
+</td>

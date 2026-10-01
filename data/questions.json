@@ -11,7 +11,13 @@
         "2nd": 25,
         "3rd": 15
       },
-      "points_display": "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts"
+      "points_display": "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "championship_top3",
+        "kind": "matrix",
+        "scope": "season"
+      }
     },
     {
       "id": "constructors_championship_top_3",
@@ -24,7 +30,13 @@
         "2nd": 25,
         "3rd": 15
       },
-      "points_display": "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts"
+      "points_display": "1st place = 50 pts, 2nd place = 25 pts, 3rd place = 15 pts",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "championship_top3",
+        "kind": "matrix",
+        "scope": "season"
+      }
     },
     {
       "id": "drivers_championship_last",
@@ -32,7 +44,14 @@
       "type": "single_choice",
       "options_source": "drivers",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "last_standing",
+        "kind": "matrix",
+        "scope": "season",
+        "sort": "asc"
+      }
     },
     {
       "id": "constructors_championship_last",
@@ -40,7 +59,14 @@
       "type": "single_choice",
       "options_source": "teams",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "last_standing",
+        "kind": "matrix",
+        "scope": "season",
+        "sort": "asc"
+      }
     },
     {
       "id": "lowest_grid_win_position",
@@ -82,7 +108,17 @@
         "3": 3,
         "4": 1
       },
-      "points_display": "Position score: exact = 10 pts; off by 1/2/3/4 = 7/5/3/1 pts. Plus 10 pts for the correct driver (can also be earned without position points)."
+      "points_display": "Position score: exact = 10 pts; off by 1/2/3/4 = 7/5/3/1 pts. Plus 10 pts for the correct driver (can also be earned without position points).",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "grid_wins",
+        "kind": "matrix",
+        "scope": "season",
+        "requiredEvidence": ["race"],
+        "matrixMetric": "grid_wins",
+        "cellMode": "ordinal",
+        "footerMode": "none"
+      }
     },
     {
       "id": "all_podium_finishers",
@@ -92,7 +128,16 @@
       "points": 5,
       "penalty": 5,
       "minimum": 0,
-      "points_display": "5 points per correct driver, -5 for each missing or incorrect driver (min 0)"
+      "points_display": "5 points per correct driver, -5 for each missing or incorrect driver (min 0)",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "podiums",
+        "kind": "matrix",
+        "scope": "season",
+        "requiredEvidence": ["race"],
+        "cellMode": "count",
+        "footerMode": "none"
+      }
     },
     {
       "id": "most_points_no_podium",
@@ -106,7 +151,17 @@
       "special_case": "all_podiums_bonus",
       "bonus_value": "All teams scored a podium",
       "bonus_points": 75,
-      "points_display": "10 points, or 75 if all teams score a podium and you predict that"
+      "points_display": "10 points, or 75 if all teams score a podium and you predict that",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "no_podium_points",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["race", "constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none"
+      }
     },
     {
       "id": "most_driver_of_the_day",
@@ -114,7 +169,17 @@
       "type": "single_choice",
       "options_source": "drivers",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "driver_of_day",
+        "kind": "matrix",
+        "scope": "season",
+        "requiredEvidence": ["external.driverOfTheDay"],
+        "matrixMetric": "driver_of_day",
+        "cellMode": "count",
+        "footerMode": "none"
+      }
     },
     {
       "id": "most_dnfs_driver",
@@ -122,7 +187,17 @@
       "type": "single_choice",
       "options_source": "drivers",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "dnfs",
+        "kind": "matrix",
+        "scope": "season",
+        "requiredEvidence": ["race"],
+        "matrixMetric": "dnfs",
+        "cellMode": "count",
+        "footerMode": "count"
+      }
     },
     {
       "id": "destructors_driver",
@@ -130,7 +205,18 @@
       "type": "single_choice",
       "options_source": "drivers",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "damage",
+        "matrixMetric": "damage",
+        "kind": "matrix",
+        "scope": "season",
+        "requiredEvidence": ["external.damage"],
+        "cellMode": "currency",
+        "footerMode": "sum",
+        "highlightMode": "rows"
+      }
     },
     {
       "id": "destructors_team",
@@ -138,7 +224,18 @@
       "type": "single_choice",
       "options_source": "teams",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "damage",
+        "matrixMetric": "damage",
+        "kind": "matrix",
+        "scope": "season",
+        "requiredEvidence": ["external.damage"],
+        "cellMode": "currency",
+        "footerMode": "sum",
+        "highlightMode": "rows"
+      }
     },
     {
       "id": "teammate_battle_antonelli_russell",
@@ -150,7 +247,18 @@
       ],
       "points": 25,
       "tie_bonus": 75,
-      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points"
+      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "teammate_points",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["driverStandings"],
+        "cellMode": "points",
+        "footerMode": "none",
+        "compareDrivers": ["Kimi Antonelli", "George Russell"]
+      }
     },
     {
       "id": "teammate_battle_lawson_lindblad",
@@ -162,7 +270,18 @@
       ],
       "points": 25,
       "tie_bonus": 75,
-      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points"
+      "points_display": "25 points minus 1 per point off (winner must be correct). Tie + correct: 75 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "teammate_points",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["driverStandings"],
+        "cellMode": "points",
+        "footerMode": "none",
+        "compareDrivers": ["Lando Norris", "Oscar Piastri"]
+      }
     },
     {
       "id": "closest_qualifying_teammates",
@@ -170,7 +289,18 @@
       "type": "single_choice",
       "options_source": "teams",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "qualifying_h2h",
+        "kind": "matrix",
+        "scope": "season",
+        "sort": "asc",
+        "requiredEvidence": ["qualifying"],
+        "matrixMetric": "qualifying_h2h",
+        "cellMode": "qualifying",
+        "footerMode": "none"
+      }
     },
     {
       "id": "alpine_vs_cadillac_audi",
@@ -181,7 +311,18 @@
         "Less"
       ],
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "alpine_comparison",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none",
+        "compareTeams": ["Alpine", "Cadillac", "Audi", "Aston Martin"]
+      }
     },
     {
       "id": "select_three_races_dnfs",
@@ -190,56 +331,132 @@
       "count": 3,
       "options_source": "races",
       "points": 2,
-      "points_display": "2 points per DNF in your selected races"
+      "points_display": "2 points per DNF in your selected races",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "dnf_by_race",
+        "matrixMetric": "dnfs",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["race"],
+        "cellMode": "count",
+        "footerMode": "count"
+      }
     },
     {
       "id": "races_before_title_decided",
       "prompt": "How many races before the end is the Drivers' title decided? (last race = 0)",
       "type": "numeric",
       "points": 10,
-      "points_display": "10 points"
+      "points_display": "10 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "title_decision",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["driverStandings", "sprint"]
+      }
     },
     {
       "id": "all_teams_score_points",
       "prompt": "Does every team score points?",
       "type": "boolean",
       "points": 5,
-      "points_display": "5 points"
+      "points_display": "5 points",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "all_teams_points",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none"
+      }
     },
     {
       "id": "mini_q1_first_race_winner_champion",
       "prompt": "Winner of race 1 wins the Drivers' Championship",
       "type": "boolean",
       "points": 5,
-      "points_display": "5 points"
+      "points_display": "5 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "race1_champion",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["race", "driverStandings"]
+      }
     },
     {
       "id": "mini_q2_mercedes_engines_top5",
       "prompt": "In the Constructors' Championship, 4 of the top 5 are teams with Mercedes engines",
       "type": "boolean",
       "points": 5,
-      "points_display": "5 points"
+      "points_display": "5 points",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "engine_top5",
+        "matrixMetric": "points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["constructorStandings"],
+        "cellMode": "points",
+        "footerMode": "none",
+        "targetEngine": "Mercedes"
+      }
     },
     {
       "id": "mini_q3_ferrari_podium",
       "prompt": "Both Ferrari drivers score at least one podium",
       "type": "boolean",
       "points": 5,
-      "points_display": "5 points"
+      "points_display": "5 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "ferrari_podium",
+        "matrixMetric": "podiums",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["race"],
+        "cellMode": "count",
+        "footerMode": "none",
+        "targetTeam": "Ferrari"
+      }
     },
     {
       "id": "mini_q4_sprint_champion_same",
       "prompt": "If we only count points from sprint races, the same driver would be world champion",
       "type": "boolean",
       "points": 5,
-      "points_display": "5 points"
+      "points_display": "5 points",
+      "race_data_focus": {
+        "view": "drivers",
+        "metric": "sprint_champion_same",
+        "matrixMetric": "sprint_points",
+        "kind": "summary",
+        "scope": "season",
+        "requiredEvidence": ["sprint", "driverStandings"],
+        "cellMode": "points",
+        "footerMode": "none"
+      }
     },
     {
       "id": "mini_q5_team_engine_switch_2027_2028",
       "prompt": "Before the end of the 2026 season, one or more teams announce they'll switch engine supplier from 2027 or 2028 onwards",
       "type": "boolean",
       "points": 5,
-      "points_display": "5 points"
+      "points_display": "5 points",
+      "race_data_focus": {
+        "view": "constructors",
+        "metric": "engine_switch",
+        "matrixMetric": "points",
+        "kind": "unavailable",
+        "scope": "season",
+        "requiredEvidence": ["external.announcement"]
+      }
     }
   ]
 }

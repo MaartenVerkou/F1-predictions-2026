@@ -1,107 +1,152 @@
-<%- include('partials/header', { title: 'Question settings', user }) %>
-<%- include('partials/admin_nav', { active: 'questions' }) %>
+<%- include('partials/header', { title: 'Questions & Results', user }) %>
+<%- include('partials/admin_nav', { active: 'questions', season }) %>
 
-<div class="card admin-page-card">
-  <h1>Question settings</h1>
-  <p class="muted">
-    Enable/disable questions and override points for simulation. Changes apply immediately to prediction forms, actuals, and leaderboard scoring.
-  </p>
-  <p class="muted"><strong>Global settings</strong> · These question and scoring rules are shared by every season.</p>
+<% const rows = Array.isArray(questionRows) ? questionRows : []; %>
+<% const view = workspaceView === 'results' ? 'results' : 'questions'; %>
+<% const editing = view === 'questions' && mode === 'edit'; %>
+<% const seasonValue = Number(season || 2026); %>
+
+<div class="card admin-page-card admin-questions-page">
+  <div class="admin-race-data-heading admin-questions-heading">
+    <div>
+      <h1>Questions &amp; Results</h1>
+      <p class="muted admin-page-intro">
+        <%= view === 'results'
+          ? 'Review derived question results from the selected season. Correct source evidence in Race Data.'
+          : 'Manage this season’s question wording, order, scoring and inclusion.' %>
+      </p>
+    </div>
+    <div class="admin-questions-context">
+      <form method="get" action="/admin/questions" class="admin-questions-season-form" data-admin-questions-season-form>
+        <input type="hidden" name="view" value="<%= view %>">
+        <% if (editing) { %><input type="hidden" name="mode" value="edit"><% } %>
+        <label for="admin-questions-season">Season</label>
+        <select id="admin-questions-season" name="season" onchange="this.form.submit()">
+          <% (availableSeasons || []).forEach((availableSeason) => { %>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === seasonValue ? 'selected' : '' %>><%= availableSeason.displayLabel %></option>
+          <% }) %>
+        </select>
+      </form>
+    </div>
+  </div>
 
   <% if (saveError || saveSuccess) { %>
     <div class="admin-feedback-context">
-      <% if (saveError) { %>
-        <div class="alert" role="alert"><%= saveError %></div>
-      <% } %>
-      <% if (saveSuccess) { %>
-        <p class="muted" role="status"><%= saveSuccess %></p>
-      <% } %>
+      <% if (saveError) { %><div class="alert" role="alert"><%= saveError %></div><% } %>
+      <% if (saveSuccess) { %><p class="muted" role="status"><%= saveSuccess %></p><% } %>
     </div>
   <% } %>
 
-  <% const formatValue = (value) => {
-    if (value == null) return "-";
-    if (typeof value === "string") return value;
-    if (typeof value === "number") return String(value);
-    return JSON.stringify(value);
-  }; %>
-
-  <form method="post" action="/admin/questions">
-    <%- csrfField() %>
-    <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Question settings table" tabindex="0">
-    <table class="table compact admin-question-table">
-      <thead>
-        <tr>
-          <th>Order</th>
-          <th>Question</th>
-          <th>Type</th>
-          <th>Included</th>
-          <th>Default points</th>
-          <th>Points override (JSON)</th>
-          <th>Effective points</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% questions.forEach((question, index) => { %>
-          <tr>
-            <td class="admin-question-order">
-              <div class="admin-order-buttons">
-                <button
-                  type="submit"
-                  class="secondary admin-order-btn"
-                  formaction="/admin/questions/reorder"
-                  formmethod="post"
-                  name="move"
-                  value="<%= `${question.id}:up` %>"
-                  <%= index === 0 ? 'disabled' : '' %>
-                  title="Move up"
-                >&#8593;</button>
-                <button
-                  type="submit"
-                  class="secondary admin-order-btn"
-                  formaction="/admin/questions/reorder"
-                  formmethod="post"
-                  name="move"
-                  value="<%= `${question.id}:down` %>"
-                  <%= index === questions.length - 1 ? 'disabled' : '' %>
-                  title="Move down"
-                >&#8595;</button>
-              </div>
-            </td>
-            <td class="admin-question-cell">
-              <div class="admin-question-title"><%= question.prompt %></div>
-              <div class="muted admin-question-id"><code class="admin-question-code"><%= question.id %></code></div>
-            </td>
-            <td><%= question.type || 'text' %></td>
-            <td class="admin-question-included">
-              <label class="muted">
-                <input
-                  type="checkbox"
-                  name="<%= question.id %>__included"
-                  value="1"
-                  <%= question._included ? 'checked' : '' %>
-                />
-                Yes
-              </label>
-            </td>
-            <td><code class="admin-question-code"><%= formatValue(question._basePoints) %></code></td>
-            <td class="admin-question-override">
-              <input
-                type="text"
-                name="<%= question.id %>__points"
-                value="<%= question._pointsOverrideRaw || '' %>"
-                placeholder='Empty = default. Ex: 10 or {"1st":50}'
-              />
-            </td>
-            <td><code class="admin-question-code"><%= formatValue(question._effectivePoints) %></code></td>
-          </tr>
-        <% }) %>
-      </tbody>
-    </table>
+  <% if (view === 'results') { %>
+    <div class="admin-question-table-region">
+      <div class="admin-race-data-detail-toolbar">
+        <%- include('partials/admin_questions_view_toggle', { view, seasonValue, editing }) %>
+      </div>
+      <%- include('partials/admin_question_results') %>
+    </div>
+  <% } else { %>
+  <div class="admin-question-table-region">
+    <div class="admin-race-data-detail-toolbar">
+      <%- include('partials/admin_questions_view_toggle', { view, seasonValue, editing }) %>
+      <div class="admin-race-data-detail-actions admin-toolbar-actions">
+      <% if (editing) { %>
+        <button type="submit" form="admin-question-edit-form" class="secondary admin-question-save-button">Save changes</button>
+        <a class="button-link secondary admin-question-cancel" href="/admin/questions?season=<%= seasonValue %>">Cancel</a>
+      <% } else { %>
+        <a class="button-link secondary admin-race-data-edit-button admin-question-edit-button" href="/admin/questions?season=<%= seasonValue %>&mode=edit">Edit data</a>
+      <% } %>
+      </div>
     </div>
 
-    <button type="submit">Save question settings</button>
+  <form id="admin-question-edit-form" method="post" action="/admin/questions" class="admin-question-edit-form">
+    <%- csrfField() %>
+    <input type="hidden" name="season" value="<%= seasonValue %>">
+    <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Questions input table" tabindex="0">
+      <table class="table compact admin-question-table <%= editing ? 'admin-question-table--editing' : '' %>" <%= editing ? 'data-question-order-table' : '' %>>
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Question</th>
+            <th scope="col">Calculation</th>
+            <th scope="col">Points</th>
+            <th scope="col">Included</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rows.forEach((row) => { %>
+            <tr data-question-order-row>
+              <td class="admin-question-order-number">
+                <% if (editing) { %>
+                  <div class="admin-question-order-controls">
+                    <label class="sr-only" for="question-<%= row.id %>-order">Order for <%= row.prompt %></label>
+                    <input id="question-<%= row.id %>-order" class="admin-question-order-input" data-question-order-input type="number" name="<%= row.id %>__order" value="<%= row.number %>" min="1" max="<%= rows.length %>" required>
+                    <div class="admin-question-order-buttons" role="group" aria-label="Reorder <%= row.prompt %>">
+                      <button type="button" class="secondary admin-question-order-btn" data-question-order-move="up" aria-label="Move <%= row.prompt %> up" title="Move up">&#8593;</button>
+                      <button type="button" class="secondary admin-question-order-btn" data-question-order-move="down" aria-label="Move <%= row.prompt %> down" title="Move down">&#8595;</button>
+                    </div>
+                  </div>
+                <% } else { %>
+                  <%= String(row.number).padStart(2, '0') %>
+                <% } %>
+              </td>
+              <td class="admin-question-cell">
+                <% if (editing) { %>
+                  <label class="sr-only" for="question-<%= row.id %>-prompt">Question wording for <%= row.prompt %></label>
+                  <textarea id="question-<%= row.id %>-prompt" name="<%= row.id %>__prompt" rows="2" maxlength="500" required><%= row.prompt %></textarea>
+                <% } else { %>
+                  <div class="admin-question-title" title="<%= row.prompt %>"><%= row.prompt %></div>
+                <% } %>
+                <div class="muted admin-question-id"><code class="admin-question-code"><%= row.id %></code></div>
+              </td>
+              <td>
+                <strong title="<%= row.derivationMeta %>"><%= row.calculationLabel %></strong>
+                <span class="admin-question-meta"><%= row.typeLabel %> · <%= row.evidenceLabel %></span>
+              </td>
+              <td class="admin-question-override">
+                <% if (editing) { %>
+                  <label class="sr-only" for="question-<%= row.id %>-points">Points for <%= row.prompt %></label>
+                  <span class="admin-question-points-current">Current: <code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.pointsCurrentLabel %></code></span>
+                  <% if (row.hasPointsOverride) { %><span class="admin-question-meta">Default: <%= row.pointsDefaultLabel %></span><% } %>
+                  <% if (row.pointsFields.length) { %>
+                    <div class="admin-question-points-fields" aria-label="Scoring override fields">
+                      <% row.pointsFields.forEach((field) => { %>
+                        <label>
+                          <span><%= field.label %></span>
+                          <input id="question-<%= row.id %>-points-<%= field.key %>" type="number" name="<%= row.id %>__points__<%= field.key %>" value="<%= field.value %>" placeholder="<%= field.placeholder %>" step="any" title="Leave blank in every scoring field to use the default">
+                        </label>
+                      <% }) %>
+                    </div>
+                  <% } else { %>
+                    <input id="question-<%= row.id %>-points" type="<%= row.pointsInputType %>" name="<%= row.id %>__points" value="<%= row.pointsOverride %>" placeholder="<%= row.pointsInputPlaceholder %>" title="Leave blank to use the default: <%= row.scoringDetail %>" <%= row.pointsInputType === 'number' ? 'step="any"' : '' %>>
+                  <% } %>
+                  <span class="admin-question-meta">Blank = default</span>
+                <% } else { %>
+                  <code class="admin-question-code" title="<%= row.scoringDetail %>"><%= row.scoringLabel %></code>
+                <% } %>
+              </td>
+              <td class="admin-question-included">
+                <% if (editing) { %>
+                  <label>
+                    <input type="checkbox" name="<%= row.id %>__included" value="1" <%= row.included ? 'checked' : '' %>>
+                    <span class="sr-only">Include <%= row.prompt %></span>
+                    <span aria-hidden="true"><%= row.included ? 'Yes' : 'No' %></span>
+                  </label>
+                <% } else { %>
+                  <span class="admin-question-included-value"><%= row.included ? 'Yes' : 'No' %></span>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
   </form>
+
+  <p class="muted admin-question-contract-note">
+    Calculation type and source are contract metadata and stay read-only here. Editing wording does not change the stable question ID or existing answers.
+  </p>
+  </div>
+  <% } %>
 </div>
 
 <%- include('partials/footer') %>

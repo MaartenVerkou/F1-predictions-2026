@@ -10,10 +10,13 @@ const {
   REVIEW_STATUS_PENDING,
   REVIEW_STATUS_REVIEWED,
   ensureActualSnapshotColumns,
+  ensurePublishedActualsSchema,
   findLatestRoundSnapshotForSeason,
   findLatestSnapshotForRound,
+  loadPublishedActuals,
   findSnapshotById,
   listLatestSnapshotsForSeason,
+  publishActualSnapshot,
   upsertSnapshotForRound
 } = require("../src/actuals-snapshots");
 
@@ -61,6 +64,7 @@ test("ensureActualSnapshotColumns backfills review metadata for existing rows", 
   ).run(2026, 4, "Miami Grand Prix", "R4 - Miami Grand Prix", "manual", null, "2026-04-10T12:00:00.000Z", 7);
 
   ensureActualSnapshotColumns(db);
+  ensurePublishedActualsSchema(db);
 
   const row = db.prepare(
     `
@@ -190,4 +194,157 @@ test("round-limited snapshot lookups ignore stale debug rounds", (t) => {
 
   assert.equal(findSnapshotById(db, debugSnapshot.snapshotId, options), null);
   assert.equal(findSnapshotById(db, debugSnapshot.snapshotId).round_number, 66);
+});
+
+test("actual snapshots keep catalog and evidence provenance in the review lifecycle", (t) => {
+  const { db, tempDir } = createTempDb();
+  t.after(() => {
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  ensureActualSnapshotColumns(db);
+  const first = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:1" },
+    sourceType: "derived",
+    catalogRevision: "catalog-a",
+    evidenceRevision: "evidence-a",
+    derivationVersion: "actuals-v1",
+    reviewStatus: REVIEW_STATUS_PENDING
+  });
+  const second = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:1" },
+    sourceType: "derived",
+    catalogRevision: "catalog-b",
+    evidenceRevision: "evidence-a",
+    derivationVersion: "actuals-v1",
+    reviewStatus: REVIEW_STATUS_PENDING,
+    preserveReviewIfUnchanged: true
+  });
+
+  assert.notEqual(second.snapshotId, first.snapshotId);
+  assert.equal(second.valuesChanged, false);
+  assert.equal(second.provenanceChanged, true);
+  const latest = findLatestSnapshotForRound(db, 2026, 6);
+  assert.equal(latest.catalog_revision, "catalog-b");
+  assert.equal(latest.evidence_revision, "evidence-a");
+  assert.equal(latest.published_at, null);
+});
+
+test("a changed evidence derivation stays pending while published scoring remains on the prior revision", (t) => {
+  const { db, tempDir } = createTempDb();
+  t.after(() => {
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  ensureActualSnapshotColumns(db);
+  ensurePublishedActualsSchema(db);
+  const published = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:1" },
+    sourceType: "race_data_derivation",
+    evidenceRevision: "evidence-base",
+    reviewStatus: REVIEW_STATUS_REVIEWED
+  });
+  publishActualSnapshot(db, { season: 2026, snapshotId: published.snapshotId, publishedByUserId: 7 });
+
+  const corrected = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 6,
+    roundName: "Monaco Grand Prix",
+    valuesByQuestion: { q1: "driver:2" },
+    sourceType: "race_data_derivation",
+    evidenceRevision: "evidence-correction",
+    reviewStatus: REVIEW_STATUS_PENDING,
+    preserveReviewIfUnchanged: true
+  });
+  assert.notEqual(corrected.snapshotId, published.snapshotId);
+  assert.equal(corrected.reviewStatus, REVIEW_STATUS_PENDING);
+  assert.deepEqual(loadPublishedActuals(db, 2026).values, { q1: "driver:1" });
+});
+
+test("published actuals are unavailable until an explicit reviewed snapshot is published", (t) => {
+  const { db, tempDir } = createTempDb();
+  t.after(() => {
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  ensureActualSnapshotColumns(db);
+  ensurePublishedActualsSchema(db);
+  const pending = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 1,
+    roundName: "Australian Grand Prix",
+    valuesByQuestion: { q1: "driver:1" },
+    reviewStatus: REVIEW_STATUS_PENDING
+  });
+  assert.equal(loadPublishedActuals(db, 2026).available, false);
+  assert.throws(
+    () => publishActualSnapshot(db, { season: 2026, snapshotId: pending.snapshotId }),
+    /reviewed actual snapshot/
+  );
+
+  const reviewed = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 1,
+    roundName: "Australian Grand Prix",
+    valuesByQuestion: { q1: "driver:2", q2: "25" },
+    reviewStatus: REVIEW_STATUS_REVIEWED,
+    createdByUserId: 9
+  });
+  const published = publishActualSnapshot(db, {
+    season: 2026,
+    snapshotId: reviewed.snapshotId,
+    publishedByUserId: 9,
+    publishedAt: "2026-04-01T12:00:00.000Z"
+  });
+  assert.equal(published.available, true);
+  assert.equal(published.snapshot.id, reviewed.snapshotId);
+  assert.deepEqual(published.values, { q1: "driver:2", q2: "25" });
+});
+
+test("publishing a newer snapshot is season-scoped and replaces only that season's pointer", (t) => {
+  const { db, tempDir } = createTempDb();
+  t.after(() => {
+    db.close();
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  ensureActualSnapshotColumns(db);
+  ensurePublishedActualsSchema(db);
+  const first = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 2,
+    valuesByQuestion: { q1: "old" },
+    reviewStatus: REVIEW_STATUS_REVIEWED
+  });
+  const second = upsertSnapshotForRound(db, {
+    season: 2026,
+    roundNumber: 3,
+    valuesByQuestion: { q1: "new" },
+    reviewStatus: REVIEW_STATUS_REVIEWED
+  });
+  const otherSeason = upsertSnapshotForRound(db, {
+    season: 2025,
+    roundNumber: 2,
+    valuesByQuestion: { q1: "other" },
+    reviewStatus: REVIEW_STATUS_REVIEWED
+  });
+  publishActualSnapshot(db, { season: 2026, snapshotId: first.snapshotId });
+  publishActualSnapshot(db, { season: 2025, snapshotId: otherSeason.snapshotId });
+  publishActualSnapshot(db, { season: 2026, snapshotId: second.snapshotId });
+
+  assert.deepEqual(loadPublishedActuals(db, 2026).values, { q1: "new" });
+  assert.deepEqual(loadPublishedActuals(db, 2025).values, { q1: "other" });
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM published_actual_sets").get().count, 2);
 });

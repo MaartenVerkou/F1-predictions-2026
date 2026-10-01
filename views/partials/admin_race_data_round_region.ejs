@@ -1,0 +1,336 @@
+<% const resultColumns = view.raceResultColumns || [
+  { id: 'finish', label: 'Pos.', title: 'Grand Prix finish position' },
+  { id: 'driver', label: 'Driver' },
+  { id: 'constructor', label: 'Constructor' },
+  { id: 'qualifying', sessionKey: 'qualifying', label: 'Qualifying', title: 'Grand Prix qualifying' },
+  { id: 'grid', label: 'Grid' },
+  { id: 'status', label: 'Status' },
+  { id: 'points', label: 'Points' }
+];
+const detailCellValue = (row, column) => {
+  if (column.id === 'finish') return row.racePosition ? row.finishLabel : (row.raceLabel || '—');
+  if (column.id === 'driver') return row.driver || '—';
+  if (column.id === 'constructor') return row.constructor || '—';
+  if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) {
+    return row.sessions?.[column.sessionKey || column.id]?.label || '—';
+  }
+  if (column.id === 'grid') return row.grid == null ? '—' : row.grid;
+  if (column.id === 'status') return row.raceStatusLabel || row.raceStatus || row.sprintStatus || '—';
+  if (column.id === 'points') return row.racePoints == null ? '—' : row.racePoints;
+  return '—';
+};
+const detailCellTitle = (row, column) => {
+  if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) {
+    return row.sessions?.[column.sessionKey || column.id]?.title || column.title || detailCellValue(row, column);
+  }
+  return column.title || detailCellValue(row, column);
+};
+const detailEditValue = (row, column) => {
+  if (column.id === 'finish') return row.racePositionNumber == null ? '' : row.racePositionNumber;
+  if (column.id === 'grid') return row.grid == null ? '' : row.grid;
+  if (column.id === 'status') return row.raceStatus || '';
+  if (column.id === 'points') return row.racePoints == null ? '' : row.racePoints;
+  if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) {
+    const session = row.sessionValues?.[column.sessionKey || column.id];
+    if (!session) return '';
+    return session.position != null && Number(session.position) > 0
+      ? session.position
+      : (session.status || session.positionText || '');
+  }
+  return '';
+};
+const detailEditInputType = (column) => ['finish', 'grid', 'points'].includes(column.id) ? 'number' : 'text';
+const detailEditStep = (column) => column.id === 'points' ? '0.1' : '1';
+const selectedEvidence = view.selectedEvidence || null;
+const selectedSnapshot = view.selectedRound?.snapshot || null;
+const reviewStatus = String(selectedSnapshot?.review_status || '').toLowerCase();
+const reviewReturnTo = `/admin/race-data?season=${encodeURIComponent(season)}&round=${encodeURIComponent(view.selectedRoundNumber)}&view=${encodeURIComponent(viewMode)}&focus=${encodeURIComponent(view.focusId || 'points')}`;
+const roundQuery = view.hasSelectedRound ? `&round=${encodeURIComponent(view.selectedRoundNumber)}` : '';
+const formatReviewDate = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).replace(',', ' ·');
+};
+const reviewerLabel = selectedSnapshot?.reviewed_by_name || 'admin';
+const editedSnapshot = selectedEvidence?.revision_kind === 'admin_correction'
+  || selectedEvidence?.source_type === 'admin_correction'
+  || Boolean(selectedEvidence?.correction_reason);
+const reviewStatusPrefix = editedSnapshot ? 'Edited by' : 'Reviewed by';
+const reviewStatusLabel = selectedSnapshot?.reviewed_at
+  ? `${reviewStatusPrefix} ${reviewerLabel} · ${formatReviewDate(selectedSnapshot.reviewed_at)}`
+  : selectedSnapshot?.reviewed_by_name
+    ? `${reviewStatusPrefix} ${reviewerLabel}`
+    : 'Reviewed';
+const reviewStatusTitle = reviewStatusLabel; %>
+<div class="admin-race-data-round-region" data-race-data-round-region>
+  <% if (view.hasSelectedRound) { %>
+  <section class="admin-race-data-detail admin-race-data-detail-first" aria-labelledby="admin-race-data-detail-heading">
+    <div class="admin-race-data-detail-toolbar">
+      <div class="admin-race-data-section-heading">
+        <h2 id="admin-race-data-detail-heading">
+          <%= view.selectedRound?.label || t('admin_race_data.no_round') %>
+        </h2>
+        <% if (view.selectedEvidence || selectedSnapshot) { %>
+          <div class="admin-race-data-review-state" data-race-data-review-state>
+            <% if (reviewStatus === 'pending' && selectedSnapshot?.id) { %>
+              <form method="post" action="/admin/race-data/review" class="admin-race-data-review-form" data-race-data-review-form>
+                <%- csrfField() %>
+                <input type="hidden" name="season" value="<%= season %>" />
+                <input type="hidden" name="snapshotId" value="<%= selectedSnapshot.id %>" />
+                <input type="hidden" name="target" value="round:<%= view.selectedRoundNumber %>" />
+                <input type="hidden" name="returnTo" value="<%= reviewReturnTo %>" />
+                <% if (view.selectedRound?.state !== 'future') { %><input type="hidden" name="unlockPast" value="1" /><% } %>
+                <button type="submit" class="secondary admin-race-data-review-button" title="Mark this round reviewed">
+                  <span class="admin-race-data-review-icon" aria-hidden="true">!</span>
+                  <span>Mark reviewed</span>
+                </button>
+              </form>
+            <% } else if (reviewStatus === 'reviewed') { %>
+              <span class="admin-race-data-review-status" data-race-data-review-status title="<%= reviewStatusTitle %>" aria-label="<%= reviewStatusTitle %>">
+                <span class="admin-race-data-review-icon" aria-hidden="true">✓</span>
+                <span><%= reviewStatusLabel %></span>
+              </span>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+      <% if (view.selectedEvidence || selectedSnapshot) { %>
+        <div class="admin-race-data-detail-actions admin-toolbar-actions" data-race-data-detail-actions>
+          <% if (view.selectedEvidence) { %>
+            <button type="button" class="secondary admin-race-data-edit-button" data-race-data-edit>Edit data</button>
+            <form method="post" action="/admin/race-data/refresh" class="admin-race-data-refresh-form" data-race-data-refresh-form onsubmit="return confirm('Fetch this round again from the source? The current revision will remain in history, and the refreshed data will require review.');">
+              <%- csrfField() %>
+              <input type="hidden" name="season" value="<%= season %>" />
+              <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+              <input type="hidden" name="view" value="<%= viewMode %>" />
+              <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
+              <input type="hidden" name="confirmRefresh" value="1" />
+              <button type="submit" class="secondary admin-race-data-refresh-button" data-race-data-refresh title="Fetch this round again from the configured source">Refresh source</button>
+            </form>
+            <div class="admin-race-data-edit-actions" data-race-data-edit-actions hidden>
+              <button type="submit" form="admin-race-data-correction-form" class="secondary admin-race-data-save-button">Save changes</button>
+              <button type="button" class="secondary" data-race-data-editor-close>Discard</button>
+            </div>
+          <% } %>
+        </div>
+      <% } %>
+    </div>
+
+    <% if (view.selectedEvidence) { %>
+      <form id="admin-race-data-correction-form" method="post" action="/admin/race-data/correction" class="admin-race-data-correction-form" data-race-data-correction-form data-race-data-editor="false">
+        <%- csrfField() %>
+        <input type="hidden" name="season" value="<%= season %>" />
+        <input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" />
+        <input type="hidden" name="view" value="<%= viewMode %>" />
+        <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
+        <input type="hidden" name="snapshotId" value="<%= view.selectedEvidence.id %>" />
+    <% } %>
+    <div class="admin-race-data-detail-table-wrap">
+      <table class="admin-race-data-detail-table admin-race-data-detail-table--result">
+        <thead>
+          <tr>
+            <% resultColumns.forEach((column) => { %>
+              <th scope="col" class="admin-race-data-result-col admin-race-data-result-col--<%= column.id %>" title="<%= column.title || column.label %>"><%= column.label %></th>
+            <% }) %>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (view.detailRows.length) { %>
+            <% view.detailRows.forEach((row, rowIndex) => { %>
+              <tr class="admin-race-data-result-row" data-race-data-result-row
+                  data-driver-id="<%= row.driverId || '' %>" data-driver-name="<%= row.driver || '' %>">
+                <% resultColumns.forEach((column) => { %>
+                  <% if (column.id === 'driver') { %>
+                    <th scope="row" class="admin-race-data-result-cell admin-race-data-result-cell--driver" title="<%= detailCellValue(row, column) %>" aria-label="<%= detailCellValue(row, column) %>">
+                      <% if (view.selectedEvidence && row.hasEvidence) { %>
+                        <input type="hidden" name="rows[<%= rowIndex %>][driverId]" value="<%= row.driverId || '' %>" />
+                        <input type="hidden" name="rows[<%= rowIndex %>][driver]" value="<%= row.driver || '' %>" />
+                      <% } %>
+                      <%- include('admin_race_data_entity_label', { fullLabel: detailCellValue(row, column), compactLabel: row.driverCode || '—' }) %>
+                    </th>
+                  <% } else if (column.id === 'constructor') { %>
+                    <td class="admin-race-data-result-cell admin-race-data-result-cell--constructor" title="<%= detailCellValue(row, column) %>" aria-label="<%= detailCellValue(row, column) %>"><%- include('admin_race_data_entity_label', { fullLabel: detailCellValue(row, column), compactLabel: row.constructorCode || '—' }) %></td>
+                  <% } else { %>
+                    <% const editKey = column.sessionKey || column.id; %>
+                    <td class="admin-race-data-result-cell admin-race-data-result-cell--<%= column.id %> <%= column.sessionKey ? 'admin-race-data-result-cell--session' : '' %>" title="<%= detailCellTitle(row, column) %>">
+                      <span data-race-data-edit-display><%= detailCellValue(row, column) %></span>
+                      <% if (view.selectedEvidence && row.hasEvidence) { %>
+                        <% if (column.sessionKey || ['practice1', 'practice2', 'practice3', 'sprintQualifying', 'sprint', 'qualifying'].includes(column.id)) { %>
+                          <input class="admin-race-data-edit-input" data-race-data-edit-input disabled name="rows[<%= rowIndex %>][sessions][<%= editKey %>]" type="text" value="<%= detailEditValue(row, column) %>" aria-label="<%= column.title || column.label %> for <%= row.driver || 'driver' %>" />
+                        <% } else { %>
+                          <input class="admin-race-data-edit-input" data-race-data-edit-input disabled name="rows[<%= rowIndex %>][<%= editKey %>]" type="<%= detailEditInputType(column) %>" value="<%= detailEditValue(row, column) %>" <%= column.id === 'finish' || column.id === 'grid' ? 'min="1" max="99"' : '' %> <%= column.id === 'points' ? 'min="0" max="200" step="0.1"' : '' %> aria-label="<%= column.title || column.label %> for <%= row.driver || 'driver' %>" />
+                        <% } %>
+                      <% } %>
+                    </td>
+                  <% } %>
+                <% }) %>
+              </tr>
+            <% }) %>
+          <% } else { %>
+            <tr><td colspan="<%= resultColumns.length %>" class="muted"><%= t('admin_race_data.no_evidence_detail') %></td></tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (view.selectedEvidence) { %>
+        <div class="admin-race-data-editor-details" data-race-data-editor-details hidden>
+          <label class="admin-race-data-correction-reason">Reason for correction
+            <textarea name="correctionReason" rows="2" required disabled data-race-data-edit-input></textarea>
+          </label>
+          <label class="admin-race-data-correction-confirm">
+            <input type="checkbox" name="confirmCorrection" value="1" required disabled data-race-data-edit-input />
+            Confirm protected correction
+          </label>
+        </div>
+      </form>
+    <% } %>
+
+    <div class="admin-race-data-evidence-meta admin-race-data-legend muted" aria-label="Race evidence metadata">
+      <span><%= view.selectedEvidence
+        ? `${view.detailRows.length} drivers · ${view.selectedEvidence.source_type || 'source'} · ${view.selectedEvidence.fetched_at || view.selectedEvidence.payload?.fetchedAt || 'source time unavailable'}`
+        : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %></span>
+      <% if (view.selectedEvidence) { %>
+        <span>Revision <%= view.selectedEvidence.revision_kind || 'provider' %>
+          · <%= (view.evidenceRevisions || []).length %> stored revision<%= (view.evidenceRevisions || []).length === 1 ? '' : 's' %>
+          <% if (view.selectedEvidence.correction_reason) { %> · <%= view.selectedEvidence.correction_reason %><% } %>
+        </span>
+      <% } %>
+    </div>
+
+  </section>
+  <% } %>
+
+  <section class="admin-race-data-table-section" data-race-data-championship aria-labelledby="admin-race-data-championship-heading">
+    <div class="admin-race-data-section-heading">
+      <h2 id="admin-race-data-championship-heading"><%= t('admin_race_data.championship_standings') %></h2>
+    </div>
+    <div class="admin-race-data-table-toolbar">
+      <div class="admin-race-data-tabs admin-race-data-view-tabs admin-race-data-switch" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
+        <% ['drivers', 'constructors'].forEach((tableView) => { %>
+          <a class="admin-race-data-tab <%= viewMode === tableView ? 'is-active' : '' %>"
+             href="/admin/race-data?season=<%= season %>&view=<%= tableView %><%= roundQuery %>&focus=<%= view.focusId || 'points' %>"
+             role="tab" aria-selected="<%= viewMode === tableView ? 'true' : 'false' %>" data-race-data-view-toggle="<%= tableView %>">
+            <%= tableView === 'drivers' ? t('admin_race_data.drivers_view') : t('admin_race_data.constructors_view') %>
+          </a>
+        <% }) %>
+      </div>
+      <div class="admin-race-data-tabs admin-race-data-metric-tabs admin-race-data-switch" role="tablist" aria-label="Race data metric">
+        <% (view.metricOptions || []).forEach((option) => { %>
+          <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.activeMetricId ? 'is-active' : '' %>"
+             href="/admin/race-data?season=<%= season %>&view=<%= viewMode %><%= roundQuery %>&focus=<%= option.id %>"
+             role="tab" aria-selected="<%= option.id === view.activeMetricId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>" title="<%= option.title || option.label %>"><%= option.label %></a>
+        <% }) %>
+      </div>
+      <form method="get" action="/admin/race-data" class="admin-race-data-metric-select-form" data-race-data-metric-select-form>
+        <input type="hidden" name="season" value="<%= season %>" />
+        <% if (view.hasSelectedRound) { %><input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" /><% } %>
+        <input type="hidden" name="view" value="<%= viewMode %>" />
+        <label for="admin-race-data-metric-select">Content</label>
+        <select id="admin-race-data-metric-select" name="focus" onchange="this.form.submit()">
+          <% (view.metricOptions || []).forEach((option) => { %>
+            <option value="<%= option.id %>" <%= option.id === view.activeMetricId ? 'selected' : '' %>><%= option.label %></option>
+          <% }) %>
+        </select>
+      </form>
+    </div>
+    <div class="admin-race-data-table-wrap">
+      <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
+        <colgroup>
+          <col class="admin-race-data-col admin-race-data-col-rank">
+          <col class="admin-race-data-col admin-race-data-col-entity">
+          <% view.rounds.forEach(() => { %><col class="admin-race-data-col admin-race-data-col-round"><% }) %>
+          <col class="admin-race-data-col admin-race-data-col-summary">
+        </colgroup>
+        <thead>
+          <tr>
+            <th scope="col" class="admin-race-data-sticky admin-race-data-rank"><%= t('admin_race_data.position') %></th>
+            <th scope="col" class="admin-race-data-sticky admin-race-data-entity"><%= viewMode === 'drivers' ? t('admin_race_data.driver') : t('admin_race_data.team') %></th>
+            <% view.rounds.forEach((round) => { %>
+              <th scope="col" class="admin-race-data-round-head <%= round.afterCutoff ? 'is-after-cutoff' : '' %> <%= round.focusColumn ? 'is-focus-column' : '' %>" data-race-data-focus-column="<%= round.focusColumn ? 'true' : 'false' %>" title="<%= round.focusColumn ? 'Selected round' : '' %>">
+                <a data-race-data-round-link href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= round.roundNumber %>&focus=<%= view.focusId || 'points' %>" title="<%= round.label %>" aria-label="<%= round.label %>"><%= round.code || `R${round.roundNumber}` %></a>
+              </th>
+            <% }) %>
+            <th scope="col" class="admin-race-data-summary admin-race-data-sticky-right"><%= view.focus?.metricLabel || t('admin_race_data.points') %></th>
+          </tr>
+        </thead>
+        <tbody data-race-data-body="<%= viewMode %>">
+          <% if (viewMode === 'drivers') { %>
+            <% view.drivers.forEach((row, index) => { %>
+              <%- include('admin_race_data_matrix_row', { season, viewMode: 'drivers', detailMode: false, rowKind: 'drivers', row, group: null, groupIndex: 0, groupSize: 1, index, focusId: view.focusId || 'points' }) %>
+            <% }) %>
+          <% } else { %>
+            <% view.constructorGroups.forEach((group) => { %>
+              <% group.drivers.forEach((row, groupIndex) => { %>
+                <%- include('admin_race_data_matrix_row', { season, viewMode: 'constructors', detailMode: true, rowKind: 'constructor-driver', row, group, groupIndex, groupSize: group.drivers.length, index: groupIndex, focusId: view.focusId || 'points' }) %>
+              <% }) %>
+            <% }) %>
+          <% } %>
+        </tbody>
+        <%- include('admin_race_data_matrix_footer', { season, viewMode, view }) %>
+      </table>
+    </div>
+    <div class="admin-race-data-legend muted" aria-label="<%= t('admin_race_data.legend') %>">
+      <strong><%= t('admin_race_data.legend') %>:</strong>
+      <% if (view.focus?.metric === 'podiums' || view.focus?.metric === 'ferrari_podium') { %><span><%= t('admin_race_data.legend_podium_focus') %></span>
+      <% } else if (view.focus?.metric === 'dnfs' || view.focus?.metric === 'dnf_by_race') { %><span><%= t('admin_race_data.legend_dnf_focus') %></span>
+      <% } else if (view.focus?.metric === 'damage') { %><span><%= t('admin_race_data.legend_damage_focus') %></span>
+      <% } else { %><span><%= t('admin_race_data.legend_retired') %> · <%= t('admin_race_data.legend_dns') %> · <%= t('admin_race_data.legend_pole') %> · <%= t('admin_race_data.legend_fastest_lap') %></span><% } %>
+    </div>
+  </section>
+
+  <section class="admin-race-data-derivation" aria-labelledby="admin-race-data-derivation-heading">
+    <div class="admin-race-data-derivation-heading">
+      <div>
+        <h2 id="admin-race-data-derivation-heading">Derivation review</h2>
+        <p class="muted">
+          Inspect the evidence interpretation used for one question.
+          <%= view.hasSelectedRound
+            ? t('admin_race_data.derivation_selected_round_note')
+            : t('admin_race_data.derivation_latest_round_note') %>
+        </p>
+      </div>
+      <form method="get" action="/admin/race-data" class="admin-race-data-question-form" data-race-data-focus-form>
+        <input type="hidden" name="season" value="<%= season %>" />
+        <% if (view.hasSelectedRound) { %><input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" /><% } %>
+        <input type="hidden" name="view" value="<%= viewMode %>" />
+        <% const selectedQuestionOption = (view.questionOptions || []).find((option) => option.id === view.focusId); %>
+        <% const selectedQuestionTableLabel = selectedQuestionOption?.view === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view'); %>
+        <% const selectedQuestionFocusLabel = selectedQuestionOption?.focusLabel || selectedQuestionTableLabel; %>
+        <label for="admin-race-data-question"><%= t('admin_race_data.questions_label') %></label>
+        <div class="admin-race-data-question-picker">
+          <select id="admin-race-data-question" name="focus" onchange="const option=this.options[this.selectedIndex]; this.form.elements.view.value=option.dataset.raceDataFocusView || 'drivers'; this.form.submit()">
+            <option value="">Choose a question</option>
+            <% (view.questionOptions || []).forEach((option) => {
+              const tableLabel = option.view === 'constructors' ? t('admin_race_data.constructors_view') : t('admin_race_data.drivers_view');
+              const questionPrefix = option.questionNumber == null ? '' : `${String(option.questionNumber).padStart(2, '0')}. `;
+              const focusLabel = option.focusLabel || tableLabel;
+            %>
+              <option value="<%= option.id %>" data-race-data-focus-view="<%= option.view %>" title="<%= questionPrefix %><%= option.label %> · <%= tableLabel %> · <%= focusLabel %>" aria-label="<%= questionPrefix %><%= option.label %> · <%= tableLabel %> · <%= focusLabel %>" <%= option.id === view.focusId ? 'selected' : '' %>><%= questionPrefix %><%= option.shortLabel || option.label %> · <%= tableLabel %> · <%= focusLabel %></option>
+            <% }) %>
+          </select>
+          <% if (selectedQuestionOption) { %>
+            <small class="admin-race-data-question-meta" data-race-data-question-meta title="<%= selectedQuestionTableLabel %> · <%= selectedQuestionFocusLabel %>"><%= selectedQuestionTableLabel %> · <%= selectedQuestionFocusLabel %></small>
+          <% } %>
+        </div>
+        <noscript><button type="submit" class="secondary"><%= t('admin_race_data.open_focus') %></button></noscript>
+      </form>
+    </div>
+    <% if (view.focus?.questionId && view.focusSummary) { %>
+      <% const focusSummaryStatusKey = view.focusSummary.status === 'ready' ? 'focus_ready' : view.focusSummary.status === 'partial' ? 'focus_partial' : 'focus_unavailable'; %>
+      <div class="admin-race-data-focus-summary is-<%= view.focusSummary.status %>" data-race-data-focus-summary title="<%= view.focusSummary.tooltip || '' %>">
+        <strong><%= view.focusSummary.value %></strong>
+        <span class="admin-race-data-focus-summary-detail"><%= view.focusSummary.detail %></span>
+        <span class="admin-race-data-focus-summary-status"><%= t(`admin_race_data.${focusSummaryStatusKey}`) %></span>
+      </div>
+    <% } %>
+  </section>
+</div>

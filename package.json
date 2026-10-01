@@ -19,14 +19,15 @@
     "db:migrate:postgres": "node scripts/migrate-sqlite-to-postgres.js",
     "actuals:auto-update": "node scripts/backfill-actuals-2026.js --dry-run",
     "actuals:auto-apply": "node scripts/backfill-actuals-2026.js --apply",
-    "analyze:balance": "node scripts/analyze-balance.js",
-    "build:last-season-results": "node scripts/build-last-season-results.js"
+    "destructors:import": "node scripts/import-destructors-reddit.js --dry-run",
+    "destructors:import:apply": "node scripts/import-destructors-reddit.js --apply",
+    "analyze:balance": "node scripts/analyze-balance.js"
   },
   "engines": {
     "node": "20.x || 22.x || 23.x || 24.x"
   },
   "overrides": {
-    "brace-expansion": "2.1.4"
+    "brace-expansion": "2.1.7"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -35,7 +36,7 @@
     "express": "^4.19.2",
     "express-session": "^1.17.3",
     "helmet": "^8.2.0",
-    "nodemailer": "^9.1.0",
+    "nodemailer": "^10.0.13",
     "pg": "^8.22.0"
   },
   "devDependencies": {
