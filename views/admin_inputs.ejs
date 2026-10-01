@@ -116,6 +116,7 @@
         <% } %>
       </div>
     <% } else if (tab === 'definitions') { %>
+      <p class="muted admin-inputs-definitions-help">Shared terms are shown on the public Questions and Responses pages. A binding limits a term to the listed question IDs; an empty binding makes it available to every question.</p>
       <div class="admin-inputs-table-toolbar admin-inputs-view-toolbar" data-table-toolbar="definitions" data-table-capabilities="edit,add">
         <%- include('partials/admin_inputs_tabs', { season, tab, unresolvedMappingCount }) %>
         <div class="admin-inputs-toolbar-end admin-toolbar-actions">
@@ -127,7 +128,6 @@
           <% } %>
         </div>
       </div>
-      <p class="muted admin-inputs-definitions-help">Shared terms are shown on the public Questions and Responses pages. A binding limits a term to the listed question IDs; an empty binding makes it available to every question.</p>
       <% if (definitionMode === 'edit') { %>
         <% (definitions || []).forEach((definition) => { %>
           <form id="definition-form-<%= definition.id %>" method="post" action="/admin/inputs/definitions" data-season-mutation>
@@ -143,7 +143,15 @@
         </form>
       <% } %>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="Definitions" tabindex="0">
-        <table class="table compact admin-inputs-table admin-inputs-definitions-table">
+        <table class="table compact admin-inputs-table admin-inputs-definitions-table <%= definitionMode === 'edit' ? 'is-editing' : '' %>">
+          <colgroup>
+            <col class="admin-definition-col-term">
+            <col class="admin-definition-col-explanation">
+            <col class="admin-definition-col-aliases">
+            <col class="admin-definition-col-bindings">
+            <col class="admin-definition-col-status">
+            <% if (definitionMode === 'edit') { %><col class="admin-definition-col-order"><col class="admin-definition-col-action"><% } %>
+          </colgroup>
           <thead><tr><th scope="col">Term</th><th scope="col">Explanation</th><th scope="col">Aliases</th><th scope="col">Question bindings</th><th scope="col">Status</th><% if (definitionMode === 'edit') { %><th scope="col">Order</th><th scope="col"></th><% } %></tr></thead>
           <tbody>
             <% (definitions || []).forEach((definition) => { %>
@@ -161,7 +169,7 @@
                   <% if (definitionMode === 'edit') { %><textarea name="explanation" form="definition-form-<%= definition.id %>" rows="2" maxlength="500" required><%= definition.explanation %></textarea><% } else { %><span><%= definition.explanation %></span><% } %>
                 </td>
                 <td>
-                  <% if (definitionMode === 'edit') { %><input name="aliases" form="definition-form-<%= definition.id %>" value="<%= definition.aliases.join(', ') %>" required title="Comma-separated matching terms"><% } else { %><span class="admin-definition-aliases"><%= definition.aliases.join(' · ') || '—' %></span><% } %>
+                  <% if (definitionMode === 'edit') { %><textarea name="aliases" form="definition-form-<%= definition.id %>" rows="2" required title="Comma-separated matching terms"><%= definition.aliases.join(', ') %></textarea><% } else { %><span class="admin-definition-aliases"><%= definition.aliases.join(' · ') || '—' %></span><% } %>
                 </td>
                 <td>
                   <% if (definitionMode === 'edit') { %><input name="question_ids" form="definition-form-<%= definition.id %>" value="<%= definition.questionIds.join(', ') %>" placeholder="Empty = global" title="Comma-separated stable question IDs"><% } else if (definition.questionIds.length) { %><span class="admin-definition-bindings"><%= definition.questionIds.join(' · ') %></span><% } else { %><span class="muted">All questions</span><% } %>
@@ -179,7 +187,7 @@
               <tr class="admin-inputs-definition-new-row">
                 <th scope="row"><input name="term_key" form="definition-form-new" placeholder="new_term_key" pattern="[a-z0-9]+(?:_[a-z0-9]+)*" required><label class="admin-definition-label-field"><span>Label</span><input name="label" form="definition-form-new" required></label></th>
                 <td><textarea name="explanation" form="definition-form-new" rows="2" maxlength="500" required placeholder="Tooltip explanation"></textarea></td>
-                <td><input name="aliases" form="definition-form-new" required placeholder="term, alternate term"></td>
+                <td><textarea name="aliases" form="definition-form-new" rows="2" required placeholder="term, alternate term"></textarea></td>
                 <td><input name="question_ids" form="definition-form-new" placeholder="Empty = global"></td>
                 <td><label class="admin-definition-active"><input type="checkbox" name="is_active" value="1" form="definition-form-new" checked> Active</label></td>
                 <td><input name="sort_order" form="definition-form-new" type="number" min="0" max="9999" value="200" aria-label="Order for new definition"></td>

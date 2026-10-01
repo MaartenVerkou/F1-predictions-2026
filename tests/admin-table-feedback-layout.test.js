@@ -188,6 +188,18 @@ test("hidden input helper forms do not create spacing between toolbar and tables
   assert.match(styles, /\.admin-inputs-page \.admin-inputs-scoring\s*\{[\s\S]*?margin-top:\s*8px/);
 });
 
+test("definitions keep the edit toolbar above a compact wrapped table", () => {
+  const view = readView("admin_inputs.ejs");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  assert.match(view, /admin-inputs-definitions-table <%= definitionMode === 'edit' \? 'is-editing' : '' %>/);
+  assert.match(view, /admin-definition-col-explanation/);
+  assert.match(view, /admin-definition-col-aliases/);
+  assert.match(styles, /\.admin-inputs-table\.admin-inputs-definitions-table\s*\{[\s\S]*?table-layout:\s*fixed/);
+  assert.match(styles, /\.admin-inputs-table\.admin-inputs-definitions-table\.is-editing\s*\{[\s\S]*?width:\s*920px/);
+  assert.match(styles, /\.admin-inputs-definitions-table \.admin-definition-col-explanation\s*\{[\s\S]*?width:\s*210px/);
+  assert.match(styles, /\.admin-inputs-definitions-table \.admin-definition-col-aliases\s*\{[\s\S]*?width:\s*125px/);
+});
+
 test("race data views share one identity column and a common row rhythm", () => {
   const page = readView("admin_race_data.ejs");
   const region = readView("partials/admin_race_data_round_region.ejs");

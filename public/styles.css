@@ -2108,8 +2108,15 @@ button:disabled {
   font-size: 12px;
 }
 
-.admin-inputs-definitions-table {
-  min-width: 860px;
+.admin-inputs-table.admin-inputs-definitions-table {
+  min-width: 800px;
+  width: 800px;
+  table-layout: fixed;
+}
+
+.admin-inputs-table.admin-inputs-definitions-table.is-editing {
+  min-width: 920px;
+  width: 920px;
 }
 
 .admin-inputs-definitions-table th,
@@ -2119,7 +2126,35 @@ button:disabled {
 }
 
 .admin-inputs-definitions-table th[scope="row"] {
-  min-width: 150px;
+  min-width: 0;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-term {
+  width: 145px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-explanation {
+  width: 210px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-aliases {
+  width: 125px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-bindings {
+  width: 190px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-status {
+  width: 85px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-order {
+  width: 70px;
+}
+
+.admin-inputs-definitions-table .admin-definition-col-action {
+  width: 70px;
 }
 
 .admin-inputs-definitions-table textarea,
@@ -2141,6 +2176,8 @@ button:disabled {
 .admin-definition-bindings {
   font-size: 12px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-definition-active {
