@@ -510,6 +510,8 @@ module.exports = {
   PROVIDER,
   PROVIDER_SCHEMA,
   buildMeetingResults,
+  buildSourceUrl,
+  createRequester,
   fetchFormula1DashboardSeasonData,
   fetchFormula1DashboardDestructors,
   normalizeBaseUrl,
