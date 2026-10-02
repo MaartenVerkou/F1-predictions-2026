@@ -181,6 +181,40 @@ test("Formula 1 Dashboard destructors can use a JSON proxy envelope when direct 
   assert.equal(data.fetchedUrl, "https://proxy.example.test/api/v1/destructors-championship?year=2026");
 });
 
+test("Formula 1 Dashboard destructors unwrap the current Jina JSON envelope", async () => {
+  const row = {
+    round: 1,
+    driver_number: 63,
+    driver_season: {
+      id: 168,
+      constructor_id: 4,
+      driver: { name: "Russell" },
+      constructor: { name: "Mercedes" }
+    },
+    components: [{ component_id: 1, name: "Front wing", price: 125000, quantity: 1 }]
+  };
+  const fetchImpl = async (url) => {
+    if (url.startsWith("https://api.example.test")) {
+      return response("challenge", { ok: false, status: 403, headers: new Map([["cf-mitigated", "challenge"]]) });
+    }
+    return response({
+      code: 200,
+      status: 20000,
+      data: { content: JSON.stringify([row]) }
+    }, { headers: new Map([["content-type", "application/json"]]) });
+  };
+  const data = await fetchFormula1DashboardDestructors({
+    season: 2026,
+    baseUrl: "https://api.example.test",
+    proxyBaseUrl: "https://proxy.example.test",
+    fetchImpl,
+    timeoutMs: 1000,
+    retries: 0
+  });
+  assert.equal(data.rows[0].totalCost, 125000);
+  assert.equal(data.byRound.get(1)[0].driverName, "Russell");
+});
+
 test("Formula 1 Dashboard does not publish a calendar round before race evidence exists", async () => {
   const meetings = [
     { round: 1, meeting_key: 1279, name: "Australian Grand Prix", meeting_short_name: "Australia", state: "completed" },

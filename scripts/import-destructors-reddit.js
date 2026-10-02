@@ -63,7 +63,7 @@ function parseArgs(argv) {
     if (arg.startsWith("--feed=")) { args.feedUrl = String(arg.slice(7)).trim(); continue; }
     if (arg.startsWith("--author=")) { args.author = String(arg.slice(9)).trim(); continue; }
     if (arg.startsWith("--dashboard-base=")) { args.dashboardBaseUrl = String(arg.slice(17)).trim(); continue; }
-    if (arg.startsWith("--dashboard-proxy=")) { args.dashboardProxyBaseUrl = String(arg.slice(19)).trim(); continue; }
+    if (arg.startsWith("--dashboard-proxy=")) { args.dashboardProxyBaseUrl = String(arg.slice(18)).trim(); continue; }
     if (arg.startsWith("--db=")) { args.dbPath = path.resolve(arg.slice(5)); continue; }
     if (arg.startsWith("--database-url=")) { args.databaseUrl = String(arg.slice(16)).trim(); continue; }
     throw new Error(`Unknown argument: ${arg}`);

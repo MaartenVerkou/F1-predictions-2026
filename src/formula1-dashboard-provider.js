@@ -180,7 +180,13 @@ function buildSourceUrl(baseUrl, path, params = {}) {
 async function responsePayload(response, label) {
   const contentType = String(response?.headers?.get?.("content-type") || "").toLowerCase();
   if (typeof response?.json === "function" && (!contentType || contentType.includes("json"))) {
-    return response.json();
+    const parsed = await response.json();
+    // Current r.jina.ai responses use a JSON envelope with the fetched body
+    // in data.content, while older responses use a Markdown text envelope.
+    if (typeof parsed?.data?.content === "string") {
+      return parseJsonText(parsed.data.content, label);
+    }
+    return parsed;
   }
   if (typeof response?.text !== "function") {
     throw new Error(`Formula 1 Dashboard ${label} response has no readable body.`);
@@ -189,9 +195,13 @@ async function responsePayload(response, label) {
   // r.jina.ai is used only as an explicitly configured transport fallback for
   // hosts whose egress IP is challenged by Formula 1 Dashboard. It wraps JSON
   // in a small Markdown envelope; remove that envelope before parsing.
+  return parseJsonText(text, label);
+}
+
+function parseJsonText(text, label) {
   const marker = "Markdown Content:";
-  const marked = text.indexOf(marker);
-  const body = (marked >= 0 ? text.slice(marked + marker.length) : text).trim();
+  const marked = String(text || "").indexOf(marker);
+  const body = (marked >= 0 ? String(text).slice(marked + marker.length) : String(text)).trim();
   const arrayStart = body.indexOf("[");
   const objectStart = body.indexOf("{");
   const starts = [arrayStart, objectStart].filter((value) => value >= 0);
@@ -510,8 +520,6 @@ module.exports = {
   PROVIDER,
   PROVIDER_SCHEMA,
   buildMeetingResults,
-  buildSourceUrl,
-  createRequester,
   fetchFormula1DashboardSeasonData,
   fetchFormula1DashboardDestructors,
   normalizeBaseUrl,
@@ -522,6 +530,5 @@ module.exports = {
   normalizedDamageRow,
   normalizedStandingsRow,
   statusFor,
-  stableHash,
-  responsePayload
+  stableHash
 };
