@@ -3752,14 +3752,6 @@ button:disabled {
   color: var(--text);
 }
 
-.admin-race-data-matrix .admin-race-data-cell.is-podium-1,
-.admin-race-data-matrix .admin-race-data-cell.is-podium-2,
-.admin-race-data-matrix .admin-race-data-cell.is-podium-3 {
-  border-color: var(--border);
-  background: var(--card);
-  color: var(--text);
-}
-
 .admin-race-data-matrix .admin-race-data-cell.is-focus-hit {
   border-color: var(--border);
   background: color-mix(in srgb, var(--text) 6%, var(--card));

@@ -139,6 +139,10 @@ function inferFocusFooterMode(focus, metric) {
   return null;
 }
 
+function formatFocusFooterValue(value, metric) {
+  return metric === "damage" ? formatDamageCost(value) : String(value);
+}
+
 function buildFocusFooter({ focus, rounds, rows, metric }) {
   const mode = inferFocusFooterMode(focus, metric);
   if (!mode) return null;
@@ -175,7 +179,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
     });
     return {
       label: observed
-        ? (metric === "damage" ? formatDamageCost(total) : String(total))
+        ? formatFocusFooterValue(total, metric)
         : "—",
       value: observed ? total : null,
       state: round.state,
@@ -197,6 +201,7 @@ function buildFocusFooter({ focus, rounds, rows, metric }) {
     label: roundLabel,
     totalLabel,
     total: hasTotal ? total : null,
+    totalDisplay: hasTotal ? formatFocusFooterValue(total, metric) : "—",
     cells
   };
 }

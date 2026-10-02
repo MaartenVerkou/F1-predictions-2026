@@ -11,7 +11,7 @@
         </td>
       <% }) %>
       <th scope="col" class="admin-race-data-footer-total admin-race-data-sticky-right">
-        <span><%= view.focusFooter.total == null ? '—' : view.focusFooter.total %></span>
+        <span><%= view.focusFooter.totalDisplay ?? (view.focusFooter.total == null ? '—' : view.focusFooter.total) %></span>
       </th>
     </tr>
   </tfoot>

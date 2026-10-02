@@ -443,3 +443,16 @@ test("race data question metadata uses the Actuals subtitle treatment", () => {
   assert.match(metaRule, /font-weight:\s*600/);
   assert.match(metaRule, /text-overflow:\s*ellipsis/);
 });
+
+test("race data shares podium styling with constructor cells and formats damage totals", () => {
+  const cell = readView("partials/admin_race_data_matrix_cell.ejs");
+  const footer = readView("partials/admin_race_data_matrix_footer.ejs");
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+
+  assert.match(cell, /cell\.podiumPosition \? 'is-podium-'/);
+  assert.doesNotMatch(cell, /viewMode === 'drivers'/);
+  assert.match(footer, /focusFooter\.totalDisplay/);
+  assert.match(styles, /\.admin-race-data-cell\.is-podium-1\s*\{/);
+  assert.match(styles, /\.admin-race-data-cell\.is-podium-2\s*\{/);
+  assert.match(styles, /\.admin-race-data-cell\.is-podium-3\s*\{/);
+});

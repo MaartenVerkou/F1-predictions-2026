@@ -52,10 +52,12 @@ test("damage focus projects the same costs for driver and constructor views", ()
   assert.equal(drivers.drivers[0].cells[0].label, "$125K");
   assert.equal(drivers.drivers[0].summaryValue, 125000);
   assert.equal(drivers.focusFooter.total, 175000);
+  assert.equal(drivers.focusFooter.totalDisplay, "$175K");
 
   const constructors = buildRaceDataAuditView({ ...common, focus: { ...common.focus, view: "constructors" } });
   assert.equal(constructors.constructors[0].cells[0].label, "$175K");
   assert.equal(constructors.constructors[0].summaryValue, 175000);
+  assert.equal(constructors.focusFooter.totalDisplay, "$175K");
 });
 
 test("damage focus keeps missing provider evidence unavailable", () => {
