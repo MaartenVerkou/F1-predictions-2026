@@ -26,5 +26,5 @@
 ## 5. Verification and preview rollout
 
 - [x] 5.1 Run lint, focused unit/integration tests, full test suite, build, and strict OpenSpec validation.
-- [ ] 5.2 Run a dry-run against a known Reddit post on the preview server and verify round matching, provenance, unresolved handling, and idempotent re-run.
-- [ ] 5.3 Apply one preview import, review it in the admin UI, compare against the source post, and document the exact scheduler invocation without enabling production scheduling.
+- [x] 5.2 Run a dry-run against a known Reddit post on the preview server and verify round matching, provenance, unresolved handling, and idempotent re-run.
+- [x] 5.3 Apply one preview import, review it in the admin UI, compare against the source post, and document the exact scheduler invocation without enabling production scheduling.
