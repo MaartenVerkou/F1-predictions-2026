@@ -17,9 +17,13 @@ const DRIVER_NAME_ALIASES = {
 };
 
 const TEAM_NAME_ALIASES = {
+  haas: "Haas F1 Team",
+  haasf1: "Haas F1 Team",
+  rb: "Racing Bulls",
+  rbf1team: "Racing Bulls",
+  visacashapprb: "Racing Bulls",
   redbull: "Red Bull Racing",
   redbullracing: "Red Bull Racing",
-  rbf1team: "Racing Bulls",
   racingbulls: "Racing Bulls",
   cadillacf1team: "Cadillac",
   alpinef1team: "Alpine",

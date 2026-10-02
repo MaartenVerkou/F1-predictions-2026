@@ -74,3 +74,65 @@ test("blocked or rate-limited Reddit discovery never opens a database mutation",
   });
   assert.equal(result.status, "blocked");
 });
+
+test("Formula 1 Dashboard destructors import keeps the API mirror pending and idempotent", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "wok-dashboard-destructors-test-"));
+  const dbPath = path.join(directory, "app.db");
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  seedDatabase(dbPath);
+  const apiRows = [{
+    round: 6,
+    driver_number: 63,
+    driver_season: {
+      id: 168,
+      constructor_id: 4,
+      driver: { name: "Russell" },
+      constructor: { name: "Mercedes" }
+    },
+    grand_prix_id: 8,
+    grand_prix: { country: "Monaco" },
+    components: [{ component_id: 1, name: "Front wing", price: 125000, quantity: 1 }]
+  }];
+  const responseFor = (url) => ({
+    ok: true,
+    status: 200,
+    headers: { get: (name) => name === "content-type" ? "application/json" : null },
+    json: async () => apiRows
+  });
+  const args = {
+    apply: true,
+    dryRun: false,
+    source: "formula1_dashboard",
+    season: 2026,
+    round: null,
+    dashboardBaseUrl: "https://api.example.test",
+    dashboardProxyBaseUrl: "",
+    feedUrl: "https://reddit.test/feed",
+    author: "Dense-Strategy-867",
+    dbPath,
+    databaseUrl: ""
+  };
+  const first = await run(args, {
+    fetchImpl: async () => responseFor("api"),
+    sleep: async () => {}
+  });
+  const second = await run(args, {
+    fetchImpl: async () => responseFor("api"),
+    sleep: async () => {}
+  });
+  const db = new Database(dbPath);
+  const source = db.prepare("SELECT provider, parser_version, status FROM destructors_source_posts").get();
+  const evidence = db.prepare("SELECT payload_json FROM race_data_snapshots ORDER BY id DESC LIMIT 1").get();
+  const pending = db.prepare("SELECT review_status FROM actual_snapshots ORDER BY id DESC LIMIT 1").get();
+  db.close();
+  assert.equal(first.imported, 1);
+  assert.equal(first.pending, 1);
+  assert.equal(second.skipped, 1);
+  assert.deepEqual(source, {
+    provider: "reddit_destructors",
+    parser_version: "formula1dashboard-api-v3",
+    status: "ready_for_review"
+  });
+  assert.equal(JSON.parse(evidence.payload_json).external.damage.rows[0].totalCost, 125000);
+  assert.equal(pending.review_status, "pending");
+});

@@ -5,11 +5,12 @@ const test = require("node:test");
 const {
   buildMeetingResults,
   fetchFormula1DashboardSeasonData,
+  fetchFormula1DashboardDestructors,
   normalizedDamageRow,
   normalizedResultRow,
   statusFor
 } = require("../src/formula1-dashboard-provider");
-const { buildEvidenceBundle } = require("../src/race-data-evidence");
+const { buildEvidenceBundle, normalizeDamageRow } = require("../src/race-data-evidence");
 
 function response(payload, { ok = true, status = 200, headers = new Map() } = {}) {
   return { ok, status, headers: { get: (name) => headers.get(name) || null }, json: async () => payload };
@@ -139,6 +140,104 @@ test("Formula 1 Dashboard destructors rows calculate component totals", () => {
   assert.equal(row.totalCost, 300);
   assert.equal(row.components[0].totalCost, 300);
   assert.equal(row.constructorName, "Test Team");
+});
+
+test("Destructors team aliases resolve provider shorthand to canonical teams", () => {
+  const canonical = {
+    team: [
+      { id: 6, label: "Haas F1 Team", value: "team:6" },
+      { id: 9, label: "Racing Bulls", value: "team:9" }
+    ],
+    driver: []
+  };
+  const roster = { teams: ["Haas F1 Team", "Racing Bulls"], drivers: [] };
+  const haas = normalizeDamageRow({
+    driverName: "Test Driver",
+    constructorName: "Haas",
+    totalCost: 100
+  }, roster, canonical);
+  const rb = normalizeDamageRow({
+    driverName: "Test Driver",
+    constructorName: "RB",
+    totalCost: 100
+  }, roster, canonical);
+  assert.equal(haas.constructor, "Haas F1 Team");
+  assert.equal(haas.team_id, 6);
+  assert.equal(rb.constructor, "Racing Bulls");
+  assert.equal(rb.team_id, 9);
+});
+
+test("Formula 1 Dashboard destructors can use a JSON proxy envelope when direct API access is challenged", async () => {
+  const row = {
+    round: 1,
+    driver_number: 63,
+    driver_season: {
+      id: 168,
+      constructor_id: 4,
+      driver: { name: "Russell" },
+      constructor: { name: "Mercedes" }
+    },
+    grand_prix_id: 3,
+    grand_prix: { country: "Australia" },
+    components: [{ component_id: 1, name: "Front wing", price: 125000, quantity: 1 }]
+  };
+  const fetchImpl = async (url) => {
+    if (url.startsWith("https://api.example.test")) {
+      return response("challenge", { ok: false, status: 403, headers: new Map([["cf-mitigated", "challenge"]]) });
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: (name) => name === "content-type" ? "text/plain" : null },
+      text: async () => `Title: api\n\nMarkdown Content:\n${JSON.stringify([row])}`
+    };
+  };
+  const data = await fetchFormula1DashboardDestructors({
+    season: 2026,
+    baseUrl: "https://api.example.test",
+    proxyBaseUrl: "https://proxy.example.test",
+    fetchImpl,
+    timeoutMs: 1000,
+    retries: 0
+  });
+  assert.equal(data.rows.length, 1);
+  assert.equal(data.byRound.get(1)[0].totalCost, 125000);
+  assert.equal(data.sourceUrl, "https://api.example.test/api/v1/destructors-championship?year=2026");
+  assert.equal(data.fetchedUrl, "https://proxy.example.test/api/v1/destructors-championship?year=2026");
+});
+
+test("Formula 1 Dashboard destructors unwrap the current Jina JSON envelope", async () => {
+  const row = {
+    round: 1,
+    driver_number: 63,
+    driver_season: {
+      id: 168,
+      constructor_id: 4,
+      driver: { name: "Russell" },
+      constructor: { name: "Mercedes" }
+    },
+    components: [{ component_id: 1, name: "Front wing", price: 125000, quantity: 1 }]
+  };
+  const fetchImpl = async (url) => {
+    if (url.startsWith("https://api.example.test")) {
+      return response("challenge", { ok: false, status: 403, headers: new Map([["cf-mitigated", "challenge"]]) });
+    }
+    return response({
+      code: 200,
+      status: 20000,
+      data: { content: JSON.stringify([row]) }
+    }, { headers: new Map([["content-type", "application/json"]]) });
+  };
+  const data = await fetchFormula1DashboardDestructors({
+    season: 2026,
+    baseUrl: "https://api.example.test",
+    proxyBaseUrl: "https://proxy.example.test",
+    fetchImpl,
+    timeoutMs: 1000,
+    retries: 0
+  });
+  assert.equal(data.rows[0].totalCost, 125000);
+  assert.equal(data.byRound.get(1)[0].driverName, "Russell");
 });
 
 test("Formula 1 Dashboard does not publish a calendar round before race evidence exists", async () => {

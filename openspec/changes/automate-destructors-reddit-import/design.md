@@ -5,7 +5,10 @@ The existing race-data evidence pipeline already stores provider payloads in
 reviewed persisted evidence.  The Destructors Championship is different from
 the standard F1 feeds: it is a community-maintained estimate published after a
 race, normally by one Reddit author, and the server cannot reliably call the
-Formula1 Dashboard endpoint.  See `proposal.md` and the destructors-import
+Formula1 Dashboard endpoint directly. The machine-readable Formula 1 Dashboard
+Destructors API is retained as an explicit transport fallback: it attributes
+the same community estimates to the Reddit author and is stored as separate
+provenance. See `proposal.md` and the destructors-import
 delta spec for the motivation and externally visible requirements.
 
 The implementation must therefore add a source adapter and a small source
@@ -18,6 +21,9 @@ community estimate to overwrite reviewed actuals.
 
 - Discover posts from a configured Reddit RSS feed with bounded retries and a
   deterministic author/title/season/round match.
+- Provide a server-friendly Formula 1 Dashboard API mirror path when Reddit
+  rejects the deployment egress address, without treating it as official F1
+  data or hiding the canonical source URL.
 - Preserve the original post metadata and body as immutable provenance while
   storing normalized damage facts for the existing evidence/derivation path.
 - Make repeated jobs safe: the same Reddit post cannot create duplicate facts
@@ -39,7 +45,11 @@ community estimate to overwrite reviewed actuals.
 
 ### 1. RSS discovery with a narrow provider contract
 
-Implement a `reddit_destructors` provider module with an injectable fetcher.
+Implement a `reddit_destructors` provider module with an injectable fetcher,
+plus a bounded Formula 1 Dashboard API adapter for environments where the
+Reddit feed is blocked. The API adapter is explicitly selected by the import
+command, keeps the API's canonical URL, and records that the estimates are
+attributed to `u/Dense-Strategy-867`.
 The default feed is configured through environment variables and defaults to a
 subreddit RSS URL filtered to the known author/title pattern.  The adapter
 normalizes Atom/RSS entries into a candidate containing post id, URL, author,
@@ -57,6 +67,11 @@ the source ledger has them.
 **Alternative considered:** searching Reddit's JSON API or crawling arbitrary
 pages.  That is less reliable, more likely to trigger access controls, and
 would make provenance non-deterministic.
+
+The Formula 1 Dashboard API fallback uses the direct endpoint first and an
+explicitly configured HTTPS transport proxy only after a server-side challenge.
+The proxy changes transport, not source attribution; the imported payload keeps
+the canonical API URL and remains pending review.
 
 ### 2. Text-first parsing and explicit unresolved facts
 
@@ -153,5 +168,6 @@ skipped, unresolved, and unchanged counts for logs/monitoring.
    code deploy rollback plus, if necessary, rejection of the pending revision;
    no destructive table/data operation is required.
 5. Only after preview acceptance should a future release add a production
-   schedule.  This change itself does not alter production data or enable that
-   schedule.
+ schedule. This change itself does not enable a production schedule; it does
+ make the server-friendly API mirror available for a controlled import when
+ Reddit is blocked.
