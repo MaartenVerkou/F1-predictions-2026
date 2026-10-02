@@ -40,7 +40,7 @@ const { deriveSnapshotsFromPersistedEvidence } = require("./backfill-actuals-202
 const ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questions.json");
-const DASHBOARD_IMPORT_PARSER_VERSION = "formula1dashboard-api-v2";
+const DASHBOARD_IMPORT_PARSER_VERSION = "formula1dashboard-api-v3";
 function parseArgs(argv) {
   const args = {
     apply: false,
@@ -394,7 +394,9 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
         }
         const sourceStatus = !mapped.round ? "unmatched_round" : mapped.complete ? "ready_for_review" : "pending_review";
         const roster = rosterForRound(catalog, mapped.round || 0);
-        const normalizedRows = mapped.rows.map((row) => normalizeDamageRow(row, roster.drivers.map((driver) => driver.display_name), catalog.canonical)).filter((row) => row.round != null && row.driver);
+        const normalizedRows = mapped.rows
+          .map((row) => normalizeDamageRow(row, roster, catalog.canonical))
+          .filter((row) => row.round != null && row.driver);
         const sourceId = saveDestructorsSourcePost(db, {
           provider: sourceProvider,
           postId: candidate.id,

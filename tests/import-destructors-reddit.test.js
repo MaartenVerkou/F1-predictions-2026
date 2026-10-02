@@ -130,7 +130,7 @@ test("Formula 1 Dashboard destructors import keeps the API mirror pending and id
   assert.equal(second.skipped, 1);
   assert.deepEqual(source, {
     provider: "reddit_destructors",
-    parser_version: "formula1dashboard-api-v2",
+    parser_version: "formula1dashboard-api-v3",
     status: "ready_for_review"
   });
   assert.equal(JSON.parse(evidence.payload_json).external.damage.rows[0].totalCost, 125000);
