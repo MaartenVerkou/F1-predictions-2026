@@ -40,6 +40,7 @@ const { deriveSnapshotsFromPersistedEvidence } = require("./backfill-actuals-202
 const ROOT = path.resolve(__dirname, "..");
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 const QUESTIONS_PATH = process.env.QUESTIONS_PATH || path.join(DATA_DIR, "questions.json");
+const DASHBOARD_IMPORT_PARSER_VERSION = "formula1dashboard-api-v2";
 function parseArgs(argv) {
   const args = {
     apply: false,
@@ -352,7 +353,7 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
     // The API mirror remains in the same approved Destructors source family;
     // its transport is recorded separately so provider policy stays explicit.
     const sourceProvider = PROVIDER;
-    const parserVersion = args.source === "formula1_dashboard" ? "formula1dashboard-api-v1" : PROVIDER_SCHEMA;
+    const parserVersion = args.source === "formula1_dashboard" ? DASHBOARD_IMPORT_PARSER_VERSION : PROVIDER_SCHEMA;
     const sourceNote = args.source === "formula1_dashboard"
       ? `${dashboardData.sourceNote}; source endpoint ${dashboardData.sourceUrl}`
       : `Reddit RSS ${args.feedUrl}`;
@@ -384,7 +385,9 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
           });
         const candidateHash = stableHash({ title: candidate.title, body: candidate.bodyText, url: candidate.url, updatedAt: candidate.updatedAt });
         const prior = findDestructorsSourcePost(db, sourceProvider, candidate.id);
-        const sameContent = prior && prior.content_hash === candidateHash;
+        const sameContent = prior
+          && prior.content_hash === candidateHash
+          && prior.parser_version === parserVersion;
         if (sameContent) {
           summary.skipped += 1;
           continue;

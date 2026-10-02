@@ -10,7 +10,7 @@ const {
   normalizedResultRow,
   statusFor
 } = require("../src/formula1-dashboard-provider");
-const { buildEvidenceBundle } = require("../src/race-data-evidence");
+const { buildEvidenceBundle, normalizeDamageRow } = require("../src/race-data-evidence");
 
 function response(payload, { ok = true, status = 200, headers = new Map() } = {}) {
   return { ok, status, headers: { get: (name) => headers.get(name) || null }, json: async () => payload };
@@ -140,6 +140,31 @@ test("Formula 1 Dashboard destructors rows calculate component totals", () => {
   assert.equal(row.totalCost, 300);
   assert.equal(row.components[0].totalCost, 300);
   assert.equal(row.constructorName, "Test Team");
+});
+
+test("Destructors team aliases resolve provider shorthand to canonical teams", () => {
+  const canonical = {
+    team: [
+      { id: 6, label: "Haas F1 Team", value: "team:6" },
+      { id: 9, label: "Racing Bulls", value: "team:9" }
+    ],
+    driver: []
+  };
+  const roster = { teams: ["Haas F1 Team", "Racing Bulls"], drivers: [] };
+  const haas = normalizeDamageRow({
+    driverName: "Test Driver",
+    constructorName: "Haas",
+    totalCost: 100
+  }, roster, canonical);
+  const rb = normalizeDamageRow({
+    driverName: "Test Driver",
+    constructorName: "RB",
+    totalCost: 100
+  }, roster, canonical);
+  assert.equal(haas.constructor, "Haas F1 Team");
+  assert.equal(haas.team_id, 6);
+  assert.equal(rb.constructor, "Racing Bulls");
+  assert.equal(rb.team_id, 9);
 });
 
 test("Formula 1 Dashboard destructors can use a JSON proxy envelope when direct API access is challenged", async () => {
