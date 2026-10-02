@@ -7,7 +7,7 @@ const { ensureSeasonInputsSchema } = require("../../src/season-inputs");
 
 const DB_PATH = path.join(__dirname, "..", "..", ".tmp", "playwright-state", "app.db");
 
-test("Questions and Results share one season selector", async ({ page }) => {
+test("Questions and Results use separate season-aware pages", async ({ page }) => {
   const db = new Database(DB_PATH);
   db.dialect = "sqlite";
   ensureSeasonInputsSchema(db);
@@ -22,19 +22,19 @@ test("Questions and Results share one season selector", async ({ page }) => {
   ).run(2027, "2027", "planned", now, now);
   db.close();
 
-  await page.goto("/admin/questions?season=2026&view=questions");
+  await page.goto("/admin/questions?season=2026");
   const season = page.locator("[data-admin-questions-season-form] select[name=season]");
   await expect(season).toHaveValue("2026");
-  await expect(page.locator(".admin-questions-view-toggle .is-active")).toHaveText("Questions");
+  await expect(page.getByRole("heading", { name: "Questions" })).toBeVisible();
+  await expect(page.locator(".admin-actuals-overview-table")).toHaveCount(0);
   await expect(page.locator("[data-question-order-row]").first()).toBeVisible();
 
-  await page.goto("/admin/questions?season=2026&view=results");
-  await expect(page.locator("[data-admin-questions-season-form] select[name=season]")).toHaveValue("2026");
-  await expect(page.locator(".admin-questions-view-toggle .is-active")).toHaveText("Results");
+  await page.goto("/admin/results?season=2026");
+  await expect(page.locator("[data-admin-results-season-form] select[name=season]")).toHaveValue("2026");
+  await expect(page.getByRole("heading", { name: "Results" })).toBeVisible();
   await expect(page.locator(".admin-actuals-overview-table")).toBeVisible();
 
-  await page.locator("[data-admin-questions-season-form] select[name=season]").selectOption("2027");
-  await page.waitForURL(/\/admin\/questions\?view=results&season=2027/);
-  await expect(page.locator("[data-admin-questions-season-form] select[name=season]")).toHaveValue("2027");
-  await expect(page.locator(".admin-questions-view-toggle .is-active")).toHaveText("Results");
+  await page.locator("[data-admin-results-season-form] select[name=season]").selectOption("2027");
+  await page.waitForURL(/\/admin\/results\?season=2027/);
+  await expect(page.locator("[data-admin-results-season-form] select[name=season]")).toHaveValue("2027");
 });

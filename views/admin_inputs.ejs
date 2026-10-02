@@ -220,7 +220,7 @@
       </form>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-data-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_drivers') %>" tabindex="0">
         <table class="table compact admin-inputs-table admin-inputs-driver-table" data-selectable-table="drivers">
-          <colgroup><col class="admin-inputs-driver-col-number"><col class="admin-inputs-driver-col-name"><col class="admin-inputs-driver-col-code"><col class="admin-inputs-driver-col-nationality"><col class="admin-inputs-driver-col-age"></colgroup>
+          <colgroup><col class="admin-inputs-index-col admin-inputs-driver-col-number"><col class="admin-inputs-driver-col-name"><col class="admin-inputs-driver-col-code"><col class="admin-inputs-driver-col-nationality"><col class="admin-inputs-driver-col-age"></colgroup>
           <thead><tr><th>#</th><th><%= t('admin_inputs.driver') %></th><th><%= t('admin_inputs.driver_code') %></th><th><%= t('admin_inputs.nationality') %></th><th><%= t('admin_inputs.age') %></th></tr></thead>
           <tbody>
             <% catalog.drivers.forEach((driver) => { %>
@@ -248,7 +248,7 @@
       </form>
       <div class="admin-question-table-wrap admin-table-scroll admin-inputs-team-table-wrap" role="region" aria-label="<%= t('admin_inputs.tab_teams') %>" tabindex="0">
         <table class="table compact admin-inputs-table admin-inputs-team-table" data-selectable-table="teams">
-          <colgroup><col class="admin-inputs-team-col-order"><col class="admin-inputs-team-col-name"><col class="admin-inputs-team-col-driver"><col class="admin-inputs-team-col-driver"></colgroup>
+          <colgroup><col class="admin-inputs-index-col admin-inputs-team-col-order"><col class="admin-inputs-team-col-name"><col class="admin-inputs-team-col-driver"><col class="admin-inputs-team-col-driver"></colgroup>
           <thead><tr><th scope="col"><abbr title="<%= t('admin_inputs.display_order') %>">#</abbr></th><th><%= t('admin_inputs.team') %></th><th><%= t('admin_inputs.driver_1') %></th><th><%= t('admin_inputs.driver_2') %></th></tr></thead>
           <tbody>
             <% teamLineupHistory.forEach((lineupTeam, index) => { %>

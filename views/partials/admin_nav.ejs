@@ -3,7 +3,8 @@
   <a class="admin-nav-link <%= active === 'overview' ? 'is-active' : '' %>" href="/admin/overview"><%= t('admin.nav_overview') %></a>
   <a class="admin-nav-link <%= active === 'inputs' ? 'is-active' : '' %>" href="/admin/inputs<%= seasonQuery %>"><%= t('admin.nav_inputs') %></a>
   <a class="admin-nav-link <%= active === 'race-data' ? 'is-active' : '' %>" href="/admin/race-data<%= seasonQuery %>"><%= t('admin.nav_race_data') %></a>
-  <a class="admin-nav-link <%= active === 'questions' || active === 'actuals' ? 'is-active' : '' %>" href="/admin/questions<%= seasonQuery ? `${seasonQuery}&view=questions` : '?view=questions' %>"><%= t('admin.nav_questions') %> &amp; Results</a>
+  <a class="admin-nav-link <%= active === 'questions' ? 'is-active' : '' %>" href="/admin/questions<%= seasonQuery || '' %>"><%= t('admin.nav_questions') %></a>
+  <a class="admin-nav-link <%= active === 'results' || active === 'actuals' ? 'is-active' : '' %>" href="/admin/results<%= seasonQuery || '' %>"><%= t('admin.nav_results') %></a>
   <a class="admin-nav-link <%= active === 'analysis' ? 'is-active' : '' %>" href="/admin/analysis"><%= t('admin.nav_analysis') %></a>
   <a class="admin-nav-link <%= active === 'ideas' ? 'is-active' : '' %>" href="/admin/ideas"><%= t('admin.nav_ideas') %></a>
 </nav>

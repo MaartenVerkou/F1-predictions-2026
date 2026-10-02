@@ -175,8 +175,34 @@ test("Questions route renders the selected season input table and edit mode", ()
   assert.equal(rendered.view, "admin_questions");
   assert.equal(rendered.model.mode, "edit");
   assert.equal(rendered.model.season, 2099);
-  assert.equal(rendered.model.workspaceView, "questions");
   assert.equal(rendered.model.questionRows[0].prompt, "Select three races with the most DNFs");
+});
+
+test("legacy Questions result mode redirects to the dedicated Results page", () => {
+  const db = {
+    prepare() {
+      return { all() { return []; }, get() { return { count: 0 }; } };
+    }
+  };
+  const routes = {};
+  const app = {
+    get(pathname, ...handlers) { routes[`GET ${pathname}`] = handlers.at(-1); },
+    post(pathname, ...handlers) { routes[`POST ${pathname}`] = handlers.at(-1); }
+  };
+  registerAdminRoutes(app, {
+    db,
+    requireAdmin: () => {},
+    getCurrentUser: () => ({ id: 7 }),
+    getQuestions: () => [],
+    getRaces: () => []
+  });
+
+  let redirected;
+  routes["GET /admin/questions"](
+    { query: { season: "2026", view: "results" }, user: { id: 7 } },
+    { redirect(path) { redirected = path; } }
+  );
+  assert.equal(redirected, "/admin/results?season=2026");
 });
 
 test("Questions edit save persists prompt, points, inclusion and order together", () => {
