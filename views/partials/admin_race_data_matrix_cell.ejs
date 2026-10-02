@@ -1,4 +1,4 @@
-<td class="admin-race-data-cell state-<%= cell.state %> <%= cell.label === '—' ? 'is-empty' : '' %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= viewMode === 'drivers' && cell.podiumPosition ? 'is-podium-' + cell.podiumPosition : '' %> <%= cell.focusHit ? 'is-focus-hit' : '' %> <%= cell.focusColumn ? 'is-focus-column' : '' %>"
+<td class="admin-race-data-cell state-<%= cell.state %> <%= cell.label === '—' ? 'is-empty' : '' %> <%= cell.afterCutoff ? 'is-after-cutoff' : '' %> <%= cell.podiumPosition ? 'is-podium-' + cell.podiumPosition : '' %> <%= cell.focusHit ? 'is-focus-hit' : '' %> <%= cell.focusColumn ? 'is-focus-column' : '' %>"
     title="<%= cell.title %>">
   <a href="/admin/race-data?season=<%= season %>&view=<%= viewMode %>&round=<%= cellIndex + 1 %>&focus=<%= focusId || 'points' %>">
     <span class="admin-race-data-result"><%= cell.label %><% if (cell.markerGlyph) { %><sup class="admin-race-data-marker" title="<%= cell.markerTitle %>" aria-label="<%= cell.markerTitle %>"><%= cell.markerGlyph %></sup><% } %></span>
