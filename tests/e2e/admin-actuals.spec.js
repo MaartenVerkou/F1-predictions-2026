@@ -96,9 +96,9 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   ).run(snapshotId, "all_teams_score_points", "yes");
   db.close();
 
-  await page.goto("/admin/actuals");
+  await page.goto("/admin/results");
 
-  await expect(page.locator("[data-admin-questions-season-form] select[name=season]")).toBeVisible();
+  await expect(page.locator("[data-admin-results-season-form] select[name=season]")).toBeVisible();
   await expect(page.locator("[data-admin-actuals-target-form]")).toHaveCount(0);
   await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
   const firstQuestionLink = page.locator("[data-admin-actuals-form] .admin-actuals-question-short-link").first();
@@ -115,6 +115,7 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await expect(page.getByText(/marked as reviewed/i)).toHaveCount(0);
   await expect(page.locator("[data-race-data-review-status]")).toContainText(/Reviewed by/);
   await expect(page.locator("[data-race-data-review-status]")).toContainText(/2026/);
+  await expect(page.locator("[data-race-data-review-status]")).not.toContainText(/\d{1,2}:\d{2}/);
 
   const editButton = page.locator("[data-race-data-edit]");
   await expect(editButton).toBeVisible();
@@ -129,7 +130,7 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await page.getByRole("button", { name: /Save changes/i }).click();
   await expect(page.locator("[data-race-data-review-status]")).toContainText(/Edited by/);
 
-  await page.goto("/admin/actuals?season=2026");
+  await page.goto("/admin/results?season=2026");
   await expect(page.locator('[data-admin-actuals-round="6"][data-review-status="reviewed"]').first()).toBeVisible();
   await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
 });
@@ -146,17 +147,17 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
 
   for (const testCase of cases) {
     await page.setViewportSize({ width: testCase.width, height: testCase.height });
-    await page.goto("/admin/actuals");
+    await page.goto("/admin/results");
     await page.evaluate((theme) => {
       localStorage.setItem("theme", theme);
       document.documentElement.setAttribute("data-theme", theme);
     }, testCase.theme);
-    await expect(page.getByRole("heading", { name: "Questions & Results" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Results" })).toBeVisible();
     await expect(page.locator("[data-admin-actuals-form]")).toBeVisible();
 
     const actualsMetrics = await page.evaluate(() => {
       const viewportWidth = document.documentElement.clientWidth;
-      const seasonSelect = document.querySelector('[data-admin-questions-season-form] select[name="season"]');
+      const seasonSelect = document.querySelector('[data-admin-results-season-form] select[name="season"]');
       const overviewTable = document.querySelector(".admin-actuals-overview-table");
       return {
         theme: document.documentElement.getAttribute("data-theme"),
@@ -205,7 +206,7 @@ test("admin actuals and admin tables fit phone-width screens", async ({ page }) 
 test("admin actuals keeps one stable table layout across normal and compact modes", async ({ page }) => {
   for (const width of [390, 600, 720, 1440]) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/admin/actuals?season=2026");
+    await page.goto("/admin/results?season=2026");
     await expect(page.locator(".admin-actuals-overview-table")).toBeVisible();
 
     const metrics = await page.evaluate(() => {

@@ -1,0 +1,38 @@
+<%- include('partials/header', { title: 'Results', user }) %>
+<%- include('partials/admin_nav', { active: 'results', season }) %>
+
+<div class="card admin-page-card admin-race-data-page admin-actuals-page admin-results-page">
+  <div class="admin-race-data-heading">
+    <div>
+      <h1>Results</h1>
+      <p class="muted admin-page-intro">Derived answers from the selected season’s reviewed Race Data.</p>
+    </div>
+    <div class="admin-race-data-selector-stack">
+      <form method="get" action="/admin/results" class="admin-race-data-selector-form admin-actuals-season-form" data-admin-results-season-form>
+        <label for="admin-results-season">Season</label>
+        <select id="admin-results-season" name="season" onchange="this.form.submit()">
+          <% (availableSeasons || []).forEach((availableSeason) => { %>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>><%= availableSeason.displayLabel %></option>
+          <% }) %>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <% if (seasonContext?.invalidRequestedSeason) { %>
+    <div class="admin-feedback-context">
+      <div class="alert" role="alert"><%= t('admin_inputs.invalid_season', { season }) %></div>
+    </div>
+  <% } %>
+
+  <% if (saveError || saveSuccess) { %>
+    <div class="admin-feedback-context">
+      <% if (saveError) { %><div class="alert" role="alert"><%= saveError %></div><% } %>
+      <% if (saveSuccess) { %><div class="alert admin-success" role="status"><%= saveSuccess %></div><% } %>
+    </div>
+  <% } %>
+
+  <%- include('partials/admin_question_results') %>
+</div>
+
+<%- include('partials/footer') %>

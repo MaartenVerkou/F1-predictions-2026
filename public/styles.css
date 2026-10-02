@@ -2485,20 +2485,24 @@ button:disabled {
 }
 
 .admin-inputs-team-table {
-  min-width: 840px;
+  min-width: 780px;
   table-layout: fixed;
 }
 
+.admin-inputs-index-col {
+  width: 5%;
+}
+
 .admin-inputs-team-table .admin-inputs-team-col-order {
-  width: 7%;
+  width: 5%;
 }
 
 .admin-inputs-team-table .admin-inputs-team-col-name {
-  width: 23%;
+  width: 35%;
 }
 
 .admin-inputs-team-table .admin-inputs-team-col-driver {
-  width: 35%;
+  width: 30%;
 }
 
 .admin-inputs-team-table th,
@@ -2508,7 +2512,15 @@ button:disabled {
 
 .admin-inputs-team-table th:first-child,
 .admin-inputs-team-table td:first-child {
-  width: auto;
+  width: 5%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.admin-inputs-team-table th:nth-child(2),
+.admin-inputs-team-table td:nth-child(2) {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .admin-inputs-team-table thead th {
@@ -2696,7 +2708,7 @@ button:disabled {
 }
 
 .admin-inputs-lineup-history-cell {
-  min-width: 210px;
+  min-width: 0;
   white-space: normal !important;
   vertical-align: top;
 }
@@ -5369,10 +5381,6 @@ button:disabled {
   max-width: 100%;
 }
 
-.admin-questions-view-toggle {
-  flex: 0 0 auto;
-}
-
 .admin-question-table-region {
   display: grid;
   gap: 12px;
@@ -5556,15 +5564,6 @@ button:disabled {
 
   .admin-questions-season-form {
     justify-content: space-between;
-  }
-
-  .admin-questions-view-toggle {
-    justify-content: stretch;
-  }
-
-  .admin-questions-view-toggle .admin-race-data-tab {
-    flex: 1 1 0;
-    text-align: center;
   }
 
   .admin-question-table {
@@ -8752,21 +8751,28 @@ button.lang-option.is-active {
 .admin-race-data-metric-select-form {
   display: none;
   align-items: center;
-  gap: 7px;
   min-width: 0;
   margin: 0;
 }
 
-.admin-race-data-metric-select-form label {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .admin-race-data-metric-select-form select {
+  min-height: 32px;
+  padding: 6px 28px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--card) 92%, var(--border));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.15;
   min-width: 0;
   max-width: 100%;
+}
+
+.admin-race-data-metric-select-form select:hover,
+.admin-race-data-metric-select-form select:focus-visible {
+  border-color: var(--accent);
 }
 
 @media (max-width: 980px) {

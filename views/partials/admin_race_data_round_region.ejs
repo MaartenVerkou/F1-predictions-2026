@@ -50,14 +50,11 @@ const formatReviewDate = (value) => {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString('en-GB', {
+  return date.toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).replace(',', ' ·');
+    year: 'numeric'
+  });
 };
 const reviewerLabel = selectedSnapshot?.reviewed_by_name || 'admin';
 const editedSnapshot = selectedEvidence?.revision_kind === 'admin_correction'
@@ -234,8 +231,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
         <input type="hidden" name="season" value="<%= season %>" />
         <% if (view.hasSelectedRound) { %><input type="hidden" name="round" value="<%= view.selectedRoundNumber %>" /><% } %>
         <input type="hidden" name="view" value="<%= viewMode %>" />
-        <label for="admin-race-data-metric-select">Content</label>
-        <select id="admin-race-data-metric-select" name="focus" onchange="this.form.submit()">
+        <select id="admin-race-data-metric-select" name="focus" aria-label="Content" title="Content" onchange="this.form.submit()">
           <% (view.metricOptions || []).forEach((option) => { %>
             <option value="<%= option.id %>" <%= option.id === view.activeMetricId ? 'selected' : '' %>><%= option.label %></option>
           <% }) %>

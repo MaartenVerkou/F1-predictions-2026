@@ -562,7 +562,7 @@ test("constructor detail groups the canonical two-seat lineup and merges team su
   assert.equal(view.constructorGroups[0].drivers[1].cells[0].label, "2");
 });
 
-test("constructor points focus keeps both seat values separate from the team total", () => {
+test("constructor Results focus keeps finish values separate from the team total", () => {
   const view = buildRaceDataAuditView({
     races: ["Australian Grand Prix"],
     roster: {
@@ -601,9 +601,51 @@ test("constructor points focus keeps both seat values separate from the team tot
   });
 
   const group = view.constructorGroups[0];
-  assert.deepEqual(group.drivers.map((driver) => driver.cells[0].label), ["25", "18"]);
+  assert.deepEqual(group.drivers.map((driver) => driver.cells[0].label), ["1", "2"]);
   assert.equal(group.summary.cells[0].label, "43");
   assert.equal(group.summary.summaryValue, 43);
+});
+
+test("constructor Points focus keeps championship points separate from the team total", () => {
+  const view = buildRaceDataAuditView({
+    races: ["Australian Grand Prix"],
+    roster: {
+      driver_entities: [
+        { id: 101, name: "Driver Alpha", teamId: 201, teamName: "Team A", seatNumber: 1 },
+        { id: 102, name: "Driver Beta", teamId: 201, teamName: "Team A", seatNumber: 2 }
+      ],
+      team_entities: [{ id: 201, name: "Team A", code: "TMA" }]
+    },
+    evidenceRows: [{
+      id: 1,
+      round_number: 1,
+      coverage_status: "complete",
+      payload: {
+        coverage: { status: "complete", sources: {} },
+        race: {
+          rows: [
+            { driver_id: 101, driver: "Driver Alpha", team_id: 201, constructor: "Team A", position: 1, points: 25, status: "Finished" },
+            { driver_id: 102, driver: "Driver Beta", team_id: 201, constructor: "Team A", position: 2, points: 18, status: "Finished" }
+          ]
+        },
+        qualifying: { rows: [] },
+        sprint: { rows: [] },
+        standings: {
+          drivers: [
+            { entity_id: 101, entity: "Driver Alpha", position: 1, points: 25 },
+            { entity_id: 102, entity: "Driver Beta", position: 2, points: 18 }
+          ],
+          constructors: [{ entity_id: 201, entity: "Team A", position: 1, points: 43 }]
+        }
+      }
+    }],
+    snapshotRows: [],
+    selectedRound: 1,
+    focus: { id: "championship_points_results", view: "constructors", metric: "championship_points_results", matrixMetric: "championship_points_results" }
+  });
+
+  assert.deepEqual(view.constructorGroups[0].drivers.map((driver) => driver.cells[0].label), ["25", "18"]);
+  assert.equal(view.constructorGroups[0].summary.cells[0].label, "43");
 });
 
 test("constructor metric views aggregate the transformed seat values without falling back to points", () => {

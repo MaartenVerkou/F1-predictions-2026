@@ -790,7 +790,7 @@ function buildRaceDataAuditView({ races, roster, evidenceRows, snapshotRows, sel
   });
 
   const constructorPointsMode = activeFocus.view === "constructors"
-    && String(activeFocus.matrixMetric || activeFocus.metric || "points") === "points";
+    && String(activeFocus.matrixMetric || activeFocus.metric || "points") === "championship_points_results";
 
   const constructorGroups = constructorRows.map((summary) => {
     const team = teamEntities.find((entity) => (
@@ -2971,7 +2971,21 @@ function registerAdminRoutes(app, deps) {
     }
   });
 
+  const legacyResultsRedirect = (req, res) => {
+    const params = new URLSearchParams();
+    if (req.query.season != null && String(req.query.season).trim()) {
+      params.set("season", String(req.query.season));
+    }
+    if (req.query.error != null) params.set("error", String(req.query.error));
+    if (req.query.success != null) params.set("success", String(req.query.success));
+    const query = params.toString();
+    return res.redirect(`/admin/results${query ? `?${query}` : ""}`);
+  };
+
   app.get("/admin/questions", requireAdmin, (req, res) => {
+    if (String(req.query.view || "").trim().toLowerCase() === "results") {
+      return legacyResultsRedirect(req, res);
+    }
     const user = getCurrentUser(req);
     const locale = res.locals.locale || "en";
     const saveError = req.query.error ? String(req.query.error) : null;
@@ -2981,9 +2995,6 @@ function registerAdminRoutes(app, deps) {
       currentSeason: CURRENT_SEASON
     });
     const season = Number(seasonContext.year || CURRENT_SEASON);
-    const workspaceView = String(req.query.view || "questions").trim().toLowerCase() === "results"
-      ? "results"
-      : "questions";
     const questions = getQuestions(locale, {
       includeExcluded: true,
       includeMeta: true,
@@ -2992,15 +3003,32 @@ function registerAdminRoutes(app, deps) {
     const questionRows = buildQuestionInputRows(questions);
     const requestedMode = String(req.query.mode || "").trim().toLowerCase();
     const mode = requestedMode === "edit" ? "edit" : "view";
-    const results = workspaceView === "results"
-      ? buildQuestionResultsModel({ season, locale, seasonContext })
-      : null;
-    res.render("admin_questions", {
+    return res.render("admin_questions", {
       user,
       questions,
       questionRows,
       mode,
-      workspaceView,
+      season,
+      seasonContext,
+      availableSeasons: seasonContext.availableSeasons,
+      saveError,
+      saveSuccess
+    });
+  });
+
+  app.get("/admin/results", requireAdmin, (req, res) => {
+    const user = getCurrentUser(req);
+    const locale = res.locals.locale || "en";
+    const saveError = req.query.error ? String(req.query.error) : null;
+    const saveSuccess = req.query.success ? String(req.query.success) : null;
+    const seasonContext = resolveAdminSeasonContext(db, {
+      requestedSeason: req.query.season,
+      currentSeason: CURRENT_SEASON
+    });
+    const season = Number(seasonContext.year || CURRENT_SEASON);
+    const results = buildQuestionResultsModel({ season, locale, seasonContext });
+    return res.render("admin_results", {
+      user,
       season,
       seasonContext,
       availableSeasons: seasonContext.availableSeasons,
@@ -3328,14 +3356,7 @@ function registerAdminRoutes(app, deps) {
   });
 
   app.get("/admin/actuals", requireAdmin, (req, res) => {
-    const params = new URLSearchParams();
-    params.set("view", "results");
-    if (req.query.season != null && String(req.query.season).trim()) {
-      params.set("season", String(req.query.season));
-    }
-    if (req.query.error != null) params.set("error", String(req.query.error));
-    if (req.query.success != null) params.set("success", String(req.query.success));
-    return res.redirect(`/admin/questions?${params.toString()}`);
+    return legacyResultsRedirect(req, res);
   });
 
   app.post("/admin/actuals/run-auto-update", requireAdmin, async (req, res) => {
@@ -3388,7 +3409,7 @@ function registerAdminRoutes(app, deps) {
         });
       }
 
-      return res.redirect(`/admin/actuals?season=${encodeURIComponent(requestedSeason)}&success=${encodeURIComponent(summary.join(" | "))}`);
+      return res.redirect(`/admin/results?season=${encodeURIComponent(requestedSeason)}&success=${encodeURIComponent(summary.join(" | "))}`);
     } catch (err) {
       if (typeof logEvent === "function") {
         logAdminEvent("warn", "admin_actuals_auto_update_failed", {
@@ -3401,7 +3422,7 @@ function registerAdminRoutes(app, deps) {
         });
       }
       return res.redirect(
-        `/admin/actuals?season=${encodeURIComponent(Number(req.body.season || CURRENT_SEASON))}&error=${encodeURIComponent(`Automatic season sync failed: ${err.message}`)}`
+        `/admin/results?season=${encodeURIComponent(Number(req.body.season || CURRENT_SEASON))}&error=${encodeURIComponent(`Automatic season sync failed: ${err.message}`)}`
       );
     }
   });
