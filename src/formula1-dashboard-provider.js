@@ -177,6 +177,32 @@ function buildSourceUrl(baseUrl, path, params = {}) {
   return url.toString();
 }
 
+async function responsePayload(response, label) {
+  const contentType = String(response?.headers?.get?.("content-type") || "").toLowerCase();
+  if (typeof response?.json === "function" && (!contentType || contentType.includes("json"))) {
+    return response.json();
+  }
+  if (typeof response?.text !== "function") {
+    throw new Error(`Formula 1 Dashboard ${label} response has no readable body.`);
+  }
+  const text = await response.text();
+  // r.jina.ai is used only as an explicitly configured transport fallback for
+  // hosts whose egress IP is challenged by Formula 1 Dashboard. It wraps JSON
+  // in a small Markdown envelope; remove that envelope before parsing.
+  const marker = "Markdown Content:";
+  const marked = text.indexOf(marker);
+  const body = (marked >= 0 ? text.slice(marked + marker.length) : text).trim();
+  const arrayStart = body.indexOf("[");
+  const objectStart = body.indexOf("{");
+  const starts = [arrayStart, objectStart].filter((value) => value >= 0);
+  const json = starts.length ? body.slice(Math.min(...starts)) : body;
+  try {
+    return JSON.parse(json);
+  } catch (error) {
+    throw new Error(`Formula 1 Dashboard ${label} response was not valid JSON: ${error.message}`);
+  }
+}
+
 function normalizeMeetingDate(value) {
   const text = String(value || "").trim();
   return text ? text.slice(0, 10) : null;
@@ -237,7 +263,7 @@ async function createRequester({
           signal: controller.signal
         });
         if (response.ok) {
-          const payload = await response.json();
+          const payload = await responsePayload(response, path);
           return { payload, url };
         }
         const cloudflareChallenge = String(response.headers?.get?.("cf-mitigated") || "").toLowerCase() === "challenge";
@@ -257,6 +283,58 @@ async function createRequester({
     }
     throw lastError || new Error("Formula 1 Dashboard request failed.");
   };
+}
+
+async function fetchFormula1DashboardDestructors({
+  season,
+  baseUrl = process.env.FORMULA1_DASHBOARD_API_BASE_URL || DEFAULT_BASE_URL,
+  proxyBaseUrl = process.env.FORMULA1_DASHBOARD_API_PROXY_BASE_URL || "",
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  retries = DEFAULT_RETRIES
+} = {}) {
+  const safeSeason = Number(season);
+  if (!Number.isInteger(safeSeason) || safeSeason <= 0) {
+    throw new Error("Formula 1 Dashboard season must be a positive integer.");
+  }
+  const normalizedBase = normalizeBaseUrl(baseUrl);
+  const sources = [normalizedBase];
+  if (proxyBaseUrl) {
+    const normalizedProxy = normalizeBaseUrl(proxyBaseUrl);
+    if (normalizedProxy !== normalizedBase) sources.push(normalizedProxy);
+  }
+  let lastError = null;
+  for (const source of sources) {
+    try {
+      const request = await createRequester({ baseUrl: source, fetchImpl, timeoutMs, retries });
+      const response = await request("destructors-championship", { year: safeSeason });
+      const rawRows = unwrapArray(response.payload, "destructors championship");
+      const rows = rawRows
+        .map((row) => normalizedDamageRow(row))
+        .filter((row) => row.round != null && Number(row.round) > 0);
+      const byRound = new Map();
+      rows.forEach((row) => {
+        const round = Number(row.round);
+        if (!byRound.has(round)) byRound.set(round, []);
+        byRound.get(round).push(row);
+      });
+      return {
+        season: safeSeason,
+        provider: PROVIDER,
+        providerSchema: PROVIDER_SCHEMA,
+        sourceType: PROVIDER,
+        sourceNote: "Formula 1 Dashboard Destructors API; community estimates attributed to Reddit user u/Dense-Strategy-867",
+        sourceUrl: buildSourceUrl(normalizedBase, "destructors-championship", { year: safeSeason }),
+        fetchedUrl: response.url,
+        rawRows,
+        rows,
+        byRound
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error("Formula 1 Dashboard Destructors request failed.");
 }
 
 async function fetchFormula1DashboardSeasonData({
@@ -433,6 +511,7 @@ module.exports = {
   PROVIDER_SCHEMA,
   buildMeetingResults,
   fetchFormula1DashboardSeasonData,
+  fetchFormula1DashboardDestructors,
   normalizeBaseUrl,
   normalizeGrid,
   normalizePosition,
@@ -441,5 +520,6 @@ module.exports = {
   normalizedDamageRow,
   normalizedStandingsRow,
   statusFor,
-  stableHash
+  stableHash,
+  responsePayload
 };

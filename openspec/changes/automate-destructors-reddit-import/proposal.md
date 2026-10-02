@@ -9,6 +9,7 @@ The Destructors Championship is published by an independent Reddit author after 
 - Parse the public damage list when it is machine-readable and retain unresolved rows/components instead of turning missing values into zero.
 - Create a pending race-data snapshot for a newly detected round; never publish or overwrite reviewed actuals automatically.
 - Add retry, rate-limit/backoff, duplicate detection, and a missing-post status suitable for a scheduled worker.
+- Add an explicit Formula 1 Dashboard API mirror fallback for deployments whose egress address is blocked by Reddit, while retaining source attribution and the same pending-review gate.
 - Keep a manual/admin review path and make every imported revision reversible by selecting the prior reviewed snapshot.
 
 ## Capabilities

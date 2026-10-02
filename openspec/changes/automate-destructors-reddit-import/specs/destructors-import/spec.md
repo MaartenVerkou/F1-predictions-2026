@@ -23,6 +23,11 @@ The system SHALL inspect the configured public RSS source for posts by the confi
 - **THEN** the importer SHALL apply bounded backoff and record the last failure
 - **AND** it SHALL not treat the failure as an empty Destructors result
 
+#### Scenario: Reddit is blocked but the configured API mirror is available
+- **WHEN** the operator selects the Formula 1 Dashboard Destructors source and the mirror returns a machine-readable season payload
+- **THEN** the importer SHALL create the same pending evidence boundary using the mirror's canonical API URL and payload hash
+- **AND** it SHALL preserve the attribution to the community source instead of presenting the estimate as official F1 data
+
 ### Requirement: Persist source evidence and normalized damage facts
 
 The system SHALL persist the original publication metadata and parser revision before deriving any damage values. It SHALL normalize uniquely matched driver/team references and retain the original labels, component text, source URL, and unresolved reasons. Missing or unparseable values SHALL remain unavailable rather than becoming zero.

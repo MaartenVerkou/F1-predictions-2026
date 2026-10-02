@@ -12,6 +12,7 @@ const {
   selectCandidates,
   stableHash
 } = require("../src/reddit-destructors-provider");
+const { fetchFormula1DashboardDestructors } = require("../src/formula1-dashboard-provider");
 const {
   SOURCE_TYPES,
   ensureRaceDataSchema,
@@ -45,8 +46,11 @@ function parseArgs(argv) {
     dryRun: true,
     season: Number(process.env.F1_SEASON || 2026),
     round: null,
+    source: String(process.env.DESTRUCTORS_SOURCE || "reddit").trim().toLowerCase(),
     feedUrl: String(process.env.DESTRUCTORS_REDDIT_FEED_URL || DEFAULT_FEED_URL),
     author: String(process.env.DESTRUCTORS_REDDIT_AUTHOR || DEFAULT_AUTHOR),
+    dashboardBaseUrl: String(process.env.FORMULA1_DASHBOARD_API_BASE_URL || "https://api.formula1dashboard.com"),
+    dashboardProxyBaseUrl: String(process.env.FORMULA1_DASHBOARD_API_PROXY_BASE_URL || "https://r.jina.ai/http://api.formula1dashboard.com"),
     dbPath: process.env.DB_PATH || path.join(DATA_DIR, "app.db"),
     databaseUrl: String(process.env.DATABASE_URL || "").trim()
   };
@@ -55,15 +59,23 @@ function parseArgs(argv) {
     if (arg === "--dry-run") { args.apply = false; args.dryRun = true; continue; }
     if (arg.startsWith("--season=")) { args.season = Number(arg.slice(9)); continue; }
     if (arg.startsWith("--round=")) { args.round = Number(arg.slice(8)); continue; }
+    if (arg.startsWith("--source=")) { args.source = String(arg.slice(9)).trim().toLowerCase(); continue; }
     if (arg.startsWith("--feed=")) { args.feedUrl = String(arg.slice(7)).trim(); continue; }
     if (arg.startsWith("--author=")) { args.author = String(arg.slice(9)).trim(); continue; }
+    if (arg.startsWith("--dashboard-base=")) { args.dashboardBaseUrl = String(arg.slice(17)).trim(); continue; }
+    if (arg.startsWith("--dashboard-proxy=")) { args.dashboardProxyBaseUrl = String(arg.slice(19)).trim(); continue; }
     if (arg.startsWith("--db=")) { args.dbPath = path.resolve(arg.slice(5)); continue; }
     if (arg.startsWith("--database-url=")) { args.databaseUrl = String(arg.slice(16)).trim(); continue; }
     throw new Error(`Unknown argument: ${arg}`);
   }
   if (!Number.isInteger(args.season) || args.season < 1950) throw new Error("--season must be a valid year.");
   if (args.round != null && (!Number.isInteger(args.round) || args.round < 1)) throw new Error("--round must be positive.");
-  if (!args.feedUrl || !/^https:\/\//i.test(args.feedUrl)) throw new Error("--feed must be an HTTPS URL.");
+  if (!["reddit", "formula1_dashboard"].includes(args.source)) throw new Error("--source must be reddit or formula1_dashboard.");
+  if (args.source === "reddit" && (!args.feedUrl || !/^https:\/\//i.test(args.feedUrl))) throw new Error("--feed must be an HTTPS URL.");
+  if (args.source === "formula1_dashboard") {
+    if (!/^https:\/\//i.test(args.dashboardBaseUrl)) throw new Error("--dashboard-base must be an HTTPS URL.");
+    if (args.dashboardProxyBaseUrl && !/^https:\/\//i.test(args.dashboardProxyBaseUrl)) throw new Error("--dashboard-proxy must be an HTTPS URL.");
+  }
   return args;
 }
 
@@ -101,11 +113,68 @@ function rosterForRound(catalog, round) {
   };
 }
 
+function dashboardCandidates({ data, args, catalog }) {
+  const driversByNumber = new Map(
+    (catalog?.drivers || [])
+      .filter((driver) => driver.driver_number != null)
+      .map((driver) => [
+        String(driver.driver_number),
+        String(driver.display_name_override || driver.display_name || "").trim()
+      ])
+  );
+  const raceByRound = new Map((catalog?.races || []).map((race) => [Number(race.round_number), race]));
+  return Array.from(data.byRound.entries())
+    .filter(([round]) => args.round == null || Number(round) === Number(args.round))
+    .sort(([left], [right]) => Number(left) - Number(right))
+    .map(([round, sourceRows]) => {
+      const race = raceByRound.get(Number(round));
+      const roundName = String(race?.display_name || sourceRows[0]?.grandPrixCountry || `Round ${round}`).trim();
+      const rows = sourceRows.map((row) => ({
+        ...row,
+        driverName: driversByNumber.get(String(row.driverNumber)) || row.driverName,
+        sourceText: JSON.stringify(row)
+      }));
+      const bodyText = JSON.stringify({ season: args.season, round: Number(round), rows });
+      const contentHash = stableHash(bodyText);
+      return {
+        id: `f1dashboard:${args.season}:r${round}:${contentHash.slice(0, 16)}`,
+        url: data.sourceUrl,
+        title: `${args.season} Destructors Championship - ${roundName}`,
+        author: "Dense-Strategy-867 (via Formula 1 Dashboard)",
+        publishedAt: null,
+        updatedAt: null,
+        bodyText,
+        bodyHtml: null,
+        imageUrls: [],
+        match: { round: Number(round), roundName },
+        provider: data.provider,
+        providerSchema: data.providerSchema,
+        sourceTransport: data.provider,
+        sourceNote: data.sourceNote,
+        mapped: {
+          round: Number(round),
+          roundName,
+          rows,
+          warnings: [],
+          complete: rows.length > 0 && rows.every((row) => row.driverName && row.constructorName && row.totalCost != null)
+        }
+      };
+    });
+}
+
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function updateDamageEvidence(existingPayload, { args, candidate, mapped, normalizedRows }) {
+function updateDamageEvidence(existingPayload, {
+  args,
+  candidate,
+  mapped,
+  normalizedRows,
+  provider = PROVIDER,
+  parserVersion = PROVIDER_SCHEMA,
+  sourceTransport = null
+}) {
   const payload = clone(existingPayload) || {
     schemaVersion: 2,
     season: args.season,
@@ -139,22 +208,24 @@ function updateDamageEvidence(existingPayload, { args, candidate, mapped, normal
     rows: normalizedRows,
     error: warnings.includes("damage_rows_missing") || warnings.includes("damage_list_missing") ? warnings.join(";") : null,
     source: {
-      provider: PROVIDER,
+      provider,
       postId: candidate.id,
       url: candidate.url,
       author: candidate.author,
       title: candidate.title,
       publishedAt: candidate.publishedAt || null,
-      parserVersion: PROVIDER_SCHEMA,
+      parserVersion,
+      transport: sourceTransport,
       warnings
     }
   };
   payload.raw = payload.raw || {};
   payload.raw.destructors = mapped.rows;
   payload.raw.destructorsSource = {
-    provider: PROVIDER,
+    provider,
     postId: candidate.id,
     url: candidate.url,
+    transport: sourceTransport,
     bodyText: candidate.bodyText,
     imageUrls: candidate.imageUrls || []
   };
@@ -189,7 +260,18 @@ function buildCatalog(db, season) {
   return buildSeasonCatalog(db, season, { questions: readQuestions() });
 }
 
-function derivePendingActual(db, { args, catalog, round, importId, evidenceId, roundName }) {
+function derivePendingActual(db, {
+  args,
+  catalog,
+  round,
+  importId,
+  evidenceId,
+  roundName,
+  sourceType = SOURCE_TYPES.REDDIT_DESTRUCTORS,
+  sourceNote = "Derived from persisted race evidence; Reddit Destructors source remains pending admin review.",
+  evidenceRevisionPrefix = "reddit",
+  derivationVersion = PROVIDER_SCHEMA
+}) {
   const questions = readQuestions();
   if (!questions.length) return { snapshotId: null, values: {}, skipped: "questions_missing" };
   const base = catalog.drivers?.length && catalog.teams?.length && catalog.races?.length;
@@ -211,14 +293,14 @@ function derivePendingActual(db, { args, catalog, round, importId, evidenceId, r
     roundNumber: round,
     roundName,
     valuesByQuestion: derived?.values || {},
-    sourceType: SOURCE_TYPES.REDDIT_DESTRUCTORS,
-    sourceNote: "Derived from persisted race evidence; Reddit Destructors source remains pending admin review.",
+    sourceType,
+    sourceNote,
     label: `R${round} - ${roundName}`,
     reviewStatus: REVIEW_STATUS_PENDING,
     preserveReviewIfUnchanged: true,
     catalogRevision: catalog.catalogRevision || null,
-    evidenceRevision: `reddit:${round}:${evidenceId}`,
-    derivationVersion: `${PROVIDER_SCHEMA}-derivation-v1`
+    evidenceRevision: `${evidenceRevisionPrefix}:${round}:${evidenceId}`,
+    derivationVersion: `${derivationVersion}-derivation-v1`
   });
   linkEvidenceToActualSnapshot(db, snapshot.snapshotId, evidenceId, importId);
   return { snapshotId: snapshot.snapshotId, values: derived?.values || {}, skipped: null };
@@ -226,16 +308,33 @@ function derivePendingActual(db, { args, catalog, round, importId, evidenceId, r
 
 async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
   let feed;
-  try {
-    feed = await fetchFeed({ feedUrl: args.feedUrl, fetchImpl, sleep });
-  } catch (error) {
-    if (Number(error?.statusCode) === 429) {
-      return { status: "rate_limited", discovered: 0, imported: 0, skipped: 0, pending: 0, error: error.message };
+  let dashboardData = null;
+  if (args.source === "formula1_dashboard") {
+    try {
+      dashboardData = await fetchFormula1DashboardDestructors({
+        season: args.season,
+        baseUrl: args.dashboardBaseUrl,
+        proxyBaseUrl: args.dashboardProxyBaseUrl,
+        fetchImpl,
+        timeoutMs: 30_000,
+        retries: 1
+      });
+      feed = { status: "ok", entries: [], headers: { get: () => "application/json" } };
+    } catch (error) {
+      return { status: "unavailable", discovered: 0, imported: 0, skipped: 0, pending: 0, error: error.message };
     }
-    if ([401, 403].includes(Number(error?.statusCode))) {
-      return { status: "blocked", discovered: 0, imported: 0, skipped: 0, pending: 0, error: error.message };
+  } else {
+    try {
+      feed = await fetchFeed({ feedUrl: args.feedUrl, fetchImpl, sleep });
+    } catch (error) {
+      if (Number(error?.statusCode) === 429) {
+        return { status: "rate_limited", discovered: 0, imported: 0, skipped: 0, pending: 0, error: error.message };
+      }
+      if ([401, 403].includes(Number(error?.statusCode))) {
+        return { status: "blocked", discovered: 0, imported: 0, skipped: 0, pending: 0, error: error.message };
+      }
+      throw error;
     }
-    throw error;
   }
   if (feed.status === "not_modified") return { status: "unchanged", discovered: 0, imported: 0, skipped: 0, pending: 0 };
   const db = args.apply ? buildDatabase(args) : createAppDatabase({ databaseUrl: args.databaseUrl, sqlitePath: args.dbPath });
@@ -244,36 +343,47 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
   try {
     if (db) catalog = buildCatalog(db, args.season);
     const races = catalog?.races || [];
-    candidates = selectCandidates(feed.entries, { author: args.author, season: args.season, races });
-    if (args.round != null) candidates = candidates.filter((candidate) => Number(candidate.match.round) === args.round);
-    const summary = { status: "ok", discovered: candidates.length, imported: 0, skipped: 0, pending: 0, incomplete: 0, rounds: [] };
+    candidates = args.source === "formula1_dashboard"
+      ? dashboardCandidates({ data: dashboardData, args, catalog })
+      : selectCandidates(feed.entries, { author: args.author, season: args.season, races });
+    if (args.source !== "formula1_dashboard" && args.round != null) {
+      candidates = candidates.filter((candidate) => Number(candidate.match.round) === args.round);
+    }
+    // The API mirror remains in the same approved Destructors source family;
+    // its transport is recorded separately so provider policy stays explicit.
+    const sourceProvider = PROVIDER;
+    const parserVersion = args.source === "formula1_dashboard" ? "formula1dashboard-api-v1" : PROVIDER_SCHEMA;
+    const sourceNote = args.source === "formula1_dashboard"
+      ? `${dashboardData.sourceNote}; source endpoint ${dashboardData.sourceUrl}`
+      : `Reddit RSS ${args.feedUrl}`;
+    const summary = { status: "ok", source: args.source, discovered: candidates.length, imported: 0, skipped: 0, pending: 0, incomplete: 0, rounds: [] };
     if (!args.apply) {
       summary.rounds = candidates.map((candidate) => {
-        const map = mapDamageRows({ post: candidate, season: args.season, races, drivers: rosterForRound(catalog || { drivers: [], assignments: [], teams: [] }, candidate.match.round || 0).drivers });
+        const map = candidate.mapped || mapDamageRows({ post: candidate, season: args.season, races, drivers: rosterForRound(catalog || { drivers: [], assignments: [], teams: [] }, candidate.match.round || 0).drivers });
         return { postId: candidate.id, title: candidate.title, round: map.round, roundName: map.roundName, rows: map.rows.length, complete: map.complete, warnings: map.warnings };
       });
       return summary;
     }
-    const syncId = `reddit-destructors-${args.season}-${Date.now()}`;
+    const syncId = `${args.source === "formula1_dashboard" ? "formula1dashboard" : "reddit"}-destructors-${args.season}-${Date.now()}`;
     const importId = createRaceDataImport(db, {
       season: args.season,
       syncId,
-      sourceType: SOURCE_TYPES.REDDIT_DESTRUCTORS,
-      parserVersion: PROVIDER_SCHEMA,
+      sourceType: sourceProvider,
+      parserVersion,
       requestedRounds: candidates.length,
-      sourceNote: `Reddit RSS ${args.feedUrl}`
+      sourceNote
     });
     const tx = db.transaction(() => {
       for (const candidate of candidates) {
-        const mapped = mapDamageRows({
-          post: candidate,
-          season: args.season,
-          races,
-          drivers: rosterForRound(catalog, candidate.match.round || 0).drivers,
-          teams: catalog.teams
-        });
+        const mapped = candidate.mapped || mapDamageRows({
+            post: candidate,
+            season: args.season,
+            races,
+            drivers: rosterForRound(catalog, candidate.match.round || 0).drivers,
+            teams: catalog.teams
+          });
         const candidateHash = stableHash({ title: candidate.title, body: candidate.bodyText, url: candidate.url, updatedAt: candidate.updatedAt });
-        const prior = findDestructorsSourcePost(db, PROVIDER, candidate.id);
+        const prior = findDestructorsSourcePost(db, sourceProvider, candidate.id);
         const sameContent = prior && prior.content_hash === candidateHash;
         if (sameContent) {
           summary.skipped += 1;
@@ -283,7 +393,7 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
         const roster = rosterForRound(catalog, mapped.round || 0);
         const normalizedRows = mapped.rows.map((row) => normalizeDamageRow(row, roster.drivers.map((driver) => driver.display_name), catalog.canonical)).filter((row) => row.round != null && row.driver);
         const sourceId = saveDestructorsSourcePost(db, {
-          provider: PROVIDER,
+          provider: sourceProvider,
           postId: candidate.id,
           season: args.season,
           roundNumber: mapped.round,
@@ -298,7 +408,7 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
           bodyText: candidate.bodyText,
           bodyHtml: candidate.bodyHtml,
           imageUrls: candidate.imageUrls,
-          parserVersion: PROVIDER_SCHEMA,
+          parserVersion,
           status: sourceStatus,
           warnings: mapped.warnings,
           normalized: { ...mapped, rows: normalizedRows },
@@ -313,7 +423,10 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
           args,
           candidate,
           mapped,
-          normalizedRows
+          normalizedRows,
+          provider: sourceProvider,
+          parserVersion,
+          sourceTransport: candidate.sourceTransport || null
         });
         const evidenceId = saveRaceDataSnapshot(db, {
           season: args.season,
@@ -322,9 +435,11 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
           syncId: `${syncId}:${candidate.id}:${candidateHash.slice(0, 12)}`,
           importId,
           fetchedAt: new Date().toISOString(),
-          sourceType: SOURCE_TYPES.REDDIT_DESTRUCTORS,
-          sourceNote: `Reddit post ${candidate.url || candidate.id}; raw evidence preserved for review.`,
-          parserVersion: PROVIDER_SCHEMA,
+          sourceType: sourceProvider,
+          sourceNote: args.source === "formula1_dashboard"
+            ? `${sourceNote}; raw API evidence preserved for review.`
+            : `Reddit post ${candidate.url || candidate.id}; raw evidence preserved for review.`,
+          parserVersion,
           calendarState: "completed",
           payloadRevision: candidateHash,
           evidence
@@ -335,7 +450,13 @@ async function run(args, { fetchImpl = globalThis.fetch, sleep } = {}) {
           round: mapped.round,
           importId,
           evidenceId,
-          roundName: mapped.roundName
+          roundName: mapped.roundName,
+          sourceType: sourceProvider,
+          sourceNote: args.source === "formula1_dashboard"
+            ? "Derived from persisted Formula 1 Dashboard Destructors evidence; pending admin review."
+            : undefined,
+          evidenceRevisionPrefix: args.source === "formula1_dashboard" ? "formula1dashboard" : "reddit",
+          derivationVersion: parserVersion
         });
         summary.imported += 1;
         if (pending.snapshotId) summary.pending += 1;

@@ -22,6 +22,8 @@
     "actuals:auto-apply": "node scripts/backfill-actuals-2026.js --apply",
     "destructors:import": "node scripts/import-destructors-reddit.js --dry-run",
     "destructors:import:apply": "node scripts/import-destructors-reddit.js --apply",
+    "destructors:import:dashboard": "node scripts/import-destructors-reddit.js --source=formula1_dashboard --dry-run",
+    "destructors:import:dashboard:apply": "node scripts/import-destructors-reddit.js --source=formula1_dashboard --apply",
     "analyze:balance": "node scripts/analyze-balance.js"
   },
   "engines": {
