@@ -24,4 +24,4 @@
 - [x] 4.2 Add regression coverage for constructor Results versus Points and review-date formatting.
 - [x] 4.3 Update Playwright coverage for Questions, Results, Race Data compact controls, and Teams layout at desktop and narrow widths.
 - [x] 4.4 Run focused tests, full project gates, strict OpenSpec validation, and review the final diff for stale code.
-- [ ] 4.5 Deploy the verified image to preview, smoke-test critical admin flows, then promote the same image to production with health verification.
+- [x] 4.5 Deploy the verified image to preview, smoke-test critical admin flows, then promote the same image to production with health verification.
