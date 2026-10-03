@@ -258,3 +258,40 @@ test("admin actuals keeps one stable table layout across normal and compact mode
     expect(metrics.questionTitle).toContain("·");
   }
 });
+
+test("shared admin presentation stays usable across reference surfaces", async ({ page }) => {
+  for (const theme of ["light", "dark"]) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/admin/race-data?season=2026&view=drivers&focus=points`);
+    await page.evaluate((value) => {
+      localStorage.setItem("theme", value);
+      document.documentElement.setAttribute("data-theme", value);
+    }, theme);
+    await expect(page.locator(".admin-shell-heading")).toBeVisible();
+    await expect(page.locator(".admin-table-shell").first()).toBeVisible();
+    await expect(page.locator(".admin-segmented-control").first()).toBeVisible();
+    const firstTableShell = page.locator(".admin-table-shell").first();
+    await firstTableShell.focus();
+    await expect(firstTableShell).toBeFocused();
+
+    for (const path of [
+      "/admin/inputs?season=2026&tab=drivers",
+      "/admin/questions?season=2026",
+      "/admin/results?season=2026"
+    ]) {
+      await page.goto(path);
+      await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
+      await expect(page.locator(".admin-shell-heading")).toBeVisible();
+      await expect(page.locator(".admin-table-shell").first()).toBeVisible();
+      const metrics = await page.evaluate(() => ({
+        pageOverflow: Math.max(
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          document.body.scrollWidth - document.body.clientWidth
+        ),
+        theme: document.documentElement.getAttribute("data-theme")
+      }));
+      expect(metrics.theme).toBe(theme);
+      expect(metrics.pageOverflow).toBeLessThanOrEqual(0);
+    }
+  }
+});

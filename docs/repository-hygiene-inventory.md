@@ -28,6 +28,23 @@ The current review should pay particular attention to overlapping admin,
 canonical-dataflow, race-review, season-input, and deployment changes before
 starting another feature branch.
 
+### Snapshot from 3 October 2026
+
+The OpenSpec inventory currently reports these changes as still active or
+incomplete and therefore not safe to archive automatically:
+
+- `unify-admin-design-system-and-repo-hygiene` — this cleanup and UI contract.
+- `unify-canonical-dataflow-and-scoring` — one task remains.
+- `consolidate-race-evidence-providers` — provider consolidation is incomplete.
+- `adopt-durable-digest-delivery` — release delivery work is incomplete.
+- `add-admin-codex-resolution-workflow` — planning is present but implementation
+  has not started.
+
+The remaining completed changes are release-history candidates. They should be
+archived in a deliberate batch after their final production verification, not
+as part of a visual cleanup commit. This keeps the archive operation reversible
+and avoids hiding an unfinished provider or deployment dependency.
+
 ## Worktree and temporary-file policy
 
 - Managed worktrees are removed only through the Codex worktree lifecycle so

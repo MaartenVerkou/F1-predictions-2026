@@ -322,7 +322,7 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.doesNotMatch(view, /season_active/);
   assert.doesNotMatch(view, /admin_inputs\.active/);
   const tabs = readView("partials/admin_inputs_tabs.ejs");
-  assert.match(tabs, /partials\/admin_segmented_control/);
+  assert.match(tabs, /include\('admin_segmented_control'/);
   assert.match(tabs, /admin-inputs-tabs admin-race-data-switch/);
   assert.match(tabs, /data_quality/);
   assert.doesNotMatch(tabs, /assignments/);
@@ -369,7 +369,7 @@ test("inputs navigation and actions reuse the race-data controls", () => {
   const raceData = readView("partials/admin_race_data_round_region.ejs");
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
 
-  assert.match(tabs, /partials\/admin_segmented_control/);
+  assert.match(tabs, /include\('admin_segmented_control'/);
   assert.match(tabs, /admin-inputs-tabs admin-race-data-switch/);
   assert.match(readView("partials/admin_segmented_control.ejs"), /admin-segmented-control__item/);
   assert.match(view, /admin-inputs-toolbar-end admin-toolbar-actions/);

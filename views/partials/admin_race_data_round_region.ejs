@@ -130,7 +130,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
         <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
         <input type="hidden" name="snapshotId" value="<%= view.selectedEvidence.id %>" />
     <% } %>
-    <div class="admin-race-data-detail-table-wrap admin-table-shell">
+    <div class="admin-race-data-detail-table-wrap admin-table-shell" role="region" aria-label="Race result table" tabindex="0">
       <table class="admin-race-data-detail-table admin-race-data-detail-table--result">
         <thead>
           <tr>
@@ -238,7 +238,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
         </select>
       </form>
     </div>
-    <div class="admin-race-data-table-wrap admin-table-shell">
+    <div class="admin-race-data-table-wrap admin-table-shell" role="region" aria-label="Championship standings table" tabindex="0">
       <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
         <colgroup>
           <col class="admin-race-data-col admin-race-data-col-rank">

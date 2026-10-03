@@ -17,7 +17,7 @@
 - [x] 3.2 Migrate Results and Questions to the same toolbar, segmented control, table shell, and status metadata contract.
 - [x] 3.3 Migrate Season Inputs, Definitions, and scoring tables, preserving selection/edit/reorder behavior and compact phone layout.
 - [x] 3.4 Migrate analysis, user/group detail, and remaining admin tables where the shared contract applies; retain explicit variants for genuinely different data shapes.
-- [ ] 3.5 Add representative Playwright coverage for desktop/mobile and light/dark states, including table-local scrolling and keyboard focus.
+- [x] 3.5 Add representative Playwright coverage for desktop/mobile and light/dark states, including table-local scrolling and keyboard focus.
 
 ## 4. Simplify admin code and measure runtime behavior
 
