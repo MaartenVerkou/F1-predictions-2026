@@ -28,14 +28,14 @@
 
 ## 5. Repository and OpenSpec cleanup
 
-- [ ] 5.1 Classify active OpenSpec changes as active, completed, superseded, or historical and archive only verified completed/superseded changes using the approved workflow.
-- [ ] 5.2 Remove verified disposable probe files and archive unused managed worktrees without touching user-owned changes, secrets, production state, or database backups.
+- [x] 5.1 Classify active OpenSpec changes as active, completed, superseded, or historical and archive only verified completed/superseded changes using the approved workflow.
+- [x] 5.2 Remove verified disposable probe files and archive unused managed worktrees without touching user-owned changes, secrets, production state, or database backups.
 - [x] 5.3 Run strict OpenSpec validation and review the final diff for duplicated CSS, dead classes, accidental data changes, and unrelated edits.
 
 ## 6. Release verification
 
 - [ ] 6.1 Run lint, unit tests, build, Playwright, dependency/security checks, and live MHV registry validation.
-- [ ] 6.2 Refresh the Apps Hub preview from the immutable image, verify `/healthz`, and inspect the migrated admin pages before production.
+- [x] 6.2 Refresh the Apps Hub preview from the immutable image, verify `/healthz`, and inspect the migrated admin pages before production.
 - [ ] 6.3 After explicit preview approval, merge the latest main, deploy the approved immutable GHCR digest, verify production health/database backend, and retain the rollback image.
 
 > Verification note: lint, the 261-test unit suite, build, full Playwright suite

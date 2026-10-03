@@ -40,10 +40,17 @@ incomplete and therefore not safe to archive automatically:
 - `add-admin-codex-resolution-workflow` — planning is present but implementation
   has not started.
 
-The remaining completed changes are release-history candidates. They should be
-archived in a deliberate batch after their final production verification, not
-as part of a visual cleanup commit. This keeps the archive operation reversible
-and avoids hiding an unfinished provider or deployment dependency.
+Completed changes were treated as release-history candidates rather than
+deleted. They were archived only after their tasks and strict validation were
+complete, keeping the archive operation reversible and avoiding unfinished
+provider or deployment work.
+
+On 3 October 2026 the completed admin/input/season/race-review changes were
+archived as `2026-10-03-*` release-history entries after their tasks and strict
+validation were complete. Two older race-review changes had already contributed
+their requirements to the main specs, so they were archived with spec syncing
+skipped to avoid applying the same requirement twice. The five entries above
+remain the only active/incomplete work and are intentionally not archived.
 
 ## Worktree and temporary-file policy
 
