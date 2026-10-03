@@ -70,7 +70,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
 <div class="admin-race-data-round-region" data-race-data-round-region>
   <% if (view.hasSelectedRound) { %>
   <section class="admin-race-data-detail admin-race-data-detail-first" aria-labelledby="admin-race-data-detail-heading">
-    <div class="admin-race-data-detail-toolbar">
+    <div class="admin-race-data-detail-toolbar admin-toolbar">
       <div class="admin-race-data-section-heading">
         <h2 id="admin-race-data-detail-heading">
           <%= view.selectedRound?.label || t('admin_race_data.no_round') %>
@@ -130,7 +130,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
         <input type="hidden" name="focus" value="<%= view.focusId || 'points' %>" />
         <input type="hidden" name="snapshotId" value="<%= view.selectedEvidence.id %>" />
     <% } %>
-    <div class="admin-race-data-detail-table-wrap">
+    <div class="admin-race-data-detail-table-wrap admin-table-shell">
       <table class="admin-race-data-detail-table admin-race-data-detail-table--result">
         <thead>
           <tr>
@@ -191,7 +191,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
       </form>
     <% } %>
 
-    <div class="admin-race-data-evidence-meta admin-race-data-legend muted" aria-label="Race evidence metadata">
+    <div class="admin-race-data-evidence-meta admin-race-data-legend admin-status-line muted" aria-label="Race evidence metadata">
       <span><%= view.selectedEvidence
         ? `${view.detailRows.length} drivers · ${view.selectedEvidence.source_type || 'source'} · ${view.selectedEvidence.fetched_at || view.selectedEvidence.payload?.fetchedAt || 'source time unavailable'}`
         : (view.selectedRound?.state === 'future' ? t('admin_race_data.future_round') : t('admin_race_data.no_evidence')) %></span>
@@ -210,19 +210,19 @@ const reviewStatusTitle = reviewStatusLabel; %>
     <div class="admin-race-data-section-heading">
       <h2 id="admin-race-data-championship-heading"><%= t('admin_race_data.championship_standings') %></h2>
     </div>
-    <div class="admin-race-data-table-toolbar">
-      <div class="admin-race-data-tabs admin-race-data-view-tabs admin-race-data-switch" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
+    <div class="admin-race-data-table-toolbar admin-toolbar">
+      <div class="admin-race-data-tabs admin-segmented-control admin-race-data-view-tabs admin-race-data-switch" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
         <% ['drivers', 'constructors'].forEach((tableView) => { %>
-          <a class="admin-race-data-tab <%= viewMode === tableView ? 'is-active' : '' %>"
+          <a class="admin-race-data-tab admin-segmented-control__item <%= viewMode === tableView ? 'is-active' : '' %>"
              href="/admin/race-data?season=<%= season %>&view=<%= tableView %><%= roundQuery %>&focus=<%= view.focusId || 'points' %>"
              role="tab" aria-selected="<%= viewMode === tableView ? 'true' : 'false' %>" data-race-data-view-toggle="<%= tableView %>">
             <%= tableView === 'drivers' ? t('admin_race_data.drivers_view') : t('admin_race_data.constructors_view') %>
           </a>
         <% }) %>
       </div>
-      <div class="admin-race-data-tabs admin-race-data-metric-tabs admin-race-data-switch" role="tablist" aria-label="Race data metric">
+      <div class="admin-race-data-tabs admin-segmented-control admin-race-data-metric-tabs admin-race-data-switch" role="tablist" aria-label="Race data metric">
         <% (view.metricOptions || []).forEach((option) => { %>
-          <a class="admin-race-data-tab admin-race-data-metric-tab <%= option.id === view.activeMetricId ? 'is-active' : '' %>"
+          <a class="admin-race-data-tab admin-segmented-control__item admin-race-data-metric-tab <%= option.id === view.activeMetricId ? 'is-active' : '' %>"
              href="/admin/race-data?season=<%= season %>&view=<%= viewMode %><%= roundQuery %>&focus=<%= option.id %>"
              role="tab" aria-selected="<%= option.id === view.activeMetricId ? 'true' : 'false' %>" data-race-data-metric-toggle="<%= option.id %>" title="<%= option.title || option.label %>"><%= option.label %></a>
         <% }) %>
@@ -238,7 +238,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
         </select>
       </form>
     </div>
-    <div class="admin-race-data-table-wrap">
+    <div class="admin-race-data-table-wrap admin-table-shell">
       <table class="admin-race-data-matrix admin-race-data-matrix--<%= viewMode %>" data-race-data-matrix data-race-data-active-view="<%= viewMode %>">
         <colgroup>
           <col class="admin-race-data-col admin-race-data-col-rank">

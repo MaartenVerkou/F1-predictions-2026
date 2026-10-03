@@ -95,6 +95,20 @@
   --glow-b: rgba(29, 62, 129, 0.16);
   --header-offset: 70px;
   --dev-toolbar-offset: 0px;
+
+  /* Shared admin surface contract. Pages can opt in with .admin-shell. */
+  --admin-space-1: 4px;
+  --admin-space-2: 8px;
+  --admin-space-3: 12px;
+  --admin-space-4: 16px;
+  --admin-space-5: 24px;
+  --admin-control-height: 34px;
+  --admin-table-cell-x: 10px;
+  --admin-table-cell-y: 8px;
+  --admin-radius: 8px;
+  --admin-border-strong: color-mix(in srgb, var(--border) 78%, var(--text));
+  --admin-surface-subtle: color-mix(in srgb, var(--card) 92%, var(--border));
+  --admin-focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 :root[data-theme="dark"] {
@@ -8643,6 +8657,242 @@ button.lang-option.is-active {
     width: 68px;
     min-width: 68px;
     max-width: 68px;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Shared admin design system
+
+   Race Data is the reference surface for admin controls and data tables. The
+   classes below provide the same contract to the other admin pages without
+   changing their domain-specific table columns or form behaviour.
+   ------------------------------------------------------------------------- */
+.admin-shell {
+  --admin-section-gap: var(--admin-space-5);
+  gap: var(--admin-section-gap);
+}
+
+.admin-shell-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--admin-space-4);
+  min-width: 0;
+}
+
+.admin-shell-heading > :first-child,
+.admin-shell-heading__copy {
+  min-width: 0;
+}
+
+.admin-shell-heading__controls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: var(--admin-space-2);
+  min-width: 0;
+}
+
+.admin-shell-heading h1,
+.admin-shell-heading h2 {
+  margin: 0;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--admin-space-2) var(--admin-space-3);
+  min-width: 0;
+}
+
+.admin-toolbar__group,
+.admin-toolbar__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--admin-space-2);
+  min-width: 0;
+}
+
+.admin-toolbar__actions > .button-link,
+.admin-toolbar__actions > button,
+.admin-toolbar__actions > form > button {
+  min-height: var(--admin-control-height);
+}
+
+.admin-segmented-control {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--admin-radius);
+  background: var(--admin-surface-subtle);
+}
+
+.admin-segmented-control__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--admin-control-height);
+  min-width: 0;
+  padding: 6px 12px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
+  background: transparent;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.admin-segmented-control__item:first-child {
+  border-left: 0;
+}
+
+.admin-segmented-control__item:hover,
+.admin-segmented-control__item:focus-visible,
+.admin-segmented-control__item.is-active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--card));
+}
+
+.admin-segmented-control__item:focus-visible,
+.admin-toolbar .button-link:focus-visible,
+.admin-toolbar button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 0;
+  box-shadow: var(--admin-focus-ring);
+}
+
+.admin-table-shell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) var(--admin-surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--admin-radius);
+  background: var(--card);
+}
+
+.admin-table-shell::-webkit-scrollbar {
+  height: 10px;
+}
+
+.admin-table-shell::-webkit-scrollbar-track {
+  background: var(--admin-surface-subtle);
+  border-radius: 999px;
+}
+
+.admin-table-shell::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 2px solid var(--admin-surface-subtle);
+  border-radius: 999px;
+}
+
+.admin-table-shell > table {
+  margin-bottom: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-table-shell > table thead th {
+  border-bottom: 2px solid var(--admin-border-strong);
+}
+
+.admin-status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--admin-space-1) var(--admin-space-3);
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.admin-status-line > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The legacy Race Data class names remain aliases so old links and partials
+   keep their behaviour while the shared contract is adopted incrementally. */
+.admin-race-data-switch.admin-segmented-control,
+.admin-race-data-switch.admin-segmented-control > .admin-segmented-control__item {
+  border-radius: 0;
+}
+
+.admin-race-data-switch.admin-segmented-control {
+  border-radius: var(--admin-radius);
+}
+
+.admin-race-data-switch .admin-race-data-tab {
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.admin-race-data-switch .admin-race-data-tab:first-child {
+  border-left: 0;
+}
+
+@media (max-width: 720px) {
+  .admin-shell-heading {
+    grid-template-columns: 1fr;
+    gap: var(--admin-space-3);
+  }
+
+  .admin-shell-heading__controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .admin-segmented-control {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .admin-segmented-control__item {
+    flex: 0 0 auto;
+    padding-inline: 10px;
+  }
+
+  .admin-toolbar {
+    align-items: flex-start;
+  }
+
+  .admin-toolbar__group,
+  .admin-toolbar__actions {
+    width: 100%;
+  }
+
+  .admin-table-shell > table th,
+  .admin-table-shell > table td {
+    padding: var(--admin-table-cell-y) var(--admin-table-cell-x);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-shell *,
+  .admin-shell *::before,
+  .admin-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

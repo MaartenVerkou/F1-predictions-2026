@@ -233,7 +233,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /admin-race-data-evidence-meta/);
   assert.match(region, /admin-race-data-legend/);
   assert.doesNotMatch(region, /admin-race-data-revision-meta/);
-  assert.match(region, /class="admin-race-data-table-toolbar"/);
+  assert.match(region, /class="admin-race-data-table-toolbar admin-toolbar"/);
   assert.doesNotMatch(region, /admin-race-data-toolbar/);
   assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
   assert.match(region, /data-race-data-result-row/);
@@ -322,7 +322,8 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.doesNotMatch(view, /season_active/);
   assert.doesNotMatch(view, /admin_inputs\.active/);
   const tabs = readView("partials/admin_inputs_tabs.ejs");
-  assert.match(tabs, /admin-race-data-tabs/);
+  assert.match(tabs, /partials\/admin_segmented_control/);
+  assert.match(tabs, /admin-inputs-tabs admin-race-data-switch/);
   assert.match(tabs, /data_quality/);
   assert.doesNotMatch(tabs, /assignments/);
 });
@@ -368,12 +369,28 @@ test("inputs navigation and actions reuse the race-data controls", () => {
   const raceData = readView("partials/admin_race_data_round_region.ejs");
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
 
-  assert.match(tabs, /admin-race-data-tabs admin-inputs-tabs admin-race-data-switch/);
-  assert.match(tabs, /admin-race-data-tab <%= tab === name \? 'is-active' : '' %>/);
+  assert.match(tabs, /partials\/admin_segmented_control/);
+  assert.match(tabs, /admin-inputs-tabs admin-race-data-switch/);
+  assert.match(readView("partials/admin_segmented_control.ejs"), /admin-segmented-control__item/);
   assert.match(view, /admin-inputs-toolbar-end admin-toolbar-actions/);
   assert.match(raceData, /admin-race-data-detail-actions admin-toolbar-actions/);
   assert.match(styles, /\.admin-toolbar-actions\s*\{/);
   assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
+});
+
+test("shared admin design primitives have one theme-aware contract", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const segmented = readView("partials/admin_segmented_control.ejs");
+  assert.match(styles, /--admin-space-5:\s*24px/);
+  assert.match(styles, /--admin-control-height:\s*34px/);
+  assert.match(styles, /--admin-table-cell-x:\s*10px/);
+  assert.match(styles, /\.admin-shell-heading\s*\{/);
+  assert.match(styles, /\.admin-toolbar\s*\{/);
+  assert.match(styles, /\.admin-segmented-control\s*\{/);
+  assert.match(styles, /\.admin-table-shell\s*\{/);
+  assert.match(styles, /prefers-reduced-motion:\s*reduce/);
+  assert.match(segmented, /admin-segmented-control__item/);
+  assert.match(segmented, /aria-current="page"/);
 });
 
 test("input editing keeps team reordering scoped to the selected row", () => {

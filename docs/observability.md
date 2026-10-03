@@ -8,6 +8,10 @@ Default production goal: make failures diagnosable later without guessing.
 - Include request id, route/action, user/workspace id when safe, status, duration, and error name.
 - Do not log secrets, tokens, cookies, full payment details, or raw personal data.
 - Use LOG_LEVEL from the environment.
+- `http_request` events include duration on every request and, by default, heap/RSS
+  observations on a small sampled subset. Configure `PERFORMANCE_SAMPLE_RATE` (0 to
+  1) to change or disable the sample. The sampled fields contain process memory only;
+  request bodies, cookies, and user content are never logged.
 
 This app emits JSON logs for:
 

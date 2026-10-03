@@ -320,6 +320,7 @@ npm run analyze:balance -- --players 1000 --seasons 200 --json balance-report.js
 - `SMTP_CLIENT_NAME` - optional SMTP client/EHLO name; defaults to `APP_DOMAIN` host (then `SMTP_USER` domain as fallback)
 - `APP_DOMAIN` - app domain/host (default `localhost`); used by built-in Caddy edge profile and for email verification/reset links. For localhost, the app uses `http://localhost:PORT`; otherwise it uses `https://APP_DOMAIN`.
 - `LOG_LEVEL` - structured server log threshold: `debug`, `info`, `warn`, `error`, or `silent` (default `info`)
+- `PERFORMANCE_SAMPLE_RATE` - sampled fraction of HTTP requests that include heap/RSS observations in structured logs (default `0.02`; use `0` to disable)
 - `TRUST_PROXY_HOPS` - trusted reverse proxy hop count for secure cookies and forwarded HTTPS detection (default `1` outside development)
 - `DEV_AUTO_LOGIN` - set to `1` to auto-login a dev user on each request (disabled when `NODE_ENV=production`)
 - `DEV_AUTO_LOGIN_EMAIL` - email used for dev auto-login (default `dev@example.com`)

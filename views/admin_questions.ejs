@@ -5,13 +5,13 @@
 <% const editing = mode === 'edit'; %>
 <% const seasonValue = Number(season || 2026); %>
 
-<div class="card admin-page-card admin-questions-page">
-  <div class="admin-race-data-heading admin-questions-heading">
-    <div>
+<div class="card admin-page-card admin-shell admin-questions-page">
+  <div class="admin-race-data-heading admin-shell-heading admin-questions-heading">
+    <div class="admin-shell-heading__copy">
       <h1>Questions</h1>
       <p class="muted admin-page-intro">Manage this season’s question wording, order, scoring and inclusion.</p>
     </div>
-    <div class="admin-questions-context">
+    <div class="admin-questions-context admin-shell-heading__controls">
       <form method="get" action="/admin/questions" class="admin-questions-season-form" data-admin-questions-season-form>
         <% if (editing) { %><input type="hidden" name="mode" value="edit"><% } %>
         <label for="admin-questions-season">Season</label>
@@ -32,8 +32,8 @@
   <% } %>
 
   <div class="admin-question-table-region">
-    <div class="admin-race-data-detail-toolbar">
-      <div class="admin-race-data-detail-actions admin-toolbar-actions">
+    <div class="admin-race-data-detail-toolbar admin-toolbar">
+      <div class="admin-race-data-detail-actions admin-toolbar-actions admin-toolbar__actions">
         <% if (editing) { %>
           <button type="submit" form="admin-question-edit-form" class="secondary admin-question-save-button">Save changes</button>
           <a class="button-link secondary admin-question-cancel" href="/admin/questions?season=<%= seasonValue %>">Cancel</a>
@@ -46,7 +46,7 @@
     <form id="admin-question-edit-form" method="post" action="/admin/questions" class="admin-question-edit-form">
       <%- csrfField() %>
       <input type="hidden" name="season" value="<%= seasonValue %>">
-      <div class="admin-question-table-wrap admin-table-scroll" role="region" aria-label="Questions input table" tabindex="0">
+      <div class="admin-question-table-wrap admin-table-scroll admin-table-shell" role="region" aria-label="Questions input table" tabindex="0">
         <table class="table compact admin-question-table <%= editing ? 'admin-question-table--editing' : '' %>" <%= editing ? 'data-question-order-table' : '' %>>
           <thead>
             <tr>

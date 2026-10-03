@@ -21,6 +21,7 @@
     {
       "slug": "wok",
       "displayName": "Wheel of Knowledge",
+      "compatibilityAliases": ["f1"],
       "repository": {
         "url": "https://github.com/MaartenVerkou/F1-predictions-2026.git",
         "branch": "main"
