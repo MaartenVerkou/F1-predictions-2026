@@ -150,6 +150,33 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
 });
 
+test("Race Data keeps the compact metric selector below the view toggle on phones", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin/race-data?season=2026&round=6&view=drivers&focus=points");
+
+  const toolbarMetrics = await page.evaluate(() => {
+    const toolbar = document.querySelector(".admin-race-data-table-toolbar");
+    const viewToggle = document.querySelector("[data-race-data-view-tabs]");
+    const metricSelect = document.querySelector("[data-race-data-metric-select-form]");
+    const select = metricSelect?.querySelector("select");
+    const rect = (element) => element?.getBoundingClientRect();
+    return {
+      toolbarDisplay: toolbar ? getComputedStyle(toolbar).display : "",
+      toolbar: rect(toolbar),
+      viewToggle: rect(viewToggle),
+      metricSelect: rect(metricSelect),
+      select: rect(select),
+      metricSelectDisplay: metricSelect ? getComputedStyle(metricSelect).display : ""
+    };
+  });
+
+  expect(toolbarMetrics.toolbarDisplay).toBe("grid");
+  expect(toolbarMetrics.metricSelectDisplay).toBe("flex");
+  expect(toolbarMetrics.metricSelect.top).toBeGreaterThanOrEqual(toolbarMetrics.viewToggle.bottom);
+  expect(toolbarMetrics.metricSelect.right).toBeLessThanOrEqual(toolbarMetrics.toolbar.right + 1);
+  expect(toolbarMetrics.select.right).toBeLessThanOrEqual(toolbarMetrics.toolbar.right + 1);
+});
+
 test("admin actuals and admin tables fit phone-width screens", async ({ page }) => {
   await page.goto("/");
 

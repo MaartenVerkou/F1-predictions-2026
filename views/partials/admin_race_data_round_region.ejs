@@ -210,7 +210,7 @@ const reviewStatusTitle = reviewStatusLabel; %>
     <div class="admin-race-data-section-heading">
       <h2 id="admin-race-data-championship-heading"><%= t('admin_race_data.championship_standings') %></h2>
     </div>
-    <div class="admin-race-data-table-toolbar admin-toolbar">
+    <div class="admin-race-data-table-toolbar admin-toolbar admin-toolbar--stack-mobile">
       <div class="admin-race-data-tabs admin-segmented-control admin-race-data-view-tabs admin-race-data-switch" role="tablist" aria-label="<%= t('admin_race_data.view_label') %>" data-race-data-view-tabs>
         <% ['drivers', 'constructors'].forEach((tableView) => { %>
           <a class="admin-race-data-tab admin-segmented-control__item <%= viewMode === tableView ? 'is-active' : '' %>"

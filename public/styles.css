@@ -3460,8 +3460,7 @@ button:disabled {
 @media (max-width: 720px) {
   .admin-race-data-heading,
   .admin-race-data-detail-heading,
-  .admin-race-data-controls,
-  .admin-race-data-table-toolbar {
+  .admin-race-data-controls {
     display: grid;
     justify-content: stretch;
   }
@@ -8503,7 +8502,6 @@ button.lang-option.is-active {
     margin-left: 0;
   }
 
-  .admin-race-data-table-section[data-race-data-championship] .admin-race-data-table-toolbar,
   .admin-race-data-derivation-heading,
   .admin-race-data-question-form {
     align-items: stretch;
@@ -8881,6 +8879,18 @@ button.lang-option.is-active {
 
   .admin-toolbar {
     align-items: flex-start;
+  }
+
+  .admin-toolbar--stack-mobile {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  .admin-toolbar--stack-mobile > * {
+    width: 100%;
+    min-width: 0;
   }
 
   .admin-toolbar__group,

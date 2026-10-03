@@ -239,7 +239,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /admin-race-data-evidence-meta/);
   assert.match(region, /admin-race-data-legend/);
   assert.doesNotMatch(region, /admin-race-data-revision-meta/);
-  assert.match(region, /class="admin-race-data-table-toolbar admin-toolbar"/);
+  assert.match(region, /class="admin-race-data-table-toolbar admin-toolbar admin-toolbar--stack-mobile"/);
   assert.doesNotMatch(region, /admin-race-data-toolbar/);
   assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
   assert.match(region, /data-race-data-result-row/);
