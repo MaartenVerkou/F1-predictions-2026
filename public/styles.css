@@ -106,6 +106,9 @@
   --admin-table-cell-x: 10px;
   --admin-table-cell-y: 8px;
   --admin-radius: 8px;
+  --admin-font-size-sm: 12px;
+  --admin-font-size-control: 13px;
+  --admin-font-weight: 700;
   --admin-border-strong: color-mix(in srgb, var(--border) 78%, var(--text));
   --admin-surface-subtle: color-mix(in srgb, var(--card) 92%, var(--border));
   --admin-focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
@@ -8746,8 +8749,8 @@ button.lang-option.is-active {
   color: var(--text);
   background: transparent;
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--admin-font-size-control);
+  font-weight: var(--admin-font-weight);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -8819,7 +8822,7 @@ button.lang-option.is-active {
   min-width: 0;
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--admin-font-size-sm);
   line-height: 1.4;
 }
 
