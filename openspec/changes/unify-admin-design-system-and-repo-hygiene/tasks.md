@@ -36,3 +36,9 @@
 - [ ] 6.1 Run lint, unit tests, build, Playwright, dependency/security checks, and live MHV registry validation.
 - [ ] 6.2 Refresh the Apps Hub preview from the immutable image, verify `/healthz`, and inspect the migrated admin pages before production.
 - [ ] 6.3 After explicit preview approval, merge the latest main, deploy the approved immutable GHCR digest, verify production health/database backend, and retain the rollback image.
+
+> Verification note: lint, the 261-test unit suite, build, full Playwright suite
+> (34 tests), and `npm audit --omit=dev --audit-level=high` pass. The live
+> registry check still reports pre-existing external drift for Kinara and two
+> unrelated shared-app mount paths, so 6.1 remains open until that platform
+> state is corrected or explicitly accepted.
