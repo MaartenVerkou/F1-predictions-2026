@@ -3,7 +3,7 @@
 <nav class="<%= segmentedClasses %>" aria-label="<%= ariaLabel || '' %>">
   <% segmentedItems.forEach((item) => { %>
     <a
-      class="admin-segmented-control__item <%= item.active ? 'is-active' : '' %> <%= item.className || '' %>"
+      class="admin-race-data-tab admin-segmented-control__item <%= item.active ? 'is-active' : '' %> <%= item.className || '' %>"
       href="<%= item.href %>"
       <% if (item.title) { %>title="<%= item.title %>"<% } %>
       <% if (item.active) { %>aria-current="page"<% } %>
