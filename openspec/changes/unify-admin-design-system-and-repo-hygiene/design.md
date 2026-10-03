@@ -54,6 +54,16 @@ Update `mhv-app.yaml`, registry documentation, and validation fixtures so the ca
 
 Classify OpenSpec folders as active, completed, superseded, or historical. Archive only completed changes after their implementation commits are on main and validation passes. Remove temporary probe files/worktrees only when ownership and recoverability are known.
 
+### 8. Use explicit WOK runtime names with a compatibility window
+
+The production application container will be named `wheelofknowledge` and expose
+that name on `mhv-web`; the stable user-testing runtime will be named
+`preview-wok`. The existing `f1-app` network alias remains temporarily so the
+currently deployed Caddy route and rollback image can continue to work until the
+preview is approved and production is redeployed. The registry and deploy
+script use the canonical names first and only fall back to the legacy production
+container while the transition is incomplete.
+
 ## Risks / Trade-offs
 
 - **Shared styles accidentally change a page-specific table** → migrate one page at a time, retain variant classes, and run desktop/mobile light/dark browser checks.

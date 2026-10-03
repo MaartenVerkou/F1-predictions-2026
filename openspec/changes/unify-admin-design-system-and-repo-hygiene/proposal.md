@@ -10,6 +10,7 @@ Wheel of Knowledge is functional and production-ready, but its admin surfaces ha
 - Add focused rendered-view and Playwright coverage for the shared controls and representative tables at desktop/mobile and light/dark themes.
 - Split oversized admin route/derivation responsibilities where a clear domain boundary exists, without changing the canonical evidence or scoring contract.
 - Normalize the platform identity to `wok` in app metadata and registry-facing configuration while keeping existing production paths, domains, databases, and rollback behavior unchanged.
+- Align the running WOK runtime names with the public identity: production uses `wheelofknowledge` and the stable test runtime uses `preview-wok`, while explicit compatibility aliases remain available during rollout.
 - Audit active OpenSpec changes and local artifacts; archive completed or superseded changes and remove only verified disposable files in a separate cleanup step.
 - Add lightweight measurement for request duration, heap usage, and expensive derivation paths before making performance changes; do not optimize memory blindly.
 

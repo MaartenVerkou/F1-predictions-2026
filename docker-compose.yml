@@ -2,7 +2,8 @@ name: f1predictions
 
 services:
   app:
-    image: ${APP_IMAGE:-f1predictions-app:workspace}
+    container_name: wheelofknowledge
+    image: ${APP_IMAGE:-wheelofknowledge-app:workspace}
     build: .
     command: node server.js
     ports:

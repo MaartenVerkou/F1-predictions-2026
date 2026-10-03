@@ -3,6 +3,7 @@
 - [x] 1.1 Update `mhv-app.yaml` and related contract fixtures to use `wok` / Wheel of Knowledge as the canonical identity while recording `f1` as an explicit compatibility alias.
 - [x] 1.2 Add contract tests and documentation assertions that registry slug, preview hostname pattern, repository, production domain, health endpoint, and database backend remain aligned.
 - [x] 1.3 Capture the current admin routes, active OpenSpec changes, worktrees, and untracked files in a reviewable cleanup inventory without deleting user files.
+- [x] 1.4 Align WOK's canonical production and stable-preview runtime names with `wheelofknowledge` and `preview-wok`, retain only an explicit temporary `f1-app` compatibility alias, and update registry/deploy contracts.
 
 ## 2. Build the shared admin presentation layer
 

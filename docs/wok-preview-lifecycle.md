@@ -9,6 +9,8 @@ app-hub URL and it never replaces the production checkout.
 - Production remains `https://wheelofknowledge.com`.
 - `wok.mhvmade.com` is a compatibility redirect only.
 - A preview uses `https://wok-preview-<id>.mhvmade.com`.
+- The pinned user-testing preview uses `https://preview-wok.mhvmade.com` and
+  the runtime container name `preview-wok`; it is the sole long-lived preview.
 - The preview hostname must be covered by the existing Cloudflare Access
   policy before its Caddy route is activated.
 
@@ -16,11 +18,16 @@ The app-hub catalog can link to the stable `wok` slug, but the direct preview
 hostname is the operational URL. This keeps the mature app independent from
 the app-hub UI implementation.
 
-Public previews always use `sanitized` data mode. They are built from an empty
-isolated database, seeded with deterministic fake race-review data, and never
-restore a production dump or copy production file state. A private diagnostic
-clone is available only with an explicit `--data-mode clone` and can never be
-activated publicly.
+Generated public previews always use `sanitized` data mode. They are built
+from an empty isolated database, seeded with deterministic fake race-review
+data, and never restore a production dump or copy production file state. A
+private diagnostic clone is available only with an explicit `--data-mode clone`
+and cannot be activated by the generic preview lifecycle.
+
+The pinned `preview-wok` environment is an explicit, access-protected
+operator preview and currently uses the isolated production snapshot that was
+approved for this testing workflow. It is not a production runtime and must
+not be used as a second source of truth.
 
 ## Plan locally
 
