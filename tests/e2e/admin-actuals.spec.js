@@ -109,6 +109,21 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
 
   await page.goto("/admin/race-data?season=2026&round=6&view=drivers&focus=points");
+  const selectorMetrics = await page.evaluate(() => {
+    const stack = document.querySelector(".admin-selector-stack");
+    const forms = Array.from(document.querySelectorAll(".admin-selector-stack__form"));
+    const selects = forms.map((form) => form.querySelector("select")?.getBoundingClientRect());
+    return {
+      display: stack ? getComputedStyle(stack).display : "",
+      formTops: forms.map((form) => Math.round(form.getBoundingClientRect().top)),
+      selectLefts: selects.map((rect) => Math.round(rect?.left || 0)),
+      selectRights: selects.map((rect) => Math.round(rect?.right || 0))
+    };
+  });
+  expect(selectorMetrics.display).toBe("grid");
+  expect(selectorMetrics.formTops[1]).toBeGreaterThan(selectorMetrics.formTops[0]);
+  expect(selectorMetrics.selectLefts[1]).toBe(selectorMetrics.selectLefts[0]);
+  expect(selectorMetrics.selectRights[1]).toBe(selectorMetrics.selectRights[0]);
   const reviewForm = page.locator("[data-race-data-review-form]");
   await expect(reviewForm).toBeVisible();
   await reviewForm.getByRole("button", { name: /Mark reviewed/i }).click();

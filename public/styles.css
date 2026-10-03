@@ -8164,34 +8164,6 @@ button.lang-option.is-active {
 }
 
 
-/* Final Race Data review layout: selectors stack in the page header and the
-   facts table starts immediately below it. */
-.admin-race-data-selector-stack {
-  display: grid;
-  gap: 6px;
-  width: min(360px, 100%);
-  min-width: 0;
-}
-
-.admin-race-data-selector-form {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.admin-race-data-selector-form label {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.admin-race-data-selector-form select {
-  min-width: 0;
-  width: 100%;
-}
-
 .admin-race-data-detail-first {
   padding-top: 0;
   border-top: 0;
@@ -8286,10 +8258,6 @@ button.lang-option.is-active {
   .admin-race-data-heading {
     display: grid;
     gap: 10px;
-  }
-
-  .admin-race-data-selector-stack {
-    width: 100%;
   }
 
   .admin-race-data-detail-toolbar {
@@ -8696,6 +8664,39 @@ button.lang-option.is-active {
   min-width: 0;
 }
 
+/* Selector pairs share one compact, right-aligned stack across admin pages. */
+.admin-selector-stack {
+  display: grid;
+  align-items: start;
+  justify-self: end;
+  gap: var(--admin-space-2);
+  width: min(100%, 22rem);
+  min-width: 0;
+}
+
+.admin-selector-stack__form {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--admin-space-2);
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-selector-stack__form label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--admin-font-size-sm);
+  font-weight: var(--admin-font-weight);
+  white-space: nowrap;
+}
+
+.admin-selector-stack__form select {
+  width: 100%;
+  min-width: 0;
+}
+
 .admin-shell-heading h1,
 .admin-shell-heading h2 {
   margin: 0;
@@ -8860,6 +8861,11 @@ button.lang-option.is-active {
 
   .admin-shell-heading__controls {
     justify-content: flex-start;
+    width: 100%;
+  }
+
+  .admin-selector-stack {
+    justify-self: stretch;
     width: 100%;
   }
 

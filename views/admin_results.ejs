@@ -7,8 +7,8 @@
       <h1>Results</h1>
       <p class="muted admin-page-intro">Derived answers from the selected season’s reviewed Race Data.</p>
     </div>
-    <div class="admin-race-data-selector-stack admin-shell-heading__controls">
-      <form method="get" action="/admin/results" class="admin-race-data-selector-form admin-actuals-season-form" data-admin-results-season-form>
+    <div class="admin-selector-stack admin-shell-heading__controls">
+      <form method="get" action="/admin/results" class="admin-selector-stack__form admin-actuals-season-form" data-admin-results-season-form>
         <label for="admin-results-season">Season</label>
         <select id="admin-results-season" name="season" onchange="this.form.submit()">
           <% (availableSeasons || []).forEach((availableSeason) => { %>
