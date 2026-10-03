@@ -1,6 +1,6 @@
 # MHV App Compatibility Report
 
-Last reviewed: 2026-06-30.
+Last reviewed: 2026-10-03.
 
 This report compares the existing apps with the MHV app platform contract and records completed compatibility migrations.
 
@@ -23,8 +23,8 @@ Current state:
 - Target path: `/srv/apps/wok/current`
 - Canonical hostname: `wheelofknowledge.com`
 - MHV redirect: `wok.mhvmade.com`
-- Canonical container after the next approved deploy: `wheelofknowledge`
-- Transition Caddy upstream: `wheelofknowledge:3000` (the `f1-app` network alias remains temporarily for rollback)
+- Canonical container: `wheelofknowledge`
+- Caddy upstream: `wheelofknowledge:3000` (the `f1-app` network alias remains temporarily for rollback)
 - Database: central PostgreSQL through `mhv-postgres`
 - Codex compatibility path: `/srv/codex/f1`
 

@@ -1,6 +1,6 @@
 # MHV Platform Inventory
 
-Last read-only inventory: 2026-06-30.
+Last verified inventory: 2026-10-03.
 Portfolio path migration completed: 2026-06-30.
 Apps overview path migration completed: 2026-06-30.
 
@@ -31,7 +31,7 @@ Current Caddy routes:
 
 | Hostname | Behavior | Upstream |
 | --- | --- | --- |
-| `wheelofknowledge.com` | App route | `wheelofknowledge:3000` after the approved runtime rename; current live route remains `f1-app:3000` until then |
+| `wheelofknowledge.com` | App route | `wheelofknowledge:3000` |
 | `www.wheelofknowledge.com` | Redirect | `wheelofknowledge.com` |
 | `wok.mhvmade.com` | Redirect | `wheelofknowledge.com` |
 | `kinara.mhvmade.com` | App route | `kinara-app:3000` |
@@ -45,7 +45,7 @@ Current Caddy routes:
 | --- | --- | --- |
 | `mhv-caddy` | `caddy:2-alpine` | Central edge |
 | `mhv-postgres` | `postgres:18-alpine` | Central PostgreSQL |
-| `wheelofknowledge` | `wheelofknowledge-app` | Target WOK runtime name; current live container remains `f1predictions-app-1` until the approved redeploy |
+| `wheelofknowledge` | `ghcr.io/maartenverkou/f1-predictions-2026@sha256:dd6a88b68246df6222d3cb6411071a0d3df64b2bda44c76ac912ffc9a9032c36` | Canonical WOK runtime; `f1-app` remains only as a temporary compatibility alias |
 | `kinara-app` | `current-app` | Kinara app |
 | `kinara-media` | `minio/minio:latest` | Kinara media storage |
 | `mhvmade-apps` | `mhvmade-apps-app` | Apps overview/admin |
