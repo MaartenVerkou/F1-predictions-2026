@@ -21,7 +21,10 @@ const {
   saveCorrectedRaceDataSnapshot,
   summarizeEvidence
 } = require("../race-data-evidence");
-const { deriveSnapshotsFromPersistedEvidence } = require("../../scripts/backfill-actuals-2026");
+const {
+  clearPersistedDerivationCache,
+  deriveSnapshotsFromPersistedEvidence
+} = require("../../scripts/backfill-actuals-2026");
 const {
   addEntityAlias,
   addProviderReference,
@@ -2955,6 +2958,7 @@ function registerAdminRoutes(app, deps) {
         correctionReason: req.body.correctionReason,
         sourceNote: "Admin correction from Race Data review"
       });
+      clearPersistedDerivationCache(db, { season });
       const correctionSnapshot = findRaceDataSnapshot(db, season, round);
       const sourceQuestions = getQuestions("en", { includeMeta: true, season });
       const seasonContext = resolveAdminSeasonContext(db, {
@@ -3044,6 +3048,7 @@ function registerAdminRoutes(app, deps) {
       const refreshed = Array.isArray(result?.snapshots)
         && result.snapshots.some((item) => Number(item?.roundNumber) === round);
       if (!refreshed) throw new Error("The source returned no completed evidence for this round.");
+      clearPersistedDerivationCache(db, { season });
       logAdminEvent("info", "admin_race_data_source_refreshed", {
         requestId: req.requestId,
         userId: adminUser?.id || null,
