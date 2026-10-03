@@ -29,7 +29,7 @@
 
 - [ ] 5.1 Classify active OpenSpec changes as active, completed, superseded, or historical and archive only verified completed/superseded changes using the approved workflow.
 - [ ] 5.2 Remove verified disposable probe files and archive unused managed worktrees without touching user-owned changes, secrets, production state, or database backups.
-- [ ] 5.3 Run strict OpenSpec validation and review the final diff for duplicated CSS, dead classes, accidental data changes, and unrelated edits.
+- [x] 5.3 Run strict OpenSpec validation and review the final diff for duplicated CSS, dead classes, accidental data changes, and unrelated edits.
 
 ## 6. Release verification
 
