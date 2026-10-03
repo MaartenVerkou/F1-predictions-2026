@@ -24,16 +24,15 @@ Every change folder must be classified as one of:
 | Superseded | A later change replaced the behavior or contract | Record the replacement and archive |
 | Historical | Kept only as an architectural record | Move to the archive, never reuse for new work |
 
-The current review should pay particular attention to overlapping admin,
-canonical-dataflow, race-review, season-input, and deployment changes before
-starting another feature branch.
+The current review should pay particular attention to overlapping
+canonical-dataflow, race-review, and deployment changes before starting
+another feature branch.
 
 ### Snapshot from 3 October 2026
 
 The OpenSpec inventory currently reports these changes as still active or
 incomplete and therefore not safe to archive automatically:
 
-- `unify-admin-design-system-and-repo-hygiene` — this cleanup and UI contract.
 - `unify-canonical-dataflow-and-scoring` — one task remains.
 - `consolidate-race-evidence-providers` — provider consolidation is incomplete.
 - `adopt-durable-digest-delivery` — release delivery work is incomplete.
@@ -45,12 +44,13 @@ deleted. They were archived only after their tasks and strict validation were
 complete, keeping the archive operation reversible and avoiding unfinished
 provider or deployment work.
 
-On 3 October 2026 the completed admin/input/season/race-review changes were
-archived as `2026-10-03-*` release-history entries after their tasks and strict
-validation were complete. Two older race-review changes had already contributed
-their requirements to the main specs, so they were archived with spec syncing
-skipped to avoid applying the same requirement twice. The five entries above
-remain the only active/incomplete work and are intentionally not archived.
+On 3 October 2026 the completed admin/input/season/race-review changes and the
+shared admin-design-system/repository-hygiene change were archived as
+`2026-10-03-*` release-history entries after their tasks and strict validation
+were complete. Two older race-review changes had already contributed their
+requirements to the main specs, so they were archived with spec syncing skipped
+to avoid applying the same requirement twice. The four entries above remain the
+only active/incomplete work and are intentionally not archived.
 
 ## Worktree and temporary-file policy
 

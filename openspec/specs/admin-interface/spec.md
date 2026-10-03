@@ -4,12 +4,17 @@
 TBD - created by archiving change polish-admin-responsive-locales. Update Purpose after archive.
 ## Requirements
 ### Requirement: Shared admin controls have one compact presentation contract
-Repeated admin segmented controls, compact selects, edit actions, and table toolbars SHALL use shared presentation classes and interaction states across Race Data, Questions, Results, and Season Inputs.
+Repeated admin segmented controls, compact selects, edit actions, and table toolbars SHALL use shared presentation classes and interaction states across Race Data, Questions, Results, and Season Inputs. Their shared geometry SHALL come from the admin design tokens and shared partials; page-specific variants MUST be explicit and limited to domain needs.
 
 #### Scenario: Admin compares page toolbars
 - **WHEN** an admin views the Race Data, Questions, Results, or Season Inputs toolbar
-- **THEN** the control height, border treatment, active state, and spacing SHALL follow the same shared classes
+- **THEN** the control height, border treatment, active state, focus state, and spacing SHALL follow the same shared classes
 - **AND** page templates SHALL not duplicate equivalent inline or page-specific control styles
+
+#### Scenario: Admin changes the shared toolbar geometry
+
+- **WHEN** the shared admin control token changes
+- **THEN** all four pages SHALL use the updated geometry without page-specific markup changes
 
 ### Requirement: Review metadata omits time from the visible audit label
 The visible review metadata SHALL show the reviewer and calendar date without a time-of-day while retaining the full stored timestamp for audit purposes.
@@ -29,7 +34,7 @@ The Season Inputs Teams table SHALL use the same centered compact index-column t
 - **AND** Driver 1 and Driver 2 columns SHALL have equal widths
 
 ### Requirement: Admin pages fit supported viewports
-The system SHALL render admin pages within supported phone and desktop viewports without page-level horizontal overflow.
+The system SHALL render admin pages within supported phone and desktop viewports without page-level horizontal overflow. Wide tables SHALL use a shared bounded scroll shell and compact presentation mode rather than page-specific overflow workarounds.
 
 Feature: Admin interface
 
@@ -41,6 +46,14 @@ Rule: Admin pages SHALL avoid page-level horizontal overflow while preserving de
 - **THEN** primary inputs and action controls SHALL fit within the viewport
 - **AND** the page SHALL not create document-level horizontal scrolling
 - **AND** DNF-per-race controls SHALL remain readable and operable
+
+#### Scenario: Wide admin tables scroll inside their own region
+
+- **GIVEN** an admin opens an overview, detail, question settings, results, or analysis page with a wide table
+- **WHEN** the viewport is narrower than the table's useful minimum width
+- **THEN** the table SHALL scroll horizontally inside the shared bounded region
+- **AND** the document itself SHALL not overflow horizontally
+- **AND** long IDs, answers, and names SHALL wrap or truncate within their cells instead of expanding the page
 
 #### Scenario: Wide admin tables scroll inside their own region
 - **GIVEN** an admin opens overview, detail, question settings, or analysis pages with wide tables
@@ -360,4 +373,3 @@ The Inputs workflow SHALL communicate current participation through round-bounde
 - **WHEN** an admin reviews the team lineup history
 - **THEN** the gap SHALL remain visible as no seat assignment
 - **AND** the system SHALL not label the driver retired or inactive based on that gap
-
