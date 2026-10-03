@@ -7,6 +7,8 @@ TOKEN_FILE="${GHCR_TOKEN_FILE:-/srv/mhvmade-apps/shared/secrets/ghcr-read-token}
 CURRENT_TAG="mhv-release/f1:current"
 ROLLBACK_TAG="mhv-release/f1:rollback"
 COMPOSE=(-f "$ROOT_DIR/docker-compose.yml" -f "$ROOT_DIR/docker-compose.server.yml")
+WOK_APP_CONTAINER="${WOK_APP_CONTAINER:-wheelofknowledge}"
+WOK_LEGACY_APP_CONTAINER="${WOK_LEGACY_APP_CONTAINER:-f1predictions-app-1}"
 
 case "${APP_IMAGE:-}" in
   ghcr.io/maartenverkou/f1-predictions-2026@sha256:*) ;;
@@ -15,8 +17,19 @@ esac
 test -s "$TOKEN_FILE" || { echo "Missing GHCR read credential" >&2; exit 2; }
 mkdir -p "$RELEASE_DIR"
 
-previous_image="$(docker inspect f1predictions-app-1 --format '{{.Image}}' 2>/dev/null || true)"
-previous_image_ref="$(docker inspect f1predictions-app-1 --format '{{.Config.Image}}' 2>/dev/null || true)"
+previous_container=""
+for candidate in "$WOK_APP_CONTAINER" "$WOK_LEGACY_APP_CONTAINER"; do
+  if docker inspect "$candidate" >/dev/null 2>&1; then
+    previous_container="$candidate"
+    break
+  fi
+done
+previous_image=""
+previous_image_ref=""
+if [[ -n "$previous_container" ]]; then
+  previous_image="$(docker inspect "$previous_container" --format '{{.Image}}' 2>/dev/null || true)"
+  previous_image_ref="$(docker inspect "$previous_container" --format '{{.Config.Image}}' 2>/dev/null || true)"
+fi
 if [[ -n "$previous_image" ]]; then
   docker image tag "$previous_image" "$ROLLBACK_TAG"
   rollback_image="${previous_image_ref:-$previous_image}"

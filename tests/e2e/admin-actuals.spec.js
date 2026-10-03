@@ -109,6 +109,21 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
 
   await page.goto("/admin/race-data?season=2026&round=6&view=drivers&focus=points");
+  const selectorMetrics = await page.evaluate(() => {
+    const stack = document.querySelector(".admin-selector-stack");
+    const forms = Array.from(document.querySelectorAll(".admin-selector-stack__form"));
+    const selects = forms.map((form) => form.querySelector("select")?.getBoundingClientRect());
+    return {
+      display: stack ? getComputedStyle(stack).display : "",
+      formTops: forms.map((form) => Math.round(form.getBoundingClientRect().top)),
+      selectLefts: selects.map((rect) => Math.round(rect?.left || 0)),
+      selectRights: selects.map((rect) => Math.round(rect?.right || 0))
+    };
+  });
+  expect(selectorMetrics.display).toBe("grid");
+  expect(selectorMetrics.formTops[1]).toBeGreaterThan(selectorMetrics.formTops[0]);
+  expect(selectorMetrics.selectLefts[1]).toBe(selectorMetrics.selectLefts[0]);
+  expect(selectorMetrics.selectRights[1]).toBe(selectorMetrics.selectRights[0]);
   const reviewForm = page.locator("[data-race-data-review-form]");
   await expect(reviewForm).toBeVisible();
   await reviewForm.getByRole("button", { name: /Mark reviewed/i }).click();
@@ -133,6 +148,33 @@ test("admin actuals shows the derived question matrix while Race Data owns revie
   await page.goto("/admin/results?season=2026");
   await expect(page.locator('[data-admin-actuals-round="6"][data-review-status="reviewed"]').first()).toBeVisible();
   await expect(page.locator("[data-admin-actuals-form] form")).toHaveCount(0);
+});
+
+test("Race Data keeps the compact metric selector below the view toggle on phones", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin/race-data?season=2026&round=6&view=drivers&focus=points");
+
+  const toolbarMetrics = await page.evaluate(() => {
+    const toolbar = document.querySelector(".admin-race-data-table-toolbar");
+    const viewToggle = document.querySelector("[data-race-data-view-tabs]");
+    const metricSelect = document.querySelector("[data-race-data-metric-select-form]");
+    const select = metricSelect?.querySelector("select");
+    const rect = (element) => element?.getBoundingClientRect();
+    return {
+      toolbarDisplay: toolbar ? getComputedStyle(toolbar).display : "",
+      toolbar: rect(toolbar),
+      viewToggle: rect(viewToggle),
+      metricSelect: rect(metricSelect),
+      select: rect(select),
+      metricSelectDisplay: metricSelect ? getComputedStyle(metricSelect).display : ""
+    };
+  });
+
+  expect(toolbarMetrics.toolbarDisplay).toBe("grid");
+  expect(toolbarMetrics.metricSelectDisplay).toBe("flex");
+  expect(toolbarMetrics.metricSelect.top).toBeGreaterThanOrEqual(toolbarMetrics.viewToggle.bottom);
+  expect(toolbarMetrics.metricSelect.right).toBeLessThanOrEqual(toolbarMetrics.toolbar.right + 1);
+  expect(toolbarMetrics.select.right).toBeLessThanOrEqual(toolbarMetrics.toolbar.right + 1);
 });
 
 test("admin actuals and admin tables fit phone-width screens", async ({ page }) => {
@@ -256,5 +298,42 @@ test("admin actuals keeps one stable table layout across normal and compact mode
     expect(metrics.questionWidth).toBe(58);
     expect(metrics.questionKey).toMatch(/^Q\d+$/);
     expect(metrics.questionTitle).toContain("·");
+  }
+});
+
+test("shared admin presentation stays usable across reference surfaces", async ({ page }) => {
+  for (const theme of ["light", "dark"]) {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/admin/race-data?season=2026&view=drivers&focus=points`);
+    await page.evaluate((value) => {
+      localStorage.setItem("theme", value);
+      document.documentElement.setAttribute("data-theme", value);
+    }, theme);
+    await expect(page.locator(".admin-shell-heading")).toBeVisible();
+    await expect(page.locator(".admin-table-shell").first()).toBeVisible();
+    await expect(page.locator(".admin-segmented-control").first()).toBeVisible();
+    const firstTableShell = page.locator(".admin-table-shell").first();
+    await firstTableShell.focus();
+    await expect(firstTableShell).toBeFocused();
+
+    for (const path of [
+      "/admin/inputs?season=2026&tab=drivers",
+      "/admin/questions?season=2026",
+      "/admin/results?season=2026"
+    ]) {
+      await page.goto(path);
+      await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
+      await expect(page.locator(".admin-shell-heading")).toBeVisible();
+      await expect(page.locator(".admin-table-shell").first()).toBeVisible();
+      const metrics = await page.evaluate(() => ({
+        pageOverflow: Math.max(
+          document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          document.body.scrollWidth - document.body.clientWidth
+        ),
+        theme: document.documentElement.getAttribute("data-theme")
+      }));
+      expect(metrics.theme).toBe(theme);
+      expect(metrics.pageOverflow).toBeLessThanOrEqual(0);
+    }
   }
 });

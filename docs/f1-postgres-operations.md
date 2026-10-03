@@ -9,7 +9,7 @@ F1 production now uses the central PostgreSQL stack on `mhv-server`.
 - Central PostgreSQL stack: `/srv/infra/postgres/current`
 - Central PostgreSQL backups: `/srv/infra/postgres/backups`
 - F1 app connects through the internal Docker network `mhv-db`.
-- F1 remains reachable by central Caddy through `mhv-web` with alias `f1-app`.
+- WOK remains reachable by central Caddy through `mhv-web` with canonical alias `wheelofknowledge`; `f1-app` is retained only as a temporary rollback alias.
 
 The F1 database connection string is host-managed in `/srv/f1-predictions/current/.env` as `DATABASE_URL`.
 

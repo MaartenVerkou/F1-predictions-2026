@@ -62,6 +62,15 @@ const BACKFILL_SOURCE_NOTE =
   "Reconstructed from OpenF1 session evidence, Formula1.com Driver of the Day, and the approved destructors source; championship points are derived from the selected season scoring rules";
 const TEAM_ENGINE_SWITCH_2027_2028_ACTUAL = "no";
 
+// Persisted evidence is immutable by revision, so the normalized derivation
+// input can be reused safely while a process handles repeated admin/source
+// operations. The cache is scoped to the database handle and keyed by the
+// latest evidence revision plus the season scoring rules. A new provider or
+// correction revision naturally gets a new key; callers can also clear the
+// season explicitly after a write.
+const persistedDerivationCaches = new WeakMap();
+const MAX_PERSISTED_DERIVATION_CACHE_ENTRIES = 4;
+
 const DRIVER_NAME_ALIASES = {
   andreakimiantonelli: "Kimi Antonelli",
   carlossainz: "Carlos Sainz Jr.",
@@ -141,6 +150,71 @@ function parseArgs(argv) {
   }
   assertStandardEvidenceProvider(args.provider);
   return args;
+}
+
+function persistedEvidenceRevisionKey(evidenceRows = []) {
+  return (evidenceRows || []).map((row) => [
+    row?.round_number ?? "",
+    row?.id ?? "",
+    row?.payload_revision ?? "",
+    row?.sync_id ?? "",
+    row?.created_at ?? row?.fetched_at ?? "",
+    row?.payload_json?.length ?? JSON.stringify(row?.payload || {}).length
+  ].join("~")).join("|");
+}
+
+function cacheStateForDatabase(db) {
+  if (!db || (typeof db !== "object" && typeof db !== "function")) return null;
+  let state = persistedDerivationCaches.get(db);
+  if (!state) {
+    state = { entries: new Map(), hits: 0, misses: 0 };
+    persistedDerivationCaches.set(db, state);
+  }
+  return state;
+}
+
+function clearPersistedDerivationCache(db, { season = null } = {}) {
+  const state = persistedDerivationCaches.get(db);
+  if (!state) return;
+  if (season == null) {
+    state.entries.clear();
+  } else {
+    const prefix = `${Number(season)}:`;
+    for (const key of state.entries.keys()) {
+      if (key.startsWith(prefix)) state.entries.delete(key);
+    }
+  }
+}
+
+function getPersistedDerivationCacheStats(db) {
+  const state = persistedDerivationCaches.get(db);
+  return {
+    entries: state?.entries.size || 0,
+    hits: state?.hits || 0,
+    misses: state?.misses || 0
+  };
+}
+
+function persistedDataForEvidence(db, season, evidenceRows, scoringRules) {
+  const state = cacheStateForDatabase(db);
+  if (!state) return buildPersistedDataFromEvidence(evidenceRows, season, { scoringRules });
+
+  const key = `${Number(season)}:${persistedEvidenceRevisionKey(evidenceRows)}:${JSON.stringify(scoringRules || {})}`;
+  const cached = state.entries.get(key);
+  if (cached) {
+    state.hits += 1;
+    state.entries.delete(key);
+    state.entries.set(key, cached);
+    return cached;
+  }
+
+  state.misses += 1;
+  const data = buildPersistedDataFromEvidence(evidenceRows, season, { scoringRules });
+  state.entries.set(key, data);
+  while (state.entries.size > MAX_PERSISTED_DERIVATION_CACHE_ENTRIES) {
+    state.entries.delete(state.entries.keys().next().value);
+  }
+  return data;
 }
 
 function readJsonFile(filePath) {
@@ -875,7 +949,7 @@ function deriveSnapshotsFromPersistedEvidence(db, {
   scoringRules = DEFAULT_SCORING_RULES
 }) {
   const persistedRows = listRaceDataSnapshots(db, season);
-  const data = buildPersistedDataFromEvidence(persistedRows, season, { scoringRules });
+  const data = persistedDataForEvidence(db, season, persistedRows, scoringRules);
   return rounds.map((roundNumber) => ({
     roundNumber,
     roundName: getRoundName(data, races, roundNumber),
@@ -1330,8 +1404,10 @@ if (require.main === module) {
 
 module.exports = {
   buildPersistedDataFromEvidence,
+  clearPersistedDerivationCache,
   compareSnapshotValues,
   deriveSnapshotsFromPersistedEvidence,
+  getPersistedDerivationCacheStats,
   fetchOpenF1CanonicalSeasonData,
   fetchFormula1SupportingData,
   fetchSeasonData,

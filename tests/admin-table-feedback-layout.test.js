@@ -43,6 +43,8 @@ test("Questions and Results use separate season-aware surfaces", () => {
   const questionCell = readView("partials/admin_actuals_question_cell.ejs");
   const nav = readView("partials/admin_nav.ejs");
   assert.match(view, /admin-questions-season-form/);
+  assert.match(view, /class="admin-selector-stack admin-shell-heading__controls"/);
+  assert.match(view, /class="admin-selector-stack__form admin-questions-season-form"/);
   assert.match(view, /name="season"/);
   assert.match(view, /admin-question-table-region/);
   assert.match(view, /admin-race-data-detail-toolbar/);
@@ -67,7 +69,7 @@ test("admin results is a read-only season overview", () => {
   const questionCell = readView("partials/admin_actuals_question_cell.ejs");
   assert.doesNotMatch(view, /autofill-current-season/);
   assert.doesNotMatch(view, /preview_autofill/);
-  assert.match(view, /admin-race-data-selector-form admin-actuals-season-form/);
+  assert.match(view, /admin-selector-stack__form admin-actuals-season-form/);
   assert.match(view, /partials\/admin_question_results/);
   assert.doesNotMatch(view, /admin-actuals-source-note|overview_source|pending_rounds|published_through|no_published_snapshot/);
   assert.match(resultsTable, /admin_actuals_question_cell/);
@@ -213,12 +215,18 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(page, /partials\/admin_race_data_round_region/);
   assert.match(region, /<tbody data-race-data-body="<%= viewMode %>">/);
   assert.equal((region.match(/data-race-data-body=/g) || []).length, 1);
-  assert.match(page, /admin-race-data-selector-stack/);
+  assert.match(page, /class="admin-selector-stack admin-shell-heading__controls"/);
+  assert.doesNotMatch(page, /admin-race-data-selector-stack/);
   assert.doesNotMatch(page, /availableSeason\.label %> ·/);
   assert.doesNotMatch(readView("admin_results.ejs"), /availableSeason\.label %> ·/);
   assert.match(page, /admin_race_data\.season_overview/);
   assert.match(page, /raceDataError \|\| raceDataSuccess/);
-  assert.match(page, /class="admin-race-data-selector-form admin-race-data-round-form" data-race-data-round-form/);
+  assert.match(page, /class="admin-selector-stack__form admin-race-data-round-form" data-race-data-round-form/);
+  const resultsPage = readView("admin_results.ejs");
+  assert.match(resultsPage, /class="admin-selector-stack admin-shell-heading__controls"/);
+  assert.match(resultsPage, /class="admin-selector-stack__form admin-actuals-season-form"/);
+  assert.match(styles, /\.admin-selector-stack\s*\{[\s\S]*?display:\s*grid[\s\S]*?justify-self:\s*end/);
+  assert.match(styles, /\.admin-selector-stack__form\s*\{[\s\S]*?grid-template-columns:\s*3\.5rem\s+minmax\(0,\s*1fr\)/);
   assert.doesNotMatch(region, /class="admin-race-data-controls"/);
   assert.match(region, /questions_label/);
   assert.match(region, /data-race-data-round-link/);
@@ -233,7 +241,7 @@ test("race data views share one identity column and a common row rhythm", () => 
   assert.match(region, /admin-race-data-evidence-meta/);
   assert.match(region, /admin-race-data-legend/);
   assert.doesNotMatch(region, /admin-race-data-revision-meta/);
-  assert.match(region, /class="admin-race-data-table-toolbar"/);
+  assert.match(region, /class="admin-race-data-table-toolbar admin-toolbar admin-toolbar--stack-mobile"/);
   assert.doesNotMatch(region, /admin-race-data-toolbar/);
   assert.doesNotMatch(region, /open_actuals|derived_actuals|derivedActuals/);
   assert.match(region, /data-race-data-result-row/);
@@ -322,7 +330,8 @@ test("inputs exposes shared historical confirmation and advanced data states", (
   assert.doesNotMatch(view, /season_active/);
   assert.doesNotMatch(view, /admin_inputs\.active/);
   const tabs = readView("partials/admin_inputs_tabs.ejs");
-  assert.match(tabs, /admin-race-data-tabs/);
+  assert.match(tabs, /include\('admin_segmented_control'/);
+  assert.match(tabs, /admin-inputs-tabs admin-race-data-switch/);
   assert.match(tabs, /data_quality/);
   assert.doesNotMatch(tabs, /assignments/);
 });
@@ -368,12 +377,31 @@ test("inputs navigation and actions reuse the race-data controls", () => {
   const raceData = readView("partials/admin_race_data_round_region.ejs");
   const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
 
-  assert.match(tabs, /admin-race-data-tabs admin-inputs-tabs admin-race-data-switch/);
-  assert.match(tabs, /admin-race-data-tab <%= tab === name \? 'is-active' : '' %>/);
+  assert.match(tabs, /include\('admin_segmented_control'/);
+  assert.match(tabs, /admin-inputs-tabs admin-race-data-switch/);
+  assert.match(readView("partials/admin_segmented_control.ejs"), /admin-segmented-control__item/);
   assert.match(view, /admin-inputs-toolbar-end admin-toolbar-actions/);
+  assert.match(view, /class="admin-selector-stack admin-shell-heading__controls"/);
+  assert.match(view, /class="admin-selector-stack__form admin-inputs-season-form"/);
   assert.match(raceData, /admin-race-data-detail-actions admin-toolbar-actions/);
   assert.match(styles, /\.admin-toolbar-actions\s*\{/);
   assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
+  assert.match(styles, /\.admin-toolbar__actions\s*>\s*\.button-link,[\s\S]*?padding:\s*4px 10px[\s\S]*?font-size:\s*var\(--admin-font-size-control\)/);
+});
+
+test("shared admin design primitives have one theme-aware contract", () => {
+  const styles = fs.readFileSync(path.join(repoRoot, "public", "styles.css"), "utf8");
+  const segmented = readView("partials/admin_segmented_control.ejs");
+  assert.match(styles, /--admin-space-5:\s*24px/);
+  assert.match(styles, /--admin-control-height:\s*34px/);
+  assert.match(styles, /--admin-table-cell-x:\s*10px/);
+  assert.match(styles, /\.admin-shell-heading\s*\{/);
+  assert.match(styles, /\.admin-toolbar\s*\{/);
+  assert.match(styles, /\.admin-segmented-control\s*\{/);
+  assert.match(styles, /\.admin-table-shell\s*\{/);
+  assert.match(styles, /prefers-reduced-motion:\s*reduce/);
+  assert.match(segmented, /admin-segmented-control__item/);
+  assert.match(segmented, /aria-current="page"/);
 });
 
 test("input editing keeps team reordering scoped to the selected row", () => {

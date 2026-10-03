@@ -31,7 +31,7 @@ Current Caddy routes:
 
 | Hostname | Behavior | Upstream |
 | --- | --- | --- |
-| `wheelofknowledge.com` | App route | `f1-app:3000` |
+| `wheelofknowledge.com` | App route | `wheelofknowledge:3000` after the approved runtime rename; current live route remains `f1-app:3000` until then |
 | `www.wheelofknowledge.com` | Redirect | `wheelofknowledge.com` |
 | `wok.mhvmade.com` | Redirect | `wheelofknowledge.com` |
 | `kinara.mhvmade.com` | App route | `kinara-app:3000` |
@@ -45,7 +45,7 @@ Current Caddy routes:
 | --- | --- | --- |
 | `mhv-caddy` | `caddy:2-alpine` | Central edge |
 | `mhv-postgres` | `postgres:18-alpine` | Central PostgreSQL |
-| `f1predictions-app-1` | `f1predictions-app` | WOK/F1 app; healthcheck healthy |
+| `wheelofknowledge` | `wheelofknowledge-app` | Target WOK runtime name; current live container remains `f1predictions-app-1` until the approved redeploy |
 | `kinara-app` | `current-app` | Kinara app |
 | `kinara-media` | `minio/minio:latest` | Kinara media storage |
 | `mhvmade-apps` | `mhvmade-apps-app` | Apps overview/admin |
@@ -56,7 +56,7 @@ Current Caddy routes:
 | Container | Networks |
 | --- | --- |
 | `mhv-caddy` | `mhv-web` |
-| `f1predictions-app-1` | `f1predictions_default`, `mhv-db`, `mhv-web` |
+| `wheelofknowledge` | `f1predictions_default`, `mhv-db`, `mhv-web` (plus temporary `f1-app` alias) |
 | `kinara-app` | `kinara-internal`, `mhv-db`, `mhv-web` |
 | `kinara-media` | `kinara-internal` |
 | `mhvmade-apps` | `mhv-web` |

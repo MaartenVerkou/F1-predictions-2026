@@ -1,15 +1,22 @@
-<nav class="admin-race-data-tabs admin-inputs-tabs admin-race-data-switch" aria-label="<%= t('admin_inputs.tabs') %>">
-  <% ['drivers', 'teams', 'races', 'scoring'].forEach((name) => { %>
-    <a class="admin-race-data-tab <%= tab === name ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=<%= name %>">
-      <%= t('admin_inputs.tab_' + name) %>
-    </a>
-  <% }) %>
-  <a class="admin-race-data-tab <%= tab === 'definitions' ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=definitions">
-    Definitions
-  </a>
-  <% if (Number(unresolvedMappingCount || 0) > 0 || tab === 'mappings') { %>
-    <a class="admin-race-data-tab <%= tab === 'mappings' ? 'is-active' : '' %>" href="/admin/inputs?season=<%= season %>&tab=mappings">
-      <%= t('admin_inputs.data_quality') %><% if (Number(unresolvedMappingCount || 0) > 0) { %> · <%= unresolvedMappingCount %><% } %>
-    </a>
-  <% } %>
-</nav>
+<% const inputTabItems = ['drivers', 'teams', 'races', 'scoring'].map((name) => ({
+  href: `/admin/inputs?season=${encodeURIComponent(season)}&tab=${name}`,
+  label: t('admin_inputs.tab_' + name),
+  active: tab === name
+})); %>
+<% inputTabItems.push({
+  href: `/admin/inputs?season=${encodeURIComponent(season)}&tab=definitions`,
+  label: 'Definitions',
+  active: tab === 'definitions'
+}); %>
+<% if (Number(unresolvedMappingCount || 0) > 0 || tab === 'mappings') { %>
+  <% inputTabItems.push({
+    href: `/admin/inputs?season=${encodeURIComponent(season)}&tab=mappings`,
+    label: `${t('admin_inputs.data_quality')}${Number(unresolvedMappingCount || 0) > 0 ? ` · ${unresolvedMappingCount}` : ''}`,
+    active: tab === 'mappings'
+  }); %>
+<% } %>
+<%- include('admin_segmented_control', {
+  ariaLabel: t('admin_inputs.tabs'),
+  className: 'admin-inputs-tabs admin-race-data-switch',
+  items: inputTabItems
+}) %>

@@ -175,6 +175,10 @@ const ACTUALS_AUTO_UPDATE_START_DELAY_MS = Number(
 );
 const SERVICE_NAME = "f1-predictions-2026";
 const LOG_LEVEL = String(process.env.LOG_LEVEL || "info").trim().toLowerCase();
+const PERFORMANCE_SAMPLE_RATE = Math.min(
+  1,
+  Math.max(0, Number(process.env.PERFORMANCE_SAMPLE_RATE || 0.02))
+);
 const TRUST_PROXY_HOPS = Number(process.env.TRUST_PROXY_HOPS || (IS_DEVELOPMENT ? 0 : 1));
 const MAX_PRIVILEGED_GROUPS = 3;
 const LOCALES_DIR = path.join(__dirname, "locales");
@@ -272,6 +276,10 @@ function getRequestId(req) {
   const raw = String(req.get("x-request-id") || "").trim();
   if (/^[A-Za-z0-9._:-]{1,128}$/.test(raw)) return raw;
   return crypto.randomUUID();
+}
+
+function shouldSamplePerformance() {
+  return PERFORMANCE_SAMPLE_RATE > 0 && Math.random() < PERFORMANCE_SAMPLE_RATE;
 }
 
 function validateProductionConfig() {
@@ -1325,13 +1333,21 @@ app.use((req, res, next) => {
     const durationMs = Number(process.hrtime.bigint() - started) / 1_000_000;
     const statusCode = res.statusCode;
     const level = statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
-    logEvent(level, "http_request", {
+    const fields = {
       requestId,
       method: req.method,
       path: req.path,
       statusCode,
       durationMs: Number(durationMs.toFixed(1))
-    });
+    };
+    if (shouldSamplePerformance()) {
+      const memory = process.memoryUsage();
+      fields.performanceSampled = true;
+      fields.heapUsedBytes = memory.heapUsed;
+      fields.heapTotalBytes = memory.heapTotal;
+      fields.rssBytes = memory.rss;
+    }
+    logEvent(level, "http_request", fields);
   });
   next();
 });

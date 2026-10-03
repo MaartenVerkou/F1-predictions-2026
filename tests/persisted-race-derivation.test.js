@@ -4,7 +4,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   buildPersistedDataFromEvidence,
-  compareSnapshotValues
+  clearPersistedDerivationCache,
+  compareSnapshotValues,
+  deriveSnapshotsFromPersistedEvidence,
+  getPersistedDerivationCacheStats
 } = require("../scripts/backfill-actuals-2026");
 
 test("snapshot comparison reports new, changed, and unchanged values", () => {
@@ -65,4 +68,54 @@ test("persisted evidence reconstructs derivation input without provider objects"
   assert.equal(data.driverStandingsByRound.get(6)[0].Driver.familyName, "Antonelli");
   assert.equal(data.constructorStandingsByRound.get(6)[0].Constructor.name, "Mercedes");
   assert.equal(data.driverOfTheDayByRound.get(6), "Kimi Antonelli");
+});
+
+test("persisted derivation reuses an unchanged evidence revision and clears after correction", () => {
+  const evidenceRow = {
+    id: 7,
+    round_number: 1,
+    round_name: "Australian Grand Prix",
+    sync_id: "openf1:2026:r1:v1",
+    payload_revision: "payload-v1",
+    created_at: "2026-03-16T12:00:00.000Z",
+    payload: {
+      roundName: "Australian Grand Prix",
+      race: { rows: [] },
+      qualifying: { rows: [] },
+      sprint: { rows: [] }
+    }
+  };
+  let queryCount = 0;
+  const db = {
+    prepare() {
+      return {
+        all() {
+          queryCount += 1;
+          return [evidenceRow];
+        }
+      };
+    }
+  };
+  const input = {
+    season: 2026,
+    rounds: [1],
+    questions: [],
+    roster: { drivers: [], teams: [], team_profiles: {} },
+    races: ["Australian Grand Prix"],
+    totalRounds: 1
+  };
+
+  clearPersistedDerivationCache(db);
+  deriveSnapshotsFromPersistedEvidence(db, input);
+  deriveSnapshotsFromPersistedEvidence(db, input);
+
+  assert.equal(queryCount, 2, "the revision is read for each derivation call");
+  assert.deepEqual(getPersistedDerivationCacheStats(db), { entries: 1, hits: 1, misses: 1 });
+
+  evidenceRow.payload_revision = "payload-v2";
+  deriveSnapshotsFromPersistedEvidence(db, input);
+  assert.deepEqual(getPersistedDerivationCacheStats(db), { entries: 2, hits: 1, misses: 2 });
+
+  clearPersistedDerivationCache(db, { season: 2026 });
+  assert.deepEqual(getPersistedDerivationCacheStats(db), { entries: 0, hits: 1, misses: 2 });
 });

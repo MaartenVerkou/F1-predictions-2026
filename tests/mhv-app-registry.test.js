@@ -62,7 +62,7 @@ test("live snapshot validation accepts registered routes, containers, networks, 
   const snapshot = {
     caddyfile: `
       {$F1_DOMAIN:wheelofknowledge.com}, www.{$F1_DOMAIN:wheelofknowledge.com}, wok.mhvmade.com {
-        reverse_proxy f1-app:3000
+        reverse_proxy wheelofknowledge:3000
       }
       kinara.mhvmade.com { reverse_proxy kinara-app:3000 }
       apps.mhvmade.com { reverse_proxy mhvmade-apps:3000 }
@@ -71,7 +71,7 @@ test("live snapshot validation accepts registered routes, containers, networks, 
       }
     `,
     containers: {
-      "f1predictions-app-1": { networks: ["f1predictions_default", "mhv-db", "mhv-web"] },
+      wheelofknowledge: { networks: ["f1predictions_default", "mhv-db", "mhv-web"] },
       "kinara-app": { networks: ["kinara-internal", "mhv-db", "mhv-web"] },
       "mhvmade-apps": {
         networks: ["mhv-web"],
@@ -100,9 +100,9 @@ test("live snapshot validation accepts registered routes, containers, networks, 
 test("live snapshot validation reports missing Caddy routes and network drift", () => {
   const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
   const snapshot = {
-    caddyfile: "wheelofknowledge.com { reverse_proxy f1-app:3000 }",
+    caddyfile: "wheelofknowledge.com { reverse_proxy wheelofknowledge:3000 }",
     containers: {
-      "f1predictions-app-1": { networks: ["mhv-web"] }
+      wheelofknowledge: { networks: ["mhv-web"] }
     },
     health: {
       "https://wheelofknowledge.com/healthz": {
@@ -115,7 +115,7 @@ test("live snapshot validation reports missing Caddy routes and network drift", 
 
   const errors = validateLiveSnapshot(registry, snapshot).join("\n");
   assert.match(errors, /Caddy route missing for wok\.mhvmade\.com/);
-  assert.match(errors, /Container f1predictions-app-1 missing network mhv-db/);
+  assert.match(errors, /Container wheelofknowledge missing network mhv-db/);
   assert.match(errors, /Health check https:\/\/wheelofknowledge\.com\/healthz returned 503/);
   assert.match(errors, /Unknown wildcard hostname did not fail closed/);
 });

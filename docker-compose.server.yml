@@ -5,6 +5,7 @@ services:
       default: {}
       web:
         aliases:
+          - wheelofknowledge
           - f1-app
       db: {}
   caddy:

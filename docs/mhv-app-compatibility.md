@@ -23,8 +23,8 @@ Current state:
 - Target path: `/srv/apps/wok/current`
 - Canonical hostname: `wheelofknowledge.com`
 - MHV redirect: `wok.mhvmade.com`
-- Container: `f1predictions-app-1`
-- Caddy upstream: `f1-app:3000`
+- Canonical container after the next approved deploy: `wheelofknowledge`
+- Transition Caddy upstream: `wheelofknowledge:3000` (the `f1-app` network alias remains temporarily for rollback)
 - Database: central PostgreSQL through `mhv-postgres`
 - Codex compatibility path: `/srv/codex/f1`
 
