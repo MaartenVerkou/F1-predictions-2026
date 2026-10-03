@@ -38,3 +38,28 @@ test("Questions and Results use separate season-aware pages", async ({ page }) =
   await page.waitForURL(/\/admin\/results\?season=2027/);
   await expect(page.locator("[data-admin-results-season-form] select[name=season]")).toHaveValue("2027");
 });
+
+test("admin season selectors and edit actions share the compact control geometry", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  const measurements = {};
+  for (const [pageName, url, selector] of [
+    ["questions", "/admin/questions?season=2026", "[data-admin-questions-season-form] select[name=season]"],
+    ["results", "/admin/results?season=2026", "[data-admin-results-season-form] select[name=season]"],
+    ["inputs", "/admin/inputs?season=2026", "#admin-inputs-season"],
+    ["raceData", "/admin/race-data?season=2026", "#admin-race-data-season"]
+  ]) {
+    await page.goto(url);
+    const rect = await page.locator(selector).boundingBox();
+    measurements[pageName] = { width: Math.round(rect.width), height: Math.round(rect.height) };
+  }
+
+  const selectorWidths = Object.values(measurements).map((value) => value.width);
+  expect(new Set(selectorWidths).size).toBe(1);
+  expect(measurements.questions.height).toBe(measurements.results.height);
+  expect(measurements.inputs.height).toBe(measurements.raceData.height);
+
+  await page.goto("/admin/questions?season=2026");
+  const editButton = await page.locator(".admin-question-edit-button").boundingBox();
+  expect(Math.round(editButton.height)).toBe(34);
+});

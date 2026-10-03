@@ -11,8 +11,8 @@
       <h1>Questions</h1>
       <p class="muted admin-page-intro">Manage this season’s question wording, order, scoring and inclusion.</p>
     </div>
-    <div class="admin-questions-context admin-shell-heading__controls">
-      <form method="get" action="/admin/questions" class="admin-questions-season-form" data-admin-questions-season-form>
+    <div class="admin-selector-stack admin-shell-heading__controls">
+      <form method="get" action="/admin/questions" class="admin-selector-stack__form admin-questions-season-form" data-admin-questions-season-form>
         <% if (editing) { %><input type="hidden" name="mode" value="edit"><% } %>
         <label for="admin-questions-season">Season</label>
         <select id="admin-questions-season" name="season" onchange="this.form.submit()">

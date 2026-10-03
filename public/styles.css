@@ -2360,26 +2360,6 @@ button:disabled {
   text-decoration: none;
 }
 
-.admin-inputs-season-form {
-  display: grid;
-  grid-template-columns: auto minmax(170px, 220px);
-  align-items: center;
-  gap: 5px 10px;
-  margin: 0;
-}
-
-.admin-inputs-season-form label {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.admin-inputs-season-form select {
-  width: 100%;
-  min-width: 0;
-}
-
 .admin-season-policy-flat {
   grid-column: 2;
   display: block;
@@ -5365,30 +5345,6 @@ button:disabled {
   align-items: flex-end;
 }
 
-.admin-questions-context {
-  display: grid;
-  justify-items: end;
-  min-width: 0;
-}
-
-.admin-questions-season-form {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.admin-questions-season-form label {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.admin-questions-season-form select {
-  min-width: 160px;
-  max-width: 100%;
-}
-
 .admin-question-table-region {
   display: grid;
   gap: 12px;
@@ -5559,19 +5515,6 @@ button:disabled {
 @media (max-width: 720px) {
   .admin-questions-heading {
     align-items: stretch;
-  }
-
-  .admin-questions-context {
-    justify-items: stretch;
-  }
-
-  .admin-questions-season-form,
-  .admin-questions-season-form select {
-    width: 100%;
-  }
-
-  .admin-questions-season-form {
-    justify-content: space-between;
   }
 
   .admin-question-table {
@@ -8665,10 +8608,12 @@ button.lang-option.is-active {
 /* Selector pairs share one compact, right-aligned stack across admin pages. */
 .admin-selector-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   justify-self: end;
   gap: var(--admin-space-2);
-  width: min(100%, 22rem);
+  width: 22rem;
+  max-width: none;
   min-width: 0;
 }
 
@@ -8722,6 +8667,8 @@ button.lang-option.is-active {
 .admin-toolbar__actions > button,
 .admin-toolbar__actions > form > button {
   min-height: var(--admin-control-height);
+  padding: 4px 10px;
+  font-size: var(--admin-font-size-control);
 }
 
 .admin-segmented-control {
@@ -8865,6 +8812,7 @@ button.lang-option.is-active {
   .admin-selector-stack {
     justify-self: stretch;
     width: 100%;
+    max-width: 100%;
   }
 
   .admin-segmented-control {

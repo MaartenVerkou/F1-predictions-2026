@@ -33,20 +33,22 @@
       <h1><%= t('admin_inputs.title') %></h1>
       <p class="muted admin-page-intro"><%= t('admin_inputs.intro') %></p>
     </div>
-    <form method="get" action="/admin/inputs" class="admin-inputs-season-form admin-shell-heading__controls">
-      <label for="admin-inputs-season"><%= t('admin_inputs.season') %></label>
-      <select id="admin-inputs-season" name="season" onchange="this.form.submit()">
-        <% (availableSeasons || []).forEach((availableSeason) => { %>
-          <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>>
-            <%= availableSeason.displayLabel %>
-          </option>
-        <% }) %>
-      </select>
-      <% if (seasonContext?.status === 'archived') { %>
-        <span class="admin-season-policy-flat" data-admin-season-policy data-season-status="archived"><%= t('admin_inputs.archived_policy_short') %></span>
-      <% } %>
-      <input type="hidden" name="tab" value="<%= tab %>" />
-    </form>
+    <div class="admin-selector-stack admin-shell-heading__controls">
+      <form method="get" action="/admin/inputs" class="admin-selector-stack__form admin-inputs-season-form">
+        <label for="admin-inputs-season"><%= t('admin_inputs.season') %></label>
+        <select id="admin-inputs-season" name="season" onchange="this.form.submit()">
+          <% (availableSeasons || []).forEach((availableSeason) => { %>
+            <option value="<%= availableSeason.year %>" <%= Number(availableSeason.year) === Number(season) ? 'selected' : '' %>>
+              <%= availableSeason.displayLabel %>
+            </option>
+          <% }) %>
+        </select>
+        <% if (seasonContext?.status === 'archived') { %>
+          <span class="admin-season-policy-flat" data-admin-season-policy data-season-status="archived"><%= t('admin_inputs.archived_policy_short') %></span>
+        <% } %>
+        <input type="hidden" name="tab" value="<%= tab %>" />
+      </form>
+    </div>
   </div>
 
   <dialog class="admin-history-dialog" data-admin-history-dialog aria-labelledby="admin-history-dialog-title">

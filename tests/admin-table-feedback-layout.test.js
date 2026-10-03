@@ -43,6 +43,8 @@ test("Questions and Results use separate season-aware surfaces", () => {
   const questionCell = readView("partials/admin_actuals_question_cell.ejs");
   const nav = readView("partials/admin_nav.ejs");
   assert.match(view, /admin-questions-season-form/);
+  assert.match(view, /class="admin-selector-stack admin-shell-heading__controls"/);
+  assert.match(view, /class="admin-selector-stack__form admin-questions-season-form"/);
   assert.match(view, /name="season"/);
   assert.match(view, /admin-question-table-region/);
   assert.match(view, /admin-race-data-detail-toolbar/);
@@ -379,9 +381,12 @@ test("inputs navigation and actions reuse the race-data controls", () => {
   assert.match(tabs, /admin-inputs-tabs admin-race-data-switch/);
   assert.match(readView("partials/admin_segmented_control.ejs"), /admin-segmented-control__item/);
   assert.match(view, /admin-inputs-toolbar-end admin-toolbar-actions/);
+  assert.match(view, /class="admin-selector-stack admin-shell-heading__controls"/);
+  assert.match(view, /class="admin-selector-stack__form admin-inputs-season-form"/);
   assert.match(raceData, /admin-race-data-detail-actions admin-toolbar-actions/);
   assert.match(styles, /\.admin-toolbar-actions\s*\{/);
   assert.match(styles, /\.admin-toolbar-actions\s*>\s*button,[\s\S]*?\.admin-toolbar-actions\s*>\s*form\s*>\s*button/);
+  assert.match(styles, /\.admin-toolbar__actions\s*>\s*\.button-link,[\s\S]*?padding:\s*4px 10px[\s\S]*?font-size:\s*var\(--admin-font-size-control\)/);
 });
 
 test("shared admin design primitives have one theme-aware contract", () => {
