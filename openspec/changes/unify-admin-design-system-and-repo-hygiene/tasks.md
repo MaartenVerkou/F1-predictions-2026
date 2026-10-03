@@ -21,7 +21,7 @@
 
 ## 4. Simplify admin code and measure runtime behavior
 
-- [ ] 4.1 Extract clearly bounded admin presentation/review helpers from `src/routes/admin.js` without changing the canonical scoring/evidence APIs.
+- [x] 4.1 Extract clearly bounded admin presentation/review helpers from `src/routes/admin.js` without changing the canonical scoring/evidence APIs.
 - [x] 4.2 Add sampled request-duration and heap observations with sensitive fields excluded from logs.
 - [ ] 4.3 Measure repeated derivation work for a season/round/revision and add revision-keyed caching only where the measurement demonstrates a benefit; invalidate on refresh/correction.
 
