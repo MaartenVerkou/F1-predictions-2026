@@ -1,8 +1,12 @@
 "use strict";
 
-const fs = require("fs");
 const { parentPort, workerData } = require("worker_threads");
 const pg = require("pg");
+const {
+  isQueryCancelled,
+  removeQueryResultFile,
+  writeQueryResultFile
+} = require("./postgres-sync-result-files");
 
 pg.types.setTypeParser(20, (value) => Number(value));
 
@@ -103,15 +107,22 @@ async function handleMessage(message) {
 parentPort.on("message", async (message) => {
   const signal = new Int32Array(message.signalBuffer);
   try {
-    const value = await handleMessage(message);
-    fs.writeFileSync(message.resultPath, JSON.stringify({ ok: true, value }), "utf8");
-  } catch (err) {
-    fs.writeFileSync(
-      message.resultPath,
-      JSON.stringify({ ok: false, error: serializeError(err), sql: message.sql || "" }),
-      "utf8"
-    );
+    if (!isQueryCancelled(message.signalBuffer)) {
+      let result;
+      try {
+        result = { ok: true, value: await handleMessage(message) };
+      } catch (err) {
+        result = { ok: false, error: serializeError(err), sql: message.sql || "" };
+      }
+
+      if (!isQueryCancelled(message.signalBuffer)) {
+        writeQueryResultFile(message.signalBuffer, message.resultPath, JSON.stringify(result));
+      }
+    }
   } finally {
+    if (isQueryCancelled(message.signalBuffer)) {
+      removeQueryResultFile(message.resultPath);
+    }
     Atomics.store(signal, 0, 1);
     Atomics.notify(signal, 0, 1);
   }
