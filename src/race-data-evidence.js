@@ -997,24 +997,31 @@ function saveCorrectedRaceDataSnapshot(db, {
 function listRaceDataSnapshots(db, season) {
   const rows = db
     .prepare(
-      `SELECT id, import_id, season, round_number, round_name, sync_id, fetched_at,
-              source_type, source_note, parser_version, calendar_state, reconstructed,
-              catalog_revision, source_identity, payload_revision, cutoff_round, unresolved_count,
-              coverage_status, revision_kind, supersedes_snapshot_id, correction_reason,
-              corrected_by_user_id, corrected_at, payload_json, created_at
-       FROM race_data_snapshots
-       WHERE season = ?
-       ORDER BY round_number ASC, created_at DESC, id DESC`
+      `WITH ranked_snapshots AS (
+         SELECT id,
+                ROW_NUMBER() OVER (
+                  PARTITION BY round_number
+                  ORDER BY created_at DESC, id DESC
+                ) AS revision_rank
+         FROM race_data_snapshots
+         WHERE season = ?
+       )
+       SELECT snapshot.id, snapshot.import_id, snapshot.season, snapshot.round_number,
+              snapshot.round_name, snapshot.sync_id, snapshot.fetched_at,
+              snapshot.source_type, snapshot.source_note, snapshot.parser_version,
+              snapshot.calendar_state, snapshot.reconstructed, snapshot.catalog_revision,
+              snapshot.source_identity, snapshot.payload_revision, snapshot.cutoff_round,
+              snapshot.unresolved_count, snapshot.coverage_status, snapshot.revision_kind,
+              snapshot.supersedes_snapshot_id, snapshot.correction_reason,
+              snapshot.corrected_by_user_id, snapshot.corrected_at, snapshot.payload_json,
+              snapshot.created_at
+       FROM race_data_snapshots snapshot
+       INNER JOIN ranked_snapshots ranked ON ranked.id = snapshot.id
+       WHERE ranked.revision_rank = 1
+       ORDER BY snapshot.round_number ASC`
     )
     .all(Number(season));
-  const latestByRound = new Map();
-  rows.forEach((row) => {
-    const round = Number(row.round_number);
-    if (!latestByRound.has(round)) {
-      latestByRound.set(round, mapRaceDataSnapshotRow(row));
-    }
-  });
-  return Array.from(latestByRound.values()).sort((a, b) => a.round_number - b.round_number);
+  return rows.map(mapRaceDataSnapshotRow);
 }
 
 function findRaceDataSnapshot(db, season, roundNumber) {

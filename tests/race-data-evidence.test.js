@@ -387,6 +387,70 @@ test("persisted evidence is reusable by round and idempotent for the same sync",
   assert.equal(db.prepare("SELECT status, completed_rounds FROM race_data_imports WHERE id = ?").get(importId).status, "completed");
 });
 
+test("listing race evidence reads only the latest revision for each round", (t) => {
+  const Database = require("better-sqlite3");
+  const db = new Database(":memory:");
+  db.dialect = "sqlite";
+  db.exec(`
+    CREATE TABLE actual_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_data_import_id INTEGER,
+      source_data_snapshot_id INTEGER
+    );
+  `);
+  ensureRaceDataSchema(db);
+  t.after(() => db.close());
+
+  const evidence = {
+    roundName: "Monaco Grand Prix",
+    coverage: { status: "complete" },
+    race: { rows: [{ driver: "driver:1", position: 1 }] }
+  };
+  const firstId = saveRaceDataSnapshot(db, {
+    season: 2026,
+    roundNumber: 6,
+    syncId: "sync-r6-first",
+    fetchedAt: "2026-05-24T00:00:00.000Z",
+    evidence
+  });
+  const latestId = saveRaceDataSnapshot(db, {
+    season: 2026,
+    roundNumber: 6,
+    syncId: "sync-r6-latest",
+    fetchedAt: "2026-05-25T00:00:00.000Z",
+    evidence
+  });
+  db.prepare("UPDATE race_data_snapshots SET created_at = ? WHERE id = ?").run(
+    "2026-05-24T00:00:00.000Z",
+    firstId
+  );
+  db.prepare("UPDATE race_data_snapshots SET created_at = ? WHERE id = ?").run(
+    "2026-05-25T00:00:00.000Z",
+    latestId
+  );
+
+  let rowsReadFromDatabase = 0;
+  const measuredDb = {
+    prepare(sql) {
+      const statement = db.prepare(sql);
+      if (!/FROM\s+race_data_snapshots/i.test(sql)) return statement;
+      return {
+        all(...params) {
+          const rows = statement.all(...params);
+          rowsReadFromDatabase = rows.length;
+          return rows;
+        }
+      };
+    }
+  };
+
+  const snapshots = listRaceDataSnapshots(measuredDb, 2026);
+
+  assert.equal(rowsReadFromDatabase, 1);
+  assert.equal(snapshots.length, 1);
+  assert.equal(snapshots[0].id, latestId);
+});
+
 test("admin evidence corrections create an auditable revision without mutating the base", (t) => {
   const Database = require("better-sqlite3");
   const db = new Database(":memory:");

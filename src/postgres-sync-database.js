@@ -6,6 +6,10 @@ const os = require("os");
 const path = require("path");
 const { Worker } = require("worker_threads");
 const { IDENTITY_TABLES } = require("./postgres-schema");
+const {
+  cancelQueryResult,
+  cleanupStaleQueryResultFiles
+} = require("./postgres-sync-result-files");
 
 const DEFAULT_QUERY_TIMEOUT_MS = 30000;
 
@@ -202,6 +206,7 @@ class PostgresSyncDatabase {
     if (!connectionString) {
       throw new Error("PostgresSyncDatabase requires a connection string.");
     }
+    cleanupStaleQueryResultFiles();
     this.dialect = "postgres";
     this.queryTimeoutMs = Number(options.queryTimeoutMs || DEFAULT_QUERY_TIMEOUT_MS);
     this.worker = new Worker(path.join(__dirname, "postgres-sync-worker.js"), {
@@ -292,7 +297,9 @@ class PostgresSyncDatabase {
 
     const waitResult = Atomics.wait(signal, 0, 0, this.queryTimeoutMs);
     if (waitResult === "timed-out") {
-      throw new Error(`PostgreSQL query timed out after ${this.queryTimeoutMs}ms.`);
+      if (cancelQueryResult(signal.buffer, resultPath)) {
+        throw new Error(`PostgreSQL query timed out after ${this.queryTimeoutMs}ms.`);
+      }
     }
 
     let parsed;
